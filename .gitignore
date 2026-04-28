@@ -1,0 +1,27 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Env files
+.env
+
+# Build
+*.jar
+*.war
+
+# Lombok
+delombok/
+
+# Application secrets
+application-prod.yml
