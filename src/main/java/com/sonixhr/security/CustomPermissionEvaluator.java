@@ -1,4 +1,26 @@
 package com.sonixhr.security;
 
-public class CustomPermissionEvaluator {
+import com.sonixhr.service.PermissionService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.PermissionEvaluator;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Component;
+
+import java.io.Serializable;
+
+@Component
+@RequiredArgsConstructor
+public class CustomPermissionEvaluator implements PermissionEvaluator {
+
+    private final PermissionService permissionService;
+
+    @Override
+    public boolean hasPermission(Authentication auth, Object targetDomainObject, Object permission) {
+        return permissionService.hasPermission(auth, (String) permission);
+    }
+
+    @Override
+    public boolean hasPermission(Authentication auth, Serializable targetId, String targetType, Object permission) {
+        return permissionService.hasPermission(auth, (String) permission);
+    }
 }

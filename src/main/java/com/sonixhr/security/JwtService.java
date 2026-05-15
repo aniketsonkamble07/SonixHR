@@ -26,11 +26,10 @@ public class JwtService {
     @Value("${app.jwt.refresh-expiration:604800000}")
     private Long refreshExpiration;
 
-    // Blacklist for invalidated tokens
     private final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
     // ========================
-    // EXTRACT METHODS
+    // EXTRACT METHODS (unchanged)
     // ========================
 
     public String extractUsername(String token) {
@@ -44,6 +43,10 @@ public class JwtService {
     public UUID extractTenantIdAsUUID(String token) {
         String tenantId = extractTenantId(token);
         return tenantId != null ? UUID.fromString(tenantId) : null;
+    }
+
+    public String extractUserType(String token) {
+        return extractClaim(token, claims -> claims.get("userType", String.class));
     }
 
     public Date extractExpiration(String token) {
@@ -94,7 +97,92 @@ public class JwtService {
     }
 
     // ========================
-    // TOKEN GENERATION
+    // TOKEN GENERATION FOR TENANT USERS
+    // ========================
+
+    public String generateTenantToken(UserDetails userDetails, UUID tenantId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "TENANT");
+        claims.put("tenantId", tenantId.toString());
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "ACCESS");
+        return createToken(claims, userDetails.getUsername(), expiration);
+    }
+
+    public String generateTenantRefreshToken(UserDetails userDetails, UUID tenantId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "TENANT");
+        claims.put("tenantId", tenantId.toString());
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "REFRESH");
+        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+    }
+
+    public TokenPair generateTenantTokenPair(UserDetails userDetails, UUID tenantId) {
+        return TokenPair.builder()
+                .accessToken(generateTenantToken(userDetails, tenantId))
+                .refreshToken(generateTenantRefreshToken(userDetails, tenantId))
+                .tokenType("Bearer")
+                .expiresIn(expiration)
+                .refreshExpiresIn(refreshExpiration)
+                .build();
+    }
+
+    // ========================
+    // TOKEN GENERATION FOR PLATFORM USERS
+    // ========================
+
+    public String generatePlatformToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "PLATFORM");
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "ACCESS");
+        return createToken(claims, userDetails.getUsername(), expiration);
+    }
+
+    public String generatePlatformRefreshToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "PLATFORM");
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "REFRESH");
+        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+    }
+
+    public TokenPair generatePlatformTokenPair(UserDetails userDetails) {
+        return TokenPair.builder()
+                .accessToken(generatePlatformToken(userDetails))
+                .refreshToken(generatePlatformRefreshToken(userDetails))
+                .tokenType("Bearer")
+                .expiresIn(expiration)
+                .refreshExpiresIn(refreshExpiration)
+                .build();
+    }
+
+    // ========================
+    // COMMON TOKEN CREATION
+    // ========================
+
+    private String createToken(Map<String, Object> claims, String subject, long expiryDuration) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setId((String) claims.getOrDefault("jti", UUID.randomUUID().toString()))
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expiryDuration))
+                .signWith(getSignKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // ========================
+    // OLD GENERIC METHODS (KEEP FOR BACKWARDS COMPATIBILITY IF NEEDED)
     // ========================
 
     public String generateToken(UserDetails userDetails, String tenantId) {
@@ -103,18 +191,14 @@ public class JwtService {
 
     public String generateToken(UserDetails userDetails, String tenantId, boolean isRefreshToken) {
         Map<String, Object> claims = new HashMap<>();
-
         claims.put("tenantId", tenantId);
-        claims.put("roles", userDetails.getAuthorities()
-                .stream()
+        claims.put("roles", userDetails.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .toList());
         claims.put("tokenType", isRefreshToken ? "REFRESH" : "ACCESS");
         claims.put("jti", UUID.randomUUID().toString());
         claims.put("iat", new Date().getTime());
-
         long expiryDuration = isRefreshToken ? refreshExpiration : expiration;
-
         return createToken(claims, userDetails.getUsername(), expiryDuration);
     }
 
@@ -132,17 +216,6 @@ public class JwtService {
                 .build();
     }
 
-    private String createToken(Map<String, Object> claims, String subject, long expiryDuration) {
-        return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .setId((String) claims.get("jti"))
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiryDuration))
-                .signWith(getSignKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
     // ========================
     // TOKEN VALIDATION
     // ========================
@@ -152,7 +225,6 @@ public class JwtService {
             final String username = extractUsername(token);
             final boolean isExpired = isTokenExpired(token);
             final boolean isBlacklisted = isTokenBlacklisted(token);
-
             return username.equals(userDetails.getUsername()) && !isExpired && !isBlacklisted;
         } catch (JwtException e) {
             log.error("Token validation failed: {}", e.getMessage());
@@ -192,12 +264,9 @@ public class JwtService {
             String jti = extractJti(token);
             Date expiration = extractExpiration(token);
             long ttl = expiration.getTime() - System.currentTimeMillis();
-
             if (ttl > 0) {
                 tokenBlacklist.add(jti);
                 log.info("Token invalidated: {}", jti);
-
-                // Schedule removal after token expires
                 scheduleBlacklistRemoval(jti, ttl);
             }
         } catch (Exception e) {
@@ -238,9 +307,15 @@ public class JwtService {
     public Optional<String> refreshAccessToken(String refreshToken, UserDetails userDetails) {
         try {
             if (validateToken(refreshToken, userDetails) && isRefreshToken(refreshToken)) {
-                String tenantId = extractTenantId(refreshToken);
-                String newAccessToken = generateToken(userDetails, tenantId, false);
-                return Optional.of(newAccessToken);
+                String userType = extractUserType(refreshToken);
+                if ("TENANT".equals(userType)) {
+                    String tenantId = extractTenantId(refreshToken);
+                    if (tenantId != null) {
+                        return Optional.of(generateTenantToken(userDetails, UUID.fromString(tenantId)));
+                    }
+                } else if ("PLATFORM".equals(userType)) {
+                    return Optional.of(generatePlatformToken(userDetails));
+                }
             }
         } catch (Exception e) {
             log.error("Token refresh failed: {}", e.getMessage());
@@ -257,19 +332,4 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // ========================
-    // INNER CLASSES
-    // ========================
-
-    @lombok.Builder
-    @lombok.Data
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
-    public static class TokenPair {
-        private String accessToken;
-        private String refreshToken;
-        private String tokenType;
-        private Long expiresIn;
-        private Long refreshExpiresIn;
-    }
 }
