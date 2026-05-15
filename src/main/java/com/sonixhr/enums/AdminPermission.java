@@ -11,7 +11,7 @@ public enum AdminPermission {
     VIEW_TENANT_DETAILS("View tenant details"),
     MANAGE_TENANT_PLANS("Manage tenant subscription plans"),
 
-    // Admin Management (These were missing)
+    // Admin Management
     MANAGE_ADMINS("Manage admin users"),
     VIEW_ADMINS("View admin users"),
     CREATE_ADMIN("Create new admin"),
@@ -53,7 +53,10 @@ public enum AdminPermission {
     MANAGE_SECURITY_SETTINGS("Manage security settings"),
     VIEW_SECURITY_REPORTS("View security reports"),
     MANAGE_API_KEYS("Manage API keys"),
-    MANAGE_WEBHOOKS("Manage webhooks");
+    MANAGE_WEBHOOKS("Manage webhooks"),
+
+    //  Add the missing permission
+    MANAGE_PLATFORM_ROLES("Manage platform roles");
 
     private final String description;
 

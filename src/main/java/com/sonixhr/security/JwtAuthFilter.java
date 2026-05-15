@@ -1,53 +1,67 @@
 package com.sonixhr.security;
 
-import com.sonixhr.service.TenantService;
+import com.sonixhr.service.platform.PlatformUserDetailsService;
 import com.sonixhr.tenant.TenantContext;
+import com.sonixhr.tenant.TenantUserDetailsService;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final TenantService tenantService;
+    private final TenantContext.TenantService tenantService;
+    private final PlatformUserDetailsService platformUserDetailsService;
+    private final TenantUserDetailsService tenantUserDetailsService;
+
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+    public JwtAuthFilter(
+            JwtService jwtService,
+            @Lazy TenantContext.TenantService tenantService,
+            PlatformUserDetailsService platformUserDetailsService,
+            TenantUserDetailsService tenantUserDetailsService
+    ) {
+        this.jwtService = jwtService;
+        this.tenantService = tenantService;
+        this.platformUserDetailsService = platformUserDetailsService;
+        this.tenantUserDetailsService = tenantUserDetailsService;
+    }
 
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/login",
-            "/api/auth/refresh",
-            "/api/public/",
+            "/api/auth/**",
+            "/api/platform/auth/**",
+            "/api/public/**",
             "/api/health",
             "/actuator/health",
             "/api/tenants/register",
-            "/api/tenants/verify-subdomain",
-            "/api/forgot-password",
-            "/api/reset-password",
-            "/swagger-ui",
-            "/v3/api-docs",
-            "/api-docs"
+            "/api/tenants/verify-subdomain/**",
+            "/api/forgot-password/**",
+            "/api/reset-password/**",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/api-docs/**",
+            "/error"
     );
 
     @Override
@@ -56,136 +70,278 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String requestPath = request.getRequestURI();
+        System.out.println("\n========== JWT FILTER START ==========");
 
-        // Skip authentication for public endpoints
-        if (isPublicPath(requestPath)) {
+        String path = request.getRequestURI();
+
+        System.out.println("Request URI: " + path);
+
+        if (isPublicPath(path)) {
+
+            System.out.println("PUBLIC API - SKIPPING JWT FILTER");
+
             filterChain.doFilter(request, response);
+
             return;
         }
 
+        String authHeader = request.getHeader("Authorization");
+
+        System.out.println("Authorization Header: " + authHeader);
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+
+            System.out.println("MISSING OR INVALID TOKEN");
+
+            sendError(
+                    response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Missing or invalid token"
+            );
+
+            return;
+        }
+
+        String token = authHeader.substring(7);
+
+        System.out.println("JWT Token Received");
+
+        boolean valid = jwtService.validateToken(token);
+
+        System.out.println("Token Valid: " + valid);
+
+        if (!valid) {
+
+            sendError(
+                    response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Invalid or expired token"
+            );
+
+            return;
+        }
+
+        Claims claims;
+
         try {
-            String authHeader = request.getHeader("Authorization");
 
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
+            claims = jwtService.extractAllClaims(token);
 
-                if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            System.out.println("Claims Extracted Successfully");
 
-                    // Validate token
-                    if (!jwtService.validateToken(token)) {
-                        log.warn("Invalid token for request: {}", requestPath);
-                        sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
-                        return;
-                    }
+        } catch (Exception e) {
 
-                    // Extract claims
-                    Claims claims = jwtService.extractAllClaims(token);
-                    String username = claims.getSubject();
-                    String tenantId = claims.get("tenantId", String.class);
+            System.out.println("FAILED TO PARSE JWT CLAIMS");
 
-                    // Extract roles safely
-                    Object rolesObj = claims.get("roles");
-                    List<String> roles = new ArrayList<>();
-                    if (rolesObj instanceof List) {
-                        for (Object role : (List<?>) rolesObj) {
-                            if (role instanceof String) {
-                                roles.add((String) role);
-                            }
-                        }
-                    }
+            e.printStackTrace();
 
-                    // Validate token type
-                    String tokenType = claims.get("tokenType", String.class);
-                    if ("REFRESH".equals(tokenType) && !requestPath.contains("/auth/refresh")) {
-                        log.warn("Attempted to use refresh token for non-refresh endpoint: {}", requestPath);
-                        sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token type");
-                        return;
-                    }
+            sendError(
+                    response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Invalid token"
+            );
 
-                    //  CRITICAL: Set tenant context for RLS
-                    if (tenantId != null && !tenantId.isEmpty()) {
-                        try {
-                            UUID tenantUUID = UUID.fromString(tenantId);
+            return;
+        }
 
-                            // Set in ThreadLocal for Java layer
-                            TenantContext.setCurrentTenant(tenantUUID);
+        String username = claims.getSubject();
+        String userType = claims.get("userType", String.class);
 
-                            // Set in PostgreSQL session for RLS
-                            tenantService.setCurrentTenantInDB(tenantUUID);
+        System.out.println("Username: " + username);
+        System.out.println("UserType: " + userType);
 
-                            log.debug("Tenant context set - Java: {}, PostgreSQL RLS: {}", tenantUUID, tenantId);
-                        } catch (IllegalArgumentException e) {
-                            log.warn("Invalid tenant ID format: {}", tenantId);
-                            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid tenant ID in token");
-                            return;
-                        }
-                    } else {
-                        log.warn("No tenant ID in token for user: {}", username);
-                        sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token: missing tenant");
-                        return;
-                    }
+        Object rolesObj = claims.get("roles");
 
-                    // Create authorities collection properly
-                    List<GrantedAuthority> authorities;
-                    if (roles != null && !roles.isEmpty()) {
-                        authorities = roles.stream()
-                                .map(role -> {
-                                    String roleName = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-                                    return new SimpleGrantedAuthority(roleName);
-                                })
-                                .collect(Collectors.toList());
-                    } else {
-                        authorities = Collections.emptyList();
-                    }
+        List<String> permissionNames =
+                rolesObj instanceof List<?> roles
+                        ? roles.stream()
+                        .map(Object::toString)
+                        .toList()
+                        : List.of();
 
-                    // Create authentication token with proper typing
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(username, null, authorities);
+        System.out.println("Permissions: " + permissionNames);
 
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+        Collection<? extends GrantedAuthority> authorities =
+                permissionNames.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
 
-                    log.debug("Authenticated user: {} with {} authorities for tenant: {}",
-                            username, authorities.size(), tenantId);
+        UserDetails userDetails;
+
+        boolean tenantDbContextSet = false;
+
+        try {
+
+            if ("TENANT".equals(userType)) {
+
+                System.out.println("TENANT USER DETECTED");
+
+                String tenantIdStr =
+                        claims.get("tenantId", String.class);
+
+                if (tenantIdStr == null) {
+
+                    sendError(
+                            response,
+                            HttpServletResponse.SC_UNAUTHORIZED,
+                            "Tenant ID missing"
+                    );
+
+                    return;
                 }
+
+                UUID tenantId;
+
+                try {
+
+                    tenantId = UUID.fromString(tenantIdStr);
+
+                } catch (Exception e) {
+
+                    sendError(
+                            response,
+                            HttpServletResponse.SC_UNAUTHORIZED,
+                            "Invalid tenant ID"
+                    );
+
+                    return;
+                }
+
+                System.out.println("Setting Tenant Context");
+
+                TenantContext.setCurrentTenant(tenantId);
+
+                System.out.println("Setting DB Tenant Context");
+
+                tenantService.setCurrentTenantInDB(tenantId);
+
+                tenantDbContextSet = true;
+
+                userDetails =
+                        tenantUserDetailsService
+                                .loadUserByUsername(username);
+
+                System.out.println(
+                        "Tenant User Loaded: "
+                                + userDetails.getUsername()
+                );
+
+            } else if ("PLATFORM".equals(userType)) {
+
+                System.out.println("PLATFORM USER DETECTED");
+
+                TenantContext.clear();
+
+                userDetails =
+                        platformUserDetailsService
+                                .loadUserByUsername(username);
+
+                System.out.println(
+                        "Platform User Loaded: "
+                                + userDetails.getUsername()
+                );
+
             } else {
-                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
+
+                sendError(
+                        response,
+                        HttpServletResponse.SC_UNAUTHORIZED,
+                        "Unknown user type"
+                );
+
                 return;
             }
 
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            authorities
+                    );
+
+            SecurityContextHolder
+                    .getContext()
+                    .setAuthentication(authToken);
+
+            System.out.println(
+                    "Authentication Stored Successfully"
+            );
+
+            System.out.println(
+                    "SecurityContext Authentication: "
+                            + SecurityContextHolder
+                            .getContext()
+                            .getAuthentication()
+            );
+
+            System.out.println(
+                    "Proceeding To Controller"
+            );
+
             filterChain.doFilter(request, response);
 
-        } catch (ExpiredJwtException e) {
-            log.error("JWT token expired: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token has expired");
-        } catch (SignatureException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token signature");
-        } catch (MalformedJwtException e) {
-            log.error("Malformed JWT token: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Malformed token");
-        } catch (Exception e) {
-            log.error("JWT authentication error: {}", e.getMessage(), e);
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication failed");
         } finally {
-            // IMPORTANT: Clear tenant context after request
+
+            System.out.println(
+                    "\n========== CLEANUP START =========="
+            );
+
             TenantContext.clear();
-            tenantService.clearCurrentTenantInDB();
-            log.debug("Cleared tenant context after request");
+
+            System.out.println("TenantContext Cleared");
+
+            if (tenantDbContextSet) {
+
+                try {
+
+                    tenantService.clearCurrentTenantInDB();
+
+                    System.out.println(
+                            "DB Tenant Context Cleared"
+                    );
+
+                } catch (Exception e) {
+
+                    System.out.println(
+                            "FAILED TO CLEAR DB TENANT CONTEXT"
+                    );
+
+                    e.printStackTrace();
+                }
+            }
+
+            System.out.println(
+                    "========== JWT FILTER END ==========\n"
+            );
         }
     }
 
-    private boolean isPublicPath(String requestPath) {
-        return PUBLIC_PATHS.stream().anyMatch(requestPath::startsWith);
+    private boolean isPublicPath(String path) {
+
+        return PUBLIC_PATHS.stream()
+                .anyMatch(pattern ->
+                        pathMatcher.match(pattern, path));
     }
 
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
+    private void sendError(HttpServletResponse response,
+                           int status,
+                           String message)
+            throws IOException {
+
+        System.out.println(
+                "SEND ERROR -> " + status + " : " + message
+        );
+
         response.setStatus(status);
+
         response.setContentType("application/json");
-        response.getWriter().write(String.format(
-                "{\"success\":false,\"status\":%d,\"message\":\"%s\",\"timestamp\":%d}",
-                status, message, System.currentTimeMillis()
-        ));
+
+        response.getWriter().write(String.format("""
+                {
+                    "success": false,
+                    "status": %d,
+                    "message": "%s"
+                }
+                """, status, message));
     }
 }

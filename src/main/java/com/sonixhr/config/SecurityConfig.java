@@ -1,14 +1,18 @@
 package com.sonixhr.config;
 
+import com.sonixhr.security.CustomPermissionEvaluator;
 import com.sonixhr.security.JwtAccessDeniedHandler;
 import com.sonixhr.security.JwtAuthenticationEntryPoint;
 import com.sonixhr.security.JwtAuthFilter;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -28,45 +32,49 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)  // Enables @PreAuthorize annotations
-@RequiredArgsConstructor
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsService tenantUserDetailsService;
+    private final UserDetailsService platformUserDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
     private final JwtAccessDeniedHandler accessDeniedHandler;
+    private final CustomPermissionEvaluator permissionEvaluator;
+
+    // Explicit constructor — @Qualifier does NOT survive Lombok's @RequiredArgsConstructor
+    public SecurityConfig(
+            @Qualifier("tenantUserDetailsService") UserDetailsService tenantUserDetailsService,
+            @Qualifier("platformUserDetailsService") UserDetailsService platformUserDetailsService,
+            JwtAuthFilter jwtAuthFilter,
+            JwtAuthenticationEntryPoint unauthorizedHandler,
+            JwtAccessDeniedHandler accessDeniedHandler,
+            CustomPermissionEvaluator permissionEvaluator) {
+        this.tenantUserDetailsService = tenantUserDetailsService;
+        this.platformUserDetailsService = platformUserDetailsService;
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.unauthorizedHandler = unauthorizedHandler;
+        this.accessDeniedHandler = accessDeniedHandler;
+        this.permissionEvaluator = permissionEvaluator;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Disable CSRF for stateless API
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // Enable CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Exception handling
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(unauthorizedHandler)
                         .accessDeniedHandler(accessDeniedHandler)
                 )
-
-                // Make session stateless
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-
-                // Authorization rules
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints - no authentication required
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/platform/auth/**",
                                 "/api/public/**",
                                 "/api/health",
                                 "/actuator/health",
-                                "/login",
-                                "/register",
                                 "/api/tenants/register",
                                 "/api/tenants/verify-subdomain/**",
                                 "/api/forgot-password/**",
@@ -75,71 +83,63 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api-docs/**"
                         ).permitAll()
-
-                        // Super Admin endpoints
-                        .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
-                        .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
-
-                        // HR Manager endpoints
-                        .requestMatchers("/api/employees/**").hasAnyRole("HR_MANAGER", "ADMIN")
-                        .requestMatchers("/api/leaves/approve/**").hasAnyRole("HR_MANAGER", "MANAGER")
-                        .requestMatchers("/api/attendance/reports/**").hasAnyRole("HR_MANAGER", "ADMIN")
-
-                        // Manager endpoints
-                        .requestMatchers("/api/teams/**").hasAnyRole("MANAGER", "HR_MANAGER")
-                        .requestMatchers("/api/leaves/team/**").hasAnyRole("MANAGER", "HR_MANAGER")
-
-                        // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )
-
-                // Authentication provider
-                .authenticationProvider(authenticationProvider())
-
-                // Add JWT filter before UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        authProvider.setHideUserNotFoundExceptions(false); // Useful for debugging
-        return authProvider;
+    // ========================
+    // TENANT AUTHENTICATION
+    // ========================
+    @Primary
+    @Bean(name = "tenantAuthenticationManager")
+    public AuthenticationManager tenantAuthenticationManager() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(tenantUserDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return new ProviderManager(List.of(provider));
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+    // ========================
+    // PLATFORM AUTHENTICATION
+    // ========================
+    @Bean(name = "platformAuthenticationManager")
+    public AuthenticationManager platformAuthenticationManager() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(platformUserDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return new ProviderManager(List.of(provider));
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12); // Strength 12 for better security
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // Configure appropriately for production
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://localhost:5173"
+                // add production origins here, e.g. "https://app.sonixhr.com"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Tenant-ID",
-                "X-Request-ID",
-                "Accept",
-                "Origin"
-        ));
+                "Authorization", "Content-Type", "X-Tenant-ID", "X-Request-ID", "Accept", "Origin"));
         configuration.setExposedHeaders(List.of("X-Total-Count", "X-Tenant-ID"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    public MethodSecurityExpressionHandler expressionHandler() {
+        DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setPermissionEvaluator(permissionEvaluator);
+        return handler;
     }
 }

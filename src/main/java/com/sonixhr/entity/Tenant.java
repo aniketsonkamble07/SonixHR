@@ -1,6 +1,7 @@
 package com.sonixhr.entity;
 
 import com.sonixhr.enums.PlanStatus;
+import com.sonixhr.enums.PlanType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,8 +37,8 @@ public class Tenant {
 
     // Plan details
     @Column(name = "plan_type", nullable = false)
-    private String planType;
-
+      @Enumerated(EnumType.STRING)
+    private PlanType planType;
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_status")
     private PlanStatus planStatus;
@@ -66,7 +67,7 @@ public class Tenant {
         this.updatedAt = LocalDateTime.now();
 
         if (this.planType == null) {
-            this.planType = "basic";
+            this.planType =PlanType.BASIC ;
         }
 
         if (this.planStatus == null) {

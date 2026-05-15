@@ -4,8 +4,8 @@ public enum PlanStatus {
     ACTIVE("active", "Active", "success"),
     TRIAL("trial", "Trial Period", "warning"),
     SUSPENDED("suspended", "Suspended", "danger"),
-    CANCELLED("cancelled", "Cancelled", "secondary");
-
+    CANCELLED("cancelled", "Cancelled", "secondary"),
+    NOT_ACTIVATED("not_activated", "Not Activated", "secondary");
     private final String code;
     private final String displayName;
     private final String badgeColor;

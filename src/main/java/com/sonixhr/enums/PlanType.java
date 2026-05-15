@@ -1,5 +1,7 @@
 package com.sonixhr.enums;
 
+import static com.sonixhr.enums.PlanStatus.NOT_ACTIVATED;
+
 public enum PlanType {
     BASIC("basic", "Basic Plan", 100, 1024),
     MODERATE("moderate", "Moderate Plan", 500, 5120),
@@ -53,4 +55,5 @@ public enum PlanType {
     public boolean isPremium() {
         return this == PREMIUM;
     }
+
 }
