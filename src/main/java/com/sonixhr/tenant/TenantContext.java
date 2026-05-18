@@ -1,17 +1,15 @@
 package com.sonixhr.tenant;
 
 import com.sonixhr.dto.ApiResponse;
-import com.sonixhr.dto.TenantCreateRequest;
 import com.sonixhr.entity.Permission;
 import com.sonixhr.entity.Role;
-import com.sonixhr.entity.Tenant;
+import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.User;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.exceptions.CompanyNameExistsException;
 import com.sonixhr.exceptions.SubdomainExistsException;
 import com.sonixhr.repository.PermissionRepository;
 import com.sonixhr.repository.RoleRepository;
-import com.sonixhr.repository.TenantRepository;
 import com.sonixhr.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
