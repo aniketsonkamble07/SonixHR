@@ -1,7 +1,6 @@
 package com.sonixhr.security;
 
 import com.sonixhr.service.platform.PlatformUserDetailsService;
-import com.sonixhr.tenant.TenantContext;
 import com.sonixhr.tenant.TenantUserDetailsService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
