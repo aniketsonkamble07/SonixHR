@@ -48,9 +48,9 @@ public class TenantContext {
         private final TenantRepository tenantRepository;
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
-        private final JdbcTemplate jdbcTemplate;          // ✅ for RLS
-        private final RoleRepository roleRepository;      // ✅ for default roles
-        private final PermissionRepository permissionRepository; // ✅ for permissions
+        private final JdbcTemplate jdbcTemplate;
+        private final RoleRepository roleRepository;
+        private final PermissionRepository permissionRepository;
 
         // ========== RLS helper methods (used by JwtAuthFilter) ==========
         @Transactional
@@ -82,7 +82,7 @@ public class TenantContext {
             if (tenantRepository.existsBySubdomain(request.getSubdomain())) {
                 throw new SubdomainExistsException("Subdomain already exists");
             }
-            if (userRepository.existsByEmail(request.getAdminEmail())) {   // ✅ fixed method name
+            if (userRepository.existsByEmail(request.getAdminEmail())) {
                 throw new RuntimeException("Admin email already exists");
             }
 
