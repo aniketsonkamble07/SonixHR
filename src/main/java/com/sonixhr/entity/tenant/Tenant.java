@@ -12,13 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "tenants", indexes = {
-        @Index(name = "idx_tenants_subdomain", columnList = "subdomain"),
-        @Index(name = "idx_tenants_tenant_code", columnList = "tenant_code"),
-        @Index(name = "idx_tenants_admin_email", columnList = "admin_email"),
-        @Index(name = "idx_tenants_status", columnList = "status"),
-        @Index(name = "idx_tenants_created_at", columnList = "created_at")
-})
+@Table(name = "tenants")
 @Data
 @Builder
 @NoArgsConstructor
@@ -55,6 +49,30 @@ public class Tenant {
     @Column(name = "admin_phone", length = 20)
     private String adminPhone;
 
+    @Column(name = "plan_type", length = 20)
+    private String planType;
+
+    @Column(name = "max_employees")
+    @Builder.Default
+    private Integer maxEmployees = 100;
+
+    @Column(name = "max_storage_mb")
+    @Builder.Default
+    private Integer maxStorageMb = 1024;
+
+    @Column(name = "plan_status", length = 20)
+    @Builder.Default
+    private String planStatus = "trial";
+
+    @Column(name = "trial_ends_at")
+    private LocalDateTime trialEndsAt;
+
+    @Column(name = "suspended_at")   // ✅ ADD THIS FIELD
+    private LocalDateTime suspendedAt;
+
+    @Column(name = "suspension_reason")
+    private String suspensionReason;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -72,23 +90,23 @@ public class Tenant {
     @Column(name = "updated_by")
     private UUID updatedBy;
 
-    // Helper method for soft delete
+    // Helper methods
     public void softDelete() {
         this.status = "deleted";
         this.isActive = false;
         this.deletedAt = LocalDateTime.now();
     }
 
-    // Helper method for suspend
     public void suspend() {
         this.status = "suspended";
         this.isActive = false;
+        this.suspendedAt = LocalDateTime.now();
     }
 
-    // Helper method for activate
     public void activate() {
         this.status = "active";
         this.isActive = true;
         this.deletedAt = null;
+        this.suspendedAt = null;
     }
 }

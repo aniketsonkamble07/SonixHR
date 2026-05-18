@@ -2,6 +2,7 @@ package com.sonixhr.security;
 
 import com.sonixhr.service.platform.PlatformUserDetailsService;
 import com.sonixhr.tenant.TenantContext;
+import com.sonixhr.tenant.TenantRLSService;
 import com.sonixhr.tenant.TenantUserDetailsService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -30,7 +31,7 @@ import java.util.stream.Collectors;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final TenantContext.TenantService tenantService;
+    private final TenantRLSService tenantRLSService;
     private final PlatformUserDetailsService platformUserDetailsService;
     private final TenantUserDetailsService tenantUserDetailsService;
 
@@ -38,12 +39,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     public JwtAuthFilter(
             JwtService jwtService,
-            @Lazy TenantContext.TenantService tenantService,
+            @Lazy TenantRLSService tenantRLSService,
             PlatformUserDetailsService platformUserDetailsService,
             TenantUserDetailsService tenantUserDetailsService
     ) {
         this.jwtService = jwtService;
-        this.tenantService = tenantService;
+        this.tenantRLSService = tenantRLSService;
         this.platformUserDetailsService = platformUserDetailsService;
         this.tenantUserDetailsService = tenantUserDetailsService;
     }
@@ -70,34 +71,38 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        log.debug("JwtAuthFilter invoked for request: {}", request.getRequestURI());
+        // ========== DEBUG PRINT 1 ==========
+        System.out.println("\n========== JWT FILTER START ==========");
+        System.out.println("Request URI: " + request.getRequestURI());
+        System.out.println("Request Method: " + request.getMethod());
 
         String path = request.getRequestURI();
 
         if (isPublicPath(path)) {
-            log.debug("Public path - skipping authentication: {}", path);
+            System.out.println("PUBLIC PATH - SKIPPING AUTH: " + path);
             filterChain.doFilter(request, response);
             return;
         }
 
+        System.out.println("PROTECTED PATH - NEEDS AUTH: " + path);
+
         String authHeader = request.getHeader("Authorization");
-        log.debug("Authorization header present: {}", authHeader != null);
+        System.out.println("Authorization Header: '" + authHeader + "'");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("Missing or invalid Authorization header for path: {}", path);
+            System.out.println("ERROR: Missing or invalid Authorization header");
             sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Missing or invalid token");
             return;
         }
 
         String token = authHeader.substring(7);
-        log.debug("JWT token received (first 20 chars): {}...",
-                token.substring(0, Math.min(20, token.length())));
+        System.out.println("Token (first 20 chars): " + token.substring(0, Math.min(20, token.length())) + "...");
 
         boolean valid = jwtService.validateToken(token);
-        log.debug("Token validation result: {}", valid);
+        System.out.println("Token Valid: " + valid);
 
         if (!valid) {
-            log.warn("Invalid or expired token for path: {}", path);
+            System.out.println("ERROR: Invalid or expired token");
             sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
             return;
         }
@@ -105,16 +110,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         Claims claims;
         try {
             claims = jwtService.extractAllClaims(token);
-            log.debug("JWT claims extracted successfully");
+            System.out.println("Claims extracted successfully");
         } catch (Exception e) {
-            log.error("Failed to parse JWT claims: {}", e.getMessage());
+            System.out.println("ERROR: Failed to parse JWT claims: " + e.getMessage());
             sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
             return;
         }
 
         String username = claims.getSubject();
         String userType = claims.get("userType", String.class);
-        log.info("Authenticating user: {} with type: {}", username, userType);
+        System.out.println("Username: " + username);
+        System.out.println("UserType: " + userType);
 
         Object rolesObj = claims.get("roles");
         List<String> permissionNames = rolesObj instanceof List<?> roles
@@ -123,7 +129,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 .toList()
                 : List.of();
 
-        log.debug("Permissions extracted: {} permissions", permissionNames.size());
+        System.out.println("Permissions count: " + permissionNames.size());
 
         Collection<? extends GrantedAuthority> authorities =
                 permissionNames.stream()
@@ -135,11 +141,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             if ("TENANT".equals(userType)) {
-                log.debug("Tenant user detected");
+                System.out.println("Processing TENANT user");
 
                 String tenantIdStr = claims.get("tenantId", String.class);
                 if (tenantIdStr == null) {
-                    log.warn("Tenant ID missing for tenant user: {}", username);
+                    System.out.println("ERROR: Tenant ID missing");
                     sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Tenant ID missing");
                     return;
                 }
@@ -148,28 +154,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 try {
                     tenantId = UUID.fromString(tenantIdStr);
                 } catch (Exception e) {
-                    log.warn("Invalid tenant ID format: {}", tenantIdStr);
+                    System.out.println("ERROR: Invalid tenant ID format: " + tenantIdStr);
                     sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid tenant ID");
                     return;
                 }
 
-                log.debug("Setting tenant context for tenant: {}", tenantId);
+                System.out.println("Setting tenant context: " + tenantId);
                 TenantContext.setCurrentTenant(tenantId);
-                tenantService.setCurrentTenantInDB(tenantId);
+                tenantRLSService.setCurrentTenantInDB(tenantId);
                 tenantDbContextSet = true;
 
                 userDetails = tenantUserDetailsService.loadUserByUsername(username);
-                log.debug("Tenant user loaded: {}", userDetails.getUsername());
+                System.out.println("Tenant user loaded: " + userDetails.getUsername());
 
             } else if ("PLATFORM".equals(userType)) {
-                log.debug("Platform user detected - no tenant context needed");
+                System.out.println("Processing PLATFORM user");
                 TenantContext.clear();
 
                 userDetails = platformUserDetailsService.loadUserByUsername(username);
-                log.debug("Platform user loaded: {}", userDetails.getUsername());
+                System.out.println("Platform user loaded: " + userDetails.getUsername());
 
             } else {
-                log.warn("Unknown user type: {} for user: {}", userType, username);
+                System.out.println("ERROR: Unknown user type: " + userType);
                 sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Unknown user type");
                 return;
             }
@@ -178,22 +184,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
-            log.info("Authentication successfully set for user: {}", username);
+            System.out.println("Authentication set successfully in SecurityContext");
 
+            System.out.println("Proceeding to controller...");
             filterChain.doFilter(request, response);
 
         } finally {
-            log.debug("Cleaning up tenant context");
+            System.out.println("\n========== CLEANUP ==========");
             TenantContext.clear();
+            System.out.println("TenantContext cleared");
 
             if (tenantDbContextSet) {
                 try {
-                    tenantService.clearCurrentTenantInDB();
-                    log.debug("Database tenant context cleared");
+                    tenantRLSService.clearCurrentTenantInDB();
+                    System.out.println("Database tenant context cleared");
                 } catch (Exception e) {
-                    log.error("Failed to clear database tenant context: {}", e.getMessage());
+                    System.out.println("Failed to clear DB tenant context: " + e.getMessage());
                 }
             }
+            System.out.println("========== JWT FILTER END ==========\n");
         }
     }
 
@@ -207,7 +216,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     private void sendError(HttpServletResponse response, int status, String message) throws IOException {
-        log.warn("Sending error response: {} - {}", status, message);
+        System.out.println("SENDING ERROR: " + status + " - " + message);
         response.setStatus(status);
         response.setContentType("application/json");
         response.getWriter().write(String.format("""
