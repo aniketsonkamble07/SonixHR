@@ -41,7 +41,7 @@ public enum AdminPermission {
     MANAGE_SUPPORT_TICKETS("Manage support tickets"),
     RESOLVE_ISSUES("Resolve issues"),
     VIEW_SUPPORT_METRICS("View support metrics"),
-
+    VIEW_PLATFORM_ROLES("View platform roles"),
     // Analytics & Reports
     VIEW_ANALYTICS("View analytics"),
     EXPORT_REPORTS("Export reports"),
