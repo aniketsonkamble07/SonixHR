@@ -12,25 +12,34 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = "platform_roles")
+@Table(name = "platform_roles", indexes = {
+        @Index(name = "idx_platform_roles_name", columnList = "name")
+})
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class PlatformRole {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true, nullable = false, length = 100)
     private String name;
 
+    @Column(length = 255)
     private String description;
 
     @Column(name = "created_by")
-    private UUID createdBy;
+    private UUID createdBy;  // Reference to PlatformUser who created this role
 
-    private LocalDateTime createdAt;
+    @Column(name = "created_at")
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -40,4 +49,9 @@ public class PlatformRole {
     )
     @Builder.Default
     private Set<PlatformPermission> permissions = new HashSet<>();
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

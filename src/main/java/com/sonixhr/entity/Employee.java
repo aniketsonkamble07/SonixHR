@@ -1,5 +1,6 @@
 package com.sonixhr.entity;
 
+import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.EmployeeStatus;
 import jakarta.persistence.*;
 import lombok.*;
