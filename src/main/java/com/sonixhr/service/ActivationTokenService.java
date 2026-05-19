@@ -3,7 +3,7 @@ package com.sonixhr.service;
 import com.sonixhr.entity.ActivationToken;
 import com.sonixhr.repository.ActivationTokenRepository;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.usertype.UserType;
+import com.sonixhr.enums.UserType;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

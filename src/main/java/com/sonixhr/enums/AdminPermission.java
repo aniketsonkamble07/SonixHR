@@ -55,11 +55,9 @@ public enum AdminPermission {
     MANAGE_API_KEYS("Manage API keys"),
     MANAGE_WEBHOOKS("Manage webhooks"),
 
-    // ✅ Platform Role Management
-    MANAGE_PLATFORM_ROLES("Manage platform roles"),
+    MANAGE_PLATFORM_ROLES("Manage platform roles");
 
-    // ✅ ADD THIS MISSING PERMISSION
-    VIEW_PLATFORM_ROLES("View platform roles");   // <-- ADD THIS LINE
+
 
     private final String description;
 

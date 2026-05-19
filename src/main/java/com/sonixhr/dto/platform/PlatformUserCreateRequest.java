@@ -15,7 +15,6 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PlatformUserCreateRequest {
-
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
@@ -25,6 +24,6 @@ public class PlatformUserCreateRequest {
 
     private String designation;
 
-    @NotNull(message = "Role IDs are required (at least one role must be assigned)")
-    private Set<Long> roleIds;  // IDs from platform_roles table
+    @NotNull(message = "Role IDs are required")
+    private Set<Long> roleIds;
 }
