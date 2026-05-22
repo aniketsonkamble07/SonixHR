@@ -52,6 +52,9 @@ public class TenantSubscription {
     @Column(name = "plan_type", nullable = false, length = 20)
     private PlanType planType;
 
+    @Column(name = "plan_name", length = 100)
+    private String planName;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_status", nullable = false, length = 20)
     @Builder.Default

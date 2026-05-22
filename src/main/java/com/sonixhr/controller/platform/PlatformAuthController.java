@@ -1,12 +1,15 @@
 package com.sonixhr.controller.platform;
 
+import com.sonixhr.dto.ActivationRequest;
 import com.sonixhr.dto.LoginRequest;
 import com.sonixhr.dto.LoginResponse;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.security.JwtService;
+import com.sonixhr.service.platform.PlatformUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,20 +23,25 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
+
 @RequestMapping("/api/platform/auth")
+
 public class PlatformAuthController {
 
     private final AuthenticationManager platformAuthenticationManager;
     private final JwtService jwtService;
     private final PlatformUserRepository platformUserRepository;
+    private final PlatformUserService platformUserService;
 
     public PlatformAuthController(
             @Qualifier("platformAuthenticationManager") AuthenticationManager platformAuthenticationManager,
             JwtService jwtService,
-            PlatformUserRepository platformUserRepository) {
+            PlatformUserRepository platformUserRepository,
+            PlatformUserService platformUserService) {
         this.platformAuthenticationManager = platformAuthenticationManager;
         this.jwtService = jwtService;
         this.platformUserRepository = platformUserRepository;
+        this.platformUserService = platformUserService;
     }
 
     @PostMapping("/login")
@@ -60,5 +68,12 @@ public class PlatformAuthController {
                 "email", user != null ? user.getEmail() : "null",
                 "authorities", SecurityContextHolder.getContext().getAuthentication().getAuthorities()
         ));
+    }
+
+
+    @PostMapping("/activate")
+    public ResponseEntity<Void> activateUser(@Valid @RequestBody ActivationRequest request) {
+        platformUserService.activateUser(request.getToken(), request.getPassword());
+        return ResponseEntity.ok().build();
     }
 }

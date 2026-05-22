@@ -3,7 +3,7 @@ package com.sonixhr.service.platform;
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
-import com.sonixhr.exceptions.DuplicateException;
+import com.sonixhr.exceptions.DuplicateResourceException;
 import com.sonixhr.exceptions.RoleNotFoundException;
 
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
@@ -32,7 +32,7 @@ public class PlatformRoleService {
 
         if (roleRepository.existsByName(request.getName())) {
             log.warn("Role creation failed - name already exists: {}", request.getName());
-            throw new DuplicateException("Role name already exists: " + request.getName());
+            throw new DuplicateResourceException("Role name already exists: " + request.getName());
         }
 
         log.debug("Fetching permissions for IDs: {}", request.getPermissionIds());

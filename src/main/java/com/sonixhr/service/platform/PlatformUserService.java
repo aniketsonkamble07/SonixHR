@@ -1,6 +1,5 @@
 package com.sonixhr.service.platform;
 
-
 import com.sonixhr.dto.platform.PlatformUserCreateRequest;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.dto.platform.PlatformUserStatistics;
@@ -10,7 +9,7 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.enums.PlatformUserStatus;
 import com.sonixhr.enums.UserType;
-import com.sonixhr.exceptions.DuplicateException;
+import com.sonixhr.exceptions.DuplicateResourceException;
 import com.sonixhr.exceptions.NotFoundException;
 import com.sonixhr.repository.ActivationTokenRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
@@ -44,17 +43,19 @@ public class PlatformUserService {
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
 
-    // ========== CREATE USER WITH INVITATION ==========
+    /**
+     * Create a new platform user with invitation
+     */
     @Transactional
-    public PlatformUserResponse createUser(PlatformUserCreateRequest request, UUID createdBy) {
+    public PlatformUserResponse createUser(PlatformUserCreateRequest request, UUID createdBy)    {
         log.info("Creating platform user: {}", request.getEmail());
 
-        // Check email already exists
+        // Check if email already exists
         if (platformUserRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateException("Email already exists: " + request.getEmail());
+            throw new DuplicateResourceException("Email already exists: " + request.getEmail());
         }
 
-        // Get roles
+        // Get and validate roles
         Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(request.getRoleIds()));
         if (roles.isEmpty()) {
             throw new IllegalArgumentException("At least one role must be assigned");
@@ -74,6 +75,7 @@ public class PlatformUserService {
                 .build();
 
         PlatformUser savedUser = platformUserRepository.save(user);
+        log.info("Platform user created with ID: {}", savedUser.getId());
 
         // Generate activation token
         String activationTokenValue = UUID.randomUUID().toString();
@@ -81,14 +83,15 @@ public class PlatformUserService {
         // Save activation token
         ActivationToken token = ActivationToken.builder()
                 .token(activationTokenValue)
-                .userId(savedUser.getId()).userType(UserType.PLATFORM)
+                .userId(savedUser.getId())
+                .userType(UserType.PLATFORM)
                 .expiryTime(LocalDateTime.now().plusHours(24))
                 .used(false)
                 .build();
 
         activationTokenRepository.save(token);
 
-        // Activation URL
+        // Build activation link
         String activationLink = baseUrl + "/api/platform/auth/activate?token=" + activationTokenValue;
 
         // Send activation email
@@ -98,16 +101,19 @@ public class PlatformUserService {
                 activationLink
         );
 
-        log.info("Platform user created: {} with invitation link", request.getEmail());
+        log.info("Platform user created and activation email sent to: {}", request.getEmail());
 
         return toResponse(savedUser, activationLink, token.getExpiryTime());
     }
 
-    // ========== ACTIVATE USER ==========
+    /**
+     * Activate user account using token
+     */
     @Transactional
     public PlatformUser activateUser(String token, String password) {
         log.info("Activating user with token: {}", token);
 
+        // Validate token
         ActivationToken activationToken = activationTokenRepository
                 .findByTokenAndUsedFalseAndExpiryTimeAfter(token, LocalDateTime.now())
                 .orElseThrow(() -> new RuntimeException("Invalid or expired activation token"));
@@ -116,7 +122,7 @@ public class PlatformUserService {
         activationToken.setUsed(true);
         activationTokenRepository.save(activationToken);
 
-        // Get user by ID
+        // Get user
         PlatformUser user = platformUserRepository.findById(activationToken.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -129,16 +135,24 @@ public class PlatformUserService {
         user.setStatus(PlatformUserStatus.ACTIVE);
         user.setMustChangePassword(false);
 
-        return platformUserRepository.save(user);
+        PlatformUser activatedUser = platformUserRepository.save(user);
+        log.info("User activated successfully: {}", user.getEmail());
+
+        // Send welcome email
+        emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
+
+        return activatedUser;
     }
 
-    // ========== RESEND ACTIVATION EMAIL ==========
+    /**
+     * Resend activation email
+     */
     @Transactional
     public void resendActivationEmail(String email) {
         log.info("Resending activation email to: {}", email);
 
         PlatformUser user = platformUserRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("User not found: " + email));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + email));
 
         if (user.isActive()) {
             throw new RuntimeException("User is already activated");
@@ -161,33 +175,38 @@ public class PlatformUserService {
         String activationLink = baseUrl + "/api/platform/auth/activate?token=" + newToken;
         emailService.sendPlatformActivationEmail(user.getEmail(), user.getFullName(), activationLink);
 
-        log.info("Resent activation email to: {}", email);
+        log.info("Activation email resent to: {}", email);
     }
 
-    // ========== GET USER BY ID ==========
+    /**
+     * Get user by ID
+     */
     @Transactional(readOnly = true)
     public PlatformUserResponse getUserById(UUID id) {
         log.debug("Fetching platform user by id: {}", id);
 
-        // ✅ Fixed method name
         PlatformUser user = platformUserRepository.findByIdWithRolesAndPermissions(id)
                 .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         return toResponse(user);
     }
 
-    // ========== GET USER BY EMAIL ==========
+    /**
+     * Get user by email
+     */
     @Transactional(readOnly = true)
     public PlatformUserResponse getUserByEmail(String email) {
         log.debug("Fetching platform user by email: {}", email);
 
         PlatformUser user = platformUserRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("User not found: " + email));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + email));
 
         return toResponse(user);
     }
 
-    // ========== GET ALL USERS (PAGINATED) ==========
+    /**
+     * Get all users (paginated)
+     */
     @Transactional(readOnly = true)
     public Page<PlatformUserResponse> getAllUsers(Pageable pageable) {
         log.debug("Fetching all platform users");
@@ -196,13 +215,15 @@ public class PlatformUserService {
                 .map(this::toResponse);
     }
 
-    // ========== UPDATE USER ==========
+    /**
+     * Update user details
+     */
     @Transactional
     public PlatformUserResponse updateUser(UUID id, PlatformUserUpdateRequest request) {
         log.info("Updating platform user: {}", id);
 
         PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName());
@@ -217,13 +238,15 @@ public class PlatformUserService {
         return toResponse(updatedUser);
     }
 
-    // ========== UPDATE USER ROLES ==========
+    /**
+     * Update user roles
+     */
     @Transactional
     public void updateUserRoles(UUID userId, Set<Long> roleIds) {
         log.info("Updating roles for platform user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
         Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(roleIds));
         if (roles.isEmpty()) {
@@ -232,16 +255,18 @@ public class PlatformUserService {
 
         user.setRoles(roles);
         platformUserRepository.save(user);
-        log.info("Updated roles for user: {}", userId);
+        log.info("Roles updated for user: {}", userId);
     }
 
-    // ========== DEACTIVATE USER ==========
+    /**
+     * Deactivate user
+     */
     @Transactional
     public void deactivateUser(UUID id) {
         log.info("Deactivating platform user: {}", id);
 
         PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         user.setActive(false);
         user.setStatus(PlatformUserStatus.INACTIVE);
@@ -249,13 +274,15 @@ public class PlatformUserService {
         log.info("Platform user deactivated: {}", id);
     }
 
-    // ========== ACTIVATE USER (ADMIN) ==========
+    /**
+     * Activate user by admin
+     */
     @Transactional
     public void activateUserByAdmin(UUID id) {
         log.info("Activating platform user by admin: {}", id);
 
         PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         user.setActive(true);
         user.setStatus(PlatformUserStatus.ACTIVE);
@@ -263,64 +290,26 @@ public class PlatformUserService {
         log.info("Platform user activated by admin: {}", id);
     }
 
-    // ========== DELETE USER (SOFT DELETE) ==========
+    /**
+     * Soft delete user
+     */
     @Transactional
     public void deleteUser(UUID id) {
         log.info("Soft deleting platform user: {}", id);
 
         PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
+                .orElseThrow(() -> new NotFoundException("User not found: " + id));
 
         user.softDelete();
         platformUserRepository.save(user);
-
-        // Also invalidate any pending tokens
         activationTokenRepository.deleteByUserId(user.getId());
 
         log.info("Platform user soft deleted: {}", id);
     }
 
-    // ========== CHANGE PASSWORD ==========
-    @Transactional
-    public void changePassword(UUID id, String currentPassword, String newPassword) {
-        log.info("Changing password for platform user: {}", id);
-
-        PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
-
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new RuntimeException("Current password is incorrect");
-        }
-
-        validatePasswordStrength(newPassword);
-
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
-        user.setPasswordChangedAt(LocalDateTime.now());
-        user.setMustChangePassword(false);
-
-        platformUserRepository.save(user);
-        log.info("Password changed for user: {}", id);
-    }
-
-    // ========== FORCE CHANGE PASSWORD (ADMIN) ==========
-    @Transactional
-    public void forceChangePassword(UUID id, String newPassword, boolean mustChangeOnLogin) {
-        log.info("Force changing password for platform user: {}", id);
-
-        PlatformUser user = platformUserRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));  // ✅ Fixed
-
-        validatePasswordStrength(newPassword);
-
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
-        user.setPasswordChangedAt(LocalDateTime.now());
-        user.setMustChangePassword(mustChangeOnLogin);
-
-        platformUserRepository.save(user);
-        log.info("Password force changed for user: {}", id);
-    }
-
-    // ========== GET USER STATISTICS ==========
+    /**
+     * Get user statistics
+     */
     @Transactional(readOnly = true)
     public PlatformUserStatistics getUserStatistics() {
         log.debug("Fetching platform user statistics");
@@ -337,7 +326,7 @@ public class PlatformUserService {
     // ========== PRIVATE HELPER METHODS ==========
 
     private void validatePasswordStrength(String password) {
-        if (password.length() < 8) {
+        if (password == null || password.length() < 8) {
             throw new RuntimeException("Password must be at least 8 characters long");
         }
         if (!password.matches(".*[A-Z].*")) {
@@ -380,5 +369,24 @@ public class PlatformUserService {
         response.setInvitationLink(invitationLink);
         response.setInvitationExpiryAt(expiryTime);
         return response;
+    }
+    /**
+     * Force change password for user (Admin operation)
+     */
+    @Transactional
+    public void forceChangePassword(UUID id, String newPassword, boolean mustChangeOnLogin) {
+        log.info("Force changing password for platform user: {}", id);
+
+        PlatformUser user = platformUserRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found: " + id));
+
+        validatePasswordStrength(newPassword);
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(LocalDateTime.now());
+        user.setMustChangePassword(mustChangeOnLogin);
+
+        platformUserRepository.save(user);
+        log.info("Password force changed for user: {}", id);
     }
 }

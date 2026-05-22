@@ -11,9 +11,9 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(DuplicateException.class)
+    @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<?> handleDuplicateException(
-            DuplicateException ex
+            DuplicateResourceException ex
     ) {
 
         return ResponseEntity

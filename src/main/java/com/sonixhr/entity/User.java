@@ -1,5 +1,6 @@
 package com.sonixhr.entity;
 
+import com.sonixhr.entity.tenant.Tenant;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,17 +30,22 @@ import java.util.stream.Collectors;
 public class User implements UserDetails {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Column(name = "tenant_id", nullable = false)
-    private UUID tenantId;
+    //  Foreign key relationship to Tenant
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
 
     @Column(nullable = false, length = 255)
     private String email;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
+
+    @Column(name = "full_name")
+    private String fullName;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -71,6 +77,11 @@ public class User implements UserDetails {
     @OneToOne
     @JoinColumn(name = "employee_id", referencedColumnName = "id")
     private Employee employee;
+
+    // Helper method to get tenant ID (convenience)
+    public UUID getTenantId() {
+        return tenant != null ? tenant.getId() : null;
+    }
 
     // Helper to get all permission names from all assigned roles
     public Set<String> getEffectivePermissions() {

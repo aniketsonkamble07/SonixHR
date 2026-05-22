@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TenantListResponse {
-    private List<TenantResponse> content;
+    private List<TenantRegistrationResponse> content;
     private int pageNumber;
     private int pageSize;
     private long totalElements;
