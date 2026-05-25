@@ -331,5 +331,43 @@ public class JwtService {
         byte[] keyBytes = Base64.getDecoder().decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
+    // ========================
+    // TOKEN GENERATION FOR EMPLOYEE USERS
+    // ========================
 
+    public String generateEmployeeToken(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "EMPLOYEE");
+        claims.put("tenantId", tenantId.toString());
+        claims.put("employeeId", employeeId);
+        claims.put("employeeCode", employeeCode);
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "ACCESS");
+        return createToken(claims, userDetails.getUsername(), expiration);
+    }
+
+    public String generateEmployeeRefreshToken(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "EMPLOYEE");
+        claims.put("tenantId", tenantId.toString());
+        claims.put("employeeId", employeeId);
+        claims.put("employeeCode", employeeCode);
+        claims.put("roles", userDetails.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .toList());
+        claims.put("tokenType", "REFRESH");
+        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+    }
+
+    public TokenPair generateEmployeeTokenPair(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
+        return TokenPair.builder()
+                .accessToken(generateEmployeeToken(userDetails, tenantId, employeeId, employeeCode))
+                .refreshToken(generateEmployeeRefreshToken(userDetails, tenantId, employeeId, employeeCode))
+                .tokenType("Bearer")
+                .expiresIn(expiration)
+                .refreshExpiresIn(refreshExpiration)
+                .build();
+    }
 }

@@ -78,6 +78,8 @@ public class SecurityConfig {
                                 "/api/tenants/register",
                                 "/api/tenants/verify-subdomain/**",
                                 "/api/forgot-password/**",
+                                "/api/employee/auth/activate",
+
                                 "/api/reset-password/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",

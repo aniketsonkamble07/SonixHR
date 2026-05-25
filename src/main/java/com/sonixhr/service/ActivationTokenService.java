@@ -39,7 +39,7 @@ public class ActivationTokenService {
     }
 
     /**
-     * Set password for user using activation token (same as platform user)
+     * Set password for user using activation token (for platform users)
      */
     @Transactional
     public void setPassword(String token, String newPassword) {
@@ -60,5 +60,30 @@ public class ActivationTokenService {
         userRepository.save(user);
 
         log.info("Password set successfully for user: {}", user.getEmail());
+    }
+
+    /**
+     * Set password and return user (for auto-login after activation)
+     */
+    @Transactional
+    public User setPasswordAndGetUser(String token, String newPassword) {
+        log.info("Setting password for token: {}", token);
+
+        ActivationToken activationToken = activationTokenRepository
+                .findByTokenAndUsedFalseAndExpiryTimeAfter(token, LocalDateTime.now())
+                .orElseThrow(() -> new RuntimeException("Invalid or expired activation token"));
+
+        activationToken.setUsed(true);
+        activationTokenRepository.save(activationToken);
+
+        User user = userRepository.findById(activationToken.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setActive(true);
+        userRepository.save(user);
+
+        log.info("Password set successfully for user: {}", user.getEmail());
+        return user;
     }
 }

@@ -18,4 +18,7 @@ public class ActivationRequest {
     @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$",
             message = "Password must contain at least 8 characters, one digit, one lowercase, one uppercase, and one special character")
     private String password;
+
+    @NotBlank(message = "Confirm password is required")
+    private String confirmPassword;
 }

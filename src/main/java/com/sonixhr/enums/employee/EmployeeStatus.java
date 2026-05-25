@@ -1,9 +1,12 @@
-package com.sonixhr.enums;
+package com.sonixhr.enums.employee;
 
 public enum EmployeeStatus {
     ACTIVE("active", "Active", "success"),
     PROBATION("probation", "On Probation", "warning"),
-    RESIGNED("resigned", "Resigned", "secondary");
+    RESIGNED("resigned", "Resigned", "secondary"),
+    TERMINATED("terminated", "Terminated", "danger"),
+    ON_LEAVE("on_leave", "On Leave", "info"),
+    SUSPENDED("suspended", "Suspended", "danger");
 
     private final String code;
     private final String displayName;
@@ -33,7 +36,7 @@ public enum EmployeeStatus {
                 return status;
             }
         }
-        throw new IllegalArgumentException("Unknown employee status: " + code);
+        return ACTIVE; // Default
     }
 
     public boolean isActive() {
@@ -46,5 +49,13 @@ public enum EmployeeStatus {
 
     public boolean isResigned() {
         return this == RESIGNED;
+    }
+
+    public boolean isTerminated() {
+        return this == TERMINATED;
+    }
+
+    public boolean isOnLeave() {
+        return this == ON_LEAVE;
     }
 }

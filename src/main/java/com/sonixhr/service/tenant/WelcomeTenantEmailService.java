@@ -1,4 +1,4 @@
-package com.sonixhr.tenant;
+package com.sonixhr.service.tenant;
 
 import org.springframework.mail.javamail.MimeMessageHelper;
 

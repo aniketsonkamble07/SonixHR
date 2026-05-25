@@ -1,4 +1,4 @@
-package com.sonixhr.tenant;
+package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.UUID;
@@ -182,7 +181,7 @@ public class TenantRegistrationService {
         userRepository.save(adminUser);
     }
 
-    // ✅ Fixed: Use proper tenant relationship
+
     private void createSubscription(Tenant tenant, PlanType planType) {
         TenantSubscription subscription = TenantSubscription.builder()
                 .tenant(tenant)

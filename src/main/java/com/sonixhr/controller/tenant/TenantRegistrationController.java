@@ -1,8 +1,6 @@
 package com.sonixhr.controller.tenant;
 
 
-
-import com.sonixhr.dto.ActivationRequest;
 import com.sonixhr.dto.SetPasswordRequest;
 import com.sonixhr.dto.tenant.SubdomainCheckResponse;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
@@ -10,7 +8,7 @@ import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.UserRepository;
 import com.sonixhr.service.ActivationTokenService;
-import com.sonixhr.tenant.TenantRegistrationService;
+import com.sonixhr.service.tenant.TenantRegistrationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -2,8 +2,8 @@ package com.sonixhr.enums;
 
 public enum UserType {
     PLATFORM("Platform User"),
-    TENANT("Tenant User");
-
+    TENANT("Tenant User"),
+    EMPLOYEE("Employee User");
     private final String displayName;
 
     UserType(String displayName) {

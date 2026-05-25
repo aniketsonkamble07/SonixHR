@@ -1,4 +1,4 @@
-package com.sonixhr.tenant;
+package com.sonixhr.service.tenant;
 
 import com.sonixhr.entity.User;
 import com.sonixhr.repository.UserRepository;

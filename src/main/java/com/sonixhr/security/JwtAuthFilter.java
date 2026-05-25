@@ -1,9 +1,9 @@
 package com.sonixhr.security;
 
 import com.sonixhr.service.platform.PlatformUserDetailsService;
-import com.sonixhr.tenant.TenantContext;
-import com.sonixhr.tenant.TenantRLSService;
-import com.sonixhr.tenant.TenantUserDetailsService;
+import com.sonixhr.service.tenant.TenantContext;
+import com.sonixhr.service.tenant.TenantRLSService;
+import com.sonixhr.service.tenant.TenantUserDetailsService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,6 +21,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +54,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/auth/**",
             "/api/platform/auth/**",
             "/api/public/**",
+            "/api/employee/auth/activate",
             "/api/health",
             "/actuator/health",
             "/api/tenants/register",
@@ -173,6 +175,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 userDetails = platformUserDetailsService.loadUserByUsername(username);
                 System.out.println("Platform user loaded: " + userDetails.getUsername());
+
+            } else if ("EMPLOYEE".equals(userType)) {
+                // ========== ADD THIS BLOCK ==========
+                System.out.println("Processing EMPLOYEE user");
+                TenantContext.clear();  // Employees don't need tenant context
+
+                // Create UserDetails for employee
+                userDetails = org.springframework.security.core.userdetails.User
+                        .withUsername(username)
+                        .password("")
+                        .authorities(new ArrayList<>())  // Empty authorities
+                        .build();
+                System.out.println("Employee user loaded: " + userDetails.getUsername());
 
             } else {
                 System.out.println("ERROR: Unknown user type: " + userType);

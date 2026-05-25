@@ -1,5 +1,8 @@
 package com.sonixhr.entity;
 
+
+
+import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
