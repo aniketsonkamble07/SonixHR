@@ -42,6 +42,15 @@ public class TenantRegistrationResponse {
     private String activationToken;  // For development/testing
     private LocalDateTime activationTokenExpiry;
 
+    // =====================================================
+    // SUPER ADMIN EMPLOYEE INFO (ADD THIS)
+    // =====================================================
+    private Long superAdminEmployeeId;
+    private String superAdminEmployeeCode;
+    private String superAdminFullName;
+    private String superAdminEmail;
+    private String superAdminPosition;
+
     // Timestamps
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -63,6 +72,32 @@ public class TenantRegistrationResponse {
                 .isActive(false)
                 .activationToken(activationToken)
                 .activationTokenExpiry(LocalDateTime.now().plusHours(24))
+                .build();
+    }
+
+    // NEW: Success response with Super Admin employee details
+    public static TenantRegistrationResponse successWithEmployee(String message, UUID tenantId,
+                                                                 String subdomain, String planType,
+                                                                 LocalDateTime trialEndsAt, String activationToken,
+                                                                 Long employeeId, String employeeCode,
+                                                                 String fullName, String email) {
+        return TenantRegistrationResponse.builder()
+                .success(true)
+                .message(message)
+                .tenantId(tenantId)
+                .subdomain(subdomain)
+                .planType(planType)
+                .planStatus("trial")
+                .trialEndsAt(trialEndsAt)
+                .status("pending_activation")
+                .isActive(false)
+                .activationToken(activationToken)
+                .activationTokenExpiry(LocalDateTime.now().plusHours(24))
+                .superAdminEmployeeId(employeeId)
+                .superAdminEmployeeCode(employeeCode)
+                .superAdminFullName(fullName)
+                .superAdminEmail(email)
+                .superAdminPosition("Super Admin")
                 .build();
     }
 

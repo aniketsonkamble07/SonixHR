@@ -21,10 +21,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -73,7 +70,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // ========== DEBUG PRINT 1 ==========
         System.out.println("\n========== JWT FILTER START ==========");
         System.out.println("Request URI: " + request.getRequestURI());
         System.out.println("Request Method: " + request.getMethod());
@@ -124,6 +120,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         System.out.println("Username: " + username);
         System.out.println("UserType: " + userType);
 
+        // Extract roles
         Object rolesObj = claims.get("roles");
         List<String> permissionNames = rolesObj instanceof List<?> roles
                 ? roles.stream()
@@ -131,7 +128,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 .toList()
                 : List.of();
 
-        System.out.println("Permissions count: " + permissionNames.size());
+        System.out.println("Roles: " + permissionNames);
 
         Collection<? extends GrantedAuthority> authorities =
                 permissionNames.stream()
@@ -141,11 +138,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         UserDetails userDetails;
         boolean tenantDbContextSet = false;
 
+        // Extract additional claims
+        String tenantIdStr = claims.get("tenantId", String.class);
+        Long employeeId = null;
+        Object employeeIdObj = claims.get("employeeId");
+        if (employeeIdObj instanceof Integer) {
+            employeeId = ((Integer) employeeIdObj).longValue();
+        } else if (employeeIdObj instanceof Long) {
+            employeeId = (Long) employeeIdObj;
+        }
+
+        String employeeCode = claims.get("employeeCode", String.class);
+
         try {
             if ("TENANT".equals(userType)) {
                 System.out.println("Processing TENANT user");
 
-                String tenantIdStr = claims.get("tenantId", String.class);
                 if (tenantIdStr == null) {
                     System.out.println("ERROR: Tenant ID missing");
                     sendError(response, HttpServletResponse.SC_UNAUTHORIZED, "Tenant ID missing");
@@ -177,15 +185,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 System.out.println("Platform user loaded: " + userDetails.getUsername());
 
             } else if ("EMPLOYEE".equals(userType)) {
-                // ========== ADD THIS BLOCK ==========
                 System.out.println("Processing EMPLOYEE user");
-                TenantContext.clear();  // Employees don't need tenant context
+                TenantContext.clear();
 
                 // Create UserDetails for employee
                 userDetails = org.springframework.security.core.userdetails.User
                         .withUsername(username)
                         .password("")
-                        .authorities(new ArrayList<>())  // Empty authorities
+                        .authorities(new ArrayList<>())
                         .build();
                 System.out.println("Employee user loaded: " + userDetails.getUsername());
 
@@ -195,12 +202,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // =====================================================
+            // STORE ADDITIONAL DETAILS IN AUTHENTICATION
+            // =====================================================
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
 
-            SecurityContextHolder.getContext().setAuthentication(authToken);
-            System.out.println("Authentication set successfully in SecurityContext");
+            // Create a map to store additional details
+            Map<String, Object> details = new HashMap<>();
+            details.put("userType", userType);
+            details.put("roles", permissionNames);
+            details.put("tenantId", tenantIdStr);
+            details.put("employeeId", employeeId);
+            details.put("employeeCode", employeeCode);
 
+            authToken.setDetails(details);
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            System.out.println("Authentication set with details - UserType: " + userType +
+                    ", Roles: " + permissionNames +
+                    ", EmployeeId: " + employeeId);
             System.out.println("Proceeding to controller...");
             filterChain.doFilter(request, response);
 

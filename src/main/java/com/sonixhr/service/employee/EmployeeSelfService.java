@@ -2,12 +2,18 @@ package com.sonixhr.service.employee;
 
 import com.sonixhr.dto.employee.EmployeeProfileUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
+import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
+import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
+import com.sonixhr.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +26,8 @@ import java.util.UUID;
 public class EmployeeSelfService {
 
     private final EmployeeRepository employeeRepository;
-
+    private final DepartmentRepository departmentRepository;
+    private final SecurityUtils securityUtils;
     // =====================================================
     // Update employee profile (self-service)
     // =====================================================
@@ -29,65 +36,121 @@ public class EmployeeSelfService {
                                                   EmployeeProfileUpdateRequest request) {
         log.info("Updating profile for employee: {}", email);
 
-        Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
+        Employee employee = employeeRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
-        // Update only null or provided fields
-        if (request.getPhone() != null) {
-            employee.setPhone(request.getPhone());
+        if (!employee.getTenantId().equals(tenantId)) {
+            throw new ResourceNotFoundException("Employee not found in this tenant");
         }
-        if (request.getPersonalEmail() != null) {
-            employee.setPersonalEmail(request.getPersonalEmail());
-        }
-        if (request.getAddress() != null) {
-            employee.setAddress(request.getAddress());
-        }
-        if (request.getCity() != null) {
-            employee.setCity(request.getCity());
-        }
-        if (request.getState() != null) {
-            employee.setState(request.getState());
-        }
-        if (request.getCountry() != null) {
-            employee.setCountry(request.getCountry());
-        }
-        if (request.getPostalCode() != null) {
-            employee.setPostalCode(request.getPostalCode());
-        }
-        if (request.getPermanentAddress() != null) {
-            employee.setPermanentAddress(request.getPermanentAddress());
-        }
-        if (request.getEmergencyContactName() != null) {
-            employee.setEmergencyContactName(request.getEmergencyContactName());
-        }
-        if (request.getEmergencyContactPhone() != null) {
-            employee.setEmergencyContactPhone(request.getEmergencyContactPhone());
-        }
-        if (request.getEmergencyContactRelation() != null) {
-            employee.setEmergencyContactRelation(request.getEmergencyContactRelation());
-        }
-        if (request.getEmergencyContactEmail() != null) {
-            employee.setEmergencyContactEmail(request.getEmergencyContactEmail());
-        }
-        if (request.getSecondaryEmergencyName() != null) {
-            employee.setSecondaryEmergencyName(request.getSecondaryEmergencyName());
-        }
-        if (request.getSecondaryEmergencyPhone() != null) {
-            employee.setSecondaryEmergencyPhone(request.getSecondaryEmergencyPhone());
-        }
-        if (request.getLinkedinUrl() != null) {
-            employee.setLinkedinUrl(request.getLinkedinUrl());
-        }
-        if (request.getGithubUrl() != null) {
-            employee.setGithubUrl(request.getGithubUrl());
-        }
-        if (request.getTwitterUrl() != null) {
-            employee.setTwitterUrl(request.getTwitterUrl());
+
+        // =====================================================
+        // CHECK PERMISSIONS USING SECURITY_UTILS (FROM JWT)
+        // =====================================================
+        boolean isSuperAdmin = securityUtils.isSuperAdmin();
+        boolean isHR = securityUtils.isHR();
+
+        log.debug("User permissions - SuperAdmin: {}, HR: {}, Roles: {}",
+                isSuperAdmin, isHR, securityUtils.getCurrentUserRoles());
+
+        // =====================================================
+        // PERSONAL INFORMATION (All employees can update)
+        // =====================================================
+        updatePersonalInfo(employee, request);
+
+        // =====================================================
+        // PROFESSIONAL INFORMATION (Only Super Admin/HR can update)
+        // =====================================================
+        if (isSuperAdmin || isHR) {
+            updateProfessionalInfo(employee, request, tenantId);
+        } else if (hasProfessionalInfoRequest(request)) {
+            log.warn("Employee {} attempted to update professional fields without permission. Roles: {}",
+                    email, securityUtils.getCurrentUserRoles());
+            throw new BusinessException("You don't have permission to update professional information. Only HR or Super Admin can update department, position, work location, and manager.");
         }
 
         Employee updatedEmployee = employeeRepository.save(employee);
         log.info("Profile updated successfully for employee: {}", email);
         return convertToResponse(updatedEmployee);
+    }
+
+    private void updatePersonalInfo(Employee employee, EmployeeProfileUpdateRequest request) {
+        if (request.getPhone() != null) employee.setPhone(request.getPhone());
+        if (request.getDateOfBirth() != null) employee.setDateOfBirth(request.getDateOfBirth());
+        if (request.getGender() != null) employee.setGender(request.getGender());
+        if (request.getMaritalStatus() != null) employee.setMaritalStatus(request.getMaritalStatus());
+        if (request.getBloodGroup() != null) employee.setBloodGroup(request.getBloodGroup());
+        if (request.getNationality() != null) employee.setNationality(request.getNationality());
+        if (request.getPersonalEmail() != null) employee.setPersonalEmail(request.getPersonalEmail());
+        if (request.getAddress() != null) employee.setAddress(request.getAddress());
+        if (request.getCity() != null) employee.setCity(request.getCity());
+        if (request.getState() != null) employee.setState(request.getState());
+        if (request.getCountry() != null) employee.setCountry(request.getCountry());
+        if (request.getPostalCode() != null) employee.setPostalCode(request.getPostalCode());
+        if (request.getPermanentAddress() != null) employee.setPermanentAddress(request.getPermanentAddress());
+        if (request.getEmergencyContactName() != null) employee.setEmergencyContactName(request.getEmergencyContactName());
+        if (request.getEmergencyContactPhone() != null) employee.setEmergencyContactPhone(request.getEmergencyContactPhone());
+        if (request.getEmergencyContactRelation() != null) employee.setEmergencyContactRelation(request.getEmergencyContactRelation());
+        if (request.getEmergencyContactEmail() != null) employee.setEmergencyContactEmail(request.getEmergencyContactEmail());
+        if (request.getSecondaryEmergencyName() != null) employee.setSecondaryEmergencyName(request.getSecondaryEmergencyName());
+        if (request.getSecondaryEmergencyPhone() != null) employee.setSecondaryEmergencyPhone(request.getSecondaryEmergencyPhone());
+        if (request.getBankDetails() != null) employee.setBankDetails(request.getBankDetails());
+        if (request.getLinkedinUrl() != null) employee.setLinkedinUrl(request.getLinkedinUrl());
+        if (request.getGithubUrl() != null) employee.setGithubUrl(request.getGithubUrl());
+        if (request.getTwitterUrl() != null) employee.setTwitterUrl(request.getTwitterUrl());
+        if (request.getCustomFields() != null) employee.setCustomFields(request.getCustomFields());
+    }
+
+    private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, UUID tenantId) {
+        if (request.getDepartmentId() != null) {
+            Department department = departmentRepository.findById(request.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
+            employee.setDepartment(department);
+            log.info("Department updated to: {} (ID: {})", department.getName(), department.getId());
+        }
+        if (request.getPosition() != null) {
+            employee.setPosition(request.getPosition());
+            log.info("Position updated to: {}", request.getPosition());
+        }
+        if (request.getWorkLocation() != null) {
+            employee.setWorkLocation(request.getWorkLocation());
+            log.info("Work location updated to: {}", request.getWorkLocation());
+        }
+        if (request.getManagerId() != null) {
+            Employee manager = employeeRepository.findById(request.getManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with id: " + request.getManagerId()));
+            employee.setManager(manager);
+            log.info("Manager updated to: {} (ID: {})", manager.getFullName(), manager.getId());
+        }
+    }
+
+    private boolean hasProfessionalInfoRequest(EmployeeProfileUpdateRequest request) {
+        return request.getDepartmentId() != null ||
+                request.getPosition() != null ||
+                request.getWorkLocation() != null ||
+                request.getManagerId() != null;
+    }
+
+    private boolean isCurrentUserSuperAdmin(UUID tenantId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        // Check if user has SUPER_ADMIN role
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
+    }
+
+    private boolean isCurrentUserHR(UUID tenantId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        // Check if user has HR role
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_HR") ||
+                        auth.getAuthority().equals("ROLE_ADMIN"));
     }
 
     // =====================================================

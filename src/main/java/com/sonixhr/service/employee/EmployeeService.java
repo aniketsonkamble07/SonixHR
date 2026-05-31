@@ -22,11 +22,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -478,7 +482,17 @@ public class EmployeeService {
     }
 
     private Long getCurrentUserId() {
-        // TODO: Get from SecurityContext
-        return 1L;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof UserDetails) {
+                UserDetails userDetails = (UserDetails) principal;
+                // User ID is UUID, but Employee.createdBy expects Long
+                // You need to get the Employee ID, not User ID
+                Optional<Employee> employee = employeeRepository.findByEmail(userDetails.getUsername());
+                return employee.map(Employee::getId).orElse(null);
+            }
+        }
+        return null;
     }
 }

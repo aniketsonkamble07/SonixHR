@@ -3,17 +3,22 @@ package com.sonixhr.service.tenant;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.entity.*;
+import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.PlanType;
 import com.sonixhr.enums.UserType;
+import com.sonixhr.enums.employee.EmployeeStatus;
+import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.DuplicateResourceException;
 import com.sonixhr.repository.*;
+import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 
+import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.UUID;
@@ -38,6 +44,8 @@ public class TenantRegistrationService {
     private final ActivationTokenRepository activationTokenRepository;
     private final WelcomeTenantEmailService notificationService;
     private final PasswordEncoder passwordEncoder;
+    private final EmployeeRepository employeeRepository;
+    private final EmployeeCodeGenerator employeeCodeGenerator;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -79,18 +87,70 @@ public class TenantRegistrationService {
         createSubscription(tenant, planType);
         log.info("Subscription created for tenant");
 
-        // 9. Generate activation token
+        // 9. Create Employee record for Super Admin
+        Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, adminUser);
+        log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
+
+        // 10. Generate activation token
         String activationToken = generateActivationToken(adminUser);
         log.info("Activation token generated");
 
-        // 10. Send welcome email
+        // 11. Send welcome email
         sendWelcomeEmail(tenant, adminUser, activationToken, planType);
         log.info("Welcome email sent");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
-        return buildResponse(tenant, activationToken);
+        return buildResponse(tenant, activationToken, superAdminEmployee);
     }
+
+    // =====================================================
+    // CREATE EMPLOYEE FOR SUPER ADMIN
+    // =====================================================
+    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request, User user) {
+        String employeeCode = employeeCodeGenerator.generateSequentialCode(tenant);
+
+        String firstName = getFirstNameFromFullName(request.getAdminName());
+        String lastName = getLastNameFromFullName(request.getAdminName());
+
+        Employee superAdmin = Employee.builder()
+                .tenant(tenant)
+                .user(user)
+                .employeeCode(employeeCode)
+                .firstName(firstName)
+                .lastName(lastName)
+                .email(request.getAdminEmail())
+                .phone(request.getAdminPhone())
+                .position("Super Admin")
+                .employmentType(EmploymentType.FULL_TIME)
+                .hireDate(LocalDate.now())
+                .probationMonths(0)
+                .status(EmployeeStatus.ACTIVE)
+                .workLocation("Head Office")
+                .createdBy(1L)
+                .build();
+
+        return employeeRepository.save(superAdmin);
+    }
+
+    private String getFirstNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) return "Admin";
+        String[] parts = fullName.split(" ");
+        return parts[0];
+    }
+
+    private String getLastNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) return "User";
+        String[] parts = fullName.split(" ");
+        if (parts.length > 1) {
+            return String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length));
+        }
+        return "";
+    }
+
+    // =====================================================
+    // EXISTING METHODS (keep as is)
+    // =====================================================
 
     private void validateUniqueness(TenantRegistrationRequest request) {
         if (tenantRepository.existsByCompanyName(request.getCompanyName())) {
@@ -109,7 +169,6 @@ public class TenantRegistrationService {
                 .replaceAll("[^a-z0-9]", "-")
                 .replaceAll("-+", "-")
                 .replaceAll("^-|-$", "");
-
         String code = baseCode;
         int counter = 1;
         while (tenantRepository.existsByTenantCode(code)) {
@@ -164,7 +223,6 @@ public class TenantRegistrationService {
         return roleRepository.save(tenantRole);
     }
 
-
     private User createAdminUser(Tenant tenant, TenantRegistrationRequest request) {
         User adminUser = User.builder()
                 .tenant(tenant)
@@ -180,7 +238,6 @@ public class TenantRegistrationService {
         adminUser.getRoles().add(superAdminRole);
         userRepository.save(adminUser);
     }
-
 
     private void createSubscription(Tenant tenant, PlanType planType) {
         TenantSubscription subscription = TenantSubscription.builder()
@@ -227,7 +284,7 @@ public class TenantRegistrationService {
         );
     }
 
-    private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken) {
+    private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken, Employee superAdminEmployee) {
         return TenantRegistrationResponse.builder()
                 .success(true)
                 .message("Registration successful! Please check your email to activate your account.")
@@ -246,6 +303,11 @@ public class TenantRegistrationService {
                 .activationToken(activationToken)
                 .activationTokenExpiry(LocalDateTime.now().plusHours(24))
                 .createdAt(tenant.getCreatedAt())
+                .superAdminEmployeeId(superAdminEmployee.getId())
+                .superAdminEmployeeCode(superAdminEmployee.getEmployeeCode())
+                .superAdminFullName(superAdminEmployee.getFullName())
+                .superAdminEmail(superAdminEmployee.getEmail())
+                .superAdminPosition(superAdminEmployee.getPosition())
                 .build();
     }
 }

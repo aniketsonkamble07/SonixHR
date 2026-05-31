@@ -49,5 +49,15 @@ public class EmployeeProfileUpdateRequest {
     private String twitterUrl;
 
     // Custom Fields
-    private Map<String, Object> customFields;
+    private Map<String, Object> customFields;private Long departmentId;
+
+    // =====================================================
+    // ONLY SUPER ADMIN / HR CAN UPDATE
+    // =====================================================
+    private String position;
+    private String workLocation;
+    private Long managerId;
+
+
+
 }
