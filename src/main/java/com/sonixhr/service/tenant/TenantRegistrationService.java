@@ -96,7 +96,7 @@ public class TenantRegistrationService {
         log.info("Activation token generated");
 
         // 11. Send welcome email
-        sendWelcomeEmail(tenant, adminUser, activationToken, planType);
+       // sendWelcomeEmail(tenant, adminUser, activationToken, planType);
         log.info("Welcome email sent");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());

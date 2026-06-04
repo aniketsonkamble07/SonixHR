@@ -95,11 +95,11 @@ public class PlatformUserService {
         String activationLink = baseUrl + "/api/platform/auth/activate?token=" + activationTokenValue;
 
         // Send activation email
-        emailService.sendPlatformActivationEmail(
+     /*   emailService.sendPlatformActivationEmail(
                 savedUser.getEmail(),
                 savedUser.getFullName(),
                 activationLink
-        );
+       );*/
 
 
 
