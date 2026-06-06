@@ -12,7 +12,7 @@ public class DepartmentResponse {
 
     // Basic Department Information
     private Long id;
-    private UUID tenantId;
+    private Long tenantId;
     private String name;
     private String code;
     private String description;

@@ -1,5 +1,6 @@
 package com.sonixhr.repository.tenant;
 
+import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.tenant.Tenant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,15 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface TenantRepository extends JpaRepository<Tenant, UUID> {
+public interface TenantRepository extends JpaRepository<Tenant, Long> {  // ✅ Changed from UUID to Long
 
     // ===== Basic Finders =====
     Optional<Tenant> findBySubdomain(String subdomain);
     Optional<Tenant> findByTenantCode(String tenantCode);
-    Optional<Tenant> findByAdminEmail(String adminEmail);
+    Optional<Tenant> findByCompanyName(String companyName);
 
+    Optional<Tenant> findByCompanyNameIgnoreCase(String companyName);
     // ===== Existence Checks =====
     boolean existsBySubdomain(String subdomain);
     boolean existsByTenantCode(String tenantCode);
@@ -40,7 +41,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     @Modifying
     @Transactional
     @Query("UPDATE Tenant t SET t.status = :status, t.isActive = :isActive, t.suspendedAt = :suspendedAt WHERE t.id = :tenantId")
-    int updateTenantStatus(@Param("tenantId") UUID tenantId,
+    int updateTenantStatus(@Param("tenantId") Long tenantId,  // ✅ Changed from UUID to Long
                            @Param("status") String status,
                            @Param("isActive") Boolean isActive,
                            @Param("suspendedAt") LocalDateTime suspendedAt);
@@ -49,12 +50,12 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     @Modifying
     @Transactional
     @Query("UPDATE Tenant t SET t.status = 'deleted', t.isActive = false, t.deletedAt = CURRENT_TIMESTAMP WHERE t.id = :tenantId")
-    int softDeleteById(@Param("tenantId") UUID tenantId);
+    int softDeleteById(@Param("tenantId") Long tenantId);  // ✅ Changed from UUID to Long
 
     @Modifying
     @Transactional
     @Query("UPDATE Tenant t SET t.status = 'active', t.isActive = true, t.deletedAt = NULL WHERE t.id = :tenantId")
-    int restoreById(@Param("tenantId") UUID tenantId);
+    int restoreById(@Param("tenantId") Long tenantId);  // ✅ Changed from UUID to Long
 
     // ===== Search with Multiple Criteria =====
     @Query("SELECT t FROM Tenant t WHERE " +
@@ -74,4 +75,54 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
     // ===== Expiring Trials =====
     List<Tenant> findByPlanStatusAndTrialEndsAtBefore(String planStatus, LocalDateTime dateTime);
+
+    // ===== Additional Useful Methods =====
+
+    /**
+     * Find tenants that are currently in trial period
+     */
+    @Query("SELECT t FROM Tenant t WHERE t.planStatus = 'trial' AND t.trialEndsAt > CURRENT_TIMESTAMP")
+    List<Tenant> findActiveTrials();
+
+    /**
+     * Find tenants with expired trials
+     */
+    @Query("SELECT t FROM Tenant t WHERE t.planStatus = 'trial' AND t.trialEndsAt < CURRENT_TIMESTAMP")
+    List<Tenant> findExpiredTrials();
+
+    /**
+     * Update plan for a tenant
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Tenant t SET t.planType = :planType, t.planStatus = :planStatus, " +
+            "t.maxEmployees = :maxEmployees WHERE t.id = :tenantId")
+    int updatePlan(@Param("tenantId") Long tenantId,
+                   @Param("planType") String planType,
+                   @Param("planStatus") String planStatus,
+                   @Param("maxEmployees") Integer maxEmployees);
+
+    /**
+     * Count tenants by plan type
+     */
+    @Query("SELECT t.planType, COUNT(t) FROM Tenant t GROUP BY t.planType")
+    List<Object[]> countByPlanType();
+
+    /**
+     * Find tenants by admin email domain
+     */
+    @Query("SELECT t FROM Tenant t WHERE t.adminEmail LIKE CONCAT('%@', :domain)")
+    List<Tenant> findByAdminEmailDomain(@Param("domain") String domain);
+
+    /**
+     * Check if subdomain exists (case insensitive)
+     */
+    @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE LOWER(t.subdomain) = LOWER(:subdomain)")
+    boolean existsBySubdomainIgnoreCase(@Param("subdomain") String subdomain);
+
+    /**
+     * Check if tenant code exists (case insensitive)
+     */
+    @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE LOWER(t.tenantCode) = LOWER(:tenantCode)")
+    boolean existsByTenantCodeIgnoreCase(@Param("tenantCode") String tenantCode);
 }

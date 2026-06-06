@@ -12,7 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
+
 
 @Slf4j
 @RestController
@@ -30,7 +30,7 @@ public class EmployeeSelfServiceController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         String email = userDetails.getUsername();
-        UUID tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = TenantContext.getCurrentTenant();
 
         log.info("Employee {} viewing their profile", email);
 
@@ -47,7 +47,7 @@ public class EmployeeSelfServiceController {
             @Valid @RequestBody EmployeeProfileUpdateRequest request) {
 
         String email = userDetails.getUsername();
-        UUID tenantId = TenantContext.getCurrentTenant();
+        Long tenantId = TenantContext.getCurrentTenant();
 
         log.info("Employee {} updating their profile", email);
 

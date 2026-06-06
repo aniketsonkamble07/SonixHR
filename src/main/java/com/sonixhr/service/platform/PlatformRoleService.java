@@ -3,11 +3,12 @@ package com.sonixhr.service.platform;
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
-import com.sonixhr.exceptions.DuplicateResourceException;
-import com.sonixhr.exceptions.RoleNotFoundException;
-
+import com.sonixhr.entity.platform.PlatformUser;
+import com.sonixhr.exceptions.BusinessException;
+import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
+import com.sonixhr.repository.platform.PlatformUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,105 +17,160 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PlatformRoleService {
 
     private final PlatformRoleRepository roleRepository;
     private final PlatformPermissionRepository permissionRepository;
+    private final PlatformUserRepository userRepository;
 
     @Transactional
-    public PlatformRole createRole(PlatformRoleCreateRequest request, UUID createdBy) {
-        log.info("Creating platform role: name={}, createdBy={}", request.getName(), createdBy);
+    public PlatformRole createRole(PlatformRoleCreateRequest request, Long tenantId, Long createdBy) {
+        log.info("Creating platform role: {} for tenant: {}", request.getName(), tenantId);
 
-        if (roleRepository.existsByName(request.getName())) {
-            log.warn("Role creation failed - name already exists: {}", request.getName());
-            throw new DuplicateResourceException("Role name already exists: " + request.getName());
+        if (roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+            throw new BusinessException("Role already exists: " + request.getName() + " for this tenant");
         }
 
-        log.debug("Fetching permissions for IDs: {}", request.getPermissionIds());
-        Set<PlatformPermission> permissions = new HashSet<>(
-                permissionRepository.findAllById(request.getPermissionIds())
-        );
-        if (permissions.size() != request.getPermissionIds().size()) {
-            log.error("Permission ID validation failed: expected {} valid IDs, got {} valid IDs",
-                    request.getPermissionIds().size(), permissions.size());
-            throw new IllegalArgumentException("Some permission IDs are invalid");
+        // Fetch permissions if provided (must belong to same tenant)
+        Set<PlatformPermission> permissions = new HashSet<>();
+        if (request.getPermissionIds() != null && !request.getPermissionIds().isEmpty()) {
+            permissions = new HashSet<>(permissionRepository.findAllByIdAndTenantId(request.getPermissionIds(), tenantId));
+            if (permissions.size() != request.getPermissionIds().size()) {
+                throw new BusinessException("One or more permission IDs are invalid for this tenant");
+            }
         }
 
         PlatformRole role = PlatformRole.builder()
+                .tenantId(tenantId)
                 .name(request.getName())
                 .description(request.getDescription())
-                .createdBy(createdBy)
-                .createdAt(java.time.LocalDateTime.now())
+                .isSystemRole(false)
                 .permissions(permissions)
+                .createdBy(createdBy)
                 .build();
 
-        PlatformRole savedRole = roleRepository.save(role);
-        log.info("Platform role created successfully: id={}, name={}", savedRole.getId(), savedRole.getName());
-        return savedRole;
+        return roleRepository.save(role);
     }
 
     @Transactional
-    public PlatformRole updateRolePermissions(Long roleId, Set<Long> permissionIds) {
-        log.info("Updating permissions for platform role: roleId={}, permissionIds={}", roleId, permissionIds);
+    public PlatformRole updateRole(Long roleId, PlatformRoleCreateRequest request, Long tenantId) {
+        log.info("Updating platform role: {} for tenant: {}", roleId, tenantId);
 
-        PlatformRole role = roleRepository.findByIdWithPermissions(roleId)
-                .orElseThrow(() -> {
-                    log.warn("Role not found for permission update: roleId={}", roleId);
-                    return new RoleNotFoundException("Role not found");
-                });
+        PlatformRole role = getRoleByIdAndTenant(roleId, tenantId);
 
-        log.debug("Current permissions for role {}: {}", roleId, role.getPermissions());
+        if (role.isSystemRole()) {
+            throw new BusinessException("Cannot modify system role");
+        }
 
-        Set<PlatformPermission> permissions = new HashSet<>(permissionRepository.findAllById(permissionIds));
+        // Check if new name conflicts with existing role in same tenant
+        if (!role.getName().equals(request.getName()) &&
+                roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+            throw new BusinessException("Role name already exists: " + request.getName());
+        }
+
+        role.setName(request.getName());
+        role.setDescription(request.getDescription());
+
+        return roleRepository.save(role);
+    }
+
+    @Transactional
+    public PlatformRole updateRolePermissions(Long roleId, Set<Long> permissionIds, Long tenantId) {
+        log.info("Updating permissions for role: {} in tenant: {}", roleId, tenantId);
+
+        PlatformRole role = getRoleByIdAndTenant(roleId, tenantId);
+
+        if (role.isSystemRole()) {
+            throw new BusinessException("Cannot modify permissions of system role");
+        }
+
+        Set<PlatformPermission> permissions = new HashSet<>(
+                permissionRepository.findAllByIdAndTenantId(permissionIds, tenantId)
+        );
+
         if (permissions.size() != permissionIds.size()) {
-            log.error("Permission ID validation failed for update: expected {} valid IDs, got {}",
-                    permissionIds.size(), permissions.size());
-            throw new IllegalArgumentException("Some permission IDs are invalid");
+            Set<Long> foundIds = permissions.stream().map(PlatformPermission::getId).collect(Collectors.toSet());
+            Set<Long> missingIds = permissionIds.stream().filter(id -> !foundIds.contains(id)).collect(Collectors.toSet());
+            throw new BusinessException("Invalid permission IDs for this tenant: " + missingIds);
         }
 
         role.setPermissions(permissions);
-        PlatformRole updatedRole = roleRepository.save(role);
-        log.info("Role permissions updated successfully: roleId={}, newPermissionCount={}",
-                updatedRole.getId(), updatedRole.getPermissions().size());
-        return updatedRole;
+        return roleRepository.save(role);
     }
 
-    @Transactional(readOnly = true)
-    public List<PlatformRole> getAllRolesWithPermissions() {
-        log.debug("Fetching all platform roles with permissions");
-        List<PlatformRole> roles = roleRepository.findAllWithPermissions();
-        log.info("Retrieved {} platform roles", roles.size());
-        return roles;
+    public PlatformRole getRoleByIdAndTenant(Long roleId, Long tenantId) {
+        return roleRepository.findByIdAndTenantId(roleId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId + " for tenant: " + tenantId));
     }
 
-    @Transactional(readOnly = true)
-    public PlatformRole getRoleById(Long roleId) {
-        log.debug("Fetching platform role by id: {}", roleId);
-        PlatformRole role = roleRepository.findByIdWithPermissions(roleId)
-                .orElseThrow(() -> {
-                    log.warn("Role not found: id={}", roleId);
-                    return new RoleNotFoundException("Role not found");
-                });
-        log.info("Platform role retrieved: id={}, name={}, permissionCount={}",
-                role.getId(), role.getName(), role.getPermissions().size());
-        return role;
+    public List<PlatformRole> getAllRolesForTenant(Long tenantId) {
+        return roleRepository.findAllByTenantIdWithPermissions(tenantId);
     }
 
     @Transactional
-    public void deleteRole(Long roleId) {
-        log.info("Deleting platform role: id={}", roleId);
-        // optional: check if any platform user has this role
-        if (roleRepository.existsById(roleId)) {
-            roleRepository.deleteById(roleId);
-            log.info("Platform role deleted successfully: id={}", roleId);
-        } else {
-            log.warn("Attempted to delete non-existent role: id={}", roleId);
-            throw new RoleNotFoundException("Role not found");
+    public void deleteRole(Long roleId, Long tenantId) {
+        log.info("Deleting platform role: {} for tenant: {}", roleId, tenantId);
+
+        PlatformRole role = getRoleByIdAndTenant(roleId, tenantId);
+
+        if (role.isSystemRole()) {
+            throw new BusinessException("Cannot delete system role");
         }
+
+        long userCount = userRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
+        if (userCount > 0) {
+            throw new BusinessException("Cannot delete role that is assigned to " + userCount + " user(s)");
+        }
+
+        roleRepository.delete(role);
+    }
+
+    public List<PlatformUser> getUsersByRole(Long roleId, Long tenantId) {
+        log.info("Getting users for role: {} in tenant: {}", roleId, tenantId);
+        // Verify role exists for this tenant
+        getRoleByIdAndTenant(roleId, tenantId);
+        return userRepository.findByRolesIdAndTenantId(roleId, tenantId);
+    }
+
+    @Transactional
+    public void assignRoleToUser(Long roleId, Long userId, Long tenantId) {
+        log.info("Assigning role {} to user {} in tenant {}", roleId, userId, tenantId);
+
+        PlatformRole role = getRoleByIdAndTenant(roleId, tenantId);
+        PlatformUser user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId + " for tenant: " + tenantId));
+
+        if (user.getRoles().stream().anyMatch(r -> r.getId().equals(roleId))) {
+            throw new BusinessException("User already has role: " + role.getName());
+        }
+
+        user.getRoles().add(role);
+        userRepository.save(user);
+
+        log.info("Role '{}' assigned to user '{}' in tenant {}", role.getName(), user.getEmail(), tenantId);
+    }
+
+    @Transactional
+    public void removeRoleFromUser(Long roleId, Long userId, Long tenantId) {
+        log.info("Removing role {} from user {} in tenant {}", roleId, userId, tenantId);
+
+        PlatformUser user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId + " for tenant: " + tenantId));
+
+        boolean removed = user.getRoles().removeIf(role -> role.getId().equals(roleId));
+
+        if (!removed) {
+            PlatformRole role = getRoleByIdAndTenant(roleId, tenantId);
+            throw new BusinessException("User does not have role: " + role.getName());
+        }
+
+        userRepository.save(user);
+        log.info("Role removed from user {} in tenant {}", userId, tenantId);
     }
 }

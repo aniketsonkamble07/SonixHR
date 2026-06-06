@@ -1,19 +1,19 @@
-package com.sonixhr.entity;
+package com.sonixhr.dto;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
-@Table(name = "permissions")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Permission {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class PermissionDTO {
     private Long id;
     private String name;
     private String description;
+    private String icon;
+    private String category;
+    private boolean selected;
 }

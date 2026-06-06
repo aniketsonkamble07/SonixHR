@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface TenantSetupTokenRepository extends JpaRepository<TenantSetupToken, UUID> {
+public interface TenantSetupTokenRepository extends JpaRepository<TenantSetupToken, Long> {
     Optional<TenantSetupToken> findByTokenAndUsedFalseAndExpiryAfter(String token, LocalDateTime now);
 
     @Modifying

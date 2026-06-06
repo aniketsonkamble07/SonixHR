@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TenantSettingRepository extends JpaRepository<TenantSetting, Long> {
-    List<TenantSetting> findByTenantId(UUID tenantId);
-    Optional<TenantSetting> findByTenantIdAndSettingKey(UUID tenantId, String settingKey);
-    void deleteByTenantIdAndSettingKey(UUID tenantId, String settingKey);
+    List<TenantSetting> findByTenantId(Long tenantId);
+    Optional<TenantSetting> findByTenantIdAndSettingKey(Long tenantId, String settingKey);
+    void deleteByTenantIdAndSettingKey(Long tenantId, String settingKey);
 }

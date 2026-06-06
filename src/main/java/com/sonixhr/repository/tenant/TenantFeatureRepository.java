@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TenantFeatureRepository extends JpaRepository<TenantFeature, Long> {
-    List<TenantFeature> findByTenantIdAndIsEnabledTrue(UUID tenantId);
-    Optional<TenantFeature> findByTenantIdAndFeatureName(UUID tenantId, String featureName);
-    boolean existsByTenantIdAndFeatureNameAndIsEnabledTrue(UUID tenantId, String featureName);
+    List<TenantFeature> findByTenantIdAndIsEnabledTrue(Long tenantId);
+    Optional<TenantFeature> findByTenantIdAndFeatureName(Long tenantId, String featureName);
+    boolean existsByTenantIdAndFeatureNameAndIsEnabledTrue(Long tenantId, String featureName);
 }

@@ -10,10 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,29 +24,31 @@ public class ShiftConfigurationService {
 
     private final ShiftConfigurationRepository shiftConfigurationRepository;
 
-    // =====================================================
-    // CREATE SHIFT CONFIGURATION
-    // =====================================================
-
     @Transactional
-    public ShiftConfigurationDTO createShiftConfiguration(ShiftConfigurationRequestDTO request, Long userId) {
-        log.info("Creating shift configuration for tenant: {}", request.getTenantId());
+    public ShiftConfigurationDTO createShiftConfiguration(
+            ShiftConfigurationRequestDTO request,
+            Long tenantId,
+            Long employeeId) {
 
-        if (shiftConfigurationRepository.existsByTenantId(request.getTenantId())) {
+        log.info("Creating shift configuration for tenant: {} by employee: {}", tenantId, employeeId);
+
+        if (shiftConfigurationRepository.existsByTenantId(tenantId)) {
             throw new BusinessException("Shift configuration already exists for this tenant");
         }
 
         validateShiftTimings(request.getStartTime(), request.getEndTime());
 
-        if (request.getShiftCode() != null && shiftConfigurationRepository.existsByShiftCode(request.getShiftCode())) {
-            throw new BusinessException("Shift code already exists: " + request.getShiftCode());
+        if (request.getShiftCode() != null && !request.getShiftCode().isEmpty()) {
+            if (shiftConfigurationRepository.existsByShiftCodeAndTenantId(request.getShiftCode(), tenantId)) {
+                throw new BusinessException("Shift code already exists for this tenant: " + request.getShiftCode());
+            }
         }
 
         validateWorkingHoursThresholds(request.getFullDayHours(), request.getHalfDayHours(), request.getQuarterDayHours());
         validateBreakDurations(request.getBreakDurationMinutes(), request.getMinBreakMinutes(), request.getMaxBreakMinutes());
 
         ShiftConfiguration shift = ShiftConfiguration.builder()
-                .tenantId(request.getTenantId())
+                .tenantId(tenantId)
                 .shiftName(request.getShiftName())
                 .shiftCode(request.getShiftCode())
                 .shiftDescription(request.getShiftDescription())
@@ -72,25 +74,26 @@ public class ShiftConfigurationService {
                 .effectiveFrom(request.getEffectiveFrom() != null ? request.getEffectiveFrom() : LocalDate.now())
                 .effectiveTo(request.getEffectiveTo())
                 .isActive(true)
-                .isDefault(!shiftConfigurationRepository.existsByTenantId(request.getTenantId()))
-                .createdBy(userId)
+                .isDefault(!shiftConfigurationRepository.existsByTenantId(tenantId))
+                .createdBy(employeeId)
                 .build();
 
         ShiftConfiguration saved = shiftConfigurationRepository.save(shift);
-        log.info("Shift configuration created with id: {}", saved.getId());
+        log.info("Shift configuration created with id: {} for tenant: {}", saved.getId(), tenantId);
 
         return convertToDTO(saved);
     }
 
-    // =====================================================
-    // UPDATE SHIFT CONFIGURATION
-    // =====================================================
-
     @Transactional
-    public ShiftConfigurationDTO updateShiftConfiguration(Long id, ShiftConfigurationRequestDTO request, Long userId) {
-        log.info("Updating shift configuration: {}", id);
+    public ShiftConfigurationDTO updateShiftConfiguration(
+            Long id,
+            ShiftConfigurationRequestDTO request,
+            Long tenantId,
+            Long employeeId) {
 
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
+        log.info("Updating shift configuration: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
+
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
 
         validateShiftTimings(request.getStartTime(), request.getEndTime());
@@ -98,8 +101,8 @@ public class ShiftConfigurationService {
         validateBreakDurations(request.getBreakDurationMinutes(), request.getMinBreakMinutes(), request.getMaxBreakMinutes());
 
         if (request.getShiftCode() != null && !request.getShiftCode().equals(shift.getShiftCode())) {
-            if (shiftConfigurationRepository.existsByShiftCode(request.getShiftCode())) {
-                throw new BusinessException("Shift code already exists: " + request.getShiftCode());
+            if (shiftConfigurationRepository.existsByShiftCodeAndTenantId(request.getShiftCode(), tenantId)) {
+                throw new BusinessException("Shift code already exists for this tenant: " + request.getShiftCode());
             }
         }
 
@@ -131,43 +134,100 @@ public class ShiftConfigurationService {
         shift.setAlternateWeekOff(request.getAlternateWeekOff());
         shift.setEffectiveFrom(request.getEffectiveFrom());
         shift.setEffectiveTo(request.getEffectiveTo());
-        shift.setUpdatedBy(userId);
+        shift.setUpdatedBy(employeeId);
 
         ShiftConfiguration saved = shiftConfigurationRepository.save(shift);
-        log.info("Shift configuration updated: {}", id);
+        log.info("Shift configuration updated: {} for tenant: {}", id, tenantId);
 
         return convertToDTO(saved);
     }
 
-    // =====================================================
-    // GET SHIFT CONFIGURATION - ALL RETURN DTO
-    // =====================================================
+    @Transactional
+    public void activateShift(Long id, Long tenantId, Long employeeId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
 
-    public ShiftConfigurationDTO getShiftConfiguration(UUID tenantId) {
+        shift.setIsActive(true);
+        shift.setUpdatedBy(employeeId);
+        shiftConfigurationRepository.save(shift);
+
+        log.info("Shift configuration activated: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
+    }
+
+    @Transactional
+    public void deactivateShift(Long id, Long tenantId, Long employeeId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
+
+        shift.setIsActive(false);
+        shift.setUpdatedBy(employeeId);
+        shiftConfigurationRepository.save(shift);
+
+        log.info("Shift configuration deactivated: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
+    }
+
+    @Transactional
+    public void setDefaultShift(Long id, Long tenantId, Long employeeId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
+
+        shiftConfigurationRepository.resetAllDefaultForTenant(tenantId);
+
+        shift.setIsDefault(true);
+        shift.setUpdatedBy(employeeId);
+        shiftConfigurationRepository.save(shift);
+
+        log.info("Shift configuration set as default: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
+    }
+
+    @Transactional
+    public void softDeleteShiftConfiguration(Long id, Long tenantId, Long employeeId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
+
+        shift.setIsActive(false);
+        shift.setIsDeleted(true);
+        shift.setUpdatedBy(employeeId);
+        shiftConfigurationRepository.save(shift);
+
+        log.info("Shift configuration soft deleted: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
+    }
+
+    @Transactional
+    public void hardDeleteShiftConfiguration(Long id, Long tenantId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
+
+        shiftConfigurationRepository.delete(shift);
+        log.info("Shift configuration permanently deleted: {} for tenant: {}", id, tenantId);
+    }
+
+    // GET methods - all using Long tenantId
+    public ShiftConfigurationDTO getShiftConfiguration(Long tenantId) {
         ShiftConfiguration shift = shiftConfigurationRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found for tenant: " + tenantId));
         return convertToDTO(shift);
     }
 
-    public ShiftConfigurationDTO getShiftConfigurationById(Long id) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
+    public ShiftConfigurationDTO getShiftConfigurationById(Long id, Long tenantId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
         return convertToDTO(shift);
     }
 
-    public ShiftConfigurationDTO getShiftByCode(String shiftCode) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByShiftCode(shiftCode)
+    public ShiftConfigurationDTO getShiftByCode(String shiftCode, Long tenantId) {
+        ShiftConfiguration shift = shiftConfigurationRepository.findByShiftCodeAndTenantId(shiftCode, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with code: " + shiftCode));
         return convertToDTO(shift);
     }
 
-    public ShiftConfigurationDTO getEffectiveShiftOnDate(UUID tenantId, LocalDate date) {
+    public ShiftConfigurationDTO getEffectiveShiftOnDate(Long tenantId, LocalDate date) {
         ShiftConfiguration shift = shiftConfigurationRepository.findEffectiveOnDate(tenantId, date)
                 .orElseThrow(() -> new ResourceNotFoundException("No effective shift configuration found for date: " + date));
         return convertToDTO(shift);
     }
 
-    public List<ShiftConfigurationDTO> getAllShiftConfigurations(UUID tenantId) {
+    public List<ShiftConfigurationDTO> getAllShiftConfigurations(Long tenantId) {
         return shiftConfigurationRepository.findAllByTenantIdOrderByEffectiveFromDesc(tenantId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -179,45 +239,35 @@ public class ShiftConfigurationService {
                 .collect(Collectors.toList());
     }
 
-    // =====================================================
-    // SHIFT VALIDATION & UTILITY METHODS - USING DTO
-    // =====================================================
-
-    public boolean isValidCheckinTime(UUID tenantId, LocalTime checkinTime, LocalDate date) {
+    // Validation methods - using Long tenantId
+    public boolean isValidCheckinTime(Long tenantId, LocalTime checkinTime, LocalDate date) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-
-        LocalTime earliestCheckin = shift.getStartTime().minusMinutes(shift.getCheckinBufferBefore());
+        LocalTime earliestCheckin = shift.getEarliestCheckin();
         if (checkinTime.isBefore(earliestCheckin)) {
             return false;
         }
-
-        LocalTime latestCheckin = shift.getEndTime().plusMinutes(shift.getCheckoutBufferAfter());
+        LocalTime latestCheckin = shift.getLatestCheckout();
         if (checkinTime.isAfter(latestCheckin)) {
             return false;
         }
-
         return true;
     }
 
-    public int calculateLateMinutes(UUID tenantId, LocalTime checkinTime, LocalDate date) {
+    public int calculateLateMinutes(Long tenantId, LocalTime checkinTime, LocalDate date) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-        LocalTime graceTime = shift.getStartTime().plusMinutes(shift.getLateGraceMinutes());
-
+        LocalTime graceTime = shift.getLateThreshold();
         if (checkinTime.isAfter(graceTime)) {
             return (int) java.time.Duration.between(shift.getStartTime(), checkinTime).toMinutes();
         }
-
         return 0;
     }
 
-    public int calculateEarlyExitMinutes(UUID tenantId, LocalTime checkoutTime, LocalDate date) {
+    public int calculateEarlyExitMinutes(Long tenantId, LocalTime checkoutTime, LocalDate date) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-        LocalTime graceTime = shift.getEndTime().minusMinutes(shift.getEarlyExitGraceMinutes());
-
+        LocalTime graceTime = shift.getEarlyExitThreshold();
         if (checkoutTime.isBefore(graceTime)) {
             return (int) java.time.Duration.between(checkoutTime, shift.getEndTime()).toMinutes();
         }
-
         return 0;
     }
 
@@ -225,165 +275,72 @@ public class ShiftConfigurationService {
         if (checkIn == null || checkOut == null) {
             return 0.0;
         }
-
         long totalMinutes = java.time.Duration.between(checkIn, checkOut).toMinutes();
         long effectiveMinutes = totalMinutes - (breakMinutes != null ? breakMinutes : 0);
-
         if (effectiveMinutes < 0) effectiveMinutes = 0;
-
         return Math.round((effectiveMinutes / 60.0) * 100.0) / 100.0;
     }
 
-    public double calculateOvertime(UUID tenantId, LocalTime checkoutTime, LocalDate date) {
+    public double calculateOvertime(Long tenantId, LocalTime checkoutTime, LocalDate date) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-
-        if (!shift.getAllowOvertime() || checkoutTime == null) {
+        if (!Boolean.TRUE.equals(shift.getAllowOvertime()) || checkoutTime == null) {
             return 0.0;
         }
-
-        LocalTime overtimeStart = shift.getEndTime().plusMinutes(shift.getOvertimeThresholdMinutes());
-
+        LocalTime overtimeStart = shift.getEndTime().plusMinutes(
+                shift.getOvertimeThresholdMinutes() != null ? shift.getOvertimeThresholdMinutes() : 30);
         if (checkoutTime.isAfter(overtimeStart)) {
             long overtimeMinutes = java.time.Duration.between(shift.getEndTime(), checkoutTime).toMinutes();
             double overtimeHours = overtimeMinutes / 60.0;
-
-            if (overtimeHours > shift.getMaxOvertimeHoursPerDay()) {
-                overtimeHours = shift.getMaxOvertimeHoursPerDay();
+            Double maxOvertime = shift.getMaxOvertimeHoursPerDay();
+            if (maxOvertime != null && overtimeHours > maxOvertime) {
+                overtimeHours = maxOvertime;
             }
-
             return Math.round(overtimeHours * 100.0) / 100.0;
         }
-
         return 0.0;
     }
 
-    public String determineStatus(UUID tenantId, LocalTime checkinTime, LocalDate date, Double workingHours) {
+    public String determineStatus(Long tenantId, LocalTime checkinTime, LocalDate date, Double workingHours) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-
         if (checkinTime == null) {
             return "ABSENT";
         }
-
-        LocalTime graceTime = shift.getStartTime().plusMinutes(shift.getLateGraceMinutes());
-
+        LocalTime graceTime = shift.getLateThreshold();
         if (checkinTime.isAfter(graceTime)) {
             return "LATE";
         }
-
         if (workingHours != null && workingHours <= shift.getHalfDayHours()) {
             return "HALF_DAY";
         }
-
         return "PRESENT";
     }
 
-    public boolean isWeekOff(UUID tenantId, LocalDate date) {
+    public boolean isWeekOff(Long tenantId, LocalDate date) {
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-
         if (shift.getWeeklyOffs() == null || shift.getWeeklyOffs().isEmpty()) {
             return false;
         }
-
         String dayName = date.getDayOfWeek().toString();
         List<String> weeklyOffs = shift.getWeeklyOffsList();
-
         if (weeklyOffs.contains(dayName)) {
             return true;
         }
-
-        if (shift.getAlternateWeekOff() != null && shift.getAlternateWeekOff()) {
+        if (Boolean.TRUE.equals(shift.getAlternateWeekOff())) {
             int weekNumber = (date.getDayOfMonth() - 1) / 7 + 1;
             return weekNumber % 2 == 0 && weeklyOffs.contains(dayName);
         }
-
         return false;
     }
 
-    public double getExpectedWorkingHours(UUID tenantId, LocalDate date) {
+    public double getExpectedWorkingHours(Long tenantId, LocalDate date) {
         if (isWeekOff(tenantId, date)) {
             return 0.0;
         }
-
         ShiftConfigurationDTO shift = getEffectiveShiftOnDate(tenantId, date);
-        return shift.getFullDayHours();
+        return shift.getFullDayHours() != null ? shift.getFullDayHours() : 8.0;
     }
 
-    // =====================================================
-    // ACTIVATE/DEACTIVATE SHIFT
-    // =====================================================
-
-    @Transactional
-    public void activateShift(Long id, Long userId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
-
-        shiftConfigurationRepository.deactivateAllShiftsForTenant(shift.getTenantId());
-        shift.setIsActive(true);
-        shift.setUpdatedBy(userId);
-        shiftConfigurationRepository.save(shift);
-
-        log.info("Shift configuration activated: {}", id);
-    }
-
-    @Transactional
-    public void deactivateShift(Long id, Long userId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
-
-        shift.setIsActive(false);
-        shift.setUpdatedBy(userId);
-        shiftConfigurationRepository.save(shift);
-
-        log.info("Shift configuration deactivated: {}", id);
-    }
-
-    @Transactional
-    public void setDefaultShift(Long id, Long userId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
-
-        List<ShiftConfiguration> tenantShifts = shiftConfigurationRepository.findAllByTenantIdOrderByEffectiveFromDesc(shift.getTenantId());
-        tenantShifts.forEach(s -> {
-            s.setIsDefault(false);
-            shiftConfigurationRepository.save(s);
-        });
-
-        shift.setIsDefault(true);
-        shift.setUpdatedBy(userId);
-        shiftConfigurationRepository.save(shift);
-
-        log.info("Shift configuration set as default: {}", id);
-    }
-
-    // =====================================================
-    // DELETE SHIFT CONFIGURATION
-    // =====================================================
-
-    @Transactional
-    public void softDeleteShiftConfiguration(Long id, Long userId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
-
-        shift.setIsActive(false);
-        shift.setUpdatedBy(userId);
-        shiftConfigurationRepository.save(shift);
-
-        log.info("Shift configuration deactivated (soft delete): {}", id);
-    }
-
-    @Transactional
-    public void hardDeleteShiftConfiguration(Long id) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
-
-        shiftConfigurationRepository.delete(shift);
-        log.info("Shift configuration permanently deleted: {}", id);
-    }
-
-    // =====================================================
-    // PRIVATE HELPER METHODS
-    // =====================================================
-
+    // Private helper methods (unchanged)
     private void validateShiftTimings(LocalTime startTime, LocalTime endTime) {
         if (startTime == null || endTime == null) {
             throw new BusinessException("Start time and end time are required");
@@ -416,21 +373,17 @@ public class ShiftConfigurationService {
 
     private Double calculateTotalHours(LocalTime startTime, LocalTime endTime) {
         if (startTime == null || endTime == null) return 0.0;
-
-        if (endTime.isBefore(startTime)) {
-            double hours1 = (24 - startTime.getHour()) + (startTime.getMinute() / 60.0);
-            double hours2 = endTime.getHour() + (endTime.getMinute() / 60.0);
-            return Math.round((hours1 + hours2) * 100.0) / 100.0;
+        double startHour = startTime.getHour() + startTime.getMinute() / 60.0;
+        double endHour = endTime.getHour() + endTime.getMinute() / 60.0;
+        if (endHour < startHour) {
+            return Math.round((24 - startHour + endHour) * 100.0) / 100.0;
         } else {
-            double hours = (endTime.getHour() - startTime.getHour()) +
-                    (endTime.getMinute() - startTime.getMinute()) / 60.0;
-            return Math.round(hours * 100.0) / 100.0;
+            return Math.round((endHour - startHour) * 100.0) / 100.0;
         }
     }
 
     private ShiftConfigurationDTO convertToDTO(ShiftConfiguration shift) {
         if (shift == null) return null;
-
         return ShiftConfigurationDTO.builder()
                 .id(shift.getId())
                 .tenantId(shift.getTenantId())

@@ -53,7 +53,7 @@ public class Department {
     private LocalDateTime updatedAt;
 
     // Helper method
-    public UUID getTenantId() {
+    public Long getTenantId() {
         return tenant != null ? tenant.getId() : null;
     }
 }

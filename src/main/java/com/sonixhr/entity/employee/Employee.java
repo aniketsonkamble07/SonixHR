@@ -1,8 +1,8 @@
 package com.sonixhr.entity.employee;
 
 import com.sonixhr.entity.department.Department;
-import com.sonixhr.entity.User;
 import com.sonixhr.entity.tenant.Tenant;
+import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
@@ -15,13 +15,20 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Data
 @Entity
@@ -40,7 +47,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Employee {
+public class Employee implements UserDetails {
 
     // =====================================================
     // PRIMARY KEY
@@ -57,20 +64,52 @@ public class Employee {
     private Tenant tenant;
 
     // =====================================================
-    // USER ACCOUNT LINK
-    // =====================================================
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
-
-    // =====================================================
-    // EMPLOYEE IDENTIFICATION
+    // EMPLOYEE IDENTIFICATION & LOGIN CREDENTIALS
     // =====================================================
     @Column(name = "employee_code", nullable = false, length = 50)
     private String employeeCode;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    private Department department;
+
+    @Column(nullable = false, length = 255)
+    private String email;
+
+    @Column(name = "password_hash", nullable = true)
+    private String passwordHash;
+
+    @Column(name = "is_active")
+    @Builder.Default
+    private boolean isActive = false;
+
+    // =====================================================
+    // ROLES & PERMISSIONS (Tenant-level) - ✅ Changed to TenantRole
+    // =====================================================
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "employee_roles",
+            joinColumns = @JoinColumn(name = "employee_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    @Builder.Default
+    private Set<TenantRole> roles = new HashSet<>();
+
+    // =====================================================
+    // SECURITY & LOGIN TRACKING
+    // =====================================================
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(name = "last_login_ip")
+    private String lastLoginIp;
+
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    @Column(name = "must_change_password")
+    @Builder.Default
+    private boolean mustChangePassword = false;
 
     // =====================================================
     // PERSONAL INFORMATION
@@ -80,9 +119,6 @@ public class Employee {
 
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
-
-    @Column(nullable = false, length = 255)
-    private String email;
 
     @Column(length = 20)
     private String phone;
@@ -111,7 +147,9 @@ public class Employee {
     // =====================================================
     // PROFESSIONAL INFORMATION
     // =====================================================
-
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
 
     @Column(length = 100)
     private String position;
@@ -257,12 +295,8 @@ public class Employee {
         return (firstName.charAt(0) + "" + lastName.charAt(0)).toUpperCase();
     }
 
-    public UUID getTenantId() {
+    public Long getTenantId() {
         return tenant != null ? tenant.getId() : null;
-    }
-
-    public UUID getUserId() {
-        return user != null ? user.getId() : null;
     }
 
     public int getTenureInMonths() {
@@ -276,7 +310,7 @@ public class Employee {
     }
 
     public boolean isActive() {
-        return status == EmployeeStatus.ACTIVE;
+        return isActive;
     }
 
     public boolean isOnProbation() {
@@ -295,10 +329,37 @@ public class Employee {
         return status == EmployeeStatus.ON_LEAVE;
     }
 
+    public boolean isAccountLocked() {
+        return lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
+    }
+
+    public Set<String> getEffectivePermissions() {
+        return roles.stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(permission -> permission.getPermission().name())
+                .collect(Collectors.toSet());
+    }
+
+    public boolean hasPermission(String permissionName) {
+        return getEffectivePermissions().contains(permissionName);
+    }
+
+    // =====================================================
+    // SETTER METHODS (for activation)
+    // =====================================================
+    public void setActive(boolean active) {
+        this.isActive = active;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     // =====================================================
     // BUSINESS METHODS
     // =====================================================
     public void activate() {
+        this.isActive = true;
         this.status = EmployeeStatus.ACTIVE;
         this.resignationDate = null;
         this.lastWorkingDate = null;
@@ -309,12 +370,14 @@ public class Employee {
     }
 
     public void resign(LocalDate resignationDate, LocalDate lastWorkingDate) {
+        this.isActive = false;
         this.status = EmployeeStatus.RESIGNED;
         this.resignationDate = resignationDate;
         this.lastWorkingDate = lastWorkingDate;
     }
 
     public void terminate() {
+        this.isActive = false;
         this.status = EmployeeStatus.TERMINATED;
         this.lastWorkingDate = LocalDate.now();
     }
@@ -329,6 +392,7 @@ public class Employee {
     public boolean isConfirmationPending() {
         return confirmationDate == null && status == EmployeeStatus.PROBATION;
     }
+
     public String getDepartmentName() {
         return department != null ? department.getName() : null;
     }
@@ -339,5 +403,57 @@ public class Employee {
 
     public Map<String, Object> getDocuments() {
         return documents != null ? documents : Map.of();
+    }
+
+    public void incrementFailedLoginAttempts() {
+        this.failedLoginAttempts = (this.failedLoginAttempts == null ? 0 : this.failedLoginAttempts) + 1;
+        if (this.failedLoginAttempts >= 5) {
+            this.lockedUntil = LocalDateTime.now().plusMinutes(30);
+        }
+    }
+
+    public void resetFailedLoginAttempts() {
+        this.failedLoginAttempts = 0;
+        this.lockedUntil = null;
+    }
+
+    // =====================================================
+    // UserDetails Implementation
+    // =====================================================
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return getEffectivePermissions().stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public String getPassword() {
+        return passwordHash;
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return !isAccountLocked();
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return isActive;
     }
 }

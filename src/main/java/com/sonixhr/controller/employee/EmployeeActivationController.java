@@ -1,8 +1,8 @@
 package com.sonixhr.controller.employee;
 
 import com.sonixhr.dto.ActivationRequest;
-import com.sonixhr.entity.User;
 import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.service.ActivationTokenService;
@@ -10,10 +10,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,49 +37,30 @@ public class EmployeeActivationController {
             throw new RuntimeException("Passwords do not match");
         }
 
-        // Step 1: Activate user and get User object
-        User user = activationTokenService.setPasswordAndGetUser(
+        // Step 1: Activate employee and get Employee object directly
+        Employee employee = activationTokenService.activateEmployee(
                 request.getToken(),
                 request.getPassword()
         );
 
-        // Step 2: Find employee by email
-        Employee employee = employeeRepository.findByEmail(user.getEmail())
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+        // Step 2: Generate JWT token for employee
+        var tokenPair = jwtService.generateEmployeeTokenPair(employee);
 
-        // Step 3: Update employee status to ACTIVE
-        employee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE);
-        employee.setConfirmationDate(java.time.LocalDate.now());
-        employeeRepository.save(employee);
-
-        // Step 4: Create UserDetails for token generation
-        UserDetails userDetails = org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password("")
-                .authorities(Collections.emptyList())
-                .build();
-
-        // Step 5: Generate JWT access token using the Employee method
-        String accessToken = jwtService.generateEmployeeToken(
-                userDetails,
-                user.getTenant().getId(),
-                employee.getId(),
-                employee.getEmployeeCode()
-        );
-
-        // Step 6: Return response with access token
+        // Step 3: Build response
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Account activated successfully!");
-        response.put("accessToken", accessToken);
+        response.put("accessToken", tokenPair.getAccessToken());
+        response.put("refreshToken", tokenPair.getRefreshToken());
         response.put("tokenType", "Bearer");
+        response.put("expiresIn", tokenPair.getExpiresIn());
         response.put("userType", "EMPLOYEE");
         response.put("employeeId", employee.getId());
         response.put("email", employee.getEmail());
         response.put("firstName", employee.getFirstName());
         response.put("lastName", employee.getLastName());
+        response.put("fullName", employee.getFullName());
         response.put("employeeCode", employee.getEmployeeCode());
-
 
         if (employee.getDepartment() != null) {
             response.put("department", Map.of(
@@ -93,6 +73,7 @@ public class EmployeeActivationController {
         }
 
         response.put("position", employee.getPosition());
+        response.put("tenantId", employee.getTenantId());
 
         log.info("Employee activated successfully: {}", employee.getEmail());
 

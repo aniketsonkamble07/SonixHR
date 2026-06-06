@@ -5,16 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AttendanceFilterDTO {
-    private UUID tenantId;
-    private Long employeeId;
+public class AttendanceDashboardStats {
+    private long totalRecords;
+    private long presentCount;
+    private long absentCount;
+    private long lateCount;
+    private long halfDayCount;
+    private long leaveCount;
+    private double attendancePercentage;
     private LocalDate startDate;
     private LocalDate endDate;
-    private String status;
 }

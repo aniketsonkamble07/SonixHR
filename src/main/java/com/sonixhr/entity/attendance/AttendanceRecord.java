@@ -1,7 +1,8 @@
 package com.sonixhr.entity.attendance;
 
+import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.attendance.AttendanceApprovalStatus;
-import com.sonixhr.enums.attendance.AttendanceMethod;
 import com.sonixhr.enums.attendance.AttendanceStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -17,11 +18,15 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "attendance_records",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "employee_id", "date"}),
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_employee_attendance_date",
+                        columnNames = {"employee_id", "attendance_date"})
+        },
         indexes = {
-                @Index(name = "idx_attendance_method", columnList = "method"),
-                @Index(name = "idx_attendance_approval", columnList = "approval_status"),
-                @Index(name = "idx_attendance_device", columnList = "device_id")
+                @Index(name = "idx_attendance_employee_date", columnList = "employee_id, attendance_date"),
+                @Index(name = "idx_attendance_marked_by_manager", columnList = "marked_by_manager_id, attendance_date"),
+                @Index(name = "idx_attendance_tenant", columnList = "tenant_id"),
+                @Index(name = "idx_attendance_approval", columnList = "approval_status")
         })
 @Data
 @Builder
@@ -33,25 +38,30 @@ public class AttendanceRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // =====================================================
-    // BASIC INFORMATION
-    // =====================================================
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
 
-    @Column(name = "tenant_id", nullable = false)
-    private UUID tenantId;
+    // Employee whose attendance is being marked
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
 
-    @Column(name = "employee_id", nullable = false)
-    private Long employeeId;
+    // Manager who marked this attendance (can be null if marked by Super Admin)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "marked_by_manager_id")
+    private Employee markedByManager;
 
-    @Column(name = "employee_code", length = 50)
-    private String employeeCode;
+    // Super Admin who marked this (if applicable)
+    @Column(name = "marked_by_admin_id")
+    private Long markedByAdminId;
 
-    @Column(name = "date", nullable = false)
-    private LocalDate date;
+    @Column(name = "marked_by_admin_name")
+    private String markedByAdminName;
 
-    // =====================================================
-    // TIME TRACKING
-    // =====================================================
+    // Attendance details
+    @Column(name = "attendance_date", nullable = false)
+    private LocalDate attendanceDate;
 
     @Column(name = "check_in_time")
     private LocalTime checkInTime;
@@ -59,213 +69,73 @@ public class AttendanceRecord {
     @Column(name = "check_out_time")
     private LocalTime checkOutTime;
 
-    @Column(name = "break_start_time")
-    private LocalTime breakStartTime;
+    @Column(name = "total_working_hours")
+    private Double totalWorkingHours;
 
-    @Column(name = "break_end_time")
-    private LocalTime breakEndTime;
-
-    @Column(name = "break_minutes")
-    @Builder.Default
-    private Integer breakMinutes = 0;
-
-    @Column(name = "total_break_minutes")
-    @Builder.Default
-    private Integer totalBreakMinutes = 0;
-
-    @Column(name = "working_hours")
-    private Double workingHours;
-
-    @Column(name = "overtime_hours")
-    @Builder.Default
-    private Double overtimeHours = 0.0;
-
-    @Column(name = "shortage_hours")
-    @Builder.Default
-    private Double shortageHours = 0.0;
-
-    @Column(name = "late_minutes")
-    @Builder.Default
-    private Integer lateMinutes = 0;
-
-    @Column(name = "early_exit_minutes")
-    @Builder.Default
-    private Integer earlyExitMinutes = 0;
-
-    // =====================================================
-    // STATUS FIELDS
-    // =====================================================
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private AttendanceStatus status;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "method", nullable = false)
-    private AttendanceMethod method;
+    // Reason for late or absence
+    @Column(name = "reason", length = 500)
+    private String reason;
 
     @Column(name = "remarks", length = 500)
     private String remarks;
 
-    // =====================================================
-    // BIOMETRIC DEVICE FIELDS
-    // =====================================================
-
-    @Column(name = "device_id")
-    private String deviceId;
-
-    @Column(name = "device_name")
-    private String deviceName;
-
-    @Column(name = "device_serial_number")
-    private String deviceSerialNumber;
-
-    @Column(name = "biometric_user_id")
-    private String biometricUserId;
-
-    @Column(name = "verification_mode")
-    private String verificationMode;
-
-    @Column(name = "raw_device_data")
-    private String rawDeviceData;
-
-    @Column(name = "is_auto_synced")
-    @Builder.Default
-    private Boolean isAutoSynced = false;
-
-    @Column(name = "device_synced_at")
-    private LocalDateTime deviceSyncedAt;
-
-    // =====================================================
-    // APPROVAL WORKFLOW (For Self & Manual methods)
-    // =====================================================
-
+    // Status
     @Enumerated(EnumType.STRING)
-    @Column(name = "approval_status", nullable = false)
-    @Builder.Default
-    private AttendanceApprovalStatus approvalStatus = AttendanceApprovalStatus.NOT_REQUIRED;
+    @Column(name = "attendance_status", nullable = false)
+    private AttendanceStatus attendanceStatus;  // PRESENT, ABSENT, LATE, HALF_DAY, ON_LEAVE
 
+    // Approval (if workflow needed)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status")
+    @Builder.Default
+    private AttendanceApprovalStatus approvalStatus = AttendanceApprovalStatus.APPROVED;
+
+    // ✅ ADD THESE MISSING FIELDS
     @Column(name = "approved_by")
-    private Long approvedBy;
+    private Long approvedBy;  // ID of the person who approved
 
     @Column(name = "approved_by_name")
-    private String approvedByName;
-
-    @Column(name = "approved_by_role")
-    private String approvedByRole;
+    private String approvedByName;  // Name of the person who approved
 
     @Column(name = "approved_at")
-    private LocalDateTime approvedAt;
+    private LocalDateTime approvedAt;  // When it was approved
 
     @Column(name = "rejection_reason", length = 500)
-    private String rejectionReason;
+    private String rejectionReason;  // Reason for rejection
 
-    // =====================================================
-    // REQUESTOR FIELDS (Who created/updated this record)
-    // =====================================================
-
-    @Column(name = "requested_by")
-    private Long requestedBy;
-
-    @Column(name = "requested_by_name")
-    private String requestedByName;
-
-    @Column(name = "requested_by_role")
-    private String requestedByRole;
-
-    @Column(name = "requested_at")
-    private LocalDateTime requestedAt;
-
-    // =====================================================
-    // CORRECTION HISTORY (For manual edits)
-    // =====================================================
-
-    @Column(name = "original_check_in")
-    private LocalTime originalCheckIn;
-
-    @Column(name = "original_check_out")
-    private LocalTime originalCheckOut;
-
-    @Column(name = "correction_reason")
-    private String correctionReason;
-
-    @Column(name = "corrected_by")
-    private Long correctedBy;
-
-    @Column(name = "corrected_at")
-    private LocalDateTime correctedAt;
-
-    @Column(name = "correction_count")
-    @Builder.Default
-    private Integer correctionCount = 0;
-
-    // =====================================================
-    // AUDIT FIELDS
-    // =====================================================
-
-    @Column(name = "created_by")
-    private Long createdBy;
-
+    // Audit
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_by")
-    private Long updatedBy;
+    @Column(name = "created_by")
+    private Long createdBy;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // =====================================================
-    // SOFT DELETE
-    // =====================================================
+    @Column(name = "updated_by")
+    private Long updatedBy;
 
-    @Column(name = "is_deleted")
-    @Builder.Default
-    private Boolean isDeleted = false;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @Column(name = "deleted_by")
-    private Long deletedBy;
-
-    // =====================================================
-    // VERSION FOR OPTIMISTIC LOCKING
-    // =====================================================
-
-    @Version
-    @Column(name = "version")
-    @Builder.Default
-    private Long version = 0L;
-
-    // =====================================================
-    // HELPER METHODS
-    // =====================================================
-
-    public boolean isBiometric() {
-        return this.method == AttendanceMethod.BIOMETRIC;
+    // Helper methods
+    public Long getTenantId() {
+        return tenant != null ? tenant.getId() : null;
     }
 
-    public boolean isSelfMarked() {
-        return this.method == AttendanceMethod.SELF;
+    public Long getEmployeeId() {
+        return employee != null ? employee.getId() : null;
     }
 
-    public boolean isManual() {
-        return this.method == AttendanceMethod.MANUAL;
+    public String getEmployeeName() {
+        return employee != null ? employee.getFullName() : null;
     }
 
-    public boolean requiresApproval() {
-        return this.method == AttendanceMethod.SELF || this.method == AttendanceMethod.MANUAL;
+    public String getEmployeeCode() {
+        return employee != null ? employee.getEmployeeCode() : null;
     }
 
-    public boolean isApproved() {
-        return this.approvalStatus == AttendanceApprovalStatus.APPROVED ||
-                this.approvalStatus == AttendanceApprovalStatus.NOT_REQUIRED;
-    }
-
-    public boolean isPending() {
-        return this.approvalStatus == AttendanceApprovalStatus.PENDING;
+    public Long getManagerId() {
+        return employee != null && employee.getManager() != null ? employee.getManager().getId() : null;
     }
 }

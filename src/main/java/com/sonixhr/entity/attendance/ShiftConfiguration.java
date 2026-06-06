@@ -7,50 +7,34 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
 
-@Entity
-@Table(name = "shift_configurations",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "shift_code"}),
-        indexes = {
-                @Index(name = "idx_shift_tenant_active", columnList = "tenant_id, is_active"),
-                @Index(name = "idx_shift_effective_dates", columnList = "effective_from, effective_to"),
-                @Index(name = "idx_shift_time_range", columnList = "start_time, end_time")
-        })
 @Data
+@Entity
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "shift_configurations")
 public class ShiftConfiguration {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // =====================================================
-    // TENANT & IDENTIFICATION
-    // =====================================================
-
     @Column(name = "tenant_id", nullable = false)
-    private UUID tenantId;
+    private Long tenantId;
 
-    @Column(name = "shift_name", nullable = false)
+    @Column(name = "shift_name", nullable = false, length = 100)
     private String shiftName;
 
-    @Column(name = "shift_code", unique = true)
+    @Column(name = "shift_code", length = 50)
     private String shiftCode;
 
     @Column(name = "shift_description", length = 500)
     private String shiftDescription;
-
-    // =====================================================
-    // SHIFT TIMINGS
-    // =====================================================
 
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
@@ -58,117 +42,56 @@ public class ShiftConfiguration {
     @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
-    @Column(name = "break_duration_minutes")
-    @Builder.Default
-    private Integer breakDurationMinutes = 60;
-
-    @Column(name = "min_break_minutes")
-    @Builder.Default
-    private Integer minBreakMinutes = 30;
-
-    @Column(name = "max_break_minutes")
-    @Builder.Default
-    private Integer maxBreakMinutes = 90;
-
-    // =====================================================
-    // GRACE PERIODS
-    // =====================================================
-
-    @Column(name = "late_grace_minutes")
-    @Builder.Default
-    private Integer lateGraceMinutes = 15;
-
-    @Column(name = "early_exit_grace_minutes")
-    @Builder.Default
-    private Integer earlyExitGraceMinutes = 15;
-
-    @Column(name = "checkin_buffer_before")
-    @Builder.Default
-    private Integer checkinBufferBefore = 60;
-
-    @Column(name = "checkout_buffer_after")
-    @Builder.Default
-    private Integer checkoutBufferAfter = 60;
-
-    // =====================================================
-    // WORKING HOURS THRESHOLDS (ADD THESE - THEY WERE MISSING!)
-    // =====================================================
-
-    @Column(name = "full_day_hours")
-    @Builder.Default
-    private Double fullDayHours = 8.0;
-
-    @Column(name = "half_day_hours")
-    @Builder.Default
-    private Double halfDayHours = 4.0;
-
-    @Column(name = "quarter_day_hours")
-    @Builder.Default
-    private Double quarterDayHours = 2.0;
-
     @Column(name = "total_hours")
     private Double totalHours;
 
-    // =====================================================
-    // OVERTIME CONFIGURATION
-    // =====================================================
+    @Column(name = "break_duration_minutes")
+    private Integer breakDurationMinutes;
+
+    @Column(name = "min_break_minutes")
+    private Integer minBreakMinutes;
+
+    @Column(name = "max_break_minutes")
+    private Integer maxBreakMinutes;
+
+    @Column(name = "late_grace_minutes")
+    private Integer lateGraceMinutes;
+
+    @Column(name = "early_exit_grace_minutes")
+    private Integer earlyExitGraceMinutes;
+
+    @Column(name = "checkin_buffer_before")
+    private Integer checkinBufferBefore;
+
+    @Column(name = "checkout_buffer_after")
+    private Integer checkoutBufferAfter;
+
+    @Column(name = "full_day_hours")
+    private Double fullDayHours;
+
+    @Column(name = "half_day_hours")
+    private Double halfDayHours;
+
+    @Column(name = "quarter_day_hours")
+    private Double quarterDayHours;
 
     @Column(name = "allow_overtime")
-    @Builder.Default
-    private Boolean allowOvertime = true;
+    private Boolean allowOvertime;
 
     @Column(name = "overtime_multiplier")
-    @Builder.Default
-    private Double overtimeMultiplier = 1.5;
+    private Double overtimeMultiplier;
 
     @Column(name = "overtime_threshold_minutes")
-    @Builder.Default
-    private Integer overtimeThresholdMinutes = 30;
+    private Integer overtimeThresholdMinutes;
 
     @Column(name = "max_overtime_hours_per_day")
-    @Builder.Default
-    private Double maxOvertimeHoursPerDay = 4.0;
+    private Double maxOvertimeHoursPerDay;
 
-    // =====================================================
-    // RESTRICTIONS
-    // =====================================================
-
-    @Column(name = "allow_remote_checkin")
-    @Builder.Default
-    private Boolean allowRemoteCheckin = true;
-
-    @Column(name = "checkin_radius_meters")
-    @Builder.Default
-    private Integer checkinRadiusMeters = 100;
-
-    // ✅ FIXED: Removed precision and scale from Double fields
-    @Column(name = "office_latitude")
-    private Double officeLatitude;
-
-    @Column(name = "office_longitude")
-    private Double officeLongitude;
-
-    @Column(name = "office_address", length = 500)
-    private String officeAddress;
-
-    @Column(name = "requires_photo_evidence")
-    @Builder.Default
-    private Boolean requiresPhotoEvidence = false;
-
-    // =====================================================
-    // WEEKLY OFF CONFIGURATION
-    // =====================================================
-
-    @Column(name = "weekly_offs")
+    @Column(name = "weekly_offs", length = 100)
     private String weeklyOffs;
 
     @Column(name = "alternate_week_off")
-    @Builder.Default
-    private Boolean alternateWeekOff = false;
-
-    // =====================================================
-    // EFFECTIVE DATES
-    // =====================================================
+    private Boolean alternateWeekOff;
 
     @Column(name = "effective_from")
     private LocalDate effectiveFrom;
@@ -177,106 +100,56 @@ public class ShiftConfiguration {
     private LocalDate effectiveTo;
 
     @Column(name = "is_active")
-    @Builder.Default
-    private Boolean isActive = true;
+    private Boolean isActive;
 
     @Column(name = "is_default")
-    @Builder.Default
-    private Boolean isDefault = false;
+    private Boolean isDefault;
 
-    // =====================================================
-    // AUDIT FIELDS
-    // =====================================================
+    // ✅ Add this field
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
 
     @Column(name = "created_by")
     private Long createdBy;
+
+    @Column(name = "updated_by")
+    private Long updatedBy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_by")
-    private Long updatedBy;
-
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Version
-    @Column(name = "version")
-    @Builder.Default
-    private Long version = 0L;
-
-    // =====================================================
-    // HELPER METHODS
-    // =====================================================
-
-    public boolean isNightShift() {
-        return endTime != null && startTime != null && endTime.isBefore(startTime);
-    }
-
-    public double getShiftDurationHours() {
-        if (startTime == null || endTime == null) return 0;
-
-        if (isNightShift()) {
-            double hours1 = (24 - startTime.getHour()) + (startTime.getMinute() / 60.0);
-            double hours2 = endTime.getHour() + (endTime.getMinute() / 60.0);
-            return Math.round((hours1 + hours2) * 100.0) / 100.0;
-        } else {
-            double hours = (endTime.getHour() - startTime.getHour()) +
-                    (endTime.getMinute() - startTime.getMinute()) / 60.0;
-            return Math.round(hours * 100.0) / 100.0;
-        }
-    }
-
-    public boolean isWithinShiftHours(LocalTime time) {
-        if (time == null || startTime == null || endTime == null) return false;
-
-        if (isNightShift()) {
-            return time.isAfter(startTime) || time.isBefore(endTime);
-        } else {
-            return time.isAfter(startTime) && time.isBefore(endTime);
-        }
-    }
-
-    public boolean isWithinCheckinBuffer(LocalTime checkinTime) {
-        if (checkinTime == null || startTime == null) return false;
-        LocalTime earliestCheckin = startTime.minusMinutes(checkinBufferBefore);
-        return !checkinTime.isBefore(earliestCheckin);
-    }
-
+    // Helper methods
     public LocalTime getLateThreshold() {
-        if (startTime == null) return null;
-        return startTime.plusMinutes(lateGraceMinutes);
+        if (lateGraceMinutes != null && lateGraceMinutes > 0) {
+            return startTime.plusMinutes(lateGraceMinutes);
+        }
+        return startTime;
     }
 
     public LocalTime getEarlyExitThreshold() {
-        if (endTime == null) return null;
-        return endTime.minusMinutes(earlyExitGraceMinutes);
+        if (earlyExitGraceMinutes != null && earlyExitGraceMinutes > 0) {
+            return endTime.minusMinutes(earlyExitGraceMinutes);
+        }
+        return endTime;
     }
 
     public LocalTime getEarliestCheckin() {
-        if (startTime == null) return null;
-        return startTime.minusMinutes(checkinBufferBefore);
+        if (checkinBufferBefore != null && checkinBufferBefore > 0) {
+            return startTime.minusMinutes(checkinBufferBefore);
+        }
+        return startTime;
     }
 
     public LocalTime getLatestCheckout() {
-        if (endTime == null) return null;
-        return endTime.plusMinutes(checkoutBufferAfter);
-    }
-
-    public List<String> getWeeklyOffsList() {
-        if (weeklyOffs == null || weeklyOffs.isEmpty()) {
-            return List.of();
+        if (checkoutBufferAfter != null && checkoutBufferAfter > 0) {
+            return endTime.plusMinutes(checkoutBufferAfter);
         }
-        return Arrays.asList(weeklyOffs.split(","));
-    }
-
-    public void setWeeklyOffsList(List<String> weeklyOffsList) {
-        if (weeklyOffsList == null || weeklyOffsList.isEmpty()) {
-            this.weeklyOffs = null;
-        } else {
-            this.weeklyOffs = String.join(",", weeklyOffsList);
-        }
+        return endTime;
     }
 }

@@ -2,22 +2,24 @@ package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
-import com.sonixhr.entity.*;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
+import com.sonixhr.entity.tenant.TenantPermission;
+import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.PlanType;
-import com.sonixhr.enums.UserType;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.DuplicateResourceException;
-import com.sonixhr.repository.*;
 import com.sonixhr.repository.employee.EmployeeRepository;
+import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
+import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
-
+import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +32,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
-import java.util.UUID;
+import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -39,9 +42,9 @@ public class TenantRegistrationService {
 
     private final TenantRepository tenantRepository;
     private final TenantSubscriptionRepository subscriptionRepository;
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final ActivationTokenRepository activationTokenRepository;
+    private final TenantRoleRepository roleRepository;
+    private final TenantPermissionRepository permissionRepository;
+    private final ActivationTokenService activationTokenService;
     private final WelcomeTenantEmailService notificationService;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;
@@ -71,33 +74,21 @@ public class TenantRegistrationService {
         Tenant tenant = createTenant(request, tenantCode, subdomain, planType);
         log.info("Tenant created with ID: {}", tenant.getId());
 
-        // 5. Copy Super Admin role for this tenant
-        Role superAdminRole = copySuperAdminRoleForTenant(tenant.getId());
-        log.info("Super Admin role copied for tenant");
+        // 5. Create Super Admin role for this tenant (with all global permissions)
+        TenantRole superAdminRole = createSuperAdminRoleForTenant(tenant.getId());
+        log.info("Super Admin role created for tenant with {} permissions", superAdminRole.getPermissions().size());
 
-        // 6. Create admin user
-        User adminUser = createAdminUser(tenant, request);
-        log.info("Admin user created: {}", adminUser.getEmail());
+        // 6. Create Employee (Super Admin)
+        Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, superAdminRole);
+        log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
 
-        // 7. Assign Super Admin role to admin user
-        assignSuperAdminRole(adminUser, superAdminRole);
-        log.info("Super Admin role assigned to admin user");
-
-        // 8. Create subscription record
+        // 7. Create subscription record
         createSubscription(tenant, planType);
         log.info("Subscription created for tenant");
 
-        // 9. Create Employee record for Super Admin
-        Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, adminUser);
-        log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
-
-        // 10. Generate activation token
-        String activationToken = generateActivationToken(adminUser);
-        log.info("Activation token generated");
-
-        // 11. Send welcome email
-       // sendWelcomeEmail(tenant, adminUser, activationToken, planType);
-        log.info("Welcome email sent");
+        // 8. Generate activation token for employee
+        String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
+        log.info("Activation token generated for employee");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
@@ -105,51 +96,7 @@ public class TenantRegistrationService {
     }
 
     // =====================================================
-    // CREATE EMPLOYEE FOR SUPER ADMIN
-    // =====================================================
-    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request, User user) {
-        String employeeCode = employeeCodeGenerator.generateSequentialCode(tenant);
-
-        String firstName = getFirstNameFromFullName(request.getAdminName());
-        String lastName = getLastNameFromFullName(request.getAdminName());
-
-        Employee superAdmin = Employee.builder()
-                .tenant(tenant)
-                .user(user)
-                .employeeCode(employeeCode)
-                .firstName(firstName)
-                .lastName(lastName)
-                .email(request.getAdminEmail())
-                .phone(request.getAdminPhone())
-                .position("Super Admin")
-                .employmentType(EmploymentType.FULL_TIME)
-                .hireDate(LocalDate.now())
-                .probationMonths(0)
-                .status(EmployeeStatus.ACTIVE)
-                .workLocation("Head Office")
-                .createdBy(1L)
-                .build();
-
-        return employeeRepository.save(superAdmin);
-    }
-
-    private String getFirstNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) return "Admin";
-        String[] parts = fullName.split(" ");
-        return parts[0];
-    }
-
-    private String getLastNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) return "User";
-        String[] parts = fullName.split(" ");
-        if (parts.length > 1) {
-            return String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length));
-        }
-        return "";
-    }
-
-    // =====================================================
-    // EXISTING METHODS (keep as is)
+    // VALIDATION METHODS
     // =====================================================
 
     private void validateUniqueness(TenantRegistrationRequest request) {
@@ -159,10 +106,14 @@ public class TenantRegistrationService {
         if (tenantRepository.existsBySubdomain(request.getSubdomain())) {
             throw new DuplicateResourceException("Subdomain already taken: " + request.getSubdomain());
         }
-        if (userRepository.existsByEmail(request.getAdminEmail())) {
+        if (employeeRepository.existsByEmail(request.getAdminEmail())) {
             throw new DuplicateResourceException("Email already registered: " + request.getAdminEmail());
         }
     }
+
+    // =====================================================
+    // TENANT CREATION
+    // =====================================================
 
     private String generateUniqueTenantCode(String companyName) {
         String baseCode = companyName.toLowerCase()
@@ -175,11 +126,14 @@ public class TenantRegistrationService {
             code = baseCode + "-" + counter;
             counter++;
         }
-        return code;
+        return code.toUpperCase();
     }
 
     private String generateUniqueSubdomain(String requestedSubdomain) {
         String subdomain = requestedSubdomain.toLowerCase().replaceAll("[^a-z0-9]", "");
+        if (subdomain.isEmpty()) {
+            subdomain = "company";
+        }
         String original = subdomain;
         int counter = 1;
         while (tenantRepository.existsBySubdomain(subdomain)) {
@@ -197,47 +151,103 @@ public class TenantRegistrationService {
                 .subdomain(subdomain)
                 .planType(planType.getCode())
                 .maxEmployees(planType.getMaxEmployees())
-                .maxStorageMb(planType.getMaxStorageMb())
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
-                .status("active")
-                .isActive(true)
+                .status("pending")
+                .isActive(false)
                 .planStatus("trial")
                 .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
                 .build();
         return tenantRepository.save(tenant);
     }
 
-    private Role copySuperAdminRoleForTenant(UUID tenantId) {
-        Role templateRole = roleRepository.findByNameAndTenantIdIsNull("Super Admin")
-                .orElseThrow(() -> new RuntimeException("Super Admin template role not found"));
+    // =====================================================
+    // ROLE MANAGEMENT
+    // =====================================================
 
-        Role tenantRole = Role.builder()
+    private TenantRole createSuperAdminRoleForTenant(Long tenantId) {
+        log.info("Creating Super Admin role for tenant: {}", tenantId);
+
+        // Get all global permissions
+        List<TenantPermission> allPermissions = permissionRepository.findAll();
+
+        if (allPermissions.isEmpty()) {
+            throw new BusinessException("No permissions found. Please ensure permissions are initialized.");
+        }
+
+        log.info("Found {} global permissions to assign to Super Admin role", allPermissions.size());
+
+        // Create tenant-specific Super Admin role with ALL global permissions
+        TenantRole tenantRole = TenantRole.builder()
                 .tenantId(tenantId)
-                .name(templateRole.getName())
-                .description(templateRole.getDescription())
-                .permissions(new HashSet<>(templateRole.getPermissions()))
+                .name("Super Admin")
+                .description("Super Administrator with full access to all tenant features")
+                .isDefault(false)
+                .permissions(new HashSet<>(allPermissions))
                 .build();
 
-        return roleRepository.save(tenantRole);
+        TenantRole savedRole = roleRepository.save(tenantRole);
+        log.info("✅ Created Super Admin role for tenant {} with ID: {} and {} permissions",
+                tenantId, savedRole.getId(), savedRole.getPermissions().size());
+
+        return savedRole;
     }
 
-    private User createAdminUser(Tenant tenant, TenantRegistrationRequest request) {
-        User adminUser = User.builder()
+    // =====================================================
+    // EMPLOYEE CREATION (Super Admin)
+    // =====================================================
+
+    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request, TenantRole superAdminRole) {
+        String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
+
+        String firstName = getFirstNameFromFullName(request.getAdminName());
+        String lastName = getLastNameFromFullName(request.getAdminName());
+
+        Employee superAdmin = Employee.builder()
                 .tenant(tenant)
+                .employeeCode(employeeCode)
+                .firstName(firstName)
+                .lastName(lastName)
                 .email(request.getAdminEmail())
-                .passwordHash(passwordEncoder.encode("TEMPORARY_DISABLED"))
-                .fullName(request.getAdminName())
+                .phone(request.getAdminPhone())
+                .position("Super Admin")
+                .employmentType(EmploymentType.FULL_TIME)
+                .hireDate(LocalDate.now())
+                .probationMonths(0)
+                .status(EmployeeStatus.INVITED)
                 .isActive(false)
+                .workLocation("Head Office")
+                .passwordHash(null)
+                .createdBy(1L)
                 .build();
-        return userRepository.save(adminUser);
+
+        Employee savedEmployee = employeeRepository.save(superAdmin);
+
+        // Assign role to employee
+        savedEmployee.getRoles().add(superAdminRole);
+
+        return employeeRepository.save(savedEmployee);
     }
 
-    private void assignSuperAdminRole(User adminUser, Role superAdminRole) {
-        adminUser.getRoles().add(superAdminRole);
-        userRepository.save(adminUser);
+    private String getFirstNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) return "Admin";
+        String[] parts = fullName.trim().split(" ");
+        return parts[0];
     }
+
+    private String getLastNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) return "User";
+        String[] parts = fullName.trim().split(" ");
+        if (parts.length > 1) {
+            return String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length));
+        }
+        return "";
+    }
+
+    // =====================================================
+    // SUBSCRIPTION MANAGEMENT
+    // =====================================================
 
     private void createSubscription(Tenant tenant, PlanType planType) {
         TenantSubscription subscription = TenantSubscription.builder()
@@ -259,30 +269,9 @@ public class TenantRegistrationService {
         subscriptionRepository.save(subscription);
     }
 
-    private String generateActivationToken(User user) {
-        String tokenValue = UUID.randomUUID().toString();
-        ActivationToken token = ActivationToken.builder()
-                .token(tokenValue)
-                .userId(user.getId())
-                .userType(UserType.TENANT)
-                .expiryTime(LocalDateTime.now().plusHours(24))
-                .used(false)
-                .build();
-        activationTokenRepository.save(token);
-        return tokenValue;
-    }
-
-    private void sendWelcomeEmail(Tenant tenant, User user, String activationToken, PlanType planType) {
-        notificationService.sendTenantWelcomeEmail(
-                tenant.getAdminEmail(),
-                tenant.getAdminName(),
-                tenant.getCompanyName(),
-                tenant.getSubdomain(),
-                activationToken,
-                planType.getDisplayName(),
-                defaultTrialDays
-        );
-    }
+    // =====================================================
+    // RESPONSE BUILDING
+    // =====================================================
 
     private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken, Employee superAdminEmployee) {
         return TenantRegistrationResponse.builder()

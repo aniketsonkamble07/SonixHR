@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Repository
 public interface UserActivationTokenRepository
-        extends JpaRepository<ActivationToken, UUID> {
+        extends JpaRepository<ActivationToken, Long> {
 
     Optional<ActivationToken> findByToken(String token);
 }

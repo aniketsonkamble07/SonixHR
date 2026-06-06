@@ -20,10 +20,10 @@ public class EmployeeResponse {
     // BASIC IDENTIFIERS
     // =====================================================
     private Long id;
-    private UUID tenantId;
+    private Long tenantId;
     private String employeeCode;
     private UUID userId;
-
+    private boolean isActive;
     // =====================================================
     // PERSONAL INFORMATION
     // =====================================================

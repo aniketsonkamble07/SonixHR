@@ -13,7 +13,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class PlatformUserResponse {
-    private UUID id;
+    private Long id;
     private String email;
     private String fullName;
     private String designation;

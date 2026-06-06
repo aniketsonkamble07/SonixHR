@@ -13,7 +13,7 @@ public class TenantSetupToken {
     @Id
     private Long id;
     private String token;
-    private UUID tenantId;
+    private Long tenantId;
     private String userEmail;
     private LocalDateTime expiry;
     private boolean used;

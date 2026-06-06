@@ -1,4 +1,3 @@
-// ShiftConfigurationRequestDTO.java
 package com.sonixhr.dto.attendance;
 
 import jakarta.validation.constraints.AssertTrue;
@@ -11,16 +10,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ShiftConfigurationRequestDTO {
-
-    @NotNull(message = "Tenant ID is required")
-    private UUID tenantId;
 
     @NotNull(message = "Shift name is required")
     private String shiftName;
@@ -79,10 +74,6 @@ public class ShiftConfigurationRequestDTO {
     private Boolean alternateWeekOff;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
-
-    // =====================================================
-    // CROSS-FIELD VALIDATION
-    // =====================================================
 
     @AssertTrue(message = "Start time cannot be equal to end time")
     private boolean isStartTimeNotEqualToEndTime() {

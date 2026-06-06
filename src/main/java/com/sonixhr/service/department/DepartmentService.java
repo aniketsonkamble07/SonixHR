@@ -38,7 +38,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
-    public DepartmentResponse createDepartment(UUID tenantId, DepartmentRequest request) {
+    public DepartmentResponse createDepartment(Long tenantId, DepartmentRequest request) {
         log.info("Creating department for tenant: {}", tenantId);
 
         // Validate unique name
@@ -73,7 +73,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
-    public DepartmentResponse updateDepartment(Long id, UUID tenantId, DepartmentRequest request) {
+    public DepartmentResponse updateDepartment(Long id, Long tenantId, DepartmentRequest request) {
         log.info("Updating department: {} for tenant: {}", id, tenantId);
 
         Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
@@ -105,7 +105,7 @@ public class DepartmentService {
     // GET DEPARTMENT BY ID (WITH EMPLOYEE COUNTS)
     // =====================================================
 
-    public DepartmentResponse getDepartmentById(Long id, UUID tenantId) {
+    public DepartmentResponse getDepartmentById(Long id, Long tenantId) {
         Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
         return convertToResponse(department);
@@ -115,12 +115,12 @@ public class DepartmentService {
     // GET ALL DEPARTMENTS (WITH EMPLOYEE COUNTS)
     // =====================================================
 
-    public Page<DepartmentResponse> getAllDepartments(UUID tenantId, Pageable pageable) {
+    public Page<DepartmentResponse> getAllDepartments(Long tenantId, Pageable pageable) {
         Page<Department> departments = departmentRepository.findByTenant_Id(tenantId, pageable);
         return departments.map(this::convertToResponse);
     }
 
-    public List<DepartmentResponse> getAllDepartmentsList(UUID tenantId) {
+    public List<DepartmentResponse> getAllDepartmentsList(Long tenantId) {
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
         return departments.stream()
                 .map(this::convertToResponse)
@@ -130,10 +130,10 @@ public class DepartmentService {
 // GET EMPLOYEE COUNT (Legacy method for backward compatibility)
 // =====================================================
 
-    public Long getEmployeeCount(Long departmentId, UUID tenantId) {
+    public Long getEmployeeCount(Long departmentId, Long tenantId) {
         return getTotalEmployeeCount(departmentId, tenantId);
     }
-    public Page<DepartmentResponse> searchDepartments(UUID tenantId, String query, Pageable pageable) {
+    public Page<DepartmentResponse> searchDepartments(Long tenantId, String query, Pageable pageable) {
         log.info("Searching departments for tenant: {} with query: {}", tenantId, query);
         Page<Department> departments = departmentRepository.searchDepartments(tenantId, query, pageable);
         return departments.map(this::convertToResponse);
@@ -143,7 +143,7 @@ public class DepartmentService {
     // GET DEPARTMENT WITH STATISTICS (ENHANCED)
     // =====================================================
 
-    public DepartmentResponse getDepartmentWithStats(Long id, UUID tenantId) {
+    public DepartmentResponse getDepartmentWithStats(Long id, Long tenantId) {
         Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
@@ -176,7 +176,7 @@ public class DepartmentService {
     // GET ALL DEPARTMENTS WITH BULK EMPLOYEE COUNTS (OPTIMIZED)
     // =====================================================
 
-    public List<DepartmentResponse> getAllDepartmentsWithBulkCounts(UUID tenantId) {
+    public List<DepartmentResponse> getAllDepartmentsWithBulkCounts(Long tenantId) {
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
 
         // Get all employee counts in a single query per department
@@ -202,7 +202,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
-    public void deleteDepartment(Long id, UUID tenantId) {
+    public void deleteDepartment(Long id, Long tenantId) {
         log.info("Deleting department: {} for tenant: {}", id, tenantId);
 
         Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
@@ -223,15 +223,15 @@ public class DepartmentService {
     // GET EMPLOYEE COUNTS FOR DEPARTMENT
     // =====================================================
 
-    public Long getTotalEmployeeCount(Long departmentId, UUID tenantId) {
+    public Long getTotalEmployeeCount(Long departmentId, Long tenantId) {
         return employeeRepository.countByDepartmentIdAndTenantId(departmentId, tenantId);
     }
 
-    public Long getActiveEmployeeCount(Long departmentId, UUID tenantId) {
+    public Long getActiveEmployeeCount(Long departmentId, Long tenantId) {
         return employeeRepository.countActiveByDepartmentIdAndTenantId(departmentId, tenantId, EmployeeStatus.ACTIVE);
     }
 
-    public Long getOnProbationCount(Long departmentId, UUID tenantId) {
+    public Long getOnProbationCount(Long departmentId, Long tenantId) {
         return employeeRepository.countActiveByDepartmentIdAndTenantId(departmentId, tenantId, EmployeeStatus.PROBATION);
     }
 
@@ -239,7 +239,7 @@ public class DepartmentService {
     // DEPARTMENT STATISTICS DASHBOARD
     // =====================================================
 
-    public Map<String, Object> getDepartmentDashboard(UUID tenantId) {
+    public Map<String, Object> getDepartmentDashboard(Long tenantId) {
         Map<String, Object> dashboard = new HashMap<>();
 
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
@@ -274,7 +274,7 @@ public class DepartmentService {
 
     private DepartmentResponse convertToResponse(Department department) {
         Long departmentId = department.getId();
-        UUID tenantId = department.getTenantId();
+        Long tenantId = department.getTenantId();
 
         // Get employee counts using repository methods
         Long totalEmployees = employeeRepository.countByDepartmentIdAndTenantId(departmentId, tenantId);

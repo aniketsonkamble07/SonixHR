@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Year;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -16,132 +15,94 @@ public class EmployeeCodeGenerator {
 
     private final EmployeeRepository employeeRepository;
 
+    private static final int SEQUENTIAL_DIGITS = 4;
+
     /**
-     * Generate employee code based on tenant
-     * Format: {TenantCode}{Sequential Number}
-     * Example: ACME001, ACME002
+     * Generate employee code
+     * Format: {Prefix}{Year}{Sequential Number}
+     * Example: ACME20260001, ACME20260002
+     *
+     * This single method handles duplicate names by using sequential numbering
+     * regardless of name similarity.
      */
-    public String generateSequentialCode(Tenant tenant) {
+    public String generateEmployeeCode(Tenant tenant) {
+        if (tenant == null) {
+            throw new IllegalArgumentException("Tenant cannot be null");
+        }
+
+        // Get tenant prefix (e.g., ACME from tenant code or company name)
         String prefix = getTenantPrefix(tenant);
 
-        // Get the latest employee code for this tenant
+        // Get current year
+        int currentYear = Year.now().getValue();
+
+        // Find the last employee code for this tenant
         String lastCode = employeeRepository.findLastEmployeeCodeByTenant(tenant.getId());
 
+        // Calculate next sequential number
+        int nextNumber = getNextNumber(lastCode, prefix, currentYear);
+
+        // Generate code: PREFIX + YEAR + SEQUENTIAL_NUMBER
+        // Example: ACME20260001
+        return String.format("%s%d%0" + SEQUENTIAL_DIGITS + "d", prefix, currentYear, nextNumber);
+    }
+
+    // =====================================================
+    // PRIVATE HELPER METHODS
+    // =====================================================
+
+    /**
+     * Get next sequential number from last code
+     */
+    private int getNextNumber(String lastCode, String prefix, int currentYear) {
         int nextNumber = 1;
-        if (lastCode != null && lastCode.startsWith(prefix)) {
-            String numberPart = lastCode.substring(prefix.length());
+
+        // Expected pattern: PREFIX + YEAR + NUMBER
+        // Example: ACME20260001
+        String expectedStart = prefix + currentYear;
+
+        if (lastCode != null && lastCode.startsWith(expectedStart)) {
+            String numberPart = lastCode.substring(expectedStart.length());
             try {
                 nextNumber = Integer.parseInt(numberPart) + 1;
+                // Reset if exceeds 9999
+                if (nextNumber > 9999) {
+                    nextNumber = 1;
+                    log.warn("Employee code exceeded limit, resetting to 1 for tenant");
+                }
             } catch (NumberFormatException e) {
+                log.warn("Failed to parse number from code: {}, using default 1", lastCode);
                 nextNumber = 1;
             }
         }
 
-        // Use 3 digits to ensure unique codes, but ensure total length <= 50
-        return String.format("%s%03d", prefix, nextNumber);
+        return nextNumber;
     }
 
     /**
      * Get tenant prefix from tenant code or company name
-     * Keep prefix short (max 4 chars) to fit within VARCHAR limit
      */
     private String getTenantPrefix(Tenant tenant) {
-        // Use tenant code
+        // Try tenant code first
         if (tenant.getTenantCode() != null && !tenant.getTenantCode().isEmpty()) {
             String cleaned = tenant.getTenantCode().toUpperCase()
                     .replaceAll("[^A-Z0-9]", "");
-            // Take first 4 characters, but ensure total code length <= 50
-            return cleaned.substring(0, Math.min(4, cleaned.length()));
+            if (!cleaned.isEmpty()) {
+                // Take first 4 characters
+                return cleaned.length() > 4 ? cleaned.substring(0, 4) : cleaned;
+            }
         }
 
         // Fallback to company name
         if (tenant.getCompanyName() != null && !tenant.getCompanyName().isEmpty()) {
             String cleaned = tenant.getCompanyName().toUpperCase()
                     .replaceAll("[^A-Z]", "");
-            return cleaned.substring(0, Math.min(4, cleaned.length()));
+            if (!cleaned.isEmpty()) {
+                return cleaned.length() > 4 ? cleaned.substring(0, 4) : cleaned;
+            }
         }
 
+        // Default prefix
         return "EMP";
-    }
-
-    /**
-     * Generate employee code with year
-     * Format: {TenantCode}-{Year}-{Sequential}
-     * Example: ACME-2026-001
-     */
-    public String generateCodeWithYear(Tenant tenant) {
-        String prefix = getTenantPrefix(tenant);
-        int currentYear = Year.now().getValue();
-
-        String lastCode = employeeRepository.findLastEmployeeCodeByTenantAndYear(
-                tenant.getId(), currentYear, prefix);
-
-        int nextNumber = 1;
-        if (lastCode != null && lastCode.contains("-")) {
-            String[] parts = lastCode.split("-");
-            if (parts.length == 3) {
-                try {
-                    nextNumber = Integer.parseInt(parts[2]) + 1;
-                } catch (NumberFormatException e) {
-                    nextNumber = 1;
-                }
-            }
-        }
-
-        return String.format("%s-%d-%03d", prefix, currentYear, nextNumber);
-    }
-
-    /**
-     * Generate department-based employee code
-     * Format: {DeptCode}-{Year}-{Sequential}
-     * Example: ENG-2026-001
-     */
-    public String generateDepartmentBasedCode(Tenant tenant, String department) {
-        String deptCode = getDepartmentCode(department);
-        int currentYear = Year.now().getValue();
-
-        String lastCode = employeeRepository.findLastEmployeeCodeByTenantAndDepartment(
-                tenant.getId(), department, currentYear, deptCode);
-
-        int nextNumber = 1;
-        if (lastCode != null && lastCode.contains("-")) {
-            String[] parts = lastCode.split("-");
-            if (parts.length == 3) {
-                try {
-                    nextNumber = Integer.parseInt(parts[2]) + 1;
-                } catch (NumberFormatException e) {
-                    nextNumber = 1;
-                }
-            }
-        }
-
-        return String.format("%s-%d-%03d", deptCode, currentYear, nextNumber);
-    }
-
-    /**
-     * Get department code
-     */
-    private String getDepartmentCode(String department) {
-        if (department == null || department.isEmpty()) {
-            return "GEN";
-        }
-
-        return switch (department.toUpperCase()) {
-            case "ENGINEERING" -> "ENG";
-            case "HUMAN RESOURCES", "HR" -> "HR";
-            case "SALES" -> "SAL";
-            case "MARKETING" -> "MKT";
-            case "FINANCE" -> "FIN";
-            case "OPERATIONS" -> "OPS";
-            case "IT", "INFORMATION TECHNOLOGY" -> "IT";
-            case "PRODUCT" -> "PRD";
-            case "DESIGN" -> "DES";
-            case "LEGAL" -> "LEG";
-            case "ADMINISTRATION" -> "ADM";
-            default -> {
-                String deptUpper = department.toUpperCase();
-                yield deptUpper.substring(0, Math.min(3, deptUpper.length()));
-            }
-        };
     }
 }

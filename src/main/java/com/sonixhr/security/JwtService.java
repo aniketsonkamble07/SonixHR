@@ -1,5 +1,7 @@
 package com.sonixhr.security;
 
+import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.entity.platform.PlatformUser;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
@@ -29,7 +31,7 @@ public class JwtService {
     private final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
     // ========================
-    // EXTRACT METHODS (unchanged)
+    // EXTRACT METHODS
     // ========================
 
     public String extractUsername(String token) {
@@ -40,9 +42,9 @@ public class JwtService {
         return extractClaim(token, claims -> claims.get("tenantId", String.class));
     }
 
-    public UUID extractTenantIdAsUUID(String token) {
+    public Long extractTenantIdAsLong(String token) {
         String tenantId = extractTenantId(token);
-        return tenantId != null ? UUID.fromString(tenantId) : null;
+        return tenantId != null ? Long.parseLong(tenantId) : null;
     }
 
     public String extractUserType(String token) {
@@ -64,6 +66,14 @@ public class JwtService {
 
     public String extractJti(String token) {
         return extractClaim(token, Claims::getId);
+    }
+
+    public Long extractEmployeeId(String token) {
+        return extractClaim(token, claims -> claims.get("employeeId", Long.class));
+    }
+
+    public String extractEmployeeCode(String token) {
+        return extractClaim(token, claims -> claims.get("employeeCode", String.class));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -97,35 +107,43 @@ public class JwtService {
     }
 
     // ========================
-    // TOKEN GENERATION FOR TENANT USERS
+    // TOKEN GENERATION FOR EMPLOYEE (Tenant users)
     // ========================
 
-    public String generateTenantToken(UserDetails userDetails, UUID tenantId) {
+    public String generateEmployeeToken(Employee employee) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userType", "TENANT");
-        claims.put("tenantId", tenantId.toString());
-        claims.put("roles", userDetails.getAuthorities().stream()
+        claims.put("userType", "EMPLOYEE");
+        claims.put("tenantId", employee.getTenantId().toString());
+        claims.put("employeeId", employee.getId());
+        claims.put("employeeCode", employee.getEmployeeCode());
+        claims.put("roles", employee.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .toList());
         claims.put("tokenType", "ACCESS");
-        return createToken(claims, userDetails.getUsername(), expiration);
+        claims.put("fullName", employee.getFullName());
+        claims.put("email", employee.getEmail());
+
+        return createToken(claims, employee.getEmail(), expiration);
     }
 
-    public String generateTenantRefreshToken(UserDetails userDetails, UUID tenantId) {
+    public String generateEmployeeRefreshToken(Employee employee) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userType", "TENANT");
-        claims.put("tenantId", tenantId.toString());
-        claims.put("roles", userDetails.getAuthorities().stream()
+        claims.put("userType", "EMPLOYEE");
+        claims.put("tenantId", employee.getTenantId().toString());
+        claims.put("employeeId", employee.getId());
+        claims.put("employeeCode", employee.getEmployeeCode());
+        claims.put("roles", employee.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .toList());
         claims.put("tokenType", "REFRESH");
-        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+
+        return createToken(claims, employee.getEmail(), refreshExpiration);
     }
 
-    public TokenPair generateTenantTokenPair(UserDetails userDetails, UUID tenantId) {
+    public TokenPair generateEmployeeTokenPair(Employee employee) {
         return TokenPair.builder()
-                .accessToken(generateTenantToken(userDetails, tenantId))
-                .refreshToken(generateTenantRefreshToken(userDetails, tenantId))
+                .accessToken(generateEmployeeToken(employee))
+                .refreshToken(generateEmployeeRefreshToken(employee))
                 .tokenType("Bearer")
                 .expiresIn(expiration)
                 .refreshExpiresIn(refreshExpiration)
@@ -136,30 +154,36 @@ public class JwtService {
     // TOKEN GENERATION FOR PLATFORM USERS
     // ========================
 
-    public String generatePlatformToken(UserDetails userDetails) {
+    public String generatePlatformToken(PlatformUser user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userType", "PLATFORM");
-        claims.put("roles", userDetails.getAuthorities().stream()
+        claims.put("userId", user.getId());
+        claims.put("roles", user.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .toList());
         claims.put("tokenType", "ACCESS");
-        return createToken(claims, userDetails.getUsername(), expiration);
+        claims.put("fullName", user.getFullName());
+        claims.put("email", user.getEmail());
+
+        return createToken(claims, user.getEmail(), expiration);
     }
 
-    public String generatePlatformRefreshToken(UserDetails userDetails) {
+    public String generatePlatformRefreshToken(PlatformUser user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userType", "PLATFORM");
-        claims.put("roles", userDetails.getAuthorities().stream()
+        claims.put("userId", user.getId());
+        claims.put("roles", user.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .toList());
         claims.put("tokenType", "REFRESH");
-        return createToken(claims, userDetails.getUsername(), refreshExpiration);
+
+        return createToken(claims, user.getEmail(), refreshExpiration);
     }
 
-    public TokenPair generatePlatformTokenPair(UserDetails userDetails) {
+    public TokenPair generatePlatformTokenPair(PlatformUser user) {
         return TokenPair.builder()
-                .accessToken(generatePlatformToken(userDetails))
-                .refreshToken(generatePlatformRefreshToken(userDetails))
+                .accessToken(generatePlatformToken(user))
+                .refreshToken(generatePlatformRefreshToken(user))
                 .tokenType("Bearer")
                 .expiresIn(expiration)
                 .refreshExpiresIn(refreshExpiration)
@@ -174,46 +198,11 @@ public class JwtService {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
-                .setId((String) claims.getOrDefault("jti", UUID.randomUUID().toString()))
+                .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiryDuration))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
-    }
-
-    // ========================
-    // OLD GENERIC METHODS (KEEP FOR BACKWARDS COMPATIBILITY IF NEEDED)
-    // ========================
-
-    public String generateToken(UserDetails userDetails, String tenantId) {
-        return generateToken(userDetails, tenantId, false);
-    }
-
-    public String generateToken(UserDetails userDetails, String tenantId, boolean isRefreshToken) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("tenantId", tenantId);
-        claims.put("roles", userDetails.getAuthorities().stream()
-                .map(auth -> auth.getAuthority())
-                .toList());
-        claims.put("tokenType", isRefreshToken ? "REFRESH" : "ACCESS");
-        claims.put("jti", UUID.randomUUID().toString());
-        claims.put("iat", new Date().getTime());
-        long expiryDuration = isRefreshToken ? refreshExpiration : expiration;
-        return createToken(claims, userDetails.getUsername(), expiryDuration);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails, String tenantId) {
-        return generateToken(userDetails, tenantId, true);
-    }
-
-    public TokenPair generateTokenPair(UserDetails userDetails, String tenantId) {
-        return TokenPair.builder()
-                .accessToken(generateToken(userDetails, tenantId, false))
-                .refreshToken(generateToken(userDetails, tenantId, true))
-                .tokenType("Bearer")
-                .expiresIn(expiration)
-                .refreshExpiresIn(refreshExpiration)
-                .build();
     }
 
     // ========================
@@ -274,11 +263,6 @@ public class JwtService {
         }
     }
 
-    public void invalidateAllUserTokens(String username) {
-        log.info("Invalidating all tokens for user: {}", username);
-        // In production, implement with Redis
-    }
-
     public boolean isTokenBlacklisted(String token) {
         try {
             String jti = extractJti(token);
@@ -308,13 +292,10 @@ public class JwtService {
         try {
             if (validateToken(refreshToken, userDetails) && isRefreshToken(refreshToken)) {
                 String userType = extractUserType(refreshToken);
-                if ("TENANT".equals(userType)) {
-                    String tenantId = extractTenantId(refreshToken);
-                    if (tenantId != null) {
-                        return Optional.of(generateTenantToken(userDetails, UUID.fromString(tenantId)));
-                    }
-                } else if ("PLATFORM".equals(userType)) {
-                    return Optional.of(generatePlatformToken(userDetails));
+                if ("EMPLOYEE".equals(userType) && userDetails instanceof Employee) {
+                    return Optional.of(generateEmployeeToken((Employee) userDetails));
+                } else if ("PLATFORM".equals(userType) && userDetails instanceof PlatformUser) {
+                    return Optional.of(generatePlatformToken((PlatformUser) userDetails));
                 }
             }
         } catch (Exception e) {
@@ -324,50 +305,58 @@ public class JwtService {
     }
 
     // ========================
+    // HELPER METHODS FOR EMPLOYEE CONTEXT
+    // ========================
+
+    public Long getTenantIdFromToken(String token) {
+        try {
+            return extractTenantIdAsLong(token);
+        } catch (Exception e) {
+            log.error("Failed to extract tenant ID from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public Long getEmployeeIdFromToken(String token) {
+        try {
+            return extractEmployeeId(token);
+        } catch (Exception e) {
+            log.error("Failed to extract employee ID from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public String getEmployeeCodeFromToken(String token) {
+        try {
+            return extractEmployeeCode(token);
+        } catch (Exception e) {
+            log.error("Failed to extract employee code from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean isEmployeeToken(String token) {
+        try {
+            return "EMPLOYEE".equals(extractUserType(token));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isPlatformToken(String token) {
+        try {
+            return "PLATFORM".equals(extractUserType(token));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ========================
     // KEY MANAGEMENT
     // ========================
 
     private Key getSignKey() {
         byte[] keyBytes = Base64.getDecoder().decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
-    }
-    // ========================
-    // TOKEN GENERATION FOR EMPLOYEE USERS
-    // ========================
-
-    public String generateEmployeeToken(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userType", "EMPLOYEE");
-        claims.put("tenantId", tenantId.toString());
-        claims.put("employeeId", employeeId);
-        claims.put("employeeCode", employeeCode);
-        claims.put("roles", userDetails.getAuthorities().stream()
-                .map(auth -> auth.getAuthority())
-                .toList());
-        claims.put("tokenType", "ACCESS");
-        return createToken(claims, userDetails.getUsername(), expiration);
-    }
-
-    public String generateEmployeeRefreshToken(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userType", "EMPLOYEE");
-        claims.put("tenantId", tenantId.toString());
-        claims.put("employeeId", employeeId);
-        claims.put("employeeCode", employeeCode);
-        claims.put("roles", userDetails.getAuthorities().stream()
-                .map(auth -> auth.getAuthority())
-                .toList());
-        claims.put("tokenType", "REFRESH");
-        return createToken(claims, userDetails.getUsername(), refreshExpiration);
-    }
-
-    public TokenPair generateEmployeeTokenPair(UserDetails userDetails, UUID tenantId, Long employeeId, String employeeCode) {
-        return TokenPair.builder()
-                .accessToken(generateEmployeeToken(userDetails, tenantId, employeeId, employeeCode))
-                .refreshToken(generateEmployeeRefreshToken(userDetails, tenantId, employeeId, employeeCode))
-                .tokenType("Bearer")
-                .expiresIn(expiration)
-                .refreshExpiresIn(refreshExpiration)
-                .build();
     }
 }

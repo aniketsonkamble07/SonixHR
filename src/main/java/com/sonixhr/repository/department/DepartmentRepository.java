@@ -21,32 +21,32 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
     // BASIC QUERIES
     // =====================================================
 
-    Optional<Department> findByIdAndTenant_Id(Long id, UUID tenantId);
+    Optional<Department> findByIdAndTenant_Id(Long id, Long tenantId);
 
-    List<Department> findByTenant_Id(UUID tenantId);
+    List<Department> findByTenant_Id(Long tenantId);
 
-    Page<Department> findByTenant_Id(UUID tenantId, Pageable pageable);
+    Page<Department> findByTenant_Id(Long tenantId, Pageable pageable);
 
-    List<Department> findByTenant_IdAndIsActiveTrue(UUID tenantId);
+    List<Department> findByTenant_IdAndIsActiveTrue(Long tenantId);
 
     // =====================================================
     // UNIQUE VALIDATION QUERIES
     // =====================================================
 
-    Optional<Department> findByTenant_IdAndCode(UUID tenantId, String code);
+    Optional<Department> findByTenant_IdAndCode(Long tenantId, String code);
 
-    Optional<Department> findByTenant_IdAndName(UUID tenantId, String name);
+    Optional<Department> findByTenant_IdAndName(Long tenantId, String name);
 
-    boolean existsByTenant_IdAndName(UUID tenantId, String name);
+    boolean existsByTenant_IdAndName(Long tenantId, String name);
 
-    boolean existsByTenant_IdAndCode(UUID tenantId, String code);
+    boolean existsByTenant_IdAndCode(Long tenantId, String code);
 
     // =====================================================
     // SORTED QUERIES
     // =====================================================
 
     @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId ORDER BY d.name ASC")
-    List<Department> findAllByTenantIdOrderByName(@Param("tenantId") UUID tenantId);
+    List<Department> findAllByTenantIdOrderByName(@Param("tenantId") Long tenantId);
 
     // =====================================================
     // QUERY TO GET DEPARTMENTS WITH EMPLOYEE COUNTS
@@ -65,7 +65,7 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
     @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId " +
             "AND (LOWER(d.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(d.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
-    Page<Department> searchDepartments(@Param("tenantId") UUID tenantId,
+    Page<Department> searchDepartments(@Param("tenantId") Long tenantId,
                                        @Param("searchTerm") String searchTerm,
                                        Pageable pageable);
 
@@ -77,19 +77,19 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
     @Transactional
     @Query("UPDATE Department d SET d.isActive = :isActive WHERE d.id = :id AND d.tenant.id = :tenantId")
     int updateDepartmentStatus(@Param("id") Long id,
-                               @Param("tenantId") UUID tenantId,
+                               @Param("tenantId") Long tenantId,
                                @Param("isActive") Boolean isActive);
 
     @Modifying
     @Transactional
     @Query("UPDATE Department d SET d.isActive = false WHERE d.tenant.id = :tenantId")
-    void deactivateAllDepartmentsForTenant(@Param("tenantId") UUID tenantId);
+    void deactivateAllDepartmentsForTenant(@Param("tenantId") Long tenantId);
 
     // =====================================================
     // COUNT QUERIES
     // =====================================================
 
-    long countByTenant_Id(UUID tenantId);
+    long countByTenant_Id(Long tenantId);
 
-    long countByTenant_IdAndIsActiveTrue(UUID tenantId);
+    long countByTenant_IdAndIsActiveTrue(Long tenantId);
 }

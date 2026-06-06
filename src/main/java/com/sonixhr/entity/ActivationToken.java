@@ -1,6 +1,5 @@
 package com.sonixhr.entity;
 
-import com.sonixhr.enums.UserType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "activation_tokens")
@@ -19,23 +17,32 @@ import java.util.UUID;
 public class ActivationToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false, unique = true)
     private String token;
 
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private Long userId;
 
+    @Column(name = "user_type", nullable = false)
+    private String userType; // "PLATFORM" or "EMPLOYEE"
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "user_type", nullable = false, length = 20)
-    private UserType userType;
+    @Column(name = "token_type", nullable = false)
+    private String tokenType; // "ACTIVATION" or "PASSWORD_RESET"
 
-    @Column(name = "expiry_time")
-    private LocalDateTime expiryTime;
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDateTime expiresAt;
+    
+    @Column(name = "used", nullable = false)
+    private boolean used;
 
-    @Builder.Default
-    private Boolean used = false;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 }

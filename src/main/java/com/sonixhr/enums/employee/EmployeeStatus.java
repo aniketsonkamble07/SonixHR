@@ -6,8 +6,8 @@ public enum EmployeeStatus {
     RESIGNED("resigned", "Resigned", "secondary"),
     TERMINATED("terminated", "Terminated", "danger"),
     ON_LEAVE("on_leave", "On Leave", "info"),
-    SUSPENDED("suspended", "Suspended", "danger");
-
+    SUSPENDED("suspended", "Suspended", "danger"),
+    INVITED("invited", "Invited", "primary");
     private final String code;
     private final String displayName;
     private final String badgeColor;

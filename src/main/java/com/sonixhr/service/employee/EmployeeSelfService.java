@@ -8,16 +8,12 @@ import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
-import com.sonixhr.repository.tenant.TenantRepository;
-import com.sonixhr.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -27,30 +23,25 @@ public class EmployeeSelfService {
 
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
-    private final SecurityUtils securityUtils;
+
     // =====================================================
     // Update employee profile (self-service)
     // =====================================================
     @Transactional
-    public EmployeeResponse updateEmployeeProfile(UUID tenantId, String email,
+    public EmployeeResponse updateEmployeeProfile(Long tenantId, String email,
                                                   EmployeeProfileUpdateRequest request) {
         log.info("Updating profile for employee: {}", email);
 
-        Employee employee = employeeRepository.findByEmail(email)
+        Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
-        if (!employee.getTenantId().equals(tenantId)) {
-            throw new ResourceNotFoundException("Employee not found in this tenant");
-        }
-
         // =====================================================
-        // CHECK PERMISSIONS USING SECURITY_UTILS (FROM JWT)
+        // CHECK PERMISSIONS FROM SECURITY CONTEXT
         // =====================================================
-        boolean isSuperAdmin = securityUtils.isSuperAdmin();
-        boolean isHR = securityUtils.isHR();
+        boolean isSuperAdmin = isCurrentUserSuperAdmin();
+        boolean isHR = isCurrentUserHR();
 
-        log.debug("User permissions - SuperAdmin: {}, HR: {}, Roles: {}",
-                isSuperAdmin, isHR, securityUtils.getCurrentUserRoles());
+        log.debug("User permissions - SuperAdmin: {}, HR: {}", isSuperAdmin, isHR);
 
         // =====================================================
         // PERSONAL INFORMATION (All employees can update)
@@ -63,8 +54,7 @@ public class EmployeeSelfService {
         if (isSuperAdmin || isHR) {
             updateProfessionalInfo(employee, request, tenantId);
         } else if (hasProfessionalInfoRequest(request)) {
-            log.warn("Employee {} attempted to update professional fields without permission. Roles: {}",
-                    email, securityUtils.getCurrentUserRoles());
+            log.warn("Employee {} attempted to update professional fields without permission", email);
             throw new BusinessException("You don't have permission to update professional information. Only HR or Super Admin can update department, position, work location, and manager.");
         }
 
@@ -100,7 +90,7 @@ public class EmployeeSelfService {
         if (request.getCustomFields() != null) employee.setCustomFields(request.getCustomFields());
     }
 
-    private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, UUID tenantId) {
+    private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, Long tenantId) {
         if (request.getDepartmentId() != null) {
             Department department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
@@ -130,18 +120,19 @@ public class EmployeeSelfService {
                 request.getManagerId() != null;
     }
 
-    private boolean isCurrentUserSuperAdmin(UUID tenantId) {
+    private boolean isCurrentUserSuperAdmin() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
         }
 
-        // Check if user has SUPER_ADMIN role
+        // Check if user has SUPER_ADMIN authority
         return authentication.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
+                .anyMatch(auth -> auth.getAuthority().equals("SUPER_ADMIN") ||
+                        auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
     }
 
-    private boolean isCurrentUserHR(UUID tenantId) {
+    private boolean isCurrentUserHR() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
@@ -149,14 +140,16 @@ public class EmployeeSelfService {
 
         // Check if user has HR role
         return authentication.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_HR") ||
+                .anyMatch(auth -> auth.getAuthority().equals("HR") ||
+                        auth.getAuthority().equals("ROLE_HR") ||
+                        auth.getAuthority().equals("ADMIN") ||
                         auth.getAuthority().equals("ROLE_ADMIN"));
     }
 
     // =====================================================
     // Get employee by email (for self-service)
     // =====================================================
-    public EmployeeResponse getEmployeeByEmail(UUID tenantId, String email) {
+    public EmployeeResponse getEmployeeByEmail(Long tenantId, String email) {
         log.debug("Fetching employee by email: {} for tenant: {}", email, tenantId);
 
         Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
@@ -164,6 +157,14 @@ public class EmployeeSelfService {
                         String.format("Employee not found with email: %s", email)));
 
         return convertToResponse(employee);
+    }
+
+    // =====================================================
+    // Get current employee profile
+    // =====================================================
+    public EmployeeResponse getCurrentEmployeeProfile(Long tenantId, String email) {
+        log.debug("Fetching current employee profile for: {}", email);
+        return getEmployeeByEmail(tenantId, email);
     }
 
     // =====================================================
@@ -175,7 +176,6 @@ public class EmployeeSelfService {
                 .id(employee.getId())
                 .tenantId(employee.getTenantId())
                 .employeeCode(employee.getEmployeeCode())
-                .userId(employee.getUserId())
                 .firstName(employee.getFirstName())
                 .lastName(employee.getLastName())
                 .fullName(employee.getFullName())
@@ -188,7 +188,6 @@ public class EmployeeSelfService {
                 .bloodGroup(employee.getBloodGroup())
                 .nationality(employee.getNationality())
                 .personalEmail(employee.getPersonalEmail())
-                // FIXED: Convert Department entity to DepartmentInfo DTO
                 .department(employee.getDepartment() != null ?
                         EmployeeResponse.DepartmentInfo.builder()
                                 .id(employee.getDepartment().getId())
@@ -214,6 +213,7 @@ public class EmployeeSelfService {
                 .lastWorkingDate(employee.getLastWorkingDate())
                 .tenureInMonths(employee.getTenureInMonths())
                 .status(employee.getStatus())
+                .isActive(employee.isActive())
                 .address(employee.getAddress())
                 .city(employee.getCity())
                 .state(employee.getState())

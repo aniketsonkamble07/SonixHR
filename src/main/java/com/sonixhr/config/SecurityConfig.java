@@ -35,27 +35,32 @@ import java.util.List;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private final UserDetailsService tenantUserDetailsService;
+    private final UserDetailsService employeeDetailsService;
     private final UserDetailsService platformUserDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
     private final JwtAccessDeniedHandler accessDeniedHandler;
     private final CustomPermissionEvaluator permissionEvaluator;
 
-    // Explicit constructor — @Qualifier does NOT survive Lombok's @RequiredArgsConstructor
     public SecurityConfig(
-            @Qualifier("tenantUserDetailsService") UserDetailsService tenantUserDetailsService,
+            @Qualifier("employeeDetailsService") UserDetailsService employeeDetailsService,
             @Qualifier("platformUserDetailsService") UserDetailsService platformUserDetailsService,
             JwtAuthFilter jwtAuthFilter,
             JwtAuthenticationEntryPoint unauthorizedHandler,
             JwtAccessDeniedHandler accessDeniedHandler,
             CustomPermissionEvaluator permissionEvaluator) {
-        this.tenantUserDetailsService = tenantUserDetailsService;
+        this.employeeDetailsService = employeeDetailsService;
         this.platformUserDetailsService = platformUserDetailsService;
         this.jwtAuthFilter = jwtAuthFilter;
         this.unauthorizedHandler = unauthorizedHandler;
         this.accessDeniedHandler = accessDeniedHandler;
         this.permissionEvaluator = permissionEvaluator;
+    }
+
+    // ✅ ADD THIS MISSING PASSWORD ENCODER BEAN
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
@@ -73,13 +78,15 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/platform/auth/**",
                                 "/api/public/**",
+                                "/api/debug/**",
                                 "/api/health",
                                 "/actuator/health",
-                                "/api/tenants/register",
-                                "/api/tenants/verify-subdomain/**",
+                                "/api/tenant/register",
+                                "/api/employee/auth/activate",
+                                "/api/tenant/auth/login",
+                                "/api/tenant/verify-subdomain/**",
                                 "/api/forgot-password/**",
                                 "/api/employee/auth/activate",
-
                                 "/api/reset-password/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -88,17 +95,17 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
     // ========================
-    // TENANT AUTHENTICATION
+    // TENANT / EMPLOYEE AUTHENTICATION
     // ========================
-    @Primary
     @Bean(name = "tenantAuthenticationManager")
     public AuthenticationManager tenantAuthenticationManager() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(tenantUserDetailsService);
+        provider.setUserDetailsService(employeeDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return new ProviderManager(List.of(provider));
     }
@@ -114,9 +121,14 @@ public class SecurityConfig {
         return new ProviderManager(List.of(provider));
     }
 
+    // ========================
+    // DEFAULT AUTHENTICATION MANAGER
+    // ========================
+    @Primary
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+    public AuthenticationManager authenticationManager() {
+        // Default to platform authentication manager
+        return platformAuthenticationManager();
     }
 
     @Bean
@@ -124,8 +136,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://localhost:5173"
-                // add production origins here, e.g. "https://app.sonixhr.com"
+                "http://localhost:5173",
+                "http://localhost:8081"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
@@ -133,6 +145,7 @@ public class SecurityConfig {
         configuration.setExposedHeaders(List.of("X-Total-Count", "X-Tenant-ID"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

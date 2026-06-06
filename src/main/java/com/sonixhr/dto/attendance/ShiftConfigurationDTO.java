@@ -20,7 +20,7 @@ public class ShiftConfigurationDTO {
 
     // Basic Identifiers
     private Long id;
-    private UUID tenantId;
+    private Long tenantId;
     private String shiftName;
     private String shiftCode;
     private String shiftDescription;

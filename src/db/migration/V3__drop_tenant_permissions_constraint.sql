@@ -1,0 +1,1 @@
+ALTER TABLE tenant_permissions DROP CONSTRAINT IF EXISTS tenant_permissions_permission_check;

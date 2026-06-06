@@ -1,5 +1,6 @@
 package com.sonixhr.controller.platform;
 
+import com.sonixhr.dto.ResetPasswordRequest;
 import com.sonixhr.dto.platform.*;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.platform.PlatformUserService;
@@ -16,7 +17,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
-import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -27,10 +27,10 @@ public class PlatformUserController {
     private final PlatformUserService platformUserService;
 
     /**
-     * Create a new platform user (Admin only)
+     * Create a new platform user (Super Admin only)
      */
     @PostMapping
-    @PreAuthorize("hasAuthority('CREATE_ADMIN')")
+    @PreAuthorize("hasAuthority('CREATE_PLATFORM_ADMIN')")
     public ResponseEntity<PlatformUserResponse> createUser(
             @Valid @RequestBody PlatformUserCreateRequest request,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
@@ -43,8 +43,8 @@ public class PlatformUserController {
      * Resend activation email to user
      */
     @PostMapping("/{id}/resend-activation")
-    @PreAuthorize("hasAuthority('CREATE_ADMIN')")
-    public ResponseEntity<Void> resendActivationEmail(@PathVariable UUID id) {
+    @PreAuthorize("hasAuthority('CREATE_PLATFORM_ADMIN')")
+    public ResponseEntity<Void> resendActivationEmail(@PathVariable Long id) {
         log.info("REST request to resend activation email for user: {}", id);
         PlatformUserResponse user = platformUserService.getUserById(id);
         platformUserService.resendActivationEmail(user.getEmail());
@@ -55,7 +55,7 @@ public class PlatformUserController {
      * Get all platform users with pagination
      */
     @GetMapping
-    @PreAuthorize("hasAuthority('VIEW_ADMINS')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
     public ResponseEntity<Page<PlatformUserResponse>> getAllUsers(
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
         log.debug("REST request to get all platform users");
@@ -67,9 +67,8 @@ public class PlatformUserController {
      * Get platform user by ID
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('VIEW_ADMINS')")
-    public ResponseEntity<PlatformUserResponse> getUserById(@PathVariable UUID id) {
-        log.debug("REST request to get platform user by id: {}", id);
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
+    public ResponseEntity<PlatformUserResponse> getUserById(@PathVariable Long id) {
         PlatformUserResponse user = platformUserService.getUserById(id);
         return ResponseEntity.ok(user);
     }
@@ -78,7 +77,7 @@ public class PlatformUserController {
      * Get platform user by email
      */
     @GetMapping("/by-email/{email}")
-    @PreAuthorize("hasAuthority('VIEW_ADMINS')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
     public ResponseEntity<PlatformUserResponse> getUserByEmail(@PathVariable String email) {
         log.debug("REST request to get platform user by email: {}", email);
         PlatformUserResponse user = platformUserService.getUserByEmail(email);
@@ -89,9 +88,9 @@ public class PlatformUserController {
      * Update platform user details
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('EDIT_ADMIN')")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
     public ResponseEntity<PlatformUserResponse> updateUser(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @Valid @RequestBody PlatformUserUpdateRequest request) {
         log.info("REST request to update platform user: {}", id);
         PlatformUserResponse user = platformUserService.updateUser(id, request);
@@ -102,9 +101,9 @@ public class PlatformUserController {
      * Update platform user roles
      */
     @PutMapping("/{id}/roles")
-    @PreAuthorize("hasAuthority('MANAGE_ADMIN_ROLES')")
+    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ADMIN_ROLES')")
     public ResponseEntity<Void> updateUserRoles(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestBody Set<Long> roleIds) {
         log.info("REST request to update roles for user: {}", id);
         platformUserService.updateUserRoles(id, roleIds);
@@ -115,8 +114,8 @@ public class PlatformUserController {
      * Deactivate platform user
      */
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority('EDIT_ADMIN')")
-    public ResponseEntity<Void> deactivateUser(@PathVariable UUID id) {
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
+    public ResponseEntity<Void> deactivateUser(@PathVariable Long id) {
         log.info("REST request to deactivate platform user: {}", id);
         platformUserService.deactivateUser(id);
         return ResponseEntity.ok().build();
@@ -126,8 +125,8 @@ public class PlatformUserController {
      * Activate platform user (by admin)
      */
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAuthority('EDIT_ADMIN')")
-    public ResponseEntity<Void> activateUserByAdmin(@PathVariable UUID id) {
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
+    public ResponseEntity<Void> activateUserByAdmin(@PathVariable Long id) {
         log.info("REST request to activate platform user by admin: {}", id);
         platformUserService.activateUserByAdmin(id);
         return ResponseEntity.ok().build();
@@ -137,23 +136,23 @@ public class PlatformUserController {
      * Soft delete platform user
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('DELETE_ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
+    @PreAuthorize("hasAuthority('DELETE_PLATFORM_ADMIN')")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         log.info("REST request to delete platform user: {}", id);
         platformUserService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
 
     /**
-     * Force change password for user (Admin)
+     * Reset password for user (Admin)
      */
-    @PostMapping("/{id}/change-password")
-    @PreAuthorize("hasAuthority('RESET_ADMIN_PASSWORD')")
-    public ResponseEntity<Void> changePassword(
-            @PathVariable UUID id,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        log.info("REST request to change password for user: {}", id);
-        platformUserService.forceChangePassword(id, request.getNewPassword(), request.isMustChangePassword());
+    @PostMapping("/{id}/reset-password")
+    @PreAuthorize("hasAuthority('RESET_PLATFORM_ADMIN_PASSWORD')")
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable Long id,
+            @Valid @RequestBody ResetPasswordRequest request) {
+        log.info("REST request to reset password for user: {}", id);
+        platformUserService.resetPasswordByAdmin(id, request.getNewPassword(),true);
         return ResponseEntity.ok().build();
     }
 

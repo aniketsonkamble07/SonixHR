@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TenantSubscriptionRepository extends JpaRepository<TenantSubscription, Long> {
-    Optional<TenantSubscription> findByTenantIdAndIsActiveTrue(UUID tenantId);
-    List<TenantSubscription> findByTenantIdOrderByCreatedAtDesc(UUID tenantId);
+    Optional<TenantSubscription> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<TenantSubscription> findByTenantIdOrderByCreatedAtDesc(Long tenantId);
     List<TenantSubscription> findByPlanStatusAndTrialEndsAtBefore(String planStatus, LocalDateTime date);
 }

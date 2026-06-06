@@ -16,7 +16,7 @@ public class TenantRLSService {
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
-    public void setCurrentTenantInDB(UUID tenantId) {
+    public void setCurrentTenantInDB(Long tenantId) {
         if (tenantId == null) {
             log.warn("Attempting to set null tenant ID");
             return;
@@ -51,7 +51,7 @@ public class TenantRLSService {
         }
     }
 
-    private void tryAlternativeSetTenant(UUID tenantId) {
+    private void tryAlternativeSetTenant(Long tenantId) {
         try {
             jdbcTemplate.execute("SET app.current_tenant = '" + tenantId.toString() + "'");
             log.debug("Set tenant using session variable: {}", tenantId);
@@ -60,9 +60,9 @@ public class TenantRLSService {
         }
     }
 
-    public UUID getCurrentTenantFromDB() {
+    public Long getCurrentTenantFromDB() {
         try {
-            return jdbcTemplate.queryForObject("SELECT get_current_tenant()", UUID.class);
+            return jdbcTemplate.queryForObject("SELECT get_current_tenant()", Long.class);
         } catch (Exception e) {
             log.warn("Could not get current tenant from database: {}", e.getMessage());
             return null;

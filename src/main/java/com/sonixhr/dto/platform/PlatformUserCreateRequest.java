@@ -23,7 +23,7 @@ public class PlatformUserCreateRequest {
     private String fullName;
 
     private String designation;
-
+    private Long tenantId;
     @NotNull(message = "Role IDs are required")
     private Set<Long> roleIds;
 }
