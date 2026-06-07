@@ -12,10 +12,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class PermissionService {
-
-    /**
-     * Check if current authenticated user has a specific permission
-     */
+    // =====================================================
+    // Check if current authenticated user has a specific permission
+    // =====================================================
     public boolean hasPermission(String permissionName) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -50,16 +49,14 @@ public class PermissionService {
         return false;
     }
 
-    /**
-     * For use in @PreAuthorize with custom evaluator
-     */
+
+    // For use in @PreAuthorize with custom evaluator
     public boolean hasPermission(Authentication auth, String permissionName) {
         return hasPermission(permissionName);
     }
 
-    /**
-     * Check if current user has any of the specified permissions
-     */
+
+    // Check if current user has any of the specified permissions
     public boolean hasAnyPermission(String... permissionNames) {
         for (String permissionName : permissionNames) {
             if (hasPermission(permissionName)) {
@@ -69,10 +66,9 @@ public class PermissionService {
         return false;
     }
 
-    /**
-     * Check if current user has all of the specified permissions
-     */
-    public boolean hasAllPermissions(String... permissionNames) {
+
+    // Check if current user has all of the specified permissions
+      public boolean hasAllPermissions(String... permissionNames) {
         for (String permissionName : permissionNames) {
             if (!hasPermission(permissionName)) {
                 return false;
@@ -81,9 +77,9 @@ public class PermissionService {
         return true;
     }
 
-    /**
-     * Get current user type (EMPLOYEE, PLATFORM, etc.)
-     */
+    // =====================================================
+    // Get current user type (EMPLOYEE, PLATFORM, etc.)
+    // =====================================================
     public String getCurrentUserType() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -100,9 +96,9 @@ public class PermissionService {
         return "UNKNOWN";
     }
 
-    /**
-     * Get current employee if authenticated as employee
-     */
+    // =====================================================
+    // Get current employee if authenticated as employee
+    // =====================================================
     public Employee getCurrentEmployee() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
@@ -114,9 +110,10 @@ public class PermissionService {
         return null;
     }
 
-    /**
-     * Get current platform user if authenticated as platform user
-     */
+    // =====================================================
+    // Get current platform user if authenticated as platform user
+    // =====================================================
+
     public PlatformUser getCurrentPlatformUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
@@ -128,23 +125,23 @@ public class PermissionService {
         return null;
     }
 
-    /**
-     * Check if current user is a tenant employee
-     */
+    // =====================================================
+    // Check if current user is a tenant employee
+    // =====================================================
     public boolean isEmployee() {
         return getCurrentEmployee() != null;
     }
 
-    /**
-     * Check if current user is a platform user
-     */
+    // =====================================================
+    // Check if current user is a platform user
+    // =====================================================
     public boolean isPlatformUser() {
         return getCurrentPlatformUser() != null;
     }
 
-    /**
-     * Check if current user is super admin (platform admin)
-     */
+    // =====================================================
+    // Check if current user is super admin (platform admin)
+    // =====================================================
     public boolean isSuperAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -163,18 +160,16 @@ public class PermissionService {
         return false;
     }
 
-    /**
-     * Get current tenant ID if user is an employee
-     */
-    public Long getCurrentTenantId() {
+
+    // Get current tenant ID if user is an employee
+       public Long getCurrentTenantId() {
         Employee employee = getCurrentEmployee();
         return employee != null ? employee.getTenantId() : null;
     }
 
-    /**
-     * Get current employee ID
-     */
-    public Long getCurrentEmployeeId() {
+
+    // Get current user ID (employee ID or platform user ID)
+      public Long getCurrentEmployeeId() {
         Employee employee = getCurrentEmployee();
         return employee != null ? employee.getId() : null;
     }

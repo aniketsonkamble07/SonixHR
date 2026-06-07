@@ -154,8 +154,8 @@ public class TenantRegistrationService {
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
-                .status("pending")
-                .isActive(false)
+                .status("active")
+                .isActive(true)
                 .planStatus("trial")
                 .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
                 .build();
@@ -204,6 +204,11 @@ public class TenantRegistrationService {
         String firstName = getFirstNameFromFullName(request.getAdminName());
         String lastName = getLastNameFromFullName(request.getAdminName());
 
+        // ✅ First save the role if it's new
+        if (superAdminRole.getId() == null) {
+            superAdminRole = roleRepository.save(superAdminRole);
+        }
+
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)
                 .employeeCode(employeeCode)
@@ -215,19 +220,15 @@ public class TenantRegistrationService {
                 .employmentType(EmploymentType.FULL_TIME)
                 .hireDate(LocalDate.now())
                 .probationMonths(0)
-                .status(EmployeeStatus.INVITED)
-                .isActive(false)
+                .status(EmployeeStatus.ACTIVE)
+                .isActive(true)
                 .workLocation("Head Office")
-                .passwordHash(null)
+                .passwordHash(passwordEncoder.encode("Admin@1234"))
                 .createdBy(1L)
+                .roles(new HashSet<>(Set.of(superAdminRole)))  // ✅ Set roles during creation
                 .build();
 
-        Employee savedEmployee = employeeRepository.save(superAdmin);
-
-        // Assign role to employee
-        savedEmployee.getRoles().add(superAdminRole);
-
-        return employeeRepository.save(savedEmployee);
+        return employeeRepository.save(superAdmin);
     }
 
     private String getFirstNameFromFullName(String fullName) {

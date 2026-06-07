@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/departments")
+@RequestMapping("/api/tenant/departments")
 @RequiredArgsConstructor
 public class DepartmentController {
 

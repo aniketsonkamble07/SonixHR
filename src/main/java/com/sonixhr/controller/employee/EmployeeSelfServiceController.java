@@ -3,7 +3,7 @@ package com.sonixhr.controller.employee;
 import com.sonixhr.dto.employee.EmployeeProfileUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.service.employee.EmployeeSelfService;
-import com.sonixhr.service.tenant.TenantContext;
+import com.sonixhr.security.TenantContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

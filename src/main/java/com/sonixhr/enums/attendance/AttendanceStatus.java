@@ -1,21 +1,22 @@
 package com.sonixhr.enums.attendance;
 
+import lombok.Getter;
+
+@Getter
 public enum AttendanceStatus {
     PRESENT("Present"),
-    LATE("Late"),
     ABSENT("Absent"),
+    LATE("Late"),
     HALF_DAY("Half Day"),
-    WEEK_OFF("Week Off"),
-    ON_LEAVE("On Leave"),
-    HOLIDAY("Holiday");
+    ON_LEAVE("On Leave");
 
-    private final String description;
+    private final String displayName;
 
-    AttendanceStatus(String description) {
-        this.description = description;
+    AttendanceStatus(String displayName) {
+        this.displayName = displayName;
     }
 
-    public String getDescription() {
-        return description;
+    public String getDisplayName() {
+        return displayName;
     }
 }

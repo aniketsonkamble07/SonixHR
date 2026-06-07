@@ -1,6 +1,5 @@
 package com.sonixhr.security;
 
-import com.sonixhr.service.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

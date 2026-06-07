@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface TenantRepository extends JpaRepository<Tenant, Long> {  // ✅ Changed from UUID to Long
+public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     // ===== Basic Finders =====
     Optional<Tenant> findBySubdomain(String subdomain);

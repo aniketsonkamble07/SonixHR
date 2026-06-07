@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 @Data
 @Builder
@@ -53,5 +54,5 @@ public class EmployeeCreateRequest {
 
     @Builder.Default
     private Integer probationMonths = 3;
-
+    private Set<Long> roleIds;
 }

@@ -88,7 +88,7 @@ public class Employee implements UserDetails {
             joinColumns = @JoinColumn(name = "employee_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
-    @Builder.Default
+
     private Set<TenantRole> roles = new HashSet<>();
 
     // =====================================================
@@ -334,6 +334,10 @@ public class Employee implements UserDetails {
     }
 
     public Set<String> getEffectivePermissions() {
+        // ✅ Add null guard
+        if (roles == null) {
+            return Set.of();
+        }
         return roles.stream()
                 .flatMap(role -> role.getPermissions().stream())
                 .map(permission -> permission.getPermission().name())
@@ -422,7 +426,11 @@ public class Employee implements UserDetails {
     // =====================================================
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return getEffectivePermissions().stream()
+        Set<String> permissions = getEffectivePermissions();
+        if (permissions.isEmpty()) {
+            return Set.of();
+        }
+        return permissions.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toSet());
     }
@@ -455,5 +463,84 @@ public class Employee implements UserDetails {
     @Override
     public boolean isEnabled() {
         return isActive;
+    }
+    // Add this method in the HELPER METHODS section (around line 250-300)
+
+// =====================================================
+// HELPER METHODS
+// =====================================================
+
+// ... existing helper methods ...
+
+    /**
+     * Check if employee has Super Admin role
+     * Super Admin has full access to all features across the tenant
+     */
+    public boolean isSuperAdmin() {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        return roles.stream()
+                .anyMatch(role -> "Super Admin".equals(role.getName()) ||
+                        "SUPER_ADMIN".equalsIgnoreCase(role.getName()));
+    }
+
+    /**
+     * Check if employee has Admin role
+     */
+    public boolean isAdmin() {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        return roles.stream()
+                .anyMatch(role -> "Admin".equals(role.getName()) ||
+                        "ADMIN".equalsIgnoreCase(role.getName()));
+    }
+
+    /**
+     * Check if employee has Manager role
+     */
+    public boolean isManager() {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        return roles.stream()
+                .anyMatch(role -> "Manager".equals(role.getName()) ||
+                        "MANAGER".equalsIgnoreCase(role.getName()));
+    }
+
+    /**
+     * Check if employee has Employee role
+     */
+    public boolean isEmployee() {
+        if (roles == null || roles.isEmpty()) {
+            return true; // Default role
+        }
+        return roles.stream()
+                .anyMatch(role -> "Employee".equals(role.getName()) ||
+                        "EMPLOYEE".equalsIgnoreCase(role.getName()));
+    }
+
+    /**
+     * Check if employee has specific role by name
+     */
+    public boolean hasRole(String roleName) {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        return roles.stream()
+                .anyMatch(role -> role.getName().equalsIgnoreCase(roleName));
+    }
+
+    /**
+     * Check if employee has any of the given roles
+     */
+    public boolean hasAnyRole(String... roleNames) {
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        Set<String> roleSet = Set.of(roleNames);
+        return roles.stream()
+                .anyMatch(role -> roleSet.contains(role.getName()));
     }
 }

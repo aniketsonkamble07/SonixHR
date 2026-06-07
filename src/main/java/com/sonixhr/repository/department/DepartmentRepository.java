@@ -1,6 +1,7 @@
 package com.sonixhr.repository.department;
 
 import com.sonixhr.entity.department.Department;
+import com.sonixhr.security.TenantAwareRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,7 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface DepartmentRepository extends JpaRepository<Department, Long> {
+public interface DepartmentRepository extends TenantAwareRepository<Department, Long> {
 
     // =====================================================
     // BASIC QUERIES

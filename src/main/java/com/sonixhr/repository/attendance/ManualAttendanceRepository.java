@@ -2,322 +2,277 @@ package com.sonixhr.repository.attendance;
 
 import com.sonixhr.entity.attendance.AttendanceRecord;
 import com.sonixhr.enums.attendance.AttendanceStatus;
+import com.sonixhr.security.TenantAwareRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
-
 @Repository
-public interface ManualAttendanceRepository extends JpaRepository<AttendanceRecord, Long> {
+public interface ManualAttendanceRepository extends TenantAwareRepository<AttendanceRecord, Long> {
 
     // =====================================================
-    // BASIC QUERIES
-    // =====================================================
-
-    /**
-     * Find attendance record by employee ID and date
-     */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.id = :employeeId AND a.attendanceDate = :attendanceDate")
-    Optional<AttendanceRecord> findByEmployeeIdAndAttendanceDate(
-            @Param("employeeId") Long employeeId,
-            @Param("attendanceDate") LocalDate attendanceDate);
-
-    /**
-     * Check if attendance exists for employee on a date
-     */
-    @Query("SELECT COUNT(a) > 0 FROM AttendanceRecord a WHERE a.employee.id = :employeeId AND a.attendanceDate = :attendanceDate")
-    boolean existsByEmployeeIdAndAttendanceDate(
-            @Param("employeeId") Long employeeId,
-            @Param("attendanceDate") LocalDate attendanceDate);
-
-    // =====================================================
-    // EMPLOYEE ATTENDANCE QUERIES
+    // BASIC QUERIES WITH TENANT ISOLATION
     // =====================================================
 
     /**
-     * Get all attendance records for an employee within date range
+     * Find attendance record by tenant, employee, and date
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.id = :employeeId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate ORDER BY a.attendanceDate DESC")
-    Page<AttendanceRecord> findByEmployeeIdAndDateRange(
-            @Param("employeeId") Long employeeId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
+    Optional<AttendanceRecord> findByTenantIdAndEmployeeIdAndAttendanceDate(
+            Long tenantId, Long employeeId, LocalDate date);
 
     /**
-     * Get all attendance records for an employee (all time)
+     * Check if attendance exists for given tenant, employee, and date
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.id = :employeeId ORDER BY a.attendanceDate DESC")
-    Page<AttendanceRecord> findAllByEmployeeId(@Param("employeeId") Long employeeId, Pageable pageable);
+    boolean existsByTenantIdAndEmployeeIdAndAttendanceDate(
+            Long tenantId, Long employeeId, LocalDate date);
 
     // =====================================================
-    // MANAGER / TEAM ATTENDANCE QUERIES
+    // EMPLOYEE ATTENDANCE (Self view)
     // =====================================================
 
     /**
-     * Get team attendance (employees under a manager) within date range
+     * Get employee attendance for date range (paginated)
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.manager.id = :managerId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate ORDER BY a.attendanceDate DESC, a.employee.firstName ASC")
-    Page<AttendanceRecord> findTeamAttendanceByManagerIdAndDateRange(
+    Page<AttendanceRecord> findByTenantIdAndEmployeeIdAndAttendanceDateBetween(
+            Long tenantId, Long employeeId, LocalDate startDate, LocalDate endDate, Pageable pageable);
+
+    /**
+     * Get employee attendance for date range (list)
+     */
+    List<AttendanceRecord> findByTenantIdAndEmployeeIdAndAttendanceDateBetween(
+            Long tenantId, Long employeeId, LocalDate startDate, LocalDate endDate);
+
+    // =====================================================
+    // TEAM ATTENDANCE (Manager view)
+    // =====================================================
+
+    /**
+     * Get attendance for multiple employees (team) for date range (paginated)
+     */
+    Page<AttendanceRecord> findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(
+            Long tenantId, List<Long> employeeIds, LocalDate startDate, LocalDate endDate, Pageable pageable);
+
+    /**
+     * Get attendance for multiple employees (team) for date range (list)
+     */
+    List<AttendanceRecord> findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(
+            Long tenantId, List<Long> employeeIds, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Get team attendance by manager ID (using employee manager relationship)
+     */
+    @Query("SELECT a FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.employee.manager.id = :managerId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate")
+    Page<AttendanceRecord> findTeamAttendanceByManagerId(
+            @Param("tenantId") Long tenantId,
             @Param("managerId") Long managerId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             Pageable pageable);
 
-    /**
-     * Get pending approval attendance records for a manager's team
-     */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.manager.id = :managerId " +
-            "AND a.approvalStatus = 'PENDING' ORDER BY a.attendanceDate ASC")
-    List<AttendanceRecord> findPendingApprovalsByManagerId(@Param("managerId") Long managerId);
-
-    /**
-     * Get attendance records for a manager's team by status
-     */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.manager.id = :managerId " +
-            "AND a.approvalStatus = :approvalStatus AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    Page<AttendanceRecord> findTeamAttendanceByManagerIdAndStatusAndDateRange(
-            @Param("managerId") Long managerId,
-            @Param("approvalStatus") String approvalStatus,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
-
     // =====================================================
-    // TENANT-WIDE ATTENDANCE QUERIES (Super Admin)
+    // ADMIN/TENANT WIDE ATTENDANCE
     // =====================================================
 
     /**
-     * Get all attendance records for a tenant within date range
+     * Get all attendance for tenant for date range (paginated)
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate ORDER BY a.attendanceDate DESC")
-    Page<AttendanceRecord> findAllByTenantIdAndDateRange(
-            @Param("tenantId") Long tenantId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
+    Page<AttendanceRecord> findByTenantIdAndAttendanceDateBetween(
+            Long tenantId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     /**
-     * Get attendance records for a tenant by department within date range
+     * Get all attendance for tenant for date range (list)
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
-            "AND a.employee.department.id = :departmentId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate ORDER BY a.attendanceDate DESC")
-    Page<AttendanceRecord> findAllByTenantIdAndDepartmentIdAndDateRange(
-            @Param("tenantId") Long tenantId,
-            @Param("departmentId") Long departmentId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
+    List<AttendanceRecord> findByTenantIdAndAttendanceDateBetween(
+            Long tenantId, LocalDate startDate, LocalDate endDate);
 
     /**
-     * Get attendance records for a tenant by status
+     * Get attendance for specific date (paginated)
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
-            "AND a.approvalStatus = :approvalStatus AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    Page<AttendanceRecord> findAllByTenantIdAndStatusAndDateRange(
-            @Param("tenantId") Long tenantId,
-            @Param("approvalStatus") String approvalStatus,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
-
-    // =====================================================
-    // DEPARTMENT ATTENDANCE QUERIES
-    // =====================================================
+    Page<AttendanceRecord> findByTenantIdAndAttendanceDate(
+            Long tenantId, LocalDate date, Pageable pageable);
 
     /**
-     * Get attendance records for a department within date range
+     * Get attendance for specific date (list)
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.department.id = :departmentId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate ORDER BY a.attendanceDate DESC")
-    Page<AttendanceRecord> findByDepartmentIdAndDateRange(
-            @Param("departmentId") Long departmentId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable);
+    List<AttendanceRecord> findByTenantIdAndAttendanceDate(
+            Long tenantId, LocalDate date);
 
     // =====================================================
     // STATISTICS QUERIES
     // =====================================================
 
     /**
-     * Count attendance records by status for a tenant within date range
+     * Count attendance by status for a specific date
      */
-    @Query("SELECT a.attendanceStatus, COUNT(a) FROM AttendanceRecord a " +
-            "WHERE a.tenant.id = :tenantId AND a.attendanceDate BETWEEN :startDate AND :endDate " +
-            "GROUP BY a.attendanceStatus")
-    List<Object[]> countAttendanceByStatusAndDateRange(
+    long countByTenantIdAndAttendanceDateAndStatus(
+            Long tenantId, LocalDate date, AttendanceStatus status);
+
+    /**
+     * Count attendance by multiple statuses for a specific date
+     */
+    long countByTenantIdAndAttendanceDateAndStatusIn(
+            Long tenantId, LocalDate date, List<AttendanceStatus> statuses);
+
+    /**
+     * Count attendance by status for date range
+     */
+    @Query("SELECT COUNT(a) FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "AND a.status = :status")
+    long countByTenantIdAndDateRangeAndStatus(
             @Param("tenantId") Long tenantId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
+            @Param("endDate") LocalDate endDate,
+            @Param("status") AttendanceStatus status);
 
     /**
-     * Count attendance records by approval status for a manager's team
+     * Count attendance by multiple statuses for date range
      */
-    @Query("SELECT a.approvalStatus, COUNT(a) FROM AttendanceRecord a " +
-            "WHERE a.employee.manager.id = :managerId AND a.attendanceDate BETWEEN :startDate AND :endDate " +
-            "GROUP BY a.approvalStatus")
-    List<Object[]> countTeamAttendanceByApprovalStatus(
-            @Param("managerId") Long managerId,
+    @Query("SELECT COUNT(a) FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "AND a.status IN :statuses")
+    long countByTenantIdAndDateRangeAndStatuses(
+            @Param("tenantId") Long tenantId,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    /**
-     * Get monthly attendance summary for an employee
-     */
-    @Query("SELECT FUNCTION('YEAR', a.attendanceDate) as year, " +
-            "FUNCTION('MONTH', a.attendanceDate) as month, " +
-            "COUNT(a) as totalDays, " +
-            "SUM(CASE WHEN a.attendanceStatus = 'PRESENT' THEN 1 ELSE 0 END) as presentDays, " +
-            "SUM(CASE WHEN a.attendanceStatus = 'LATE' THEN 1 ELSE 0 END) as lateDays, " +
-            "SUM(CASE WHEN a.attendanceStatus = 'ABSENT' THEN 1 ELSE 0 END) as absentDays " +
-            "FROM AttendanceRecord a WHERE a.employee.id = :employeeId " +
-            "GROUP BY FUNCTION('YEAR', a.attendanceDate), FUNCTION('MONTH', a.attendanceDate) " +
-            "ORDER BY year DESC, month DESC")
-    List<Object[]> getMonthlyAttendanceSummary(@Param("employeeId") Long employeeId);
+            @Param("endDate") LocalDate endDate,
+            @Param("statuses") List<AttendanceStatus> statuses);
 
     // =====================================================
-    // AGGREGATION & STATISTICS QUERIES (for Dashboard)
+    // SUMMARY & GROUPING QUERIES
     // =====================================================
 
     /**
-     * Count attendance records by status for a tenant within date range
+     * Get status count grouped by status for date range
      */
-    @Query("SELECT COUNT(a) FROM AttendanceRecord a " +
+    @Query("SELECT a.status, COUNT(a) FROM AttendanceRecord a " +
             "WHERE a.tenant.id = :tenantId " +
-            "AND a.attendanceStatus IN :statuses " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    long countByTenantIdAndAttendanceStatusInAndDateBetween(
+            "AND a.employee.id = :employeeId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY a.status")
+    List<Object[]> getStatusCountByEmployeeAndDateRange(
             @Param("tenantId") Long tenantId,
-            @Param("statuses") List<AttendanceStatus> statuses,
+            @Param("employeeId") Long employeeId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
     /**
-     * Count attendance records by specific status for a tenant within date range
+     * Get total overtime for an employee for date range
      */
-    @Query("SELECT COUNT(a) FROM AttendanceRecord a " +
+    @Query("SELECT COALESCE(SUM(a.overtimeHours), 0) FROM AttendanceRecord a " +
             "WHERE a.tenant.id = :tenantId " +
-            "AND a.attendanceStatus = :status " +
+            "AND a.employee.id = :employeeId " +
             "AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    long countByTenantIdAndAttendanceStatusAndDateBetween(
+    Double getTotalOvertimeByEmployeeAndDateRange(
             @Param("tenantId") Long tenantId,
-            @Param("status") AttendanceStatus status,
+            @Param("employeeId") Long employeeId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
+    // =====================================================
+    // BULK OPERATIONS
+    // =====================================================
+
     /**
-     * Get average check-in time for a tenant within date range
+     * Delete all attendance records for a tenant on a specific date
      */
-    @Query("SELECT AVG(CAST(FUNCTION('HOUR', a.checkInTime) * 60 + FUNCTION('MINUTE', a.checkInTime) AS double)) " +
-            "FROM AttendanceRecord a " +
+    @Modifying
+    @Query("DELETE FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.attendanceDate = :date")
+    void deleteByTenantIdAndAttendanceDate(
+            @Param("tenantId") Long tenantId,
+            @Param("date") LocalDate date);
+
+    /**
+     * Delete attendance record for specific employee and date
+     */
+    @Modifying
+    @Query("DELETE FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.employee.id = :employeeId " +
+            "AND a.attendanceDate = :date")
+    void deleteByTenantIdAndEmployeeIdAndAttendanceDate(
+            @Param("tenantId") Long tenantId,
+            @Param("employeeId") Long employeeId,
+            @Param("date") LocalDate date);
+
+    // =====================================================
+    // SEARCH QUERIES
+    // =====================================================
+
+    /**
+     * Search attendance records by employee name or code
+     */
+    @Query("SELECT a FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "AND (LOWER(a.employee.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(a.employee.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(a.employee.employeeCode) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    Page<AttendanceRecord> searchAttendanceByDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("searchTerm") String searchTerm,
+            Pageable pageable);
+
+    // =====================================================
+    // DASHBOARD QUERIES
+    // =====================================================
+
+    /**
+     * Get today's attendance summary for all employees in tenant
+     */
+    @Query("SELECT a.status, COUNT(a) FROM AttendanceRecord a " +
+            "WHERE a.tenant.id = :tenantId AND a.attendanceDate = :date " +
+            "GROUP BY a.status")
+    List<Object[]> getTodayAttendanceSummary(
+            @Param("tenantId") Long tenantId,
+            @Param("date") LocalDate date);
+
+    /**
+     * Get attendance percentage for date range
+     */
+    @Query("SELECT COUNT(DISTINCT a.employee.id) FROM AttendanceRecord a " +
             "WHERE a.tenant.id = :tenantId " +
-            "AND a.checkInTime IS NOT NULL " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    Optional<Double> getAverageCheckInTimeInMinutes(
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "AND a.status IN ('PRESENT', 'LATE', 'HALF_DAY')")
+    long countEmployeesPresentInDateRange(
             @Param("tenantId") Long tenantId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
-
-    /**
-     * Default method to get average check-in time as LocalTime
-     */
-    default Optional<LocalTime> getAverageCheckInTime(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        Optional<Double> avgMinutes = getAverageCheckInTimeInMinutes(tenantId, startDate, endDate);
-        if (avgMinutes.isPresent() && avgMinutes.get() > 0) {
-            int hours = (int) (avgMinutes.get() / 60);
-            int minutes = (int) (avgMinutes.get() % 60);
-            return Optional.of(LocalTime.of(hours, minutes));
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Get average check-out time for a tenant within date range
-     */
-    @Query("SELECT AVG(CAST(FUNCTION('HOUR', a.checkOutTime) * 60 + FUNCTION('MINUTE', a.checkOutTime) AS double)) " +
-            "FROM AttendanceRecord a " +
-            "WHERE a.tenant.id = :tenantId " +
-            "AND a.checkOutTime IS NOT NULL " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    Optional<Double> getAverageCheckOutTimeInMinutes(
-            @Param("tenantId") Long tenantId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    /**
-     * Default method to get average check-out time as LocalTime
-     */
-    default Optional<LocalTime> getAverageCheckOutTime(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        Optional<Double> avgMinutes = getAverageCheckOutTimeInMinutes(tenantId, startDate, endDate);
-        if (avgMinutes.isPresent() && avgMinutes.get() > 0) {
-            int hours = (int) (avgMinutes.get() / 60);
-            int minutes = (int) (avgMinutes.get() % 60);
-            return Optional.of(LocalTime.of(hours, minutes));
-        }
-        return Optional.empty();
-    }
 
     // =====================================================
     // LEAVE QUERIES
     // =====================================================
 
     /**
-     * Get leave records for an employee within date range
+     * Get employees on leave for a specific date
      */
-    @Query("SELECT a FROM AttendanceRecord a WHERE a.employee.id = :employeeId " +
-            "AND a.attendanceStatus = 'ON_LEAVE' " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
-            "ORDER BY a.attendanceDate ASC")
-    List<AttendanceRecord> findLeavesByEmployeeIdAndDateRange(
-            @Param("employeeId") Long employeeId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    /**
-     * Check if employee is on leave on a specific date
-     */
-    @Query("SELECT COUNT(a) > 0 FROM AttendanceRecord a " +
-            "WHERE a.employee.id = :employeeId " +
+    @Query("SELECT a.employee FROM AttendanceRecord a " +
+            "WHERE a.tenant.id = :tenantId " +
             "AND a.attendanceDate = :date " +
-            "AND a.attendanceStatus = 'ON_LEAVE'")
-    boolean isOnLeaveOnDate(
-            @Param("employeeId") Long employeeId,
+            "AND a.status = 'ON_LEAVE'")
+    List<com.sonixhr.entity.employee.Employee> getEmployeesOnLeave(
+            @Param("tenantId") Long tenantId,
             @Param("date") LocalDate date);
 
-    // =====================================================
-    // BULK OPERATIONS (if needed)
-    // =====================================================
-
     /**
-     * Delete attendance records for an employee within date range
+     * Count employees on leave for a date range
      */
-    @Query("DELETE FROM AttendanceRecord a WHERE a.employee.id = :employeeId " +
-            "AND a.attendanceDate BETWEEN :startDate AND :endDate")
-    void deleteByEmployeeIdAndDateRange(
-            @Param("employeeId") Long employeeId,
+    @Query("SELECT COUNT(DISTINCT a.employee.id) FROM AttendanceRecord a " +
+            "WHERE a.tenant.id = :tenantId " +
+            "AND a.attendanceDate BETWEEN :startDate AND :endDate " +
+            "AND a.status = 'ON_LEAVE'")
+    long countEmployeesOnLeaveInDateRange(
+            @Param("tenantId") Long tenantId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
-
-    /**
-     * Update approval status for a list of attendance records
-     */
-    @Query("UPDATE AttendanceRecord a SET a.approvalStatus = :status, " +
-            "a.approvedBy = :approvedBy, a.approvedAt = CURRENT_TIMESTAMP " +
-            "WHERE a.id IN :attendanceIds")
-    void bulkUpdateApprovalStatus(
-            @Param("attendanceIds") List<Long> attendanceIds,
-            @Param("status") String status,
-            @Param("approvedBy") Long approvedBy);
 }

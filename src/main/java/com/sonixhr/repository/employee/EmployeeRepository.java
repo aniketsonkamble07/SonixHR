@@ -99,7 +99,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Page<Employee> searchEmployeesForAssignment(@Param("tenantId") Long tenantId,
                                                 @Param("query") String query,
                                                 Pageable pageable);
-
+    /**
+     * Search team members for a manager (simpler version for attendance marking)
+     */
+    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId AND " +
+            "(LOWER(e.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(e.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(e.employeeCode) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    List<Employee> searchTeamMembers(@Param("managerId") Long managerId,
+                                     @Param("tenantId") Long tenantId,
+                                     @Param("searchTerm") String searchTerm);
     // =====================================================
     // COUNT QUERIES
     // =====================================================
@@ -265,14 +275,62 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Page<Object[]> findTeamMembersWithReportCount(@Param("tenantId") Long tenantId,
                                                   @Param("managerId") Long managerId,
                                                   Pageable pageable);
-    // ✅ CORRECT - Uses e.tenant.id through relationship
+    //  CORRECT - Uses e.tenant.id through relationship
     @Query("SELECT DISTINCT e FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     List<Employee> findByRolesIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
-    // ✅ CORRECT - Uses e.tenant.id through relationship
+    //  CORRECT - Uses e.tenant.id through relationship
     @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     long countUsersByRoleIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
-    // ✅ CORRECT - Spring Data JPA will derive this query using getTenantId() method
+    // CORRECT - Spring Data JPA will derive this query using getTenantId() method
     @Query("SELECT e FROM Employee e WHERE e.id = :id AND e.tenant.id = :tenantId")
-    Optional<Employee> findByIdAndTenantId(@Param("id") Long id, @Param("tenantId") Long tenantId);}
+    Optional<Employee> findByIdAndTenantId(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+// Add this in the MANAGER QUERIES section
+
+// =====================================================
+// MANAGER QUERIES
+// =====================================================
+
+    //  Add this simple method (without tenant_id for cases where you have the manager object)
+    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
+    List<Employee> findByManagerId(@Param("managerId") Long managerId);
+
+    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
+    Page<Employee> findByManagerId(@Param("managerId") Long managerId, Pageable pageable);
+
+
+// Add to EmployeeRepository.java
+
+// =====================================================
+// LEAVE MANAGEMENT SPECIFIC QUERIES
+// =====================================================
+
+
+
+    /**
+     * Count employees by manager for leave reporting
+     */
+    @Query("SELECT e.manager.id, COUNT(e) FROM Employee e " +
+            "WHERE e.tenant.id = :tenantId AND e.manager IS NOT NULL " +
+            "GROUP BY e.manager.id")
+    List<Object[]> countEmployeesByManager(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find employees with pending leave requests (for notification)
+     */
+    @Query("SELECT DISTINCT e FROM Employee e JOIN LeaveRequest l ON l.employee.id = e.id " +
+            "WHERE e.tenant.id = :tenantId AND l.status = 'PENDING'")
+    List<Employee> findEmployeesWithPendingLeaves(@Param("tenantId") Long tenantId);
+
+    // Add this in the BASIC QUERIES section, after findByEmail(String email)
+
+    @Query("""
+    SELECT DISTINCT e FROM Employee e
+    LEFT JOIN FETCH e.roles r
+    LEFT JOIN FETCH r.permissions
+    WHERE e.email = :email
+""")
+    Optional<Employee> findByEmailWithRolesAndPermissions(@Param("email") String email);
+}

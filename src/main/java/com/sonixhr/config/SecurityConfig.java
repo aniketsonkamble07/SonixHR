@@ -57,7 +57,7 @@ public class SecurityConfig {
         this.permissionEvaluator = permissionEvaluator;
     }
 
-    // ✅ ADD THIS MISSING PASSWORD ENCODER BEAN
+    //  ADD THIS MISSING PASSWORD ENCODER BEAN
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);

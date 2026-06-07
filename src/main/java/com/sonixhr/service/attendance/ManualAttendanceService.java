@@ -1,9 +1,8 @@
 package com.sonixhr.service.attendance;
 
-import com.sonixhr.dto.attendance.AttendanceDashboardStats;
+import com.sonixhr.dto.attendance.ManualTeamMemberAttendanceDTO;
 import com.sonixhr.entity.attendance.AttendanceRecord;
 import com.sonixhr.entity.employee.Employee;
-import com.sonixhr.enums.attendance.AttendanceApprovalStatus;
 import com.sonixhr.enums.attendance.AttendanceStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
@@ -15,14 +14,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -33,459 +30,780 @@ public class ManualAttendanceService {
     private final ManualAttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
 
-    private static final LocalTime LATE_THRESHOLD = LocalTime.of(10, 0); // 10:00 AM
-    private static final double HALF_DAY_HOURS = 4.0;
+    // =====================================================
+    // CONFIGURATION
+    // =====================================================
     private static final int MAX_PAST_DAYS = 90;
-    private static final int MAX_FUTURE_LEAVE_DAYS = 30;
+    private static final double MAX_OVERTIME_PER_DAY = 12.0;
 
     // =====================================================
-    // MARK ATTENDANCE BY MANAGER (Team Member)
-    // =====================================================
-
-    @Transactional
-    public AttendanceRecord markAttendanceByManager(Long managerEmployeeId, Long employeeId,
-                                                    LocalDate attendanceDate, LocalTime checkInTime,
-                                                    LocalTime checkOutTime, String reason,
-                                                    Long tenantId, Long userId) {
-
-        log.info("Manager {} marking attendance for employee: {} on date: {}",
-                managerEmployeeId, employeeId, attendanceDate);
-
-        // 1. Verify manager exists
-        Employee manager = employeeRepository.findById(managerEmployeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Manager not found with id: " + managerEmployeeId));
-
-        // 2. Verify employee exists and reports to this manager
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
-
-        if (employee.getManager() == null || !employee.getManager().getId().equals(managerEmployeeId)) {
-            throw new BusinessException("This employee is not in your team");
-        }
-
-        // 3. Validate date rules
-        validateAttendanceDate(employee, attendanceDate, checkInTime != null);
-
-        // 4. Check if attendance already exists
-        if (attendanceRepository.existsByEmployeeIdAndAttendanceDate(employeeId, attendanceDate)) {
-            throw new BusinessException("Attendance already marked for this date. Use update endpoint to modify.");
-        }
-
-        // 5. Calculate working hours
-        Double workingHours = calculateWorkingHours(checkInTime, checkOutTime);
-
-        // 6. Determine status
-        AttendanceStatus status = determineStatus(checkInTime, workingHours);
-
-        // 7. Build and save attendance record
-        AttendanceRecord attendance = AttendanceRecord.builder()
-                .tenant(employee.getTenant())
-                .employee(employee)
-                .markedByManager(manager)
-                .attendanceDate(attendanceDate)
-                .checkInTime(checkInTime)
-                .checkOutTime(checkOutTime)
-                .totalWorkingHours(workingHours)
-                .reason(reason)
-                .attendanceStatus(status)
-                .approvalStatus(AttendanceApprovalStatus.APPROVED)
-                .createdBy(userId)
-                .build();
-
-        AttendanceRecord saved = attendanceRepository.save(attendance);
-        log.info("Manager {} marked attendance for employee: {} on date: {} with status: {}",
-                managerEmployeeId, employeeId, attendanceDate, status);
-
-        return saved;
-    }
-
-    // =====================================================
-    // MARK ATTENDANCE BY SUPER ADMIN
-    // =====================================================
-
-    @Transactional
-    public AttendanceRecord markAttendanceByAdmin(Long employeeId, LocalDate attendanceDate,
-                                                  LocalTime checkInTime, LocalTime checkOutTime,
-                                                  String reason, Long tenantId, Long adminUserId,
-                                                  String adminName) {
-
-        log.info("Admin {} marking attendance for employee: {} on date: {}", adminName, employeeId, attendanceDate);
-
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-
-        if (attendanceRepository.existsByEmployeeIdAndAttendanceDate(employeeId, attendanceDate)) {
-            throw new BusinessException("Attendance already marked for this date");
-        }
-
-        Double workingHours = calculateWorkingHours(checkInTime, checkOutTime);
-        AttendanceStatus status = determineStatus(checkInTime, workingHours);
-
-        AttendanceRecord attendance = AttendanceRecord.builder()
-                .tenant(employee.getTenant())
-                .employee(employee)
-                .markedByAdminId(adminUserId)
-                .markedByAdminName(adminName)
-                .markedByManager(null)
-                .attendanceDate(attendanceDate)
-                .checkInTime(checkInTime)
-                .checkOutTime(checkOutTime)
-                .totalWorkingHours(workingHours)
-                .reason(reason)
-                .attendanceStatus(status)
-                .approvalStatus(AttendanceApprovalStatus.APPROVED)
-                .approvedBy(adminUserId)
-                .approvedByName(adminName)
-                .approvedAt(LocalDateTime.now())
-                .createdBy(adminUserId)
-                .build();
-
-        return attendanceRepository.save(attendance);
-    }
-
-    // =====================================================
-    // UPDATE ATTENDANCE
-    // =====================================================
-
-    @Transactional
-    public AttendanceRecord updateAttendance(Long attendanceId, Long managerEmployeeId,
-                                             LocalTime checkInTime, LocalTime checkOutTime,
-                                             String reason, boolean isAdmin) {
-
-        AttendanceRecord attendance = attendanceRepository.findById(attendanceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found with id: " + attendanceId));
-
-        // Validate authorization
-        if (!isAdmin) {
-            if (attendance.getMarkedByManager() == null ||
-                    !attendance.getMarkedByManager().getId().equals(managerEmployeeId)) {
-                throw new BusinessException("You are not authorized to update this attendance");
-            }
-        }
-
-        // Validate date rules for update
-        validateAttendanceDate(attendance.getEmployee(), attendance.getAttendanceDate(), checkInTime != null);
-
-        // Update fields
-        if (checkInTime != null) attendance.setCheckInTime(checkInTime);
-        if (checkOutTime != null) attendance.setCheckOutTime(checkOutTime);
-        if (reason != null) attendance.setReason(reason);
-
-        // Recalculate working hours
-        Double workingHours = calculateWorkingHours(attendance.getCheckInTime(), attendance.getCheckOutTime());
-        attendance.setTotalWorkingHours(workingHours);
-
-        // Re-determine status
-        attendance.setAttendanceStatus(determineStatus(attendance.getCheckInTime(), workingHours));
-
-        return attendanceRepository.save(attendance);
-    }
-
-    // =====================================================
-    // DELETE ATTENDANCE RECORD
-    // =====================================================
-
-    @Transactional
-    public void deleteAttendanceRecord(Long attendanceId, Long adminId) {
-        log.info("Admin {} deleting attendance record: {}", adminId, attendanceId);
-
-        AttendanceRecord attendance = attendanceRepository.findById(attendanceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found with id: " + attendanceId));
-
-        attendanceRepository.delete(attendance);
-        log.info("Successfully deleted attendance record: {}", attendanceId);
-    }
-
-    // =====================================================
-    // GET TEAM ATTENDANCE (Manager View)
-    // =====================================================
-
-    public Page<AttendanceRecord> getTeamAttendance(Long managerEmployeeId, LocalDate startDate,
-                                                    LocalDate endDate, Pageable pageable) {
-        log.info("Getting team attendance for manager: {} between {} and {}", managerEmployeeId, startDate, endDate);
-
-        validateDateRange(startDate, endDate);
-
-        return attendanceRepository.findTeamAttendanceByManagerIdAndDateRange(
-                managerEmployeeId, startDate, endDate, pageable);
-    }
-
-    // =====================================================
-    // GET ALL ATTENDANCE (Super Admin View)
-    // =====================================================
-
-    public Page<AttendanceRecord> getAllAttendance(Long tenantId, LocalDate startDate,
-                                                   LocalDate endDate, Long departmentId, Pageable pageable) {
-        log.info("Getting all attendance for tenant: {} between {} and {}", tenantId, startDate, endDate);
-
-        validateDateRange(startDate, endDate);
-
-        if (departmentId != null) {
-            return attendanceRepository.findAllByTenantIdAndDepartmentIdAndDateRange(
-                    tenantId, departmentId, startDate, endDate, pageable);
-        }
-
-        return attendanceRepository.findAllByTenantIdAndDateRange(tenantId, startDate, endDate, pageable);
-    }
-
-    // =====================================================
-    // GET EMPLOYEE ATTENDANCE (Self view for employee)
-    // =====================================================
-
-    public Page<AttendanceRecord> getEmployeeAttendance(Long employeeId, LocalDate startDate,
-                                                        LocalDate endDate, Pageable pageable) {
-        log.info("Getting attendance for employee: {} between {} and {}", employeeId, startDate, endDate);
-
-        validateDateRange(startDate, endDate);
-
-        return attendanceRepository.findByEmployeeIdAndDateRange(employeeId, startDate, endDate, pageable);
-    }
-
-    // =====================================================
-    // GET TODAY'S ATTENDANCE FOR EMPLOYEE
-    // =====================================================
-
-    public AttendanceRecord getTodayAttendance(Long employeeId) {
-        LocalDate today = LocalDate.now();
-        log.info("Getting today's attendance for employee: {}", employeeId);
-
-        return attendanceRepository.findByEmployeeIdAndAttendanceDate(employeeId, today)
-                .orElse(null); // Return null if not found (controller will handle)
-    }
-
-    // =====================================================
-    // GET ATTENDANCE SUMMARY
-    // =====================================================
-
-    public Map<String, Object> getAttendanceSummary(Long employeeId, int year, int month) {
-        log.info("Getting attendance summary for employee: {} for {}-{}", employeeId, year, month);
-
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-
-        Page<AttendanceRecord> records = attendanceRepository.findByEmployeeIdAndDateRange(
-                employeeId, startDate, endDate, Pageable.unpaged());
-
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("year", year);
-        summary.put("month", month);
-        summary.put("totalDays", endDate.getDayOfMonth());
-
-        long present = 0, late = 0, halfDay = 0, absent = 0, leave = 0;
-        double totalWorkingHours = 0;
-
-        for (AttendanceRecord record : records) {
-            switch (record.getAttendanceStatus()) {
-                case PRESENT:
-                    present++;
-                    break;
-                case LATE:
-                    late++;
-                    break;
-                case HALF_DAY:
-                    halfDay++;
-                    break;
-                case ABSENT:
-                    absent++;
-                    break;
-                case ON_LEAVE:
-                    leave++;
-                    break;
-            }
-
-            if (record.getTotalWorkingHours() != null) {
-                totalWorkingHours += record.getTotalWorkingHours();
-            }
-        }
-
-        summary.put("present", present);
-        summary.put("late", late);
-        summary.put("halfDay", halfDay);
-        summary.put("absent", absent);
-        summary.put("onLeave", leave);
-        summary.put("totalWorkingHours", totalWorkingHours);
-        summary.put("attendanceRate", (present + late + halfDay) * 100.0 / endDate.getDayOfMonth());
-
-        return summary;
-    }
-
-    // =====================================================
-    // GET ATTENDANCE CALENDAR
-    // =====================================================
-
-    public Map<LocalDate, AttendanceRecord> getAttendanceCalendar(Long employeeId, int year, int month) {
-        log.info("Getting attendance calendar for employee: {} for {}-{}", employeeId, year, month);
-
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-
-        List<AttendanceRecord> records = attendanceRepository.findByEmployeeIdAndDateRange(
-                employeeId, startDate, endDate, Pageable.unpaged()).getContent();
-
-        Map<LocalDate, AttendanceRecord> calendar = new HashMap<>();
-        for (AttendanceRecord record : records) {
-            calendar.put(record.getAttendanceDate(), record);
-        }
-
-        return calendar;
-    }
-
-    // =====================================================
-    // GET TOTAL ACTIVE EMPLOYEES
-    // =====================================================
-
-    public long getTotalActiveEmployees(Long tenantId) {
-        log.info("Getting total active employees for tenant: {}", tenantId);
-        return employeeRepository.countByTenantIdAndIsActiveTrue(tenantId);
-    }
-
-    // =====================================================
-    // GET TOTAL PRESENT DAYS
-    // =====================================================
-
-    public long getTotalPresentDays(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        log.info("Getting total present days for tenant: {} between {} and {}", tenantId, startDate, endDate);
-        return attendanceRepository.countByTenantIdAndAttendanceStatusInAndDateBetween(
-                tenantId,
-                List.of(AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.HALF_DAY),
-                startDate,
-                endDate);
-    }
-
-    // =====================================================
-    // GET TOTAL ABSENT DAYS
-    // =====================================================
-
-    public long getTotalAbsentDays(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        log.info("Getting total absent days for tenant: {} between {} and {}", tenantId, startDate, endDate);
-        return attendanceRepository.countByTenantIdAndAttendanceStatusAndDateBetween(
-                tenantId, AttendanceStatus.ABSENT, startDate, endDate);
-    }
-
-    // =====================================================
-    // GET AVERAGE CHECK-IN TIME
-    // =====================================================
-
-    public LocalTime getAverageCheckInTime(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        log.info("Getting average check-in time for tenant: {} between {} and {}", tenantId, startDate, endDate);
-        return attendanceRepository.getAverageCheckInTime(tenantId, startDate, endDate)
-                .orElse(LocalTime.of(9, 0)); // Default to 9:00 AM if no data
-    }
-
-    // =====================================================
-    // GET AVERAGE CHECK-OUT TIME
-    // =====================================================
-
-    public LocalTime getAverageCheckOutTime(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        log.info("Getting average check-out time for tenant: {} between {} and {}", tenantId, startDate, endDate);
-        return attendanceRepository.getAverageCheckOutTime(tenantId, startDate, endDate)
-                .orElse(LocalTime.of(18, 0)); // Default to 6:00 PM if no data
-    }
-
-    // =====================================================
-    // GET ATTENDANCE RATE
-    // =====================================================
-
-    public double getAttendanceRate(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        log.info("Getting attendance rate for tenant: {} between {} and {}", tenantId, startDate, endDate);
-
-        long totalEmployees = getTotalActiveEmployees(tenantId);
-        long totalDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        long totalPresentDays = getTotalPresentDays(tenantId, startDate, endDate);
-
-        long maxPossibleAttendance = totalEmployees * totalDays;
-
-        if (maxPossibleAttendance == 0) {
-            return 0.0;
-        }
-
-        return (totalPresentDays * 100.0) / maxPossibleAttendance;
-    }
-
-    // =====================================================
-    // PRIVATE HELPER METHODS
+    // DATE VALIDATION (CRITICAL)
     // =====================================================
 
     /**
-     * Validate attendance date rules
+     * Validate attendance date against server date and employee hire date
+     * Rules:
+     * 1. Cannot mark attendance for future dates
+     * 2. Cannot mark attendance before employee's hire date
+     * 3. Cannot mark attendance older than 90 days
      */
-    private void validateAttendanceDate(Employee employee, LocalDate attendanceDate, boolean hasCheckInTime) {
-        LocalDate today = LocalDate.now();
+    private void validateAttendanceDate(LocalDate attendanceDate, Employee employee) {
+        LocalDate today = LocalDate.now(Clock.systemUTC());
 
-        // Rule 1: Cannot mark before hire date
-        if (attendanceDate.isBefore(employee.getHireDate())) {
-            throw new BusinessException("Cannot mark attendance before hire date: " + employee.getHireDate());
+        // RULE 1: Cannot mark future dates
+        if (attendanceDate.isAfter(today)) {
+            throw new BusinessException(
+                    String.format("Cannot mark attendance for future dates. Today is %s", today)
+            );
         }
 
-        // Rule 2: Cannot mark after termination/resignation
-        if (employee.getLastWorkingDate() != null && attendanceDate.isAfter(employee.getLastWorkingDate())) {
-            throw new BusinessException("Cannot mark attendance after last working date: " + employee.getLastWorkingDate());
+        // RULE 2: Cannot mark before hire date
+        if (employee.getHireDate() != null && attendanceDate.isBefore(employee.getHireDate())) {
+            throw new BusinessException(
+                    String.format("Cannot mark attendance before hire date: %s. Hire date is %s",
+                            attendanceDate, employee.getHireDate())
+            );
         }
 
-        // Rule 3: Future dates with check-in time are not allowed (only leave)
-        if (attendanceDate.isAfter(today) && hasCheckInTime) {
-            throw new BusinessException("Cannot mark PRESENT/LATE for future dates. Use leave marking for future dates.");
-        }
-
-        // Rule 4: Cannot mark older than MAX_PAST_DAYS days
+        // RULE 3: Cannot mark older than 90 days
         LocalDate maxPastDate = today.minusDays(MAX_PAST_DAYS);
         if (attendanceDate.isBefore(maxPastDate)) {
-            throw new BusinessException("Cannot mark attendance older than " + MAX_PAST_DAYS + " days");
+            throw new BusinessException(
+                    String.format("Cannot mark attendance older than %d days. Date %s is too old",
+                            MAX_PAST_DAYS, attendanceDate)
+            );
         }
 
-        // Rule 5: Future leave cannot exceed MAX_FUTURE_LEAVE_DAYS
-        if (attendanceDate.isAfter(today.plusDays(MAX_FUTURE_LEAVE_DAYS))) {
-            throw new BusinessException("Cannot mark leave for dates beyond " + MAX_FUTURE_LEAVE_DAYS + " days in advance");
+        // RULE 4: Cannot mark after resignation/last working day
+        if (employee.getLastWorkingDate() != null && attendanceDate.isAfter(employee.getLastWorkingDate())) {
+            throw new BusinessException(
+                    String.format("Cannot mark attendance after last working date: %s", employee.getLastWorkingDate())
+            );
         }
     }
 
     /**
-     * Validate date range
+     * Validate date range for reports
      */
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new BusinessException("Start date cannot be after end date");
         }
 
-        long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate);
         if (daysBetween > 365) {
             throw new BusinessException("Date range cannot exceed 365 days");
         }
     }
 
     /**
-     * Calculate working hours between check-in and check-out
+     * Validate overtime hours
      */
-    private Double calculateWorkingHours(LocalTime checkInTime, LocalTime checkOutTime) {
-        if (checkInTime == null || checkOutTime == null) {
-            return null;
+    private void validateOvertime(Double overtimeHours) {
+        if (overtimeHours == null) return;
+
+        if (overtimeHours > MAX_OVERTIME_PER_DAY) {
+            throw new BusinessException("Overtime cannot exceed " + MAX_OVERTIME_PER_DAY + " hours per day");
+        }
+        if (overtimeHours < 0) {
+            throw new BusinessException("Overtime cannot be negative");
+        }
+    }
+
+    // =====================================================
+    // AUTHORIZATION CHECKS
+    // =====================================================
+
+    private void validateAuthorization(Employee currentUser, Long targetEmployeeId) {
+        // Super Admin can mark for anyone
+        if (currentUser.isSuperAdmin()) {
+            log.info("Super Admin {} marking attendance", currentUser.getEmail());
+            return;
         }
 
-        long minutes = ChronoUnit.MINUTES.between(checkInTime, checkOutTime);
-        double hours = minutes / 60.0;
-        return Math.round(hours * 100.0) / 100.0;
+        // Check if trying to mark own attendance
+        if (currentUser.getId().equals(targetEmployeeId)) {
+            throw new BusinessException("Employees cannot mark their own attendance. Only manager or admin can mark.");
+        }
+
+        // Check if current user is the manager of target employee
+        Employee targetEmployee = employeeRepository.findById(targetEmployeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (targetEmployee.getManager() == null ||
+                !targetEmployee.getManager().getId().equals(currentUser.getId())) {
+            throw new BusinessException("You can only mark attendance for employees who report to you");
+        }
+
+        log.info("Manager {} marking attendance for team member {}",
+                currentUser.getEmail(), targetEmployee.getEmail());
+    }
+
+    // =====================================================
+    // MARK ATTENDANCE (Manager or Admin only)
+    // =====================================================
+
+    /**
+     * Mark attendance for today
+     */
+    @Transactional
+    public AttendanceRecord markAttendance(Long targetEmployeeId, AttendanceStatus status,
+                                           String reason, Double overtimeHours,
+                                           Employee currentUser) {
+
+        log.info("User {} marking attendance for employee: {} as: {}",
+                currentUser.getEmail(), targetEmployeeId, status);
+
+        validateAuthorization(currentUser, targetEmployeeId);
+        validateOvertime(overtimeHours);
+
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+
+        return markAttendanceForDate(targetEmployeeId, today, status, reason, overtimeHours, currentUser);
     }
 
     /**
-     * Determine attendance status based on check-in time and working hours
+     * Mark attendance for specific date (with strict date validation)
      */
-    private AttendanceStatus determineStatus(LocalTime checkInTime, Double workingHours) {
-        // Case 1: No check-in = ABSENT
-        if (checkInTime == null) {
-            return AttendanceStatus.ABSENT;
+    @Transactional
+    public AttendanceRecord markAttendanceForDate(Long targetEmployeeId, LocalDate date,
+                                                  AttendanceStatus status, String reason,
+                                                  Double overtimeHours, Employee currentUser) {
+
+        log.info("User {} marking attendance for employee: {} on date: {} as: {}",
+                currentUser.getEmail(), targetEmployeeId, date, status);
+
+        validateAuthorization(currentUser, targetEmployeeId);
+
+        // Get target employee first for validation
+        Employee targetEmployee = employeeRepository.findById(targetEmployeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        // CRITICAL: Validate date against hire date and future dates
+        validateAttendanceDate(date, targetEmployee);
+        validateOvertime(overtimeHours);
+
+        Long tenantId = targetEmployee.getTenant().getId();
+
+        // Get or create attendance record
+        Optional<AttendanceRecord> existing = attendanceRepository
+                .findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, targetEmployeeId, date);
+
+        AttendanceRecord record;
+        if (existing.isPresent()) {
+            record = existing.get();
+
+            // Prevent modifying old records if needed
+            LocalDate today = LocalDate.now(Clock.systemUTC());
+            if (date.isBefore(today.minusDays(7))) {
+                log.warn("Modifying attendance record older than 7 days: {}", date);
+            }
+
+            record.setStatus(status);
+            if (reason != null) record.setReason(reason);
+            if (overtimeHours != null) record.setOvertimeHours(overtimeHours);
+            record.setMarkedBy(currentUser.getId());
+            record.setMarkedByName(currentUser.getFullName());
+            record.setMarkedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER");
+            record.setUpdatedAt(LocalDateTime.now());
+
+            log.info("Updated attendance for employee: {} on date: {} to status: {}",
+                    targetEmployeeId, date, status);
+        } else {
+            record = AttendanceRecord.builder()
+                    .tenant(targetEmployee.getTenant())
+                    .employee(targetEmployee)
+                    .attendanceDate(date)
+                    .status(status)
+                    .reason(reason)
+                    .overtimeHours(overtimeHours)
+                    .markedBy(currentUser.getId())
+                    .markedByName(currentUser.getFullName())
+                    .markedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER")
+                    .markedAt(LocalDateTime.now())
+                    .build();
+
+            log.info("Created new attendance record for employee: {} on date: {} with status: {}",
+                    targetEmployeeId, date, status);
         }
 
-        // Case 2: Late check-in (after threshold)
-        if (checkInTime.isAfter(LATE_THRESHOLD)) {
-            return AttendanceStatus.LATE;
+        return attendanceRepository.save(record);
+    }
+
+    // =====================================================
+    // BULK ATTENDANCE MARKING
+    // =====================================================
+
+    /**
+     * Mark attendance for multiple team members at once
+     */
+    @Transactional
+    public List<AttendanceRecord> markTeamAttendance(Long managerId, LocalDate date,
+                                                     Map<Long, AttendanceStatus> attendanceMap,
+                                                     Map<Long, String> reasonMap,
+                                                     Map<Long, Double> overtimeMap) {
+
+        log.info("Manager {} marking attendance for {} team members on date: {}",
+                managerId, attendanceMap.size(), date);
+
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+
+        List<AttendanceRecord> records = new ArrayList<>();
+
+        for (Map.Entry<Long, AttendanceStatus> entry : attendanceMap.entrySet()) {
+            Long employeeId = entry.getKey();
+            AttendanceStatus status = entry.getValue();
+            String reason = reasonMap != null ? reasonMap.get(employeeId) : null;
+            Double overtime = overtimeMap != null ? overtimeMap.get(employeeId) : null;
+
+            // Verify employee is in manager's team
+            Employee employee = employeeRepository.findById(employeeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Employee not found: " + employeeId));
+
+            if (employee.getManager() == null || !employee.getManager().getId().equals(managerId)) {
+                log.warn("Employee {} is not in manager {} team, skipping", employeeId, managerId);
+                continue;
+            }
+
+            try {
+                AttendanceRecord record = markAttendanceForDate(employeeId, date, status, reason, overtime, manager);
+                records.add(record);
+            } catch (BusinessException e) {
+                log.warn("Could not mark attendance for employee {}: {}", employeeId, e.getMessage());
+            }
         }
 
-        // Case 3: Half day (less than 4 hours)
-        if (workingHours != null && workingHours < HALF_DAY_HOURS) {
-            return AttendanceStatus.HALF_DAY;
+        log.info("Successfully marked attendance for {} team members", records.size());
+        return records;
+    }
+
+    /**
+     * Quick mark all team members with same status (for today only)
+     */
+    @Transactional
+    public List<AttendanceRecord> quickMarkTeamAttendance(Long managerId, AttendanceStatus defaultStatus) {
+        log.info("Manager {} quick marking all team members as: {}", managerId, defaultStatus);
+
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        List<Employee> teamMembers = getTeamMembers(managerId);
+
+        Map<Long, AttendanceStatus> attendanceMap = new HashMap<>();
+        for (Employee employee : teamMembers) {
+            attendanceMap.put(employee.getId(), defaultStatus);
         }
 
-        // Case 4: Full day present
-        return AttendanceStatus.PRESENT;
+        return markTeamAttendance(managerId, today, attendanceMap, null, null);
+    }
+
+    // =====================================================
+    // OVERTIME MANAGEMENT
+    // =====================================================
+
+    @Transactional
+    public AttendanceRecord addOvertime(Long employeeId, LocalDate date, Double overtimeHours,
+                                        String reason, Employee currentUser) {
+
+        log.info("User {} adding {} overtime hours for employee: {} on date: {}",
+                currentUser.getEmail(), overtimeHours, employeeId, date);
+
+        validateAuthorization(currentUser, employeeId);
+
+        Employee targetEmployee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        validateAttendanceDate(date, targetEmployee);
+        validateOvertime(overtimeHours);
+
+        Long tenantId = targetEmployee.getTenant().getId();
+
+        Optional<AttendanceRecord> existing = attendanceRepository
+                .findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, employeeId, date);
+
+        AttendanceRecord record;
+        if (existing.isPresent()) {
+            record = existing.get();
+            Double currentOvertime = record.getOvertimeHours() != null ? record.getOvertimeHours() : 0;
+            record.setOvertimeHours(currentOvertime + overtimeHours);
+
+            String overtimeReason = record.getReason() != null ?
+                    record.getReason() + " | Overtime: " + reason :
+                    "Overtime: " + reason;
+            record.setReason(overtimeReason);
+            record.setUpdatedAt(LocalDateTime.now());
+        } else {
+            record = AttendanceRecord.builder()
+                    .tenant(targetEmployee.getTenant())
+                    .employee(targetEmployee)
+                    .attendanceDate(date)
+                    .status(AttendanceStatus.PRESENT)
+                    .overtimeHours(overtimeHours)
+                    .reason("Overtime: " + reason)
+                    .markedBy(currentUser.getId())
+                    .markedByName(currentUser.getFullName())
+                    .markedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER")
+                    .markedAt(LocalDateTime.now())
+                    .build();
+        }
+
+        record.setMarkedBy(currentUser.getId());
+        record.setMarkedByName(currentUser.getFullName());
+        record.setMarkedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER");
+
+        log.info("Overtime added successfully. Total: {} hours", record.getOvertimeHours());
+        return attendanceRepository.save(record);
+    }
+
+    // =====================================================
+    // TEAM MANAGEMENT
+    // =====================================================
+
+    public List<Employee> getTeamMembers(Long managerId) {
+        log.info("Getting team members for manager: {}", managerId);
+
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+
+        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+
+        log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
+        return teamMembers;
+    }
+
+    public Page<Employee> getTeamMembersPaginated(Long managerId, Pageable pageable) {
+        log.info("Getting paginated team members for manager: {}", managerId);
+        return employeeRepository.findByManagerId(managerId, pageable);
+    }
+
+    public List<ManualTeamMemberAttendanceDTO> getTeamWithTodayAttendance(Long managerId) {
+        log.info("Getting team with today's attendance for manager: {}", managerId);
+
+        List<Employee> teamMembers = getTeamMembers(managerId);
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+
+        List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
+
+        for (Employee employee : teamMembers) {
+            if (employee.getHireDate() != null && employee.getHireDate().isAfter(today)) {
+                continue;
+            }
+
+            Long tenantId = employee.getTenant().getId();
+            Optional<AttendanceRecord> attendance = attendanceRepository
+                    .findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, employee.getId(), today);
+
+            ManualTeamMemberAttendanceDTO dto = ManualTeamMemberAttendanceDTO.builder()
+                    .employeeId(employee.getId())
+                    .employeeCode(employee.getEmployeeCode())
+                    .employeeName(employee.getFullName())
+                    .email(employee.getEmail())
+                    .position(employee.getPosition())
+                    .profilePicture(employee.getProfilePictureUrl())
+                    .hireDate(employee.getHireDate())
+                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
+                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
+                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
+                    .isMarked(attendance.isPresent())
+                    .build();
+
+            teamAttendance.add(dto);
+        }
+
+        return teamAttendance;
+    }
+
+    public List<Employee> searchTeamMembers(Long managerId, String searchTerm) {
+        log.info("Searching team members for manager: {} with term: {}", managerId, searchTerm);
+
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return getTeamMembers(managerId);
+        }
+
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        Long tenantId = manager.getTenant().getId();
+
+        return employeeRepository.searchTeamMembers(managerId, tenantId, searchTerm.toLowerCase());
+    }
+
+    // =====================================================
+    // VIEW ATTENDANCE
+    // =====================================================
+
+    public Page<AttendanceRecord> getTeamAttendance(Employee currentUser, LocalDate startDate,
+                                                    LocalDate endDate, Pageable pageable) {
+
+        log.info("Getting team attendance for user: {}", currentUser.getEmail());
+        validateDateRange(startDate, endDate);
+
+        Long tenantId = currentUser.getTenantId();
+        List<Long> teamIds;
+
+        if (currentUser.isSuperAdmin()) {
+            List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
+            teamIds = allEmployees.stream()
+                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(endDate))
+                    .map(Employee::getId)
+                    .collect(Collectors.toList());
+        } else {
+            List<Employee> team = employeeRepository.findByManagerId(currentUser.getId());
+            teamIds = team.stream()
+                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(endDate))
+                    .map(Employee::getId)
+                    .collect(Collectors.toList());
+        }
+
+        if (teamIds.isEmpty()) {
+            return Page.empty();
+        }
+
+        return attendanceRepository.findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(
+                tenantId, teamIds, startDate, endDate, pageable);
+    }
+
+    public Page<AttendanceRecord> getEmployeeAttendance(Long employeeId, LocalDate startDate,
+                                                        LocalDate endDate, Employee currentUser,
+                                                        Pageable pageable) {
+
+        log.info("Getting attendance for employee: {} from {} to {}", employeeId, startDate, endDate);
+        validateDateRange(startDate, endDate);
+
+        Long tenantId = currentUser.getTenantId();
+
+        Employee targetEmployee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (targetEmployee.getHireDate() != null && startDate.isBefore(targetEmployee.getHireDate())) {
+            startDate = targetEmployee.getHireDate();
+            log.info("Adjusted start date to hire date: {}", startDate);
+        }
+
+        if (!currentUser.isSuperAdmin() && !currentUser.getId().equals(employeeId)) {
+            if (targetEmployee.getManager() == null ||
+                    !targetEmployee.getManager().getId().equals(currentUser.getId())) {
+                throw new BusinessException("You can only view attendance for your team members");
+            }
+        }
+
+        return attendanceRepository.findByTenantIdAndEmployeeIdAndAttendanceDateBetween(
+                tenantId, employeeId, startDate, endDate, pageable);
+    }
+
+    public AttendanceRecord getTodayAttendance(Long employeeId, Long tenantId) {
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        return attendanceRepository.findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, employeeId, today)
+                .orElse(null);
+    }
+
+    // =====================================================
+    // SUMMARY & REPORTS
+    // =====================================================
+
+    public Map<String, Object> getMonthlySummary(Long employeeId, int year, int month, Long tenantId) {
+
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (employee.getHireDate() != null && startDate.isBefore(employee.getHireDate())) {
+            startDate = employee.getHireDate();
+        }
+
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        if (startDate.isAfter(today)) {
+            Map<String, Object> emptySummary = new HashMap<>();
+            emptySummary.put("message", "Cannot view attendance for future months");
+            emptySummary.put("employeeId", employeeId);
+            emptySummary.put("year", year);
+            emptySummary.put("month", month);
+            return emptySummary;
+        }
+
+        if (endDate.isAfter(today)) {
+            endDate = today;
+        }
+
+        List<AttendanceRecord> records = attendanceRepository
+                .findByTenantIdAndEmployeeIdAndAttendanceDateBetween(tenantId, employeeId, startDate, endDate);
+
+        Map<AttendanceStatus, Long> statusCount = records.stream()
+                .collect(Collectors.groupingBy(AttendanceRecord::getStatus, Collectors.counting()));
+
+        double totalOvertime = records.stream()
+                .filter(r -> r.getOvertimeHours() != null)
+                .mapToDouble(AttendanceRecord::getOvertimeHours)
+                .sum();
+
+        long totalWorkingDays = endDate.getDayOfMonth();
+        long totalPresent = statusCount.getOrDefault(AttendanceStatus.PRESENT, 0L) +
+                statusCount.getOrDefault(AttendanceStatus.LATE, 0L);
+
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("employeeId", employeeId);
+        summary.put("employeeName", employee.getFullName());
+        summary.put("employeeCode", employee.getEmployeeCode());
+        summary.put("hireDate", employee.getHireDate());
+        summary.put("year", year);
+        summary.put("month", month);
+        summary.put("periodStart", startDate);
+        summary.put("periodEnd", endDate);
+        summary.put("totalDaysInMonth", totalWorkingDays);
+        summary.put("present", statusCount.getOrDefault(AttendanceStatus.PRESENT, 0L));
+        summary.put("absent", statusCount.getOrDefault(AttendanceStatus.ABSENT, 0L));
+        summary.put("halfDay", statusCount.getOrDefault(AttendanceStatus.HALF_DAY, 0L));
+        summary.put("late", statusCount.getOrDefault(AttendanceStatus.LATE, 0L));
+        summary.put("onLeave", statusCount.getOrDefault(AttendanceStatus.ON_LEAVE, 0L));
+        summary.put("totalOvertimeHours", totalOvertime);
+        summary.put("attendanceRate", totalWorkingDays > 0 ? (totalPresent * 100.0 / totalWorkingDays) : 0);
+
+        return summary;
+    }
+// =====================================================
+// TEAM ATTENDANCE SUMMARY
+// =====================================================
+
+    /**
+     * Get team attendance summary for a manager
+     */
+    public Map<String, Object> getTeamAttendanceSummary(Long managerId, LocalDate startDate, LocalDate endDate) {
+        log.info("Getting team attendance summary for manager: {} from {} to {}", managerId, startDate, endDate);
+
+        // Validate date range
+        validateDateRange(startDate, endDate);
+
+        // Get manager's team members
+        List<Employee> teamMembers = getTeamMembers(managerId);
+        List<Long> teamIds = teamMembers.stream()
+                .map(Employee::getId)
+                .collect(Collectors.toList());
+
+        if (teamIds.isEmpty()) {
+            Map<String, Object> emptyResponse = new HashMap<>();
+            emptyResponse.put("message", "No team members found");
+            emptyResponse.put("totalTeamMembers", 0);
+            emptyResponse.put("startDate", startDate);
+            emptyResponse.put("endDate", endDate);
+            return emptyResponse;
+        }
+
+        // Get tenant ID from manager
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        Long tenantId = manager.getTenant().getId();
+
+        // Get all attendance records for team
+        List<AttendanceRecord> allAttendance = attendanceRepository
+                .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, teamIds, startDate, endDate);
+
+        // Calculate employee summaries
+        Map<String, Object> employeeSummaries = new LinkedHashMap<>();
+        Map<String, Object> teamTotals = new HashMap<>();
+        teamTotals.put("present", 0L);
+        teamTotals.put("absent", 0L);
+        teamTotals.put("halfDay", 0L);
+        teamTotals.put("late", 0L);
+        teamTotals.put("onLeave", 0L);
+        teamTotals.put("totalOvertime", 0.0);
+
+        for (Employee employee : teamMembers) {
+            List<AttendanceRecord> employeeRecords = allAttendance.stream()
+                    .filter(r -> r.getEmployee().getId().equals(employee.getId()))
+                    .collect(Collectors.toList());
+
+            long present = employeeRecords.stream()
+                    .filter(r -> r.getStatus() == AttendanceStatus.PRESENT).count();
+            long absent = employeeRecords.stream()
+                    .filter(r -> r.getStatus() == AttendanceStatus.ABSENT).count();
+            long halfDay = employeeRecords.stream()
+                    .filter(r -> r.getStatus() == AttendanceStatus.HALF_DAY).count();
+            long late = employeeRecords.stream()
+                    .filter(r -> r.getStatus() == AttendanceStatus.LATE).count();
+            long onLeave = employeeRecords.stream()
+                    .filter(r -> r.getStatus() == AttendanceStatus.ON_LEAVE).count();
+
+            double overtime = employeeRecords.stream()
+                    .filter(r -> r.getOvertimeHours() != null)
+                    .mapToDouble(AttendanceRecord::getOvertimeHours)
+                    .sum();
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("employeeId", employee.getId());
+            summary.put("employeeName", employee.getFullName());
+            summary.put("employeeCode", employee.getEmployeeCode());
+            summary.put("present", present);
+            summary.put("absent", absent);
+            summary.put("halfDay", halfDay);
+            summary.put("late", late);
+            summary.put("onLeave", onLeave);
+            summary.put("overtimeHours", overtime);
+
+            employeeSummaries.put(employee.getEmployeeCode(), summary);
+
+            // Update team totals
+            teamTotals.put("present", (long) teamTotals.get("present") + present);
+            teamTotals.put("absent", (long) teamTotals.get("absent") + absent);
+            teamTotals.put("halfDay", (long) teamTotals.get("halfDay") + halfDay);
+            teamTotals.put("late", (long) teamTotals.get("late") + late);
+            teamTotals.put("onLeave", (long) teamTotals.get("onLeave") + onLeave);
+            teamTotals.put("totalOvertime", (double) teamTotals.get("totalOvertime") + overtime);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("startDate", startDate);
+        response.put("endDate", endDate);
+        response.put("totalTeamMembers", teamMembers.size());
+        response.put("teamTotals", teamTotals);
+        response.put("employeeSummaries", employeeSummaries);
+
+        return response;
+    }
+
+    // =====================================================
+// ATTENDANCE CALENDAR
+// =====================================================
+
+    /**
+     * Get attendance calendar view for an employee
+     * Returns a map of dates with attendance status for the entire month
+     */
+    public Map<LocalDate, Map<String, Object>> getAttendanceCalendar(Long employeeId, int year, int month, Long tenantId) {
+        log.info("Getting attendance calendar for employee: {} for {}-{}", employeeId, year, month);
+
+        // Get employee to verify existence and hire date
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+
+        // Adjust start date if employee was hired after month start
+        if (employee.getHireDate() != null && startDate.isBefore(employee.getHireDate())) {
+            startDate = employee.getHireDate();
+        }
+
+        // Don't show future months
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        if (startDate.isAfter(today)) {
+            return new LinkedHashMap<>();
+        }
+
+        if (endDate.isAfter(today)) {
+            endDate = today;
+        }
+
+        // Get all attendance records for the employee in the date range
+        List<AttendanceRecord> records = attendanceRepository
+                .findByTenantIdAndEmployeeIdAndAttendanceDateBetween(tenantId, employeeId, startDate, endDate);
+
+        // Create calendar map
+        Map<LocalDate, Map<String, Object>> calendar = new LinkedHashMap<>();
+
+        // Initialize all dates in the range
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            Map<String, Object> dayInfo = new HashMap<>();
+            dayInfo.put("date", date);
+            dayInfo.put("dayOfWeek", date.getDayOfWeek().toString());
+            dayInfo.put("dayOfWeekValue", date.getDayOfWeek().getValue());
+            dayInfo.put("status", "NOT_MARKED");
+            dayInfo.put("statusCode", "N/A");
+            dayInfo.put("reason", null);
+            dayInfo.put("overtimeHours", 0.0);
+            dayInfo.put("markedBy", null);
+            dayInfo.put("isWeekend", isWeekend(date));
+            dayInfo.put("isHoliday", false); // You can implement holiday check if needed
+            calendar.put(date, dayInfo);
+        }
+
+        // Fill in attendance data
+        for (AttendanceRecord record : records) {
+            Map<String, Object> dayInfo = calendar.get(record.getAttendanceDate());
+            if (dayInfo != null) {
+                dayInfo.put("status", record.getStatus().toString());
+                dayInfo.put("statusCode", getStatusCode(record.getStatus()));
+                dayInfo.put("reason", record.getReason());
+                dayInfo.put("overtimeHours", record.getOvertimeHours() != null ? record.getOvertimeHours() : 0.0);
+                dayInfo.put("markedBy", record.getMarkedByName());
+            }
+        }
+
+        return calendar;
+    }
+
+    /**
+     * Get status code for display (P, A, H, L, LV)
+     */
+    private String getStatusCode(AttendanceStatus status) {
+        switch (status) {
+            case PRESENT: return "P";
+            case ABSENT: return "A";
+            case HALF_DAY: return "H";
+            case LATE: return "L";
+            case ON_LEAVE: return "LV";
+            default: return "N/A";
+        }
+    }
+
+
+
+    public Map<String, Object> getDashboardStats(Employee currentUser) {
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        Long tenantId = currentUser.getTenantId();
+
+        List<Long> teamIds;
+        if (currentUser.isSuperAdmin()) {
+            List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
+            teamIds = allEmployees.stream()
+                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
+                    .map(Employee::getId)
+                    .collect(Collectors.toList());
+        } else {
+            List<Employee> team = employeeRepository.findByManagerId(currentUser.getId());
+            teamIds = team.stream()
+                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
+                    .map(Employee::getId)
+                    .collect(Collectors.toList());
+        }
+
+        long totalEmployees = teamIds.size();
+        long presentToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatusIn(
+                tenantId, today, List.of(AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.HALF_DAY));
+        long absentToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatus(
+                tenantId, today, AttendanceStatus.ABSENT);
+        long onLeaveToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatus(
+                tenantId, today, AttendanceStatus.ON_LEAVE);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("date", today);
+        stats.put("totalEmployees", totalEmployees);
+        stats.put("present", presentToday);
+        stats.put("absent", absentToday);
+        stats.put("onLeave", onLeaveToday);
+        stats.put("pending", totalEmployees - (presentToday + absentToday + onLeaveToday));
+        stats.put("attendancePercentage", totalEmployees > 0 ? (presentToday * 100 / totalEmployees) : 0);
+
+        return stats;
+    }
+    public List<AttendanceRecord> getEmployeeAttendance(Long employeeId, LocalDate startDate, LocalDate endDate) {
+        log.info("Getting attendance for employee: {} from {} to {}", employeeId, startDate, endDate);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        Long tenantId = employee.getTenant().getId();
+
+        // This method already has all your conditions (future dates, hire date, etc.)
+        return attendanceRepository.findByTenantIdAndEmployeeIdAndAttendanceDateBetween(
+                tenantId, employeeId, startDate, endDate);
+    }
+
+    // =====================================================
+    // HELPER METHODS
+    // =====================================================
+
+    private boolean isWeekend(LocalDate date) {
+        String day = date.getDayOfWeek().toString();
+        return day.equals("SATURDAY") || day.equals("SUNDAY");
     }
 }

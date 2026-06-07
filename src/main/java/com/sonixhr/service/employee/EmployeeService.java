@@ -7,6 +7,7 @@ import com.sonixhr.dto.employee.EmployeeSearchResponse;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
+import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.BusinessException;
@@ -14,6 +15,7 @@ import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
+import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +46,7 @@ public class EmployeeService {
     private final ActivationTokenService activationTokenService;
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
-
+    private final TenantRoleRepository roleRepository;
     @Value("${app.base-url}")
     private String baseUrl;
 
@@ -52,7 +54,7 @@ public class EmployeeService {
     // CREATE EMPLOYEE
     // =====================================================
     @Transactional
-    public EmployeeResponse createEmployee(Long tenantId, EmployeeCreateRequest request) {  // ✅ Changed to Long
+    public EmployeeResponse createEmployee(Long tenantId, EmployeeCreateRequest request) {
         log.info("Creating employee for tenant: {}", tenantId);
 
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -81,16 +83,22 @@ public class EmployeeService {
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created successfully with code: {}", employeeCode);
 
+        // ✅ Assign roles if provided
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            List<TenantRole> roles = roleRepository.findAllById(request.getRoleIds());
+            savedEmployee.getRoles().addAll(roles);
+            savedEmployee = employeeRepository.save(savedEmployee);
+            log.info("Assigned {} roles to employee: {}", roles.size(), savedEmployee.getEmail());
+        }
+
         // Generate activation token for employee
         String activationTokenValue = activationTokenService.generateTokenForEmployee(savedEmployee.getId());
-        String activationLink = baseUrl + "/api/employee/auth/activate?token=" + activationTokenValue;
+        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationTokenValue;
 
-        // Send activation email
-        emailService.sendEmployeeActivationEmail(
-                savedEmployee.getEmail(),
-                savedEmployee.getFirstName(),
-                activationLink
-        );
+        // Auto-activate for testing
+        savedEmployee.setStatus(EmployeeStatus.ACTIVE);
+        savedEmployee.setActive(true);
+        savedEmployee.setPasswordHash(passwordEncoder.encode("Test@123"));
 
         return convertToResponse(savedEmployee);
     }
@@ -126,7 +134,7 @@ public class EmployeeService {
     // UPDATE EMPLOYEE
     // =====================================================
     @Transactional
-    public EmployeeResponse updateEmployee(Long id, Long tenantId, EmployeeCreateRequest request) {  // ✅ Changed to Long
+    public EmployeeResponse updateEmployee(Long id, Long tenantId, EmployeeCreateRequest request) {
         log.info("Updating employee with id: {} for tenant: {}", id, tenantId);
 
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
@@ -171,7 +179,7 @@ public class EmployeeService {
     // ASSIGN MANAGER BY EMPLOYEE CODE
     // =====================================================
     @Transactional
-    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, Long tenantId, String reason) {  // ✅ Changed to Long
+    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, Long tenantId, String reason) {
         log.info("Assigning manager by code - Employee: {} to Manager: {}", employeeCode, managerCode);
 
         Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
@@ -197,7 +205,7 @@ public class EmployeeService {
     // REMOVE MANAGER
     // =====================================================
     @Transactional
-    public void removeManager(String employeeCode, Long tenantId, String reason) {  // ✅ Changed to Long
+    public void removeManager(String employeeCode, Long tenantId, String reason) {
         log.info("Removing manager for employee: {} with reason: {}", employeeCode, reason);
 
         Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
@@ -213,7 +221,7 @@ public class EmployeeService {
     // =====================================================
     // GET TEAM MEMBERS (Paginated)
     // =====================================================
-    public Page<EmployeeResponse> getTeamMembersPaginated(Long tenantId, Long managerId, Pageable pageable) {  // ✅ Changed to Long
+    public Page<EmployeeResponse> getTeamMembersPaginated(Long tenantId, Long managerId, Pageable pageable) {
         log.info("Getting team members for manager: {} with pagination", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId, pageable)
@@ -223,7 +231,7 @@ public class EmployeeService {
     // =====================================================
     // GET TEAM MEMBERS (List)
     // =====================================================
-    public List<EmployeeResponse> getTeamMembers(Long managerId, Long tenantId) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getTeamMembers(Long managerId, Long tenantId) {
         log.info("Getting team members for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId)
@@ -235,7 +243,7 @@ public class EmployeeService {
     // =====================================================
     // GET ALL SUBORDINATES
     // =====================================================
-    public List<EmployeeResponse> getAllSubordinates(Long managerId, Long tenantId) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getAllSubordinates(Long managerId, Long tenantId) {
         log.info("Getting all subordinates for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         List<Employee> allSubordinates = new java.util.ArrayList<>();
@@ -245,7 +253,7 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
-    private void collectAllSubordinates(Long managerId, Long tenantId, List<Employee> result) {  // ✅ Changed to Long
+    private void collectAllSubordinates(Long managerId, Long tenantId, List<Employee> result) {
         List<Employee> directReports = employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId);
         result.addAll(directReports);
         for (Employee report : directReports) {
@@ -256,7 +264,7 @@ public class EmployeeService {
     // =====================================================
     // GET MANAGER CHAIN
     // =====================================================
-    public List<EmployeeResponse> getManagerChain(Long employeeId, Long tenantId) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getManagerChain(Long employeeId, Long tenantId) {
         log.info("Getting manager chain for employee: {}", employeeId);
         Employee employee = findEmployeeByIdAndTenant(employeeId, tenantId);
         List<Employee> chain = new java.util.ArrayList<>();
@@ -273,7 +281,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES WITH NO MANAGER
     // =====================================================
-    public List<EmployeeResponse> getEmployeesWithNoManager(Long tenantId) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getEmployeesWithNoManager(Long tenantId) {
         log.info("Getting employees with no manager for tenant: {}", tenantId);
         return employeeRepository.findByManagerIsNullAndTenant_Id(tenantId)
                 .stream()
@@ -284,7 +292,7 @@ public class EmployeeService {
     // =====================================================
     // CHECK IF EMPLOYEE IS MANAGER
     // =====================================================
-    public boolean isManager(Long employeeId, Long tenantId) {  // ✅ Changed to Long
+    public boolean isManager(Long employeeId, Long tenantId) {
         log.info("Checking if employee is manager: {}", employeeId);
         findEmployeeByIdAndTenant(employeeId, tenantId);
         long directReportsCount = employeeRepository.countByManagerIdAndTenant_Id(employeeId, tenantId);
@@ -294,7 +302,7 @@ public class EmployeeService {
     // =====================================================
     // SEARCH EMPLOYEES FOR ASSIGNMENT
     // =====================================================
-    public Page<EmployeeSearchResponse> searchEmployeesForAssignment(Long tenantId, String query, Pageable pageable) {  // ✅ Changed to Long
+    public Page<EmployeeSearchResponse> searchEmployeesForAssignment(Long tenantId, String query, Pageable pageable) {
         log.info("Searching employees for assignment with query: {}", query);
         return employeeRepository.searchEmployeesForAssignment(tenantId, query, pageable)
                 .map(this::convertToSearchResponse);
@@ -303,7 +311,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEE BY ID
     // =====================================================
-    public EmployeeResponse getEmployeeById(Long id, Long tenantId) {  // ✅ Changed to Long
+    public EmployeeResponse getEmployeeById(Long id, Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         return convertToResponse(employee);
     }
@@ -311,7 +319,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEE BY CODE
     // =====================================================
-    public EmployeeResponse getEmployeeByCode(Long tenantId, String employeeCode) {  // ✅ Changed to Long
+    public EmployeeResponse getEmployeeByCode(Long tenantId, String employeeCode) {
         Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
         return convertToResponse(employee);
@@ -320,7 +328,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEE BY EMAIL
     // =====================================================
-    public EmployeeResponse getEmployeeByEmail(Long tenantId, String email) {  // ✅ Changed to Long
+    public EmployeeResponse getEmployeeByEmail(Long tenantId, String email) {
         Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
         return convertToResponse(employee);
@@ -329,7 +337,7 @@ public class EmployeeService {
     // =====================================================
     // GET ALL EMPLOYEES
     // =====================================================
-    public Page<EmployeeResponse> getAllEmployees(Long tenantId, Pageable pageable) {  // ✅ Changed to Long
+    public Page<EmployeeResponse> getAllEmployees(Long tenantId, Pageable pageable) {
         return employeeRepository.findByTenant_Id(tenantId, pageable)
                 .map(this::convertToResponse);
     }
@@ -337,7 +345,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES BY STATUS
     // =====================================================
-    public Page<EmployeeResponse> getEmployeesByStatus(Long tenantId, EmployeeStatus status, Pageable pageable) {  // ✅ Changed to Long
+    public Page<EmployeeResponse> getEmployeesByStatus(Long tenantId, EmployeeStatus status, Pageable pageable) {
         return employeeRepository.findByTenant_IdAndStatus(tenantId, status, pageable)
                 .map(this::convertToResponse);
     }
@@ -345,7 +353,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES BY DEPARTMENT NAME
     // =====================================================
-    public List<EmployeeResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
         log.debug("Fetching employees in department: {} for tenant: {}", departmentName, tenantId);
         return employeeRepository.findByTenantIdAndDepartmentName(tenantId, departmentName)
                 .stream()
@@ -356,7 +364,7 @@ public class EmployeeService {
     // =====================================================
     // GET ORGANIZATION CHART
     // =====================================================
-    public List<EmployeeResponse> getOrganizationChart(Long tenantId) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getOrganizationChart(Long tenantId) {
         List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
         return allEmployees.stream()
                 .filter(e -> e.getManager() == null)
@@ -368,7 +376,7 @@ public class EmployeeService {
     // UPDATE EMPLOYEE STATUS
     // =====================================================
     @Transactional
-    public void updateEmployeeStatus(Long id, Long tenantId, EmployeeStatus newStatus, String reason) {  // ✅ Changed to Long
+    public void updateEmployeeStatus(Long id, Long tenantId, EmployeeStatus newStatus, String reason) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         EmployeeStatus oldStatus = employee.getStatus();
 
@@ -399,7 +407,7 @@ public class EmployeeService {
     // CONFIRM EMPLOYEE
     // =====================================================
     @Transactional
-    public void confirmEmployee(Long id, Long tenantId) {  // ✅ Changed to Long
+    public void confirmEmployee(Long id, Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         if (!employee.isOnProbation()) {
             throw new BusinessException("Employee is not on probation");
@@ -412,7 +420,7 @@ public class EmployeeService {
     // =====================================================
     // SEARCH EMPLOYEES
     // =====================================================
-    public Page<EmployeeResponse> searchEmployees(Long tenantId, String searchTerm, Pageable pageable) {  // ✅ Changed to Long
+    public Page<EmployeeResponse> searchEmployees(Long tenantId, String searchTerm, Pageable pageable) {
         return employeeRepository.searchEmployees(tenantId, searchTerm, pageable)
                 .map(this::convertToResponse);
     }
@@ -421,7 +429,7 @@ public class EmployeeService {
     // DELETE EMPLOYEE (SOFT DELETE)
     // =====================================================
     @Transactional
-    public void deleteEmployee(Long id, Long tenantId) {  // ✅ Changed to Long
+    public void deleteEmployee(Long id, Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         List<Employee> subordinates = employeeRepository.findByManagerIdAndTenant_Id(id, tenantId);
         if (!subordinates.isEmpty()) {
@@ -437,7 +445,7 @@ public class EmployeeService {
     // =====================================================
     // GET DEPARTMENT STATISTICS
     // =====================================================
-    public List<DepartmentStat> getDepartmentStatistics(Long tenantId) {  // ✅ Changed to Long
+    public List<DepartmentStat> getDepartmentStatistics(Long tenantId) {
         List<Object[]> results = employeeRepository.countEmployeesByDepartment(tenantId);
         return results.stream()
                 .map(row -> DepartmentStat.builder()
@@ -450,7 +458,7 @@ public class EmployeeService {
     // =====================================================
     // GET UPCOMING BIRTHDAYS
     // =====================================================
-    public List<EmployeeResponse> getUpcomingBirthdays(Long tenantId, int days) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getUpcomingBirthdays(Long tenantId, int days) {
         LocalDate today = LocalDate.now();
         List<Employee> employees = employeeRepository.findByTenant_Id(tenantId);
         return employees.stream()
@@ -477,7 +485,7 @@ public class EmployeeService {
     // =====================================================
     // GET UPCOMING ANNIVERSARIES
     // =====================================================
-    public List<EmployeeResponse> getUpcomingAnniversaries(Long tenantId, int days) {  // ✅ Changed to Long
+    public List<EmployeeResponse> getUpcomingAnniversaries(Long tenantId, int days) {
         LocalDate today = LocalDate.now();
         List<Employee> employees = employeeRepository.findByTenant_Id(tenantId);
         return employees.stream()
@@ -627,7 +635,7 @@ public class EmployeeService {
         return response;
     }
 
-    private Employee findEmployeeByIdAndTenant(Long id, Long tenantId) {  // ✅ Changed to Long
+    private Employee findEmployeeByIdAndTenant(Long id, Long tenantId) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
         if (!employee.getTenantId().equals(tenantId)) {
@@ -647,7 +655,7 @@ public class EmployeeService {
         return null;
     }
 
-    private void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {  // ✅ Changed to Long
+    private void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {
         if (manager == null) {
             log.info("Removing manager for employee: {}", employee.getEmployeeCode());
             return;

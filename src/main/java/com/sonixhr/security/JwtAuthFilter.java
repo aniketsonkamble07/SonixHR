@@ -2,8 +2,6 @@ package com.sonixhr.security;
 
 import com.sonixhr.service.employee.EmployeeDetailsService;
 import com.sonixhr.service.platform.PlatformUserDetailsService;
-import com.sonixhr.service.tenant.TenantContext;
-import com.sonixhr.service.tenant.TenantRLSService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
