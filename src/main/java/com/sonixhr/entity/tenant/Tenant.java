@@ -1,17 +1,17 @@
 package com.sonixhr.entity.tenant;
 
+import com.sonixhr.enums.PlanType;
+import com.sonixhr.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tenants",
@@ -25,8 +25,7 @@ import java.util.UUID;
                 @Index(name = "idx_tenant_status", columnList = "status"),
                 @Index(name = "idx_tenant_is_active", columnList = "is_active")
         })
-@Getter
-@Setter
+@Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -45,13 +44,14 @@ public class Tenant {
     @Column(unique = true, nullable = false, length = 100)
     private String subdomain;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private String status = "ACTIVE";
+    private UserStatus status = UserStatus.ACTIVE;  // ✅ Changed to enum
 
     @Column(name = "is_active")
     @Builder.Default
-    private Boolean isActive = true;
+    private boolean isActive = true;  // ✅ Changed to primitive boolean
 
     @Column(name = "admin_email", nullable = false, length = 255)
     private String adminEmail;
@@ -62,15 +62,14 @@ public class Tenant {
     @Column(name = "admin_phone", length = 20)
     private String adminPhone;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", length = 20)
     @Builder.Default
-    private String planType = "TRIAL";
+    private PlanType planType = PlanType.TRIAL;  // ✅ Changed to enum
 
     @Column(name = "max_employees")
     @Builder.Default
     private Integer maxEmployees = 100;
-
-
 
     @Column(name = "plan_status", length = 20)
     @Builder.Default
@@ -97,10 +96,10 @@ public class Tenant {
     private LocalDateTime deletedAt;
 
     @Column(name = "created_by")
-    private UUID createdBy;
+    private Long createdBy;  // ✅ Changed from UUID to Long (matches Employee/User ID)
 
     @Column(name = "updated_by")
-    private UUID updatedBy;
+    private Long updatedBy;  // ✅ Changed from UUID to Long
 
     @Version
     @Builder.Default
@@ -109,20 +108,20 @@ public class Tenant {
     // ==================== Helper Methods ====================
 
     public void softDelete() {
-        this.status = "DELETED";
+        this.status = UserStatus.DELETED;
         this.isActive = false;
         this.deletedAt = LocalDateTime.now();
     }
 
     public void suspend(String reason) {
-        this.status = "SUSPENDED";
+        this.status = UserStatus.SUSPENDED;
         this.isActive = false;
         this.suspendedAt = LocalDateTime.now();
         this.suspensionReason = reason;
     }
 
     public void activate() {
-        this.status = "ACTIVE";
+        this.status = UserStatus.ACTIVE;
         this.isActive = true;
         this.deletedAt = null;
         this.suspendedAt = null;
@@ -130,30 +129,53 @@ public class Tenant {
     }
 
     public boolean isSuspended() {
-        return "SUSPENDED".equals(this.status) || (this.suspendedAt != null && this.suspendedAt.isBefore(LocalDateTime.now()));
+        return this.status == UserStatus.SUSPENDED;
     }
 
     public boolean isDeleted() {
-        return "DELETED".equals(this.status) || this.deletedAt != null;
+        return this.status == UserStatus.DELETED;
     }
 
     public boolean isTrialActive() {
-        return "TRIAL".equals(this.planType) &&
+        return this.planType == PlanType.TRIAL &&
                 this.trialEndsAt != null &&
                 this.trialEndsAt.isAfter(LocalDateTime.now());
     }
 
     public boolean isTrialExpired() {
-        return "TRIAL".equals(this.planType) &&
+        return this.planType == PlanType.TRIAL &&
                 this.trialEndsAt != null &&
                 this.trialEndsAt.isBefore(LocalDateTime.now());
     }
 
     public int getDaysLeftInTrial() {
-        if (this.trialEndsAt == null || !"TRIAL".equals(this.planType)) {
+        if (this.trialEndsAt == null || this.planType != PlanType.TRIAL) {
             return 0;
         }
         return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.trialEndsAt);
+    }
+
+    // ✅ Convenience method for template compatibility
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    // ✅ JPA Lifecycle Validation
+    @PrePersist
+    @PreUpdate
+    private void validate() {
+        if (tenantCode == null || tenantCode.isEmpty()) {
+            throw new IllegalStateException("Tenant code is required");
+        }
+        if (companyName == null || companyName.isEmpty()) {
+            throw new IllegalStateException("Company name is required");
+        }
+        if (subdomain == null || subdomain.isEmpty()) {
+            throw new IllegalStateException("Subdomain is required");
+        }
+        if (adminEmail == null || !adminEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new IllegalStateException("Valid admin email is required");
+        }
     }
 
     // ==================== equals, hashCode, toString ====================
@@ -178,9 +200,9 @@ public class Tenant {
                 ", tenantCode='" + tenantCode + '\'' +
                 ", companyName='" + companyName + '\'' +
                 ", subdomain='" + subdomain + '\'' +
-                ", status='" + status + '\'' +
+                ", status=" + status +
                 ", isActive=" + isActive +
-                ", planType='" + planType + '\'' +
+                ", planType=" + planType +
                 ", createdAt=" + createdAt +
                 '}';
     }

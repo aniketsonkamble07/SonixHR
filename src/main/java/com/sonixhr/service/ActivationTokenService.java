@@ -4,7 +4,7 @@ import com.sonixhr.entity.ActivationToken;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.entity.tenant.Tenant;
-import com.sonixhr.enums.PlatformUserStatus;
+import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.repository.ActivationTokenRepository;
@@ -34,11 +34,9 @@ public class ActivationTokenService {
     public static final long TOKEN_EXPIRY_HOURS = 24;
     public static final long PASSWORD_RESET_EXPIRY_HOURS = 1;
 
-    // Token type constants
     public static final String TOKEN_TYPE_ACTIVATION = "ACTIVATION";
     public static final String TOKEN_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
 
-    // User type constants
     public static final String USER_TYPE_EMPLOYEE = "EMPLOYEE";
     public static final String USER_TYPE_PLATFORM = "PLATFORM";
 
@@ -50,8 +48,8 @@ public class ActivationTokenService {
     public String generateTokenForEmployee(Long employeeId) {
         log.info("Generating activation token for employee: {}", employeeId);
 
-        // Delete any existing unused tokens for this employee
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(employeeId, USER_TYPE_EMPLOYEE + "_" + TOKEN_TYPE_ACTIVATION);
+        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
+                employeeId, TOKEN_TYPE_ACTIVATION);
 
         String tokenValue = UUID.randomUUID().toString();
         ActivationToken token = ActivationToken.builder()
@@ -68,63 +66,54 @@ public class ActivationTokenService {
         return tokenValue;
     }
 
-    /**
-     * Activate employee and return the employee object
-     */
+    @Transactional(readOnly = true)
+    public boolean isTokenExpired(String token) {
+        return activationTokenRepository
+                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
+                .isEmpty();
+    }
+
     @Transactional
     public Employee activateEmployee(String token, String password) {
         log.info("Activating employee with token: {}", token);
 
-        // Find valid token
         ActivationToken activationToken = activationTokenRepository
                 .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
                 .orElseThrow(() -> new BusinessException("Invalid or expired activation token"));
 
-        // Verify token type
         if (!USER_TYPE_EMPLOYEE.equals(activationToken.getUserType()) ||
                 !TOKEN_TYPE_ACTIVATION.equals(activationToken.getTokenType())) {
             throw new BusinessException("Invalid token type");
         }
 
-        // Get employee
         Employee employee = employeeRepository.findById(activationToken.getUserId())
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
-        // Check if employee is already activated
         if (employee.isActive()) {
             throw new BusinessException("Employee account is already activated");
         }
 
-        // Update employee
         employee.setPasswordHash(passwordEncoder.encode(password));
         employee.setActive(true);
         employee.setStatus(EmployeeStatus.ACTIVE);
-        employee.setMustChangePassword(false);
 
         Employee savedEmployee = employeeRepository.save(employee);
 
-        // Activate associated tenant if needed
-        Tenant tenant = tenantRepository.findById(employee.getTenantId()).orElse(null);
+        Tenant tenant = employee.getTenant();
         if (tenant != null && !tenant.getIsActive()) {
             tenant.activate();
             tenantRepository.save(tenant);
             log.info("Tenant activated: {}", tenant.getSubdomain());
         }
 
-        // Mark token as used
         activationToken.setUsed(true);
         activationTokenRepository.save(activationToken);
-
-        // Optional: Mark all other activation tokens for this employee as used
-        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), USER_TYPE_EMPLOYEE + "_" + TOKEN_TYPE_ACTIVATION);
+        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), TOKEN_TYPE_ACTIVATION);
 
         log.info("Employee activated successfully: {}", employee.getEmail());
         return savedEmployee;
     }
 
-    /**
-     * Set password for employee (legacy method)
-     */
     @Transactional
     public void setPassword(String token, String newPassword) {
         Employee employee = activateEmployee(token, newPassword);
@@ -132,15 +121,15 @@ public class ActivationTokenService {
     }
 
     // =====================================================
-    // PLATFORM USER ACTIVATION METHODS
+    // PLATFORM USER ACTIVATION METHODS (SIMPLIFIED)
     // =====================================================
 
     @Transactional
     public String generateTokenForPlatformUser(Long platformUserId) {
         log.info("Generating activation token for platform user: {}", platformUserId);
 
-        // Delete any existing unused tokens for this platform user
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(platformUserId, USER_TYPE_PLATFORM + "_" + TOKEN_TYPE_ACTIVATION);
+        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
+                platformUserId, TOKEN_TYPE_ACTIVATION);
 
         String tokenValue = UUID.randomUUID().toString();
         ActivationToken token = ActivationToken.builder()
@@ -165,7 +154,6 @@ public class ActivationTokenService {
                 .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
                 .orElseThrow(() -> new BusinessException("Invalid or expired activation token"));
 
-        // Verify token type
         if (!USER_TYPE_PLATFORM.equals(activationToken.getUserType()) ||
                 !TOKEN_TYPE_ACTIVATION.equals(activationToken.getTokenType())) {
             throw new BusinessException("Invalid token type");
@@ -174,29 +162,20 @@ public class ActivationTokenService {
         PlatformUser platformUser = platformUserRepository.findById(activationToken.getUserId())
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
-        // Check if user is already activated
-        if (platformUser.isEnabled() && platformUser.isActive()) {
+        // ✅ Simplified: Only check status (SUSPENDED is the only restriction)
+        if (platformUser.getStatus() == UserStatus.ACTIVE) {
             throw new BusinessException("Platform user account is already activated");
         }
 
-        // Update platform user
+        // ✅ Simplified: Only update password and status
         platformUser.setPassword(passwordEncoder.encode(password));
-        platformUser.setActive(true);
-        platformUser.setEnabled(true);
-        platformUser.setStatus(PlatformUserStatus.ACTIVE);
-        platformUser.setMustChangePassword(false);
-        platformUser.setPasswordLastChanged(LocalDateTime.now());
-        platformUser.setFailedLoginAttempts(0);
-        platformUser.setAccountNonLocked(true);
+        platformUser.setStatus(UserStatus.ACTIVE);
 
         PlatformUser savedUser = platformUserRepository.save(platformUser);
 
-        // Mark token as used
         activationToken.setUsed(true);
         activationTokenRepository.save(activationToken);
-
-        // Optional: Mark all other activation tokens for this user as used
-        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), USER_TYPE_PLATFORM + "_" + TOKEN_TYPE_ACTIVATION);
+        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), TOKEN_TYPE_ACTIVATION);
 
         log.info("Platform user activated successfully: {}", platformUser.getEmail());
         return savedUser;
@@ -209,15 +188,15 @@ public class ActivationTokenService {
     }
 
     // =====================================================
-    // PLATFORM USER PASSWORD RESET METHODS
+    // PLATFORM USER PASSWORD RESET METHODS (SIMPLIFIED)
     // =====================================================
 
     @Transactional
     public String generatePasswordResetTokenForPlatformUser(Long platformUserId) {
         log.info("Generating password reset token for platform user: {}", platformUserId);
 
-        // Delete any existing unused reset tokens
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(platformUserId, USER_TYPE_PLATFORM + "_" + TOKEN_TYPE_PASSWORD_RESET);
+        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
+                platformUserId, TOKEN_TYPE_PASSWORD_RESET);
 
         String tokenValue = UUID.randomUUID().toString();
         ActivationToken token = ActivationToken.builder()
@@ -250,21 +229,13 @@ public class ActivationTokenService {
         PlatformUser platformUser = platformUserRepository.findById(resetToken.getUserId())
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
-        // Update password
+        // ✅ Simplified: Just update password
         platformUser.setPassword(passwordEncoder.encode(newPassword));
-        platformUser.setPasswordLastChanged(LocalDateTime.now());
-        platformUser.setMustChangePassword(true); // Force password change on next login
-        platformUser.setFailedLoginAttempts(0);
-        platformUser.setAccountNonLocked(true);
-
         platformUserRepository.save(platformUser);
 
-        // Mark token as used
         resetToken.setUsed(true);
         activationTokenRepository.save(resetToken);
-
-        // Mark all other password reset tokens for this user as used
-        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), USER_TYPE_PLATFORM + "_" + TOKEN_TYPE_PASSWORD_RESET);
+        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), TOKEN_TYPE_PASSWORD_RESET);
 
         log.info("Password reset successfully for platform user: {}", platformUser.getEmail());
     }
@@ -277,8 +248,8 @@ public class ActivationTokenService {
     public String generatePasswordResetTokenForEmployee(Long employeeId) {
         log.info("Generating password reset token for employee: {}", employeeId);
 
-        // Delete any existing unused reset tokens
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(employeeId, USER_TYPE_EMPLOYEE + "_" + TOKEN_TYPE_PASSWORD_RESET);
+        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
+                employeeId, TOKEN_TYPE_PASSWORD_RESET);
 
         String tokenValue = UUID.randomUUID().toString();
         ActivationToken token = ActivationToken.builder()
@@ -311,17 +282,12 @@ public class ActivationTokenService {
         Employee employee = employeeRepository.findById(resetToken.getUserId())
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
-        // Update password - Employee uses setPasswordHash
         employee.setPasswordHash(passwordEncoder.encode(newPassword));
-        employee.setMustChangePassword(true);
         employeeRepository.save(employee);
 
-        // Mark token as used
         resetToken.setUsed(true);
         activationTokenRepository.save(resetToken);
-
-        // Mark all other password reset tokens for this employee as used
-        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), USER_TYPE_EMPLOYEE + "_" + TOKEN_TYPE_PASSWORD_RESET);
+        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), TOKEN_TYPE_PASSWORD_RESET);
 
         log.info("Password reset successfully for employee: {}", employee.getEmail());
     }

@@ -1,16 +1,13 @@
 package com.sonixhr.service.tenant;
 
-import org.springframework.mail.javamail.MimeMessageHelper;
-
-
-
-
+import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
@@ -31,15 +28,114 @@ public class WelcomeTenantEmailService {
     @Value("${spring.mail.username:noreply@sonixhr.com}")
     private String fromEmail;
 
+    @Value("${app.email.enabled:true}")
+    private boolean emailEnabled;
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMMM dd, yyyy");
 
+    // =====================================================
+    // ✅ ADDED: Method called by TenantRegistrationService
+    // =====================================================
+
     /**
-     * Send tenant welcome email after registration
+     * Send welcome email to tenant admin (called after registration)
      */
+    @Async
+    public void sendWelcomeEmail(Tenant tenant, Employee superAdminEmployee) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send welcome email to: {}", tenant.getAdminEmail());
+            return;
+        }
+
+        log.info("Sending welcome email to tenant admin: {} for company: {}",
+                tenant.getAdminEmail(), tenant.getCompanyName());
+
+        try {
+            String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=";
+            String tenantUrl = "https://" + tenant.getSubdomain() + ".sonixhr.com";
+            String trialEndDate = tenant.getTrialEndsAt() != null ?
+                    tenant.getTrialEndsAt().format(DATE_FORMATTER) :
+                    LocalDate.now().plusDays(14).format(DATE_FORMATTER);
+
+            String subject = "Welcome to SonixHR - Activate Your Account";
+
+            String htmlContent = String.format("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+                        .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
+                        .details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
+                        .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 30px; font-weight: bold; margin: 20px 0; }
+                        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+                        .highlight { color: #667eea; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1 style="margin: 0;">Welcome to SonixHR! 🎉</h1>
+                        </div>
+                        <div class="content">
+                            <p>Dear <strong>%s</strong>,</p>
+                            <p>Thank you for choosing SonixHR! Your account for <strong>%s</strong> has been created successfully.</p>
+                            
+                            <div class="details">
+                                <h3 style="margin-top: 0; color: #667eea;">📋 Account Details</h3>
+                                <p><strong>🏢 Company:</strong> %s</p>
+                                <p><strong>🔗 Portal URL:</strong> <a href="%s">%s</a></p>
+                                <p><strong>📊 Plan:</strong> <span class="highlight">%s</span></p>
+                                <p><strong>⏰ Trial Period:</strong> %d days</p>
+                            </div>
+                            
+                            <p>An activation email has been sent to <strong>%s</strong> with instructions to set up your password.</p>
+                            
+                            <div class="footer">
+                                <p>© 2026 SonixHR. All rights reserved.<br>
+                                Need help? Contact us at <a href="mailto:support@sonixhr.com">support@sonixhr.com</a></p>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """,
+                    tenant.getAdminName(),
+                    tenant.getCompanyName(),
+                    tenant.getCompanyName(),
+                    tenantUrl, tenantUrl,
+                    tenant.getPlanType() != null ? tenant.getPlanType() : "Trial",
+                    14,
+                    tenant.getAdminEmail()
+            );
+
+            sendEmail(tenant.getAdminEmail(), subject, htmlContent);
+            log.info("Welcome email sent successfully to: {}", tenant.getAdminEmail());
+
+        } catch (Exception e) {
+            log.error("Failed to send welcome email to: {}", tenant.getAdminEmail(), e);
+            // ✅ Don't throw - email failure shouldn't break registration
+        }
+    }
+
+    // =====================================================
+    // TENANT WELCOME EMAIL (with activation token)
+    // =====================================================
+
+    @Async
     public void sendTenantWelcomeEmail(String to, String adminName, String companyName,
                                        String subdomain, String activationToken,
                                        String planName, int trialDays) {
-        String activationLink = baseUrl + "/api/public/activate?token=" + activationToken;
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send tenant welcome email to: {}", to);
+            return;
+        }
+
+        // ✅ FIXED: Correct activation endpoint
+        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationToken;
         String tenantUrl = "https://" + subdomain + ".sonixhr.com";
         String trialEndDate = LocalDate.now().plusDays(trialDays).format(DATE_FORMATTER);
 
@@ -59,7 +155,6 @@ public class WelcomeTenantEmailService {
                     .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 30px; font-weight: bold; margin: 20px 0; }
                     .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
                     .highlight { color: #667eea; font-weight: bold; }
-                    .info-box { background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 15px 0; }
                 </style>
             </head>
             <body>
@@ -87,18 +182,7 @@ public class WelcomeTenantEmailService {
                         
                         <p style="font-size: 12px; color: #999; text-align: center;">This link will expire in <strong>24 hours</strong>.</p>
                         
-                        <div class="info-box">
-                            <strong>💡 Quick Tip:</strong> After activation, you'll have full access to:
-                            <ul style="margin: 10px 0 0 20px;">
-                                <li>Employee Management</li>
-                                <li>Leave Tracking & Approvals</li>
-                                <li>Attendance Management</li>
-                                <li>HR Reports & Analytics</li>
-                            </ul>
-                        </div>
-                        
-                        <hr style="margin: 20px 0;"/>
-                        
+                        <hr/>
                         <p style="font-size: 12px; color: #666;">If you didn't sign up for SonixHR, please ignore this email.</p>
                         
                         <div class="footer">
@@ -116,164 +200,7 @@ public class WelcomeTenantEmailService {
     }
 
     /**
-     * Send trial reminder email
-     */
-    public void sendTrialReminderEmail(String to, String companyName, String message, LocalDateTime trialEndsAt) {
-        String subject = "SonixHR - " + message;
-        String trialEndDate = trialEndsAt.format(DATE_FORMATTER);
-
-        String htmlContent = String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
-                    .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
-                    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 8px; }
-                    .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 30px; font-weight: bold; }
-                    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>⚠️ Trial Reminder</h2>
-                    </div>
-                    <div class="content">
-                        <p>Dear <strong>%s</strong> Team,</p>
-                        
-                        <div class="warning">
-                            <p><strong>%s</strong></p>
-                            <p>Your trial ends on <strong>%s</strong>.</p>
-                        </div>
-                        
-                        <p>Don't lose access to your HR data! Upgrade now to continue using SonixHR.</p>
-                        
-                        <div style="text-align: center;">
-                            <a href="https://app.sonixhr.com/billing" class="button">Upgrade Now</a>
-                        </div>
-                        
-                        <div class="footer">
-                            <p>Need help? Contact us at support@sonixhr.com</p>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """, companyName, message, trialEndDate);
-
-        sendEmail(to, subject, htmlContent);
-    }
-
-    /**
-     * Send account activation confirmation email
-     */
-    public void sendActivationConfirmationEmail(String to, String name, String companyName) {
-        String subject = "Welcome to SonixHR - Account Activated!";
-
-        String htmlContent = String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
-                    .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
-                    .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 30px; font-weight: bold; }
-                    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🎉 Account Activated!</h1>
-                    </div>
-                    <div class="content">
-                        <p>Dear <strong>%s</strong>,</p>
-                        <p>Your account for <strong>%s</strong> has been successfully activated!</p>
-                        
-                        <p>You can now log in and start managing your HR operations:</p>
-                        
-                        <div style="text-align: center;">
-                            <a href="https://app.sonixhr.com/login" class="button">Login to Your Account</a>
-                        </div>
-                        
-                        <div class="footer">
-                            <p>Thanks for choosing SonixHR!</p>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """, name, companyName);
-
-        sendEmail(to, subject, htmlContent);
-    }
-
-    /**
-     * Send password reset email
-     */
-    public void sendPasswordResetEmail(String to, String name, String resetToken) {
-        String resetLink = baseUrl + "/api/auth/reset-password?token=" + resetToken;
-        String subject = "SonixHR - Password Reset Request";
-
-        String htmlContent = String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
-                    .content { background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
-                    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 8px; }
-                    .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 30px; font-weight: bold; }
-                    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>🔐 Password Reset Request</h2>
-                    </div>
-                    <div class="content">
-                        <p>Dear <strong>%s</strong>,</p>
-                        
-                        <div class="warning">
-                            <p>We received a request to reset your password.</p>
-                        </div>
-                        
-                        <p>Click the button below to create a new password:</p>
-                        
-                        <div style="text-align: center;">
-                            <a href="%s" class="button">Reset Password</a>
-                        </div>
-                        
-                        <p style="font-size: 12px; color: #999;">This link will expire in <strong>1 hour</strong>.</p>
-                        
-                        <hr/>
-                        <p style="font-size: 12px; color: #666;">If you didn't request this, please ignore this email.</p>
-                        
-                        <div class="footer">
-                            <p>SonixHR Support Team</p>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """, name, resetLink);
-
-        sendEmail(to, subject, htmlContent);
-    }
-
-    /**
-     * Generic email sender
+     * Generic email sender - ✅ FIXED: Doesn't throw exception
      */
     private void sendEmail(String to, String subject, String htmlContent) {
         try {
@@ -289,7 +216,7 @@ public class WelcomeTenantEmailService {
             log.info("Email sent successfully to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to: {}", to, e);
-            throw new RuntimeException("Failed to send email", e);
+            // ✅ FIXED: Don't throw - just log error
         }
     }
 }

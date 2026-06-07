@@ -2,6 +2,8 @@ package com.sonixhr.repository.tenant;
 
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.enums.TenantPermissionEnum;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,45 +20,119 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     // BASIC QUERIES
     // =====================================================
 
+    /**
+     * Find permission by enum value
+     */
     Optional<TenantPermission> findByPermission(TenantPermissionEnum permission);
 
+    /**
+     * Find permissions by multiple enum values
+     */
     List<TenantPermission> findByPermissionIn(Set<TenantPermissionEnum> permissions);
 
+    /**
+     * Find permissions by category (unsorted)
+     */
     List<TenantPermission> findByCategory(String category);
 
+    /**
+     * Find permissions by category with sorting ✅ FIXED - Added this method
+     */
+    List<TenantPermission> findByCategoryOrderByDisplayOrderAsc(String category);
+
+    /**
+     * Find all permissions sorted by category then display order
+     */
     List<TenantPermission> findAllByOrderByCategoryAscDisplayOrderAsc();
-
-
 
     // =====================================================
     // BATCH QUERIES
     // =====================================================
 
-    // Find permissions by IDs (basic)
+    /**
+     * Find permissions by IDs
+     */
     @Query("SELECT p FROM TenantPermission p WHERE p.id IN :ids")
     List<TenantPermission> findAllByIdIn(@Param("ids") Set<Long> ids);
 
+    /**
+     * Find permissions by IDs with pagination ✅ NEW
+     */
+    @Query("SELECT p FROM TenantPermission p WHERE p.id IN :ids")
+    Page<TenantPermission> findByIdIn(@Param("ids") Set<Long> ids, Pageable pageable);
 
     // =====================================================
     // CATEGORY QUERIES
     // =====================================================
 
+    /**
+     * Get all unique categories
+     */
     @Query("SELECT DISTINCT p.category FROM TenantPermission p WHERE p.category IS NOT NULL ORDER BY p.category")
     List<String> findAllCategories();
 
+    /**
+     * Get permissions by category with pagination ✅ NEW
+     */
+    Page<TenantPermission> findByCategory(String category, Pageable pageable);
+
     // =====================================================
-    // SEARCH QUERIES (Optional but useful)
+    // SEARCH QUERIES
     // =====================================================
 
+    /**
+     * Search permissions by name or description
+     */
     @Query("SELECT p FROM TenantPermission p WHERE " +
             "LOWER(p.permission) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<TenantPermission> searchPermissions(@Param("searchTerm") String searchTerm);
 
+    /**
+     * Search permissions with pagination ✅ NEW
+     */
+    @Query("SELECT p FROM TenantPermission p WHERE " +
+            "LOWER(p.permission) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+    Page<TenantPermission> searchPermissions(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    /**
+     * Search permissions by category and term ✅ NEW
+     */
+    @Query("SELECT p FROM TenantPermission p WHERE " +
+            "p.category = :category AND (" +
+            "LOWER(p.permission) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    List<TenantPermission> searchPermissionsByCategory(@Param("category") String category,
+                                                       @Param("searchTerm") String searchTerm);
+
     // =====================================================
-    // COUNT QUERIES (Optional)
+    // COUNT QUERIES
     // =====================================================
 
+    /**
+     * Count how many roles have this permission
+     */
     @Query("SELECT COUNT(r) FROM TenantRole r JOIN r.permissions p WHERE p.id = :permissionId")
     long countRolesByPermissionId(@Param("permissionId") Long permissionId);
+
+    /**
+     * Count permissions by category ✅ NEW
+     */
+    @Query("SELECT p.category, COUNT(p) FROM TenantPermission p GROUP BY p.category")
+    List<Object[]> countPermissionsByCategory();
+
+    /**
+     * Check if permission exists by enum ✅ NEW
+     */
+    boolean existsByPermission(TenantPermissionEnum permission);
+
+    // =====================================================
+    // BULK OPERATIONS
+    // =====================================================
+
+    /**
+     * Delete permissions by IDs (use with caution) ✅ NEW
+     */
+    void deleteByIdIn(Set<Long> ids);
 }

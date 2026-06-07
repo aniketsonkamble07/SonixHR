@@ -14,10 +14,9 @@ import java.util.Objects;
 @Entity
 @Table(name = "platform_permissions",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_permission_tenant_name", columnNames = {"tenant_id", "permission"})
+                @UniqueConstraint(name = "uk_permission_name", columnNames = { "permission"})
         },
         indexes = {
-                @Index(name = "idx_permission_tenant", columnList = "tenant_id"),
                 @Index(name = "idx_permission_type", columnList = "permission"),
                 @Index(name = "idx_permission_category", columnList = "category")
         })
@@ -33,8 +32,7 @@ public class PlatformPermission {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tenant_id", nullable = false)
-    private Long tenantId;  // Null for global permissions
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -88,7 +86,6 @@ public class PlatformPermission {
     public String toString() {
         return "PlatformPermission{" +
                 "id=" + id +
-                ", tenantId=" + tenantId +
                 ", permission=" + permission +
                 ", description='" + description + '\'' +
                 ", category='" + category + '\'' +

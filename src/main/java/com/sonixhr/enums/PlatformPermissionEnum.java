@@ -37,7 +37,7 @@ public enum PlatformPermissionEnum {
     EDIT_PLATFORM_ROLE("Edit platform role", "Role Management", 3),
     DELETE_PLATFORM_ROLE("Delete platform role", "Role Management", 4),
     ASSIGN_PLATFORM_ROLE("Assign platform role to users", "Role Management", 5),
-
+    VIEW_PLATFORM_USERS("View platform users", "User Management", 1),
     // =====================================================
     // SYSTEM MANAGEMENT
     // =====================================================

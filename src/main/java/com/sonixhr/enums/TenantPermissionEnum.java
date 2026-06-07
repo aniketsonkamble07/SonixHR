@@ -50,31 +50,29 @@ public enum TenantPermissionEnum {
     DEPARTMENT_DELETE("Delete departments", "Department Management", 4),
 
     // =====================================================
-    // ROLE MANAGEMENT (EXPANDED)
+    // ROLE MANAGEMENT
     // =====================================================
     ROLE_VIEW("View roles", "Role Management", 1),
-    ROLE_VIEW_ASSIGNED("View roles assigned to users", "Role Management", 2),
-    ROLE_CREATE("Create new roles", "Role Management", 3),
-    ROLE_EDIT("Edit role details", "Role Management", 4),
-    ROLE_DELETE("Delete roles", "Role Management", 5),
-    ROLE_ASSIGN("Assign roles to users", "Role Management", 6),
-    ROLE_REMOVE("Remove roles from users", "Role Management", 7),
-    ROLE_BULK_ASSIGN("Bulk assign roles to multiple users", "Role Management", 8),
-    ROLE_BULK_REMOVE("Bulk remove roles from multiple users", "Role Management", 9),
-    ROLE_SET_DEFAULT("Set default role for new employees", "Role Management", 10),
-    ROLE_VIEW_PERMISSIONS("View permissions of a role", "Role Management", 11),
-    ROLE_EDIT_PERMISSIONS("Edit permissions of a role", "Role Management", 12),
-    ROLE_COPY("Copy existing role", "Role Management", 13),
-    ROLE_DUPLICATE("Duplicate role", "Role Management", 14),
-    ROLE_EXPORT("Export role definitions", "Role Management", 15),
-    ROLE_IMPORT("Import role definitions", "Role Management", 16),
+    ROLE_CREATE("Create new roles", "Role Management", 2),
+    ROLE_EDIT("Edit role details", "Role Management", 3),
+    ROLE_DELETE("Delete roles", "Role Management", 4),
+    ROLE_ASSIGN("Assign roles to users", "Role Management", 5),
+    ROLE_REMOVE("Remove roles from users", "Role Management", 6),
+    ROLE_BULK_ASSIGN("Bulk assign roles to multiple users", "Role Management", 7),
+    ROLE_BULK_REMOVE("Bulk remove roles from multiple users", "Role Management", 8),
+    ROLE_SET_DEFAULT("Set default role for new employees", "Role Management", 9),
+    ROLE_VIEW_PERMISSIONS("View permissions of a role", "Role Management", 10),
+    ROLE_EDIT_PERMISSIONS("Edit permissions of a role", "Role Management", 11),
+    ROLE_COPY("Copy existing role", "Role Management", 12),
+    ROLE_DUPLICATE("Duplicate role", "Role Management", 13),
+    ROLE_EXPORT("Export role definitions", "Role Management", 14),
+    ROLE_IMPORT("Import role definitions", "Role Management", 15),
 
     // =====================================================
     // PERMISSION MANAGEMENT
     // =====================================================
     PERMISSION_VIEW("View all permissions", "Permission Management", 1),
     PERMISSION_VIEW_BY_CATEGORY("View permissions by category", "Permission Management", 2),
-    PERMISSION_VIEW_ASSIGNED("View permissions assigned to roles", "Permission Management", 3),
 
     // =====================================================
     // REPORT MANAGEMENT
@@ -83,7 +81,6 @@ public enum TenantPermissionEnum {
     REPORT_VIEW_COMPANY("View company-wide reports", "Report Management", 2),
     REPORT_EXPORT("Export reports", "Report Management", 3),
     REPORT_SCHEDULE("Schedule automated reports", "Report Management", 4),
-    REPORT_ROLE_USAGE("View role usage statistics", "Report Management", 5),
 
     // =====================================================
     // SETTINGS
@@ -91,17 +88,16 @@ public enum TenantPermissionEnum {
     SETTINGS_VIEW("View tenant settings", "Settings", 1),
     SETTINGS_EDIT("Edit tenant settings", "Settings", 2),
     SETTINGS_INTEGRATIONS("Manage integrations", "Settings", 3),
-    SETTINGS_ROLE_POLICIES("Configure role policies", "Settings", 4),
 
     // =====================================================
-    // BILLING (TENANT LEVEL)
+    // BILLING
     // =====================================================
     VIEW_BILLING("View billing information", "Billing", 1),
     MANAGE_SUBSCRIPTION("Manage subscription", "Billing", 2),
     VIEW_INVOICES("View invoices", "Billing", 3),
 
     // =====================================================
-    // AUDIT & SECURITY (TENANT LEVEL)
+    // AUDIT & SECURITY
     // =====================================================
     AUDIT_ROLE_ASSIGNMENTS("View role assignment audit logs", "Audit", 1),
     AUDIT_PERMISSION_CHANGES("View permission change audit logs", "Audit", 2);
@@ -109,16 +105,4 @@ public enum TenantPermissionEnum {
     private final String description;
     private final String category;
     private final int order;
-
-    public String getDescription() {
-        return description;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public int getOrder() {
-        return order;
-    }
 }

@@ -2,9 +2,11 @@ package com.sonixhr.controller.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
+import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.platform.PlatformRoleService;
+import com.sonixhr.service.platform.PlatformUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +27,10 @@ import java.util.stream.Collectors;
 public class PlatformRoleController {
 
     private final PlatformRoleService roleService;
+    private final PlatformUserService userService;  // ✅ Added for user responses
 
-    private Long getCurrentTenantId(PlatformUser currentUser) {
-        Long tenantId = currentUser.getTenantId();
-        if (tenantId == null) {
-            throw new IllegalStateException("User not associated with any tenant");
-        }
-        return tenantId;
-    }
+    // ✅ REMOVED - Platform users don't have tenantId
+    // private Long getCurrentTenantId(PlatformUser currentUser) { ... }
 
     @PostMapping
     @PreAuthorize("hasAuthority('CREATE_PLATFORM_ROLE')")
@@ -40,11 +38,10 @@ public class PlatformRoleController {
             @Valid @RequestBody PlatformRoleCreateRequest request,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} creating role: {} for tenant: {}",
-                currentAdmin.getEmail(), request.getName(), tenantId);
+        log.info("Platform admin {} creating role: {}", currentAdmin.getEmail(), request.getName());
 
-        PlatformRole role = roleService.createRole(request, tenantId, currentAdmin.getId());
+        // ✅ Platform roles are global, no tenantId needed
+        PlatformRole role = roleService.createRole(request, currentAdmin.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(role));
     }
 
@@ -55,36 +52,28 @@ public class PlatformRoleController {
             @RequestBody Set<Long> permissionIds,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} assigning permissions to role: {} for tenant: {}",
-                currentAdmin.getEmail(), roleId, tenantId);
+        log.info("Platform admin {} assigning permissions to role: {}", currentAdmin.getEmail(), roleId);
 
-        PlatformRole updated = roleService.updateRolePermissions(roleId, permissionIds, tenantId);
+        // ✅ Platform roles are global, no tenantId needed
+        PlatformRole updated = roleService.updateRolePermissions(roleId, permissionIds);
         return ResponseEntity.ok(toResponse(updated));
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
-    public ResponseEntity<List<PlatformRoleResponse>> getAllRoles(
-            @AuthenticationPrincipal PlatformUser currentUser) {
+    public ResponseEntity<List<PlatformRoleResponse>> getAllRoles() {
+        log.debug("Getting all platform roles");
 
-        Long tenantId = getCurrentTenantId(currentUser);
-        log.debug("Getting all platform roles for tenant: {}", tenantId);
-
-        List<PlatformRole> roles = roleService.getAllRolesForTenant(tenantId);
+        List<PlatformRole> roles = roleService.getAllRoles();
         return ResponseEntity.ok(roles.stream().map(this::toResponse).collect(Collectors.toList()));
     }
 
     @GetMapping("/{roleId}")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
-    public ResponseEntity<PlatformRoleResponse> getRole(
-            @PathVariable Long roleId,
-            @AuthenticationPrincipal PlatformUser currentUser) {
+    public ResponseEntity<PlatformRoleResponse> getRole(@PathVariable Long roleId) {
+        log.debug("Getting platform role with id: {}", roleId);
 
-        Long tenantId = getCurrentTenantId(currentUser);
-        log.debug("Getting platform role with id: {} for tenant: {}", roleId, tenantId);
-
-        PlatformRole role = roleService.getRoleByIdAndTenant(roleId, tenantId);
+        PlatformRole role = roleService.getRoleById(roleId);
         return ResponseEntity.ok(toResponse(role));
     }
 
@@ -95,11 +84,9 @@ public class PlatformRoleController {
             @Valid @RequestBody PlatformRoleCreateRequest request,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} updating role: {} for tenant: {}",
-                currentAdmin.getEmail(), roleId, tenantId);
+        log.info("Platform admin {} updating role: {}", currentAdmin.getEmail(), roleId);
 
-        PlatformRole updated = roleService.updateRole(roleId, request, tenantId);
+        PlatformRole updated = roleService.updateRole(roleId, request);
         return ResponseEntity.ok(toResponse(updated));
     }
 
@@ -109,24 +96,19 @@ public class PlatformRoleController {
             @PathVariable Long roleId,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} deleting role: {} for tenant: {}",
-                currentAdmin.getEmail(), roleId, tenantId);
+        log.info("Platform admin {} deleting role: {}", currentAdmin.getEmail(), roleId);
 
-        roleService.deleteRole(roleId, tenantId);
+        roleService.deleteRole(roleId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{roleId}/users")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
-    public ResponseEntity<List<PlatformUser>> getUsersByRole(
-            @PathVariable Long roleId,
-            @AuthenticationPrincipal PlatformUser currentUser) {
+    public ResponseEntity<List<PlatformUserResponse>> getUsersByRole(@PathVariable Long roleId) {
+        log.debug("Getting users for role: {}", roleId);
 
-        Long tenantId = getCurrentTenantId(currentUser);
-        log.debug("Getting users for role: {} in tenant: {}", roleId, tenantId);
-
-        List<PlatformUser> users = roleService.getUsersByRole(roleId, tenantId);
+        // ✅ Return DTO instead of entity
+        List<PlatformUserResponse> users = roleService.getUsersByRole(roleId);
         return ResponseEntity.ok(users);
     }
 
@@ -137,11 +119,9 @@ public class PlatformRoleController {
             @PathVariable Long userId,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} assigning role {} to user {} in tenant {}",
-                currentAdmin.getEmail(), roleId, userId, tenantId);
+        log.info("Platform admin {} assigning role {} to user {}", currentAdmin.getEmail(), roleId, userId);
 
-        roleService.assignRoleToUser(roleId, userId, tenantId);
+        roleService.assignRoleToUser(roleId, userId);
         return ResponseEntity.ok().build();
     }
 
@@ -152,11 +132,9 @@ public class PlatformRoleController {
             @PathVariable Long userId,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        Long tenantId = getCurrentTenantId(currentAdmin);
-        log.info("Platform admin {} removing role {} from user {} in tenant {}",
-                currentAdmin.getEmail(), roleId, userId, tenantId);
+        log.info("Platform admin {} removing role {} from user {}", currentAdmin.getEmail(), roleId, userId);
 
-        roleService.removeRoleFromUser(roleId, userId, tenantId);
+        roleService.removeRoleFromUser(roleId, userId);
         return ResponseEntity.noContent().build();
     }
 

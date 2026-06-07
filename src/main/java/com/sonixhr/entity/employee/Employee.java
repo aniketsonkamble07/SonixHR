@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -23,15 +24,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Data
 @Entity
+@ToString(exclude = {"documents", "certifications", "customFields", "bankDetails"})
 @Table(name = "employees", uniqueConstraints = {
         @UniqueConstraint(name = "uk_employee_code_tenant", columnNames = {"tenant_id", "employee_code"}),
         @UniqueConstraint(name = "uk_employee_email_tenant", columnNames = {"tenant_id", "email"})
@@ -72,7 +70,7 @@ public class Employee implements UserDetails {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = true)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Column(name = "is_active")
@@ -80,32 +78,25 @@ public class Employee implements UserDetails {
     private boolean isActive = false;
 
     // =====================================================
-    // ROLES & PERMISSIONS (Tenant-level) - ✅ Changed to TenantRole
+    // ROLES & PERMISSIONS
     // =====================================================
-    @ManyToMany(fetch = FetchType.EAGER)
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
             name = "employee_roles",
             joinColumns = @JoinColumn(name = "employee_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
-
     private Set<TenantRole> roles = new HashSet<>();
 
     // =====================================================
-    // SECURITY & LOGIN TRACKING
+    // LOGIN TRACKING (Simple version - no attempt locking)
     // =====================================================
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
     @Column(name = "last_login_ip")
     private String lastLoginIp;
-
-    @Column(name = "failed_login_attempts")
-    @Builder.Default
-    private Integer failedLoginAttempts = 0;
-
-    @Column(name = "locked_until")
-    private LocalDateTime lockedUntil;
 
     @Column(name = "must_change_password")
     @Builder.Default
@@ -237,22 +228,23 @@ public class Employee implements UserDetails {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "bank_details", columnDefinition = "jsonb")
-    private Map<String, Object> bankDetails;
+    @Builder.Default
+    private Map<String, Object> bankDetails = new HashMap<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "documents", columnDefinition = "jsonb")
     @Builder.Default
-    private Map<String, Object> documents = Map.of();
+    private Map<String, Object> documents = new HashMap<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "certifications", columnDefinition = "jsonb")
     @Builder.Default
-    private Map<String, Object> certifications = Map.of();
+    private Map<String, Object> certifications = new HashMap<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "custom_fields", columnDefinition = "jsonb")
     @Builder.Default
-    private Map<String, Object> customFields = Map.of();
+    private Map<String, Object> customFields = new HashMap<>();
 
     // =====================================================
     // SOCIAL LINKS
@@ -286,12 +278,15 @@ public class Employee implements UserDetails {
     // =====================================================
     // HELPER METHODS
     // =====================================================
+
     public String getFullName() {
-        return firstName + " " + lastName;
+        return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
     }
 
     public String getInitials() {
-        if (firstName == null || lastName == null) return "";
+        if (firstName == null || firstName.isEmpty() || lastName == null || lastName.isEmpty()) {
+            return "";
+        }
         return (firstName.charAt(0) + "" + lastName.charAt(0)).toUpperCase();
     }
 
@@ -329,33 +324,45 @@ public class Employee implements UserDetails {
         return status == EmployeeStatus.ON_LEAVE;
     }
 
+    // ✅ No account lock methods - always return true
     public boolean isAccountLocked() {
-        return lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
+        return false; // Account never locked
     }
 
+    // ✅ Safe null checks
     public Set<String> getEffectivePermissions() {
-        // ✅ Add null guard
-        if (roles == null) {
-            return Set.of();
+        if (roles == null || roles.isEmpty()) {
+            return Collections.emptySet();
         }
+
         return roles.stream()
+                .filter(Objects::nonNull)
+                .filter(role -> role.getPermissions() != null)
                 .flatMap(role -> role.getPermissions().stream())
+                .filter(Objects::nonNull)
+                .filter(permission -> permission.getPermission() != null)
                 .map(permission -> permission.getPermission().name())
                 .collect(Collectors.toSet());
     }
 
     public boolean hasPermission(String permissionName) {
+        if (permissionName == null || permissionName.isEmpty()) {
+            return false;
+        }
         return getEffectivePermissions().contains(permissionName);
     }
 
     // =====================================================
-    // SETTER METHODS (for activation)
+    // SETTER METHODS
     // =====================================================
     public void setActive(boolean active) {
         this.isActive = active;
     }
 
     public void setPasswordHash(String passwordHash) {
+        if (passwordHash == null || passwordHash.isEmpty()) {
+            throw new IllegalArgumentException("Password hash cannot be null or empty");
+        }
         this.passwordHash = passwordHash;
     }
 
@@ -363,6 +370,9 @@ public class Employee implements UserDetails {
     // BUSINESS METHODS
     // =====================================================
     public void activate() {
+        if (passwordHash == null || passwordHash.isEmpty()) {
+            throw new IllegalStateException("Cannot activate employee without password");
+        }
         this.isActive = true;
         this.status = EmployeeStatus.ACTIVE;
         this.resignationDate = null;
@@ -374,6 +384,9 @@ public class Employee implements UserDetails {
     }
 
     public void resign(LocalDate resignationDate, LocalDate lastWorkingDate) {
+        if (resignationDate == null || lastWorkingDate == null) {
+            throw new IllegalArgumentException("Resignation date and last working date are required");
+        }
         this.isActive = false;
         this.status = EmployeeStatus.RESIGNED;
         this.resignationDate = resignationDate;
@@ -398,7 +411,7 @@ public class Employee implements UserDetails {
     }
 
     public String getDepartmentName() {
-        return department != null ? department.getName() : null;
+        return department != null ? department.getName() : "";
     }
 
     public Long getDepartmentId() {
@@ -406,19 +419,19 @@ public class Employee implements UserDetails {
     }
 
     public Map<String, Object> getDocuments() {
-        return documents != null ? documents : Map.of();
+        return documents != null ? documents : new HashMap<>();
     }
 
-    public void incrementFailedLoginAttempts() {
-        this.failedLoginAttempts = (this.failedLoginAttempts == null ? 0 : this.failedLoginAttempts) + 1;
-        if (this.failedLoginAttempts >= 5) {
-            this.lockedUntil = LocalDateTime.now().plusMinutes(30);
-        }
+    public Map<String, Object> getCertifications() {
+        return certifications != null ? certifications : new HashMap<>();
     }
 
-    public void resetFailedLoginAttempts() {
-        this.failedLoginAttempts = 0;
-        this.lockedUntil = null;
+    public Map<String, Object> getCustomFields() {
+        return customFields != null ? customFields : new HashMap<>();
+    }
+
+    public Map<String, Object> getBankDetails() {
+        return bankDetails != null ? bankDetails : new HashMap<>();
     }
 
     // =====================================================
@@ -428,7 +441,7 @@ public class Employee implements UserDetails {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Set<String> permissions = getEffectivePermissions();
         if (permissions.isEmpty()) {
-            return Set.of();
+            return Collections.emptySet();
         }
         return permissions.stream()
                 .map(SimpleGrantedAuthority::new)
@@ -452,95 +465,112 @@ public class Employee implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return !isAccountLocked();
+        return true; // Always true - no lockout
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return !mustChangePassword;
     }
 
     @Override
     public boolean isEnabled() {
-        return isActive;
+        return isActive && status == EmployeeStatus.ACTIVE;
     }
-    // Add this method in the HELPER METHODS section (around line 250-300)
 
-// =====================================================
-// HELPER METHODS
-// =====================================================
+    // =====================================================
+    // ROLE CHECK METHODS
+    // =====================================================
 
-// ... existing helper methods ...
-
-    /**
-     * Check if employee has Super Admin role
-     * Super Admin has full access to all features across the tenant
-     */
     public boolean isSuperAdmin() {
         if (roles == null || roles.isEmpty()) {
             return false;
         }
         return roles.stream()
-                .anyMatch(role -> "Super Admin".equals(role.getName()) ||
-                        "SUPER_ADMIN".equalsIgnoreCase(role.getName()));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null &&
+                        ("Super Admin".equals(role.getName()) || "SUPER_ADMIN".equalsIgnoreCase(role.getName())));
     }
 
-    /**
-     * Check if employee has Admin role
-     */
     public boolean isAdmin() {
         if (roles == null || roles.isEmpty()) {
             return false;
         }
         return roles.stream()
-                .anyMatch(role -> "Admin".equals(role.getName()) ||
-                        "ADMIN".equalsIgnoreCase(role.getName()));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null &&
+                        ("Admin".equals(role.getName()) || "ADMIN".equalsIgnoreCase(role.getName())));
     }
 
-    /**
-     * Check if employee has Manager role
-     */
     public boolean isManager() {
         if (roles == null || roles.isEmpty()) {
             return false;
         }
         return roles.stream()
-                .anyMatch(role -> "Manager".equals(role.getName()) ||
-                        "MANAGER".equalsIgnoreCase(role.getName()));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null &&
+                        ("Manager".equals(role.getName()) || "MANAGER".equalsIgnoreCase(role.getName())));
     }
 
-    /**
-     * Check if employee has Employee role
-     */
     public boolean isEmployee() {
         if (roles == null || roles.isEmpty()) {
-            return true; // Default role
+            return false;
         }
         return roles.stream()
-                .anyMatch(role -> "Employee".equals(role.getName()) ||
-                        "EMPLOYEE".equalsIgnoreCase(role.getName()));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null &&
+                        ("Employee".equals(role.getName()) || "EMPLOYEE".equalsIgnoreCase(role.getName())));
     }
 
-    /**
-     * Check if employee has specific role by name
-     */
     public boolean hasRole(String roleName) {
-        if (roles == null || roles.isEmpty()) {
+        if (roles == null || roles.isEmpty() || roleName == null || roleName.isEmpty()) {
             return false;
         }
         return roles.stream()
-                .anyMatch(role -> role.getName().equalsIgnoreCase(roleName));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null && role.getName().equalsIgnoreCase(roleName));
     }
 
-    /**
-     * Check if employee has any of the given roles
-     */
     public boolean hasAnyRole(String... roleNames) {
-        if (roles == null || roles.isEmpty()) {
+        if (roles == null || roles.isEmpty() || roleNames == null || roleNames.length == 0) {
             return false;
         }
-        Set<String> roleSet = Set.of(roleNames);
+        Set<String> roleSet = new HashSet<>(Arrays.asList(roleNames));
         return roles.stream()
-                .anyMatch(role -> roleSet.contains(role.getName()));
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getName() != null && roleSet.contains(role.getName()));
+    }
+
+    // =====================================================
+    // JPA LIFECYCLE METHODS
+    // =====================================================
+
+    @PrePersist
+    @PreUpdate
+    private void validate() {
+        if (isActive && (passwordHash == null || passwordHash.isEmpty())) {
+            throw new IllegalStateException("Active employee must have a password hash");
+        }
+
+        if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new IllegalStateException("Valid email is required");
+        }
+
+        if (employeeCode == null || employeeCode.isEmpty()) {
+            throw new IllegalStateException("Employee code is required");
+        }
+
+        if (firstName == null || firstName.isEmpty()) {
+            throw new IllegalStateException("First name is required");
+        }
+
+        if (lastName == null || lastName.isEmpty()) {
+            throw new IllegalStateException("Last name is required");
+        }
+
+        // Validate that active employee has roles
+        if (isActive && (roles == null || roles.isEmpty())) {
+            throw new IllegalStateException("Active employee must have at least one role");
+        }
     }
 }

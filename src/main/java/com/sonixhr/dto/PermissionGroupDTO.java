@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.util.List;
 
 @Data
@@ -24,6 +23,7 @@ public class PermissionGroupDTO {
         private String name;
         private String description;
         private String category;
-        private Integer displayOrder;  // Added this field
+        private Integer displayOrder;
+        private boolean selected;
     }
 }

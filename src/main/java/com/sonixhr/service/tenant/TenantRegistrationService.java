@@ -10,6 +10,7 @@ import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.PlanType;
+import com.sonixhr.enums.UserStatus;  // ✅ ADD THIS IMPORT
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.BusinessException;
@@ -20,6 +21,7 @@ import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import com.sonixhr.service.ActivationTokenService;
+import com.sonixhr.service.EmailService;
 import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +47,8 @@ public class TenantRegistrationService {
     private final TenantRoleRepository roleRepository;
     private final TenantPermissionRepository permissionRepository;
     private final ActivationTokenService activationTokenService;
-    private final WelcomeTenantEmailService notificationService;
+    private final WelcomeTenantEmailService welcomeTenantEmailService;
+    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;
     private final EmployeeCodeGenerator employeeCodeGenerator;
@@ -88,7 +91,14 @@ public class TenantRegistrationService {
 
         // 8. Generate activation token for employee
         String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
-        log.info("Activation token generated for employee");
+        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationToken;
+
+        // Log the activation link for manual testing
+        log.info("==========================================");
+        log.info("🔗 ACTIVATION LINK: {}", activationLink);
+        log.info("📧 Admin Email: {}", superAdminEmployee.getEmail());
+        log.info("🔑 Temporary Password: Admin@123");
+        log.info("==========================================");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
@@ -149,12 +159,12 @@ public class TenantRegistrationService {
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
                 .subdomain(subdomain)
-                .planType(planType.getCode())
+                .planType(planType)
                 .maxEmployees(planType.getMaxEmployees())
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
-                .status("active")
+                .status(UserStatus.ACTIVE)  // ✅ FIXED: Use TenantStatus
                 .isActive(true)
                 .planStatus("trial")
                 .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
@@ -169,7 +179,6 @@ public class TenantRegistrationService {
     private TenantRole createSuperAdminRoleForTenant(Long tenantId) {
         log.info("Creating Super Admin role for tenant: {}", tenantId);
 
-        // Get all global permissions
         List<TenantPermission> allPermissions = permissionRepository.findAll();
 
         if (allPermissions.isEmpty()) {
@@ -178,12 +187,11 @@ public class TenantRegistrationService {
 
         log.info("Found {} global permissions to assign to Super Admin role", allPermissions.size());
 
-        // Create tenant-specific Super Admin role with ALL global permissions
         TenantRole tenantRole = TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Super Admin")
                 .description("Super Administrator with full access to all tenant features")
-                .isDefault(false)
+                .isDefault(true)
                 .permissions(new HashSet<>(allPermissions))
                 .build();
 
@@ -204,11 +212,11 @@ public class TenantRegistrationService {
         String firstName = getFirstNameFromFullName(request.getAdminName());
         String lastName = getLastNameFromFullName(request.getAdminName());
 
-        // ✅ First save the role if it's new
         if (superAdminRole.getId() == null) {
             superAdminRole = roleRepository.save(superAdminRole);
         }
 
+        // Super Admin is created with ACTIVE status and hardcoded password for testing
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)
                 .employeeCode(employeeCode)
@@ -223,9 +231,9 @@ public class TenantRegistrationService {
                 .status(EmployeeStatus.ACTIVE)
                 .isActive(true)
                 .workLocation("Head Office")
-                .passwordHash(passwordEncoder.encode("Admin@1234"))
-                .createdBy(1L)
-                .roles(new HashSet<>(Set.of(superAdminRole)))  // ✅ Set roles during creation
+                .passwordHash(passwordEncoder.encode("Admin@123"))  // Hardcoded for testing
+                .createdBy(null)
+                .roles(new HashSet<>(Set.of(superAdminRole)))
                 .build();
 
         return employeeRepository.save(superAdmin);
@@ -282,10 +290,10 @@ public class TenantRegistrationService {
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())
                 .subdomain(tenant.getSubdomain())
-                .planType(tenant.getPlanType())
+                .planType(tenant.getPlanType() != null ? tenant.getPlanType().getCode() : null)
                 .planStatus(tenant.getPlanStatus())
                 .trialEndsAt(tenant.getTrialEndsAt())
-                .status(tenant.getStatus())
+                .status(tenant.getStatus() != null ? tenant.getStatus().name() : null)
                 .isActive(tenant.getIsActive())
                 .adminEmail(tenant.getAdminEmail())
                 .adminName(tenant.getAdminName())

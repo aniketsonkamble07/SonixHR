@@ -30,7 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,6 +48,7 @@ public class EmployeeService {
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final TenantRoleRepository roleRepository;
+
     @Value("${app.base-url}")
     private String baseUrl;
 
@@ -60,45 +62,42 @@ public class EmployeeService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + tenantId));
 
-        // Check if employee with this email already exists in this tenant
+        // Check if employee with this email already exists
         if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
-            throw new BusinessException("Employee with email " + request.getEmail() + " already exists in this tenant");
+            throw new BusinessException("Employee with email " + request.getEmail() + " already exists");
         }
 
         // Generate employee code
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
-        // Create employee entity directly
+
+        // Build employee
         Employee employee = buildEmployeeFromRequest(tenant, request, employeeCode);
 
         // Set manager if provided
         if (request.getManagerId() != null) {
             Employee manager = employeeRepository.findById(request.getManagerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with id: " + request.getManagerId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
             if (!manager.getTenantId().equals(tenantId)) {
                 throw new BusinessException("Manager must be from the same tenant");
             }
             employee.setManager(manager);
         }
 
+        // ✅ Set a default password hash (temporary, will be changed on activation)
+        employee.setPasswordHash(passwordEncoder.encode("Test@123"));
+        employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.setActive(true);
+
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created successfully with code: {}", employeeCode);
 
-        // ✅ Assign roles if provided
+        // Assign roles if provided
         if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
             List<TenantRole> roles = roleRepository.findAllById(request.getRoleIds());
             savedEmployee.getRoles().addAll(roles);
             savedEmployee = employeeRepository.save(savedEmployee);
-            log.info("Assigned {} roles to employee: {}", roles.size(), savedEmployee.getEmail());
+            log.info("Assigned {} roles to employee", roles.size());
         }
-
-        // Generate activation token for employee
-        String activationTokenValue = activationTokenService.generateTokenForEmployee(savedEmployee.getId());
-        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationTokenValue;
-
-        // Auto-activate for testing
-        savedEmployee.setStatus(EmployeeStatus.ACTIVE);
-        savedEmployee.setActive(true);
-        savedEmployee.setPasswordHash(passwordEncoder.encode("Test@123"));
 
         return convertToResponse(savedEmployee);
     }
@@ -116,18 +115,33 @@ public class EmployeeService {
 
         validatePasswordStrength(password);
 
-        // Get employee ID from token and set password
-        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
-        activationTokenService.invalidateToken(token);
+        // Validate token
+        if (activationTokenService.isTokenExpired(token)) {
+            throw new BusinessException("Activation token has expired. Please request a new one.");
+        }
 
+        // Get employee ID from token
+        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
+
+        // Check if already activated
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Account is already activated");
+        }
+
+        activationTokenService.invalidateToken(token);
 
         employee.setPasswordHash(passwordEncoder.encode(password));
         employee.setActive(true);
         employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.setMustChangePassword(true);  // Force password change on first login
 
-        return employeeRepository.save(employee);
+        Employee activated = employeeRepository.save(employee);
+        log.info("Employee activated successfully: {}", activated.getEmail());
+
+        return activated;
     }
 
     // =====================================================
@@ -224,7 +238,7 @@ public class EmployeeService {
     public Page<EmployeeResponse> getTeamMembersPaginated(Long tenantId, Long managerId, Pageable pageable) {
         log.info("Getting team members for manager: {} with pagination", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
-        return employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId, pageable)
+        return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId, pageable)
                 .map(this::convertToResponse);
     }
 
@@ -234,7 +248,7 @@ public class EmployeeService {
     public List<EmployeeResponse> getTeamMembers(Long managerId, Long tenantId) {
         log.info("Getting team members for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
-        return employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId)
+        return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId)
                 .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -246,7 +260,7 @@ public class EmployeeService {
     public List<EmployeeResponse> getAllSubordinates(Long managerId, Long tenantId) {
         log.info("Getting all subordinates for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
-        List<Employee> allSubordinates = new java.util.ArrayList<>();
+        List<Employee> allSubordinates = new ArrayList<>();
         collectAllSubordinates(managerId, tenantId, allSubordinates);
         return allSubordinates.stream()
                 .map(this::convertToResponse)
@@ -254,7 +268,7 @@ public class EmployeeService {
     }
 
     private void collectAllSubordinates(Long managerId, Long tenantId, List<Employee> result) {
-        List<Employee> directReports = employeeRepository.findByManagerIdAndTenant_Id(managerId, tenantId);
+        List<Employee> directReports = employeeRepository.findByManagerIdAndTenantId(managerId, tenantId);
         result.addAll(directReports);
         for (Employee report : directReports) {
             collectAllSubordinates(report.getId(), tenantId, result);
@@ -267,7 +281,7 @@ public class EmployeeService {
     public List<EmployeeResponse> getManagerChain(Long employeeId, Long tenantId) {
         log.info("Getting manager chain for employee: {}", employeeId);
         Employee employee = findEmployeeByIdAndTenant(employeeId, tenantId);
-        List<Employee> chain = new java.util.ArrayList<>();
+        List<Employee> chain = new ArrayList<>();
         Employee current = employee.getManager();
         while (current != null) {
             chain.add(current);
@@ -283,7 +297,7 @@ public class EmployeeService {
     // =====================================================
     public List<EmployeeResponse> getEmployeesWithNoManager(Long tenantId) {
         log.info("Getting employees with no manager for tenant: {}", tenantId);
-        return employeeRepository.findByManagerIsNullAndTenant_Id(tenantId)
+        return employeeRepository.findEmployeesWithNoManager(tenantId)
                 .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -295,13 +309,14 @@ public class EmployeeService {
     public boolean isManager(Long employeeId, Long tenantId) {
         log.info("Checking if employee is manager: {}", employeeId);
         findEmployeeByIdAndTenant(employeeId, tenantId);
-        long directReportsCount = employeeRepository.countByManagerIdAndTenant_Id(employeeId, tenantId);
+        long directReportsCount = employeeRepository.countByManagerIdAndTenantId(employeeId, tenantId);
         return directReportsCount > 0;
     }
 
     // =====================================================
     // SEARCH EMPLOYEES FOR ASSIGNMENT
     // =====================================================
+    @Transactional(readOnly = true)
     public Page<EmployeeSearchResponse> searchEmployeesForAssignment(Long tenantId, String query, Pageable pageable) {
         log.info("Searching employees for assignment with query: {}", query);
         return employeeRepository.searchEmployeesForAssignment(tenantId, query, pageable)
@@ -353,6 +368,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES BY DEPARTMENT NAME
     // =====================================================
+    @Transactional(readOnly = true)
     public List<EmployeeResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
         log.debug("Fetching employees in department: {} for tenant: {}", departmentName, tenantId);
         return employeeRepository.findByTenantIdAndDepartmentName(tenantId, departmentName)
@@ -365,11 +381,33 @@ public class EmployeeService {
     // GET ORGANIZATION CHART
     // =====================================================
     public List<EmployeeResponse> getOrganizationChart(Long tenantId) {
+        log.debug("Getting organization chart for tenant: {}", tenantId);
+
+        // Get all employees with their managers in one query
         List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
-        return allEmployees.stream()
-                .filter(e -> e.getManager() == null)
-                .map(this::convertToResponseWithChildren)
+
+        // Build hierarchy in memory (only one DB query)
+        Map<Long, List<Employee>> managerToSubordinates = new HashMap<>();
+
+        for (Employee emp : allEmployees) {
+            Long managerId = emp.getManager() != null ? emp.getManager().getId() : null;
+            managerToSubordinates.computeIfAbsent(managerId, k -> new ArrayList<>()).add(emp);
+        }
+
+        // Build response for top-level employees (no manager)
+        return managerToSubordinates.getOrDefault(null, Collections.emptyList())
+                .stream()
+                .map(emp -> buildHierarchyResponse(emp, managerToSubordinates))
                 .collect(Collectors.toList());
+    }
+
+    private EmployeeResponse buildHierarchyResponse(Employee employee, Map<Long, List<Employee>> managerToSubordinates) {
+        EmployeeResponse response = convertToResponse(employee);
+        List<Employee> subordinates = managerToSubordinates.getOrDefault(employee.getId(), Collections.emptyList());
+        response.setDirectReports(subordinates.stream()
+                .map(sub -> buildHierarchyResponse(sub, managerToSubordinates))
+                .collect(Collectors.toList()));
+        return response;
     }
 
     // =====================================================
@@ -431,7 +469,7 @@ public class EmployeeService {
     @Transactional
     public void deleteEmployee(Long id, Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        List<Employee> subordinates = employeeRepository.findByManagerIdAndTenant_Id(id, tenantId);
+        List<Employee> subordinates = employeeRepository.findByManagerIdAndTenantId(id, tenantId);
         if (!subordinates.isEmpty()) {
             throw new BusinessException("Cannot delete employee with " + subordinates.size() + " subordinates");
         }
@@ -459,25 +497,13 @@ public class EmployeeService {
     // GET UPCOMING BIRTHDAYS
     // =====================================================
     public List<EmployeeResponse> getUpcomingBirthdays(Long tenantId, int days) {
+        log.debug("Getting upcoming birthdays for tenant: {} within {} days", tenantId, days);
+
         LocalDate today = LocalDate.now();
-        List<Employee> employees = employeeRepository.findByTenant_Id(tenantId);
-        return employees.stream()
-                .filter(e -> e.getDateOfBirth() != null)
-                .filter(e -> {
-                    LocalDate nextBirthday = e.getDateOfBirth().withYear(today.getYear());
-                    if (nextBirthday.isBefore(today)) {
-                        nextBirthday = nextBirthday.plusYears(1);
-                    }
-                    long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, nextBirthday);
-                    return daysUntil >= 0 && daysUntil <= days;
-                })
-                .sorted((e1, e2) -> {
-                    LocalDate b1 = e1.getDateOfBirth().withYear(today.getYear());
-                    LocalDate b2 = e2.getDateOfBirth().withYear(today.getYear());
-                    if (b1.isBefore(today)) b1 = b1.plusYears(1);
-                    if (b2.isBefore(today)) b2 = b2.plusYears(1);
-                    return b1.compareTo(b2);
-                })
+        LocalDate futureDate = today.plusDays(days);
+
+        return employeeRepository.findEmployeesWithUpcomingBirthdays(tenantId, today, futureDate)
+                .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -486,25 +512,13 @@ public class EmployeeService {
     // GET UPCOMING ANNIVERSARIES
     // =====================================================
     public List<EmployeeResponse> getUpcomingAnniversaries(Long tenantId, int days) {
+        log.debug("Getting upcoming anniversaries for tenant: {} within {} days", tenantId, days);
+
         LocalDate today = LocalDate.now();
-        List<Employee> employees = employeeRepository.findByTenant_Id(tenantId);
-        return employees.stream()
-                .filter(e -> e.getHireDate() != null)
-                .filter(e -> {
-                    LocalDate anniversary = e.getHireDate().withYear(today.getYear());
-                    if (anniversary.isBefore(today)) {
-                        anniversary = anniversary.plusYears(1);
-                    }
-                    long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, anniversary);
-                    return daysUntil >= 0 && daysUntil <= days;
-                })
-                .sorted((e1, e2) -> {
-                    LocalDate a1 = e1.getHireDate().withYear(today.getYear());
-                    LocalDate a2 = e2.getHireDate().withYear(today.getYear());
-                    if (a1.isBefore(today)) a1 = a1.plusYears(1);
-                    if (a2.isBefore(today)) a2 = a2.plusYears(1);
-                    return a1.compareTo(a2);
-                })
+        LocalDate futureDate = today.plusDays(days);
+
+        return employeeRepository.findEmployeesWithUpcomingAnniversaries(tenantId, today, futureDate)
+                .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -626,15 +640,6 @@ public class EmployeeService {
                 .build();
     }
 
-    private EmployeeResponse convertToResponseWithChildren(Employee employee) {
-        EmployeeResponse response = convertToResponse(employee);
-        List<Employee> directReports = employeeRepository.findByManagerIdAndTenant_Id(employee.getId(), employee.getTenantId());
-        response.setDirectReports(directReports.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList()));
-        return response;
-    }
-
     private Employee findEmployeeByIdAndTenant(Long id, Long tenantId) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
@@ -683,7 +688,7 @@ public class EmployeeService {
     }
 
     private boolean isCircularReference(Employee employee, Employee potentialManager) {
-        java.util.Set<Long> visited = new java.util.HashSet<>();
+        Set<Long> visited = new HashSet<>();
         Employee current = potentialManager;
 
         while (current != null) {

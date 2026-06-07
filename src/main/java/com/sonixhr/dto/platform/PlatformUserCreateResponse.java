@@ -1,6 +1,6 @@
 package com.sonixhr.dto.platform;
 
-import com.sonixhr.enums.PlatformUserStatus;
+import com.sonixhr.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +21,7 @@ public class PlatformUserCreateResponse {
     private String email;
     private String fullName;
     private String designation;
-    private PlatformUserStatus status;
+    private UserStatus status;
     private boolean isActive;
 
     private Set<PlatformRoleResponse> roles;

@@ -1,4 +1,5 @@
 package com.sonixhr.controller.platform;
+
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.dto.ActivationRequest;
@@ -8,6 +9,7 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.security.JwtService;
+import com.sonixhr.security.PlatformTokenBlacklistService;
 import com.sonixhr.service.platform.PlatformUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -44,7 +47,10 @@ public class PlatformAuthController {
     private final PlatformUserService platformUserService;
     private final PlatformPermissionRepository permissionRepository;
     private final PlatformRoleRepository roleRepository;
+    private final PlatformTokenBlacklistService tokenBlacklistService;  // ✅ For logout
+
     @PostMapping("/login")
+    @Transactional  // ✅ Added for database update
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                                HttpServletRequest httpRequest) {
         log.info("Login request for platform user: {}", request.getEmail());
@@ -57,8 +63,6 @@ public class PlatformAuthController {
             PlatformUser user = (PlatformUser) auth.getPrincipal();
 
             // Update last login details
-            user.setLastLoginAt(LocalDateTime.now());
-            user.setLastLoginIp(httpRequest.getRemoteAddr());
             platformUserRepository.save(user);
 
             var tokenPair = jwtService.generatePlatformTokenPair(user);
@@ -83,9 +87,20 @@ public class PlatformAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(@AuthenticationPrincipal PlatformUser user) {
+    public ResponseEntity<Map<String, String>> logout(
+            @AuthenticationPrincipal PlatformUser user,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         log.info("Logout request for platform user: {}", user != null ? user.getEmail() : "unknown");
-        // TODO: Add token blacklist logic here
+
+        // ✅ Blacklist the token if provided
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            tokenBlacklistService.blacklistToken(token);
+            log.info("Token blacklisted for user: {}", user != null ? user.getEmail() : "unknown");
+        }
+
+        SecurityContextHolder.clearContext();
+
         return ResponseEntity.ok(Map.of(
                 "message", "Logout successful",
                 "status", "success"
@@ -97,6 +112,11 @@ public class PlatformAuthController {
         log.info("Token refresh request");
 
         try {
+            // ✅ Check if token is blacklisted
+            if (tokenBlacklistService.isBlacklisted(refreshToken)) {
+                throw new RuntimeException("Token has been revoked");
+            }
+
             if (jwtService.validateToken(refreshToken) && jwtService.isRefreshToken(refreshToken)) {
                 String username = jwtService.extractUsername(refreshToken);
                 PlatformUser user = platformUserRepository.findByEmail(username)
@@ -187,8 +207,7 @@ public class PlatformAuthController {
         response.put("fullName", user.getFullName());
         response.put("designation", user.getDesignation());
         response.put("status", user.getStatus());
-        response.put("isActive", user.isActive());
-        response.put("lastLoginAt", user.getLastLoginAt());
+        response.put("isActive", user.getStatus().isActive());
         response.put("authorities", authentication.getAuthorities().toString());
 
         return ResponseEntity.ok(response);
@@ -265,6 +284,14 @@ public class PlatformAuthController {
         log.debug("Verifying token");
 
         try {
+            // ✅ Check if token is blacklisted
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                return ResponseEntity.ok(Map.of(
+                        "valid", false,
+                        "error", "Token has been revoked"
+                ));
+            }
+
             boolean isValid = jwtService.validateToken(token);
             String userType = null;
             String email = null;
@@ -287,6 +314,7 @@ public class PlatformAuthController {
             ));
         }
     }
+
     @GetMapping("/debug/security-context")
     public ResponseEntity<Map<String, Object>> debugSecurityContext() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -303,6 +331,7 @@ public class PlatformAuthController {
 
         return ResponseEntity.ok(result);
     }
+
     @GetMapping("/debug/platform-setup")
     public ResponseEntity<Map<String, Object>> checkPlatformSetup() {
         Map<String, Object> info = new HashMap<>();
@@ -322,17 +351,18 @@ public class PlatformAuthController {
                 ))
                 .collect(Collectors.toList()));
 
-        // Check Super Admin user - FIXED: use platformUserRepository instead of userRepository
-        var superAdminOpt = platformUserRepository.findByEmail("superadmin@sonixhr.com");
+        // ✅ FIXED: Use correct Super Admin email
+        var superAdminOpt = platformUserRepository.findByEmail("admin@sonixhr.com");
         if (superAdminOpt.isPresent()) {
             PlatformUser superAdmin = superAdminOpt.get();
             info.put("superAdminExists", true);
             info.put("superAdminId", superAdmin.getId());
-            info.put("superAdminActive", superAdmin.isActive());
+            info.put("superAdminStatus", superAdmin.getStatus());
             info.put("superAdminRoles", superAdmin.getRoles().size());
             info.put("superAdminAuthorities", superAdmin.getAuthorities().size());
         } else {
             info.put("superAdminExists", false);
+            info.put("expectedSuperAdminEmail", "admin@sonixhr.com");
         }
 
         return ResponseEntity.ok(info);

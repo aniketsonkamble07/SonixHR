@@ -5,7 +5,7 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.PlatformPermissionEnum;
-import com.sonixhr.enums.PlatformUserStatus;
+import com.sonixhr.enums.UserStatus;
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -19,7 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -32,10 +31,8 @@ public class PlatformDataInitializer implements ApplicationRunner {
     private final PlatformPermissionRepository permissionRepository;
     private final PlatformRoleRepository roleRepository;
     private final PlatformUserRepository userRepository;
-    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
 
-    private static final String SYSTEM_TENANT_CODE = "SYSTEM";
     private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
     private static final String SUPER_ADMIN_PASSWORD = "Admin@123";
     private static final String SUPER_ADMIN_NAME = "Super Administrator";
@@ -47,159 +44,136 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("Platform Data Initializer Started");
         log.info("=========================================");
 
-        Tenant systemTenant = getOrCreateSystemTenant();
-        Long systemTenantId = systemTenant.getId();
+        // Step 1: Create all permissions
+        createAllPermissions();
 
-        log.info("System Tenant ID: {} with code: {}", systemTenantId, systemTenant.getTenantCode());
+        // Step 2: Create Super Admin role with ALL permissions
+        PlatformRole superAdminRole = createSuperAdminRole();
 
-        createPermissionsIfMissing(systemTenantId);
-        createSuperAdminRoleIfMissing(systemTenantId);
-        createOtherDefaultRolesIfMissing(systemTenantId);
-        createSuperAdminUserIfMissing(systemTenantId);
+        // Step 3: Create Super Admin user
+        createSuperAdminUser(superAdminRole);
+
+        // Step 4: Create other default roles (optional)
+        createOtherDefaultRoles();
 
         log.info("=========================================");
         log.info("Platform Data Initializer Completed");
         log.info("=========================================");
     }
 
-    private Tenant getOrCreateSystemTenant() {
-        log.info("Getting or creating system tenant with code: {}", SYSTEM_TENANT_CODE);
+    private void createAllPermissions() {
+        log.info("Creating all permissions...");
+        int createdCount = 0;
 
-        return tenantRepository.findByTenantCode(SYSTEM_TENANT_CODE)
+        for (PlatformPermissionEnum permEnum : PlatformPermissionEnum.values()) {
+            if (permissionRepository.findByPermission(permEnum).isEmpty()) {
+                PlatformPermission permission = PlatformPermission.builder()
+                        .permission(permEnum)
+                        .description(permEnum.getDescription())
+                        .category(permEnum.getCategory())
+                        .displayOrder(permEnum.getOrder())
+                        .build();
+                permissionRepository.save(permission);
+                createdCount++;
+                log.debug("Created permission: {}", permEnum.name());
+            }
+        }
+        log.info("✅ Created {} new permissions. Total: {}", createdCount, permissionRepository.count());
+    }
+
+    private PlatformRole createSuperAdminRole() {
+        log.info("Creating Super Admin role...");
+
+        return roleRepository.findByName("Super Admin")
                 .orElseGet(() -> {
-                    log.info("System tenant not found, creating new one...");
-                    Tenant systemTenant = Tenant.builder()
-                            .tenantCode(SYSTEM_TENANT_CODE)
-                            .companyName("SonixHR Platform")
-                            .subdomain("system")
-                            .status("ACTIVE")
-                            .isActive(true)
-                            .adminEmail("admin@sonixhr.com")
-                            .adminName("System Administrator")
-                            .planType("PLATFORM")
-                            .maxEmployees(10000)
-                            .planStatus("ACTIVE")
+                    Set<PlatformPermission> allPermissions = new HashSet<>(permissionRepository.findAll());
+
+                    PlatformRole role = PlatformRole.builder()
+                            .name("Super Admin")
+                            .description("Full platform access - has ALL permissions")
+                            .isSystemRole(true)
+                            .permissions(allPermissions)
                             .build();
-                    Tenant saved = tenantRepository.save(systemTenant);
-                    log.info("✅ Created system tenant with ID: {} and code: {}", saved.getId(), saved.getTenantCode());
+
+                    PlatformRole saved = roleRepository.save(role);
+                    log.info("✅ Created Super Admin role with {} permissions", allPermissions.size());
                     return saved;
                 });
     }
 
-    private void createPermissionsIfMissing(Long systemTenantId) {
-        log.info("Seeding platform permissions for tenant: {}", systemTenantId);
-        int createdCount = 0;
+    private void createSuperAdminUser(PlatformRole superAdminRole) {
+        log.info("Creating Super Admin user...");
 
-        for (PlatformPermissionEnum adminPerm : PlatformPermissionEnum.values()) {
-            if (permissionRepository.findByPermission(adminPerm).isEmpty()) {
-                PlatformPermission perm = PlatformPermission.builder()
-                        .tenantId(systemTenantId)
-                        .permission(adminPerm)
-                        .description(adminPerm.getDescription())
-                        .category(adminPerm.getCategory())
-                        .displayOrder(adminPerm.getOrder())
-                        .build();
-                permissionRepository.save(perm);
-                createdCount++;
-                log.debug("Created permission: {}", adminPerm.name());
-            }
-        }
-        log.info("Platform permissions seeding completed. Created: {}, Total: {}",
-                createdCount, permissionRepository.count());
-    }
-
-    private void createSuperAdminRoleIfMissing(Long systemTenantId) {
-        Set<PlatformPermission> allPermissions = new HashSet<>(permissionRepository.findAll());
-
-        if (allPermissions.isEmpty()) {
-            log.warn("No permissions found – run createPermissionsIfMissing first.");
+        if (userRepository.findByEmail(SUPER_ADMIN_EMAIL).isPresent()) {
+            log.info("Super Admin user already exists: {}", SUPER_ADMIN_EMAIL);
             return;
         }
 
-        PlatformRole superAdminRole = roleRepository.findByNameAndTenantId("Super Admin", systemTenantId)
-                .orElse(null);
+        PlatformUser superAdmin = PlatformUser.builder()
+                .email(SUPER_ADMIN_EMAIL)
+                .password(passwordEncoder.encode(SUPER_ADMIN_PASSWORD))
+                .fullName(SUPER_ADMIN_NAME)
+                .designation("System Administrator")
+                .status(UserStatus.ACTIVE)
+                .build();
 
-        if (superAdminRole == null) {
-            superAdminRole = PlatformRole.builder()
-                    .tenantId(systemTenantId)
-                    .name("Super Admin")
-                    .description("Full platform access – manages everything (System Administrator)")
-                    .permissions(allPermissions)
-                    .isSystemRole(true)
-                    .category("SYSTEM")
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            roleRepository.save(superAdminRole);
-            log.info("✅ Created Super Admin role with {} permissions.", allPermissions.size());
-        } else {
-            superAdminRole.setPermissions(allPermissions);
-            roleRepository.save(superAdminRole);
-            log.info("✅ Updated Super Admin role to have {} permissions.", allPermissions.size());
-        }
+        superAdmin.getRoles().add(superAdminRole);
+        userRepository.save(superAdmin);
+
+        log.info("=========================================");
+        log.info("✅ SUPER ADMIN CREATED WITH ALL PERMISSIONS!");
+        log.info("   Email: {}", SUPER_ADMIN_EMAIL);
+        log.info("   Password: {}", SUPER_ADMIN_PASSWORD);
+        log.info("   Name: {}", SUPER_ADMIN_NAME);
+        log.info("   Role: Super Admin (ALL permissions)");
+        log.info("   Authorities: {}", superAdmin.getAuthorities().size());
+        log.info("=========================================");
+        log.warn("🔴 PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN!");
+        log.info("=========================================");
     }
 
-    private void createOtherDefaultRolesIfMissing(Long systemTenantId) {
-        createPlatformRoleIfMissing(systemTenantId, "Platform Admin",
-                "Manages platform operations but with limited system access",
+    private void createOtherDefaultRoles() {
+        log.info("Creating other default roles...");
+
+        // Platform Admin Role
+        createRoleIfMissing("Platform Admin",
+                "Manages platform operations",
                 Set.of(
                         PlatformPermissionEnum.VIEW_TENANTS,
                         PlatformPermissionEnum.VIEW_TENANT_DETAILS,
-                        PlatformPermissionEnum.VIEW_PLATFORM_ADMINS,
+                        PlatformPermissionEnum.VIEW_PLATFORM_USERS,
                         PlatformPermissionEnum.VIEW_PLATFORM_ROLES,
                         PlatformPermissionEnum.VIEW_SUBSCRIPTIONS,
-                        PlatformPermissionEnum.VIEW_INVOICES,
-                        PlatformPermissionEnum.VIEW_SUPPORT_TICKETS,
-                        PlatformPermissionEnum.MANAGE_SUPPORT_TICKETS,
-                        PlatformPermissionEnum.VIEW_ANALYTICS,
-                        PlatformPermissionEnum.VIEW_SYSTEM_HEALTH
+                        PlatformPermissionEnum.VIEW_ANALYTICS
                 ));
 
-        createPlatformRoleIfMissing(systemTenantId, "Support Admin",
-                "Handles support tickets and user queries",
+        // Support Admin Role
+        createRoleIfMissing("Support Admin",
+                "Handles support tickets",
                 Set.of(
                         PlatformPermissionEnum.VIEW_TENANTS,
-                        PlatformPermissionEnum.VIEW_TENANT_DETAILS,
                         PlatformPermissionEnum.VIEW_SUPPORT_TICKETS,
                         PlatformPermissionEnum.MANAGE_SUPPORT_TICKETS,
-                        PlatformPermissionEnum.RESOLVE_ISSUES,
-                        PlatformPermissionEnum.VIEW_SUPPORT_METRICS
+                        PlatformPermissionEnum.RESOLVE_ISSUES
                 ));
 
-        createPlatformRoleIfMissing(systemTenantId, "Billing Admin",
-                "Manages billing, subscriptions and invoices",
+        // Billing Admin Role
+        createRoleIfMissing("Billing Admin",
+                "Manages billing and subscriptions",
                 Set.of(
-                        PlatformPermissionEnum.VIEW_TENANTS,
-                        PlatformPermissionEnum.VIEW_TENANT_DETAILS,
                         PlatformPermissionEnum.VIEW_SUBSCRIPTIONS,
                         PlatformPermissionEnum.MANAGE_SUBSCRIPTIONS,
                         PlatformPermissionEnum.VIEW_INVOICES,
                         PlatformPermissionEnum.PROCESS_PAYMENTS,
-                        PlatformPermissionEnum.VIEW_BILLING_REPORTS,
-                        PlatformPermissionEnum.MANAGE_PRICING_PLANS
+                        PlatformPermissionEnum.VIEW_BILLING_REPORTS
                 ));
 
-        createPlatformRoleIfMissing(systemTenantId, "Audit Viewer",
-                "Read-only access to audit logs and system metrics",
-                Set.of(
-                        PlatformPermissionEnum.VIEW_SYSTEM_METRICS,
-                        PlatformPermissionEnum.VIEW_AUDIT_LOGS,
-                        PlatformPermissionEnum.VIEW_ACTIVITY_REPORTS,
-                        PlatformPermissionEnum.VIEW_SYSTEM_HEALTH
-                ));
-
-        createPlatformRoleIfMissing(systemTenantId, "Tenant Creator",
-                "Can create and manage tenants",
-                Set.of(
-                        PlatformPermissionEnum.CREATE_TENANT,
-                        PlatformPermissionEnum.VIEW_TENANTS,
-                        PlatformPermissionEnum.VIEW_TENANT_DETAILS
-                ));
+        log.info("✅ Default roles created successfully");
     }
 
-    private void createPlatformRoleIfMissing(Long tenantId, String roleName, String description,
-                                             Set<PlatformPermissionEnum> permissionEnums) {
-        if (roleRepository.findByNameAndTenantId(roleName, tenantId).isPresent()) {
-            log.debug("Role already exists: {} for tenant: {}", roleName, tenantId);
+    private void createRoleIfMissing(String roleName, String description, Set<PlatformPermissionEnum> permissionEnums) {
+        if (roleRepository.findByName(roleName).isPresent()) {
+            log.debug("Role already exists: {}", roleName);
             return;
         }
 
@@ -209,80 +183,13 @@ public class PlatformDataInitializer implements ApplicationRunner {
         }
 
         PlatformRole role = PlatformRole.builder()
-                .tenantId(tenantId)
                 .name(roleName)
                 .description(description)
-                .permissions(permissions)
                 .isSystemRole(false)
-                .category(getRoleCategory(roleName))
-                .createdAt(LocalDateTime.now())
+                .permissions(permissions)
                 .build();
 
         roleRepository.save(role);
-        log.info("✅ Created platform role: {} with {} permissions for tenant: {}", roleName, permissions.size(), tenantId);
-    }
-
-    private void createSuperAdminUserIfMissing(Long systemTenantId) {
-        var existingUser = userRepository.findByEmail(SUPER_ADMIN_EMAIL);
-        if (existingUser.isPresent()) {
-            PlatformUser user = existingUser.get();
-
-            PlatformRole superAdminRole = roleRepository.findByNameAndTenantId("Super Admin", systemTenantId)
-                    .orElseThrow(() -> new IllegalStateException("Super Admin role not found"));
-
-            if (!user.getRoles().contains(superAdminRole)) {
-                log.info("Adding Super Admin role to existing user");
-                user.getRoles().add(superAdminRole);
-                userRepository.save(user);
-                log.info("✅ Added Super Admin role to existing user");
-            }
-
-            log.info("Super Admin user already exists: {}", SUPER_ADMIN_EMAIL);
-            log.info("User roles count: {}", user.getRoles().size());
-            log.info("User authorities count: {}", user.getAuthorities().size());
-            return;
-        }
-
-        PlatformRole superAdminRole = roleRepository.findByNameAndTenantId("Super Admin", systemTenantId)
-                .orElseThrow(() -> new IllegalStateException("Super Admin role not found – seeding order problem?"));
-
-        PlatformUser superAdmin = PlatformUser.builder()
-                .tenantId(systemTenantId)
-                .email(SUPER_ADMIN_EMAIL)
-                .password(passwordEncoder.encode(SUPER_ADMIN_PASSWORD))
-                .fullName(SUPER_ADMIN_NAME)
-                .designation("System Administrator")
-                .isActive(true)
-                .isEnabled(true)
-                .status(PlatformUserStatus.ACTIVE)
-                .mustChangePassword(true)
-                .systemProtected(true)
-                .build();
-
-        superAdmin.getRoles().add(superAdminRole);
-        superAdmin = userRepository.save(superAdmin);
-
-        log.info("=========================================");
-        log.info("✅ DEFAULT SUPER ADMIN CREATED!");
-        log.info("   Email: {}", SUPER_ADMIN_EMAIL);
-        log.info("   Password: {}", SUPER_ADMIN_PASSWORD);
-        log.info("   Tenant: SYSTEM (ID: {})", systemTenantId);
-        log.info("   Role: Super Admin");
-        log.info("   Roles Count: {}", superAdmin.getRoles().size());
-        log.info("   Authorities Count: {}", superAdmin.getAuthorities().size());
-        log.info("=========================================");
-        log.warn("🔴 PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN!");
-        log.info("=========================================");
-    }
-
-    private String getRoleCategory(String roleName) {
-        return switch (roleName) {
-            case "Platform Admin" -> "ADMIN";
-            case "Support Admin" -> "SUPPORT";
-            case "Billing Admin" -> "BILLING";
-            case "Audit Viewer" -> "AUDIT";
-            case "Tenant Creator" -> "TENANT_MANAGEMENT";
-            default -> "CUSTOM";
-        };
+        log.info("✅ Created role: {} with {} permissions", roleName, permissions.size());
     }
 }

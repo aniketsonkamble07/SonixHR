@@ -21,9 +21,6 @@ public class PlatformPermissionService {
 
     private final PlatformPermissionRepository permissionRepository;
 
-    /**
-     * Get grouped permissions - matches controller's getGroupedPermissions()
-     */
     public List<PermissionGroupDTO> getGroupedPermissions() {
         log.debug("Getting grouped permissions");
 
@@ -32,7 +29,6 @@ public class PlatformPermissionService {
             return new ArrayList<>();
         }
 
-        // Group permissions by category
         Map<String, List<PermissionGroupDTO.PermissionInfo>> groupedByCategory = allPermissions.stream()
                 .filter(p -> p.getPermission() != null)
                 .collect(Collectors.groupingBy(
@@ -49,12 +45,10 @@ public class PlatformPermissionService {
                         )
                 ));
 
-        // Sort permissions within each group by displayOrder
         groupedByCategory.forEach((category, permissions) ->
                 permissions.sort(Comparator.comparing(PermissionGroupDTO.PermissionInfo::getDisplayOrder))
         );
 
-        // Convert to DTO list sorted by category name
         return groupedByCategory.entrySet().stream()
                 .map(entry -> PermissionGroupDTO.builder()
                         .groupName(entry.getKey())
@@ -64,23 +58,16 @@ public class PlatformPermissionService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all permissions - matches controller's getAllPermissions()
-     */
     public List<PlatformPermission> getAllPermissions() {
         log.debug("Getting all permissions");
         List<PlatformPermission> permissions = permissionRepository.findAll();
         return permissions != null ? permissions : new ArrayList<>();
     }
 
-    // Additional methods that might be useful (optional)
-
+    // Remove tenantId parameter - just return all permissions
     public List<PlatformPermission> getPermissionsByTenant(Long tenantId) {
-        log.debug("Getting permissions for tenant: {}", tenantId);
-        if (tenantId == null) {
-            return new ArrayList<>();
-        }
-        return permissionRepository.findByTenantIdOrTenantIdIsNull(tenantId);
+        log.debug("Getting permissions (system-wide)");
+        return permissionRepository.findAll();
     }
 
     public PlatformPermission getPermissionById(Long id) {
@@ -127,57 +114,21 @@ public class PlatformPermissionService {
         return type != null && permissionRepository.existsByPermission(type);
     }
 
-    @Transactional
-    public List<PlatformPermission> initializePermissionsForTenant(Long tenantId) {
-        log.info("Initializing all permissions for tenant: {}", tenantId);
-
-        if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant ID cannot be null");
-        }
-
-        List<PlatformPermission> permissions = new ArrayList<>();
-
-        for (PlatformPermissionEnum permEnum : PlatformPermissionEnum.values()) {
-            if (!permissionRepository.existsByTenantIdAndPermission(tenantId, permEnum)) {
-                PlatformPermission permission = PlatformPermission.builder()
-                        .tenantId(tenantId)
-                        .permission(permEnum)
-                        .description(permEnum.getDescription())
-                        .category(permEnum.getCategory())
-                        .displayOrder(permEnum.getOrder())
-                        .build();
-                permissions.add(permission);
-            }
-        }
-
-        if (!permissions.isEmpty()) {
-            List<PlatformPermission> savedPermissions = permissionRepository.saveAll(permissions);
-            log.info("Initialized {} permissions for tenant: {}", savedPermissions.size(), tenantId);
-            return savedPermissions;
-        }
-
-        return new ArrayList<>();
-    }
-
+    // Remove tenantId parameter
     @Transactional
     public PlatformPermission createCustomPermission(PlatformPermissionEnum type, String description,
-                                                     String category, Integer displayOrder, Long tenantId) {
-        log.info("Creating custom permission: {} for tenant: {}", type, tenantId);
+                                                     String category, Integer displayOrder) {
+        log.info("Creating custom permission: {}", type);
 
         if (type == null) {
             throw new IllegalArgumentException("Permission type cannot be null");
         }
 
-        if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant ID cannot be null");
-        }
-
-        if (permissionRepository.existsByTenantIdAndPermission(tenantId, type)) {
+        if (permissionRepository.existsByPermission(type)) {
             throw new IllegalStateException("Permission already exists: " + type);
         }
 
         PlatformPermission permission = PlatformPermission.builder()
-                .tenantId(tenantId)
                 .permission(type)
                 .description(description != null ? description : type.getDescription())
                 .category(category != null ? category : type.getCategory())
@@ -201,26 +152,14 @@ public class PlatformPermissionService {
     }
 
     @Transactional
-    public void deletePermission(Long id, Long tenantId) {
-        log.info("Deleting permission with id: {} for tenant: {}", id, tenantId);
+    public void deletePermission(Long id) {  // Remove tenantId parameter
+        log.info("Deleting permission with id: {}", id);
 
         if (id == null) {
             throw new IllegalArgumentException("Permission ID cannot be null");
         }
 
-        if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant ID cannot be null");
-        }
-
         PlatformPermission permission = getPermissionById(id);
-
-        if (permission.getTenantId() == null) {
-            throw new SecurityException("Cannot delete global permissions");
-        }
-
-        if (!permission.getTenantId().equals(tenantId)) {
-            throw new SecurityException("Permission does not belong to tenant");
-        }
 
         if (permissionRepository.countRolesByPermissionId(id) > 0) {
             throw new IllegalStateException("Cannot delete permission that is assigned to roles");
@@ -229,20 +168,16 @@ public class PlatformPermissionService {
         permissionRepository.delete(permission);
     }
 
+    // Remove tenantId parameter
     @Transactional
-    public List<PlatformPermission> syncPermissionsWithEnum(Long tenantId) {
-        log.info("Syncing permissions with enum for tenant: {}", tenantId);
-
-        if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant ID cannot be null");
-        }
+    public List<PlatformPermission> syncPermissionsWithEnum() {  // Remove tenantId parameter
+        log.info("Syncing permissions with enum");
 
         List<PlatformPermission> newPermissions = new ArrayList<>();
 
         for (PlatformPermissionEnum permEnum : PlatformPermissionEnum.values()) {
-            if (!permissionRepository.existsByTenantIdAndPermission(tenantId, permEnum)) {
+            if (!permissionRepository.existsByPermission(permEnum)) {
                 PlatformPermission permission = PlatformPermission.builder()
-                        .tenantId(tenantId)
                         .permission(permEnum)
                         .description(permEnum.getDescription())
                         .category(permEnum.getCategory())

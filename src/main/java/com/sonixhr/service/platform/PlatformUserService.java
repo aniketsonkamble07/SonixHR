@@ -6,7 +6,7 @@ import com.sonixhr.dto.platform.PlatformUserStatistics;
 import com.sonixhr.dto.platform.PlatformUserUpdateRequest;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
-import com.sonixhr.enums.PlatformUserStatus;
+import com.sonixhr.enums.UserStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.DuplicateResourceException;
 import com.sonixhr.exceptions.NotFoundException;
@@ -73,28 +73,14 @@ public class PlatformUserService {
             throw new BusinessException("Invalid role IDs: " + missingRoleIds);
         }
 
-        // ✅ FIX: Set tenantId - default to system tenant (1) if not provided
-        Long tenantId = request.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1L; // System tenant
-            log.warn("tenantId was null for user {}, defaulting to system tenant (1)", request.getEmail());
-        }
-
-        // Create user with temporary disabled password
+        // ✅ FIXED: Create user with INACTIVE status (needs activation)
         PlatformUser user = PlatformUser.builder()
                 .email(request.getEmail())
                 .password("TEMPORARY_DISABLED")
                 .fullName(request.getFullName())
                 .designation(request.getDesignation())
-                .tenantId(tenantId)  // ✅ ADD THIS LINE
-                .status(PlatformUserStatus.PENDING_VERIFICATION)
-                .isActive(false)
-                .isEnabled(false)
-                .isAccountNonLocked(true)
-                .isAccountNonExpired(true)
-                .isCredentialsNonExpired(true)
+                .status(UserStatus.INACTIVE)  // ✅ Changed from ACTIVE to INACTIVE
                 .roles(roles)
-                .createdBy(createdBy)
                 .build();
 
         PlatformUser savedUser = platformUserRepository.save(user);
@@ -137,12 +123,14 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
 
-        if (user.isActive()) {
+        // ✅ FIXED: Correct status check
+        if (user.getStatus() == UserStatus.ACTIVE) {
             throw new BusinessException("User is already activated");
         }
 
-        if (user.getStatus() != PlatformUserStatus.PENDING_VERIFICATION) {
-            throw new BusinessException("User is not in pending verification status");
+        // Only INACTIVE users can be activated (they haven't activated yet)
+        if (user.getStatus() != UserStatus.INACTIVE) {
+            throw new BusinessException("User is not in pending verification status. Current status: " + user.getStatus());
         }
 
         String newToken = activationTokenService.generateTokenForPlatformUser(user.getId());
@@ -183,9 +171,9 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
 
-        // Prevent modification of system-protected users
-        if (user.isSystemProtected()) {
-            throw new BusinessException("Cannot modify system-protected user");
+        // Check if this is the default Super Admin (can't modify)
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
+            throw new BusinessException("Cannot modify the default Super Admin user");
         }
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
@@ -203,7 +191,6 @@ public class PlatformUserService {
             user.setEmail(request.getEmail());
         }
 
-        user.setUpdatedBy(getCurrentUserId());
         PlatformUser updated = platformUserRepository.save(user);
 
         log.info("Platform user updated: {}", userId);
@@ -211,19 +198,18 @@ public class PlatformUserService {
     }
 
     @Transactional
-    public PlatformUserResponse updateUserStatus(Long userId, PlatformUserStatus status) {
+    public PlatformUserResponse updateUserStatus(Long userId, UserStatus status) {
+        log.info("Updating status for user: {} to {}", userId, status);
+
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
 
-        // Prevent status change for system-protected users
-        if (user.isSystemProtected()) {
-            throw new BusinessException("Cannot modify status of system-protected user");
+        // Check if this is the default Super Admin (can't suspend/delete)
+        if ("admin@sonixhr.com".equals(user.getEmail()) && status != UserStatus.ACTIVE) {
+            throw new BusinessException("Cannot change status of the default Super Admin user");
         }
 
         user.setStatus(status);
-        user.setActive(status == PlatformUserStatus.ACTIVE);
-        user.setEnabled(status == PlatformUserStatus.ACTIVE);
-        user.setUpdatedBy(getCurrentUserId());
 
         PlatformUser updated = platformUserRepository.save(user);
         log.info("User {} status updated to: {}", userId, status);
@@ -253,8 +239,6 @@ public class PlatformUserService {
         }
 
         user.setRoles(roles);
-        user.setUpdatedBy(getCurrentUserId());
-
         PlatformUser updated = platformUserRepository.save(user);
         log.info("Roles updated for user: {}", userId);
 
@@ -272,18 +256,11 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
 
-        if (user.isSystemProtected()) {
-            throw new BusinessException("Cannot activate/deactivate system-protected user");
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
+            throw new BusinessException("Super Admin is already active");
         }
 
-        user.setActive(true);
-        user.setEnabled(true);
-        user.setStatus(PlatformUserStatus.ACTIVE);
-        user.setUpdatedBy(getCurrentUserId());
-        user.setLockTime(null);
-        user.setFailedLoginAttempts(0);
-        user.setAccountNonLocked(true);
-
+        user.setStatus(UserStatus.ACTIVE);
         platformUserRepository.save(user);
         log.info("Platform user activated by admin: {}", userId);
 
@@ -292,26 +269,21 @@ public class PlatformUserService {
     }
 
     @Transactional
-    public void deactivateUser(Long userId) {
-        log.info("Deactivating platform user: {}", userId);
+    public void suspendUser(Long userId) {
+        log.info("Suspending platform user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
 
-        if (user.isSystemProtected()) {
-            throw new BusinessException("Cannot deactivate system-protected user");
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
+            throw new BusinessException("Cannot suspend the default Super Admin user");
         }
 
-        user.setActive(false);
-        user.setEnabled(false);
-        user.setStatus(PlatformUserStatus.INACTIVE);
-        user.setUpdatedBy(getCurrentUserId());
-
+        user.setStatus(UserStatus.SUSPENDED);
         platformUserRepository.save(user);
-        log.info("Platform user deactivated: {}", userId);
+        log.info("Platform user suspended: {}", userId);
 
-        // Send notification email
-        emailService.sendAccountDeactivatedNotification(user.getEmail(), user.getFullName());
+       // emailService.sendAccountDeactivatedNotification(user.getEmail(), user.getFullName());
     }
 
     @Transactional
@@ -321,16 +293,11 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
 
-        if (user.isSystemProtected()) {
-            throw new BusinessException("Cannot delete system-protected user");
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
+            throw new BusinessException("Cannot delete the default Super Admin user");
         }
 
-        user.setActive(false);
-        user.setEnabled(false);
-        user.setStatus(PlatformUserStatus.DELETED);
-        user.setUpdatedBy(getCurrentUserId());
-        user.setDeletedAt(LocalDateTime.now());
-
+        user.setStatus(UserStatus.DELETED);
         platformUserRepository.save(user);
         log.info("User {} soft deleted", userId);
     }
@@ -344,7 +311,7 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
 
-        if (!user.isActive() || user.getStatus() != PlatformUserStatus.ACTIVE) {
+        if (user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException("Cannot reset password for inactive user");
         }
 
@@ -377,17 +344,11 @@ public class PlatformUserService {
         validatePasswordStrength(newPassword);
 
         String encodedPassword = passwordEncoder.encode(newPassword);
-        user.setPassword(encodedPassword);  // Fixed: Changed from setPasswordHash to setPassword
-        user.setPasswordLastChanged(LocalDateTime.now());
-        user.setMustChangePassword(forceChange);
-        user.setUpdatedBy(getCurrentUserId());
-        user.setFailedLoginAttempts(0);
-        user.setAccountNonLocked(true);
-
+        user.setPassword(encodedPassword);
         platformUserRepository.save(user);
         log.info("Password reset by admin for user: {}", userId);
 
-        emailService.sendPasswordResetNotification(user.getEmail(), user.getFullName());
+       // emailService.sendPasswordResetNotification(user.getEmail(), user.getFullName());
     }
 
     @Transactional
@@ -407,10 +368,6 @@ public class PlatformUserService {
 
         String encodedPassword = passwordEncoder.encode(newPassword);
         user.setPassword(encodedPassword);
-        user.setPasswordLastChanged(LocalDateTime.now());
-        user.setMustChangePassword(false);
-        user.setUpdatedBy(userId);
-
         platformUserRepository.save(user);
         log.info("Password changed successfully for user: {}", userId);
     }
@@ -422,11 +379,10 @@ public class PlatformUserService {
     public PlatformUserStatistics getUserStatistics() {
         return PlatformUserStatistics.builder()
                 .totalUsers(platformUserRepository.count())
-                .activeUsers(platformUserRepository.countByIsActiveTrue())
-                .inactiveUsers(platformUserRepository.countByIsActiveFalse())
-                .pendingVerification(platformUserRepository.countByStatus(PlatformUserStatus.PENDING_VERIFICATION))
-                .suspendedUsers(platformUserRepository.countByStatus(PlatformUserStatus.SUSPENDED))
-                .lockedUsers(platformUserRepository.countByStatus(PlatformUserStatus.LOCKED))
+                .activeUsers(platformUserRepository.countByStatus(UserStatus.ACTIVE))
+                .inactiveUsers(platformUserRepository.countByStatus(UserStatus.INACTIVE))
+                .pendingVerification(platformUserRepository.countByStatus(UserStatus.INACTIVE))  // ✅ FIXED
+                .suspendedUsers(platformUserRepository.countByStatus(UserStatus.SUSPENDED))
                 .build();
     }
 
@@ -471,8 +427,7 @@ public class PlatformUserService {
                 .fullName(user.getFullName())
                 .designation(user.getDesignation())
                 .status(user.getStatus())
-                .isActive(user.isActive())
-                .lastLoginAt(user.getLastLoginAt())
+                .isActive(user.getStatus() == UserStatus.ACTIVE)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .roles(user.getRoles().stream()

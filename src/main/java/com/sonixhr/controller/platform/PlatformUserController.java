@@ -35,6 +35,8 @@ public class PlatformUserController {
             @Valid @RequestBody PlatformUserCreateRequest request,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
         log.info("REST request to create platform user: {}", request.getEmail());
+
+        // ✅ Pass the current admin's ID as createdBy
         PlatformUserResponse response = platformUserService.createUser(request, currentAdmin.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -43,7 +45,7 @@ public class PlatformUserController {
      * Resend activation email to user
      */
     @PostMapping("/{id}/resend-activation")
-    @PreAuthorize("hasAuthority('CREATE_PLATFORM_ADMIN')")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")  // ✅ FIXED: Changed permission
     public ResponseEntity<Void> resendActivationEmail(@PathVariable Long id) {
         log.info("REST request to resend activation email for user: {}", id);
         PlatformUserResponse user = platformUserService.getUserById(id);
@@ -104,20 +106,15 @@ public class PlatformUserController {
     @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ADMIN_ROLES')")
     public ResponseEntity<Void> updateUserRoles(
             @PathVariable Long id,
-            @RequestBody Set<Long> roleIds) {
+            @RequestBody @Valid Set<Long> roleIds) {  // ✅ FIXED: Added @Valid
         log.info("REST request to update roles for user: {}", id);
-        platformUserService.updateUserRoles(id, roleIds);
-        return ResponseEntity.ok().build();
-    }
 
-    /**
-     * Deactivate platform user
-     */
-    @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
-    public ResponseEntity<Void> deactivateUser(@PathVariable Long id) {
-        log.info("REST request to deactivate platform user: {}", id);
-        platformUserService.deactivateUser(id);
+        // ✅ FIXED: Add validation
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one role ID is required");
+        }
+
+        platformUserService.updateUserRoles(id, roleIds);
         return ResponseEntity.ok().build();
     }
 
@@ -129,6 +126,17 @@ public class PlatformUserController {
     public ResponseEntity<Void> activateUserByAdmin(@PathVariable Long id) {
         log.info("REST request to activate platform user by admin: {}", id);
         platformUserService.activateUserByAdmin(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Suspend platform user (by admin)
+     */
+    @PatchMapping("/{id}/suspend")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
+    public ResponseEntity<Void> suspendUser(@PathVariable Long id) {
+        log.info("REST request to suspend platform user: {}", id);
+        platformUserService.suspendUser(id);
         return ResponseEntity.ok().build();
     }
 
@@ -152,7 +160,7 @@ public class PlatformUserController {
             @PathVariable Long id,
             @Valid @RequestBody ResetPasswordRequest request) {
         log.info("REST request to reset password for user: {}", id);
-        platformUserService.resetPasswordByAdmin(id, request.getNewPassword(),true);
+        platformUserService.resetPasswordByAdmin(id, request.getNewPassword(), true);
         return ResponseEntity.ok().build();
     }
 

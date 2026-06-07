@@ -12,22 +12,14 @@ import java.util.Optional;
 @Repository
 public interface PlatformRoleRepository extends JpaRepository<PlatformRole, Long> {
 
-    // Tenant-scoped queries
-    boolean existsByTenantIdAndName(Long tenantId, String name);
+    // ✅ Basic queries (no tenantId)
+    boolean existsByName(String name);
     Optional<PlatformRole> findByName(String name);
-    Optional<PlatformRole> findByNameAndTenantId(String name, Long tenantId);
 
-    Optional<PlatformRole> findByIdAndTenantId(Long id, Long tenantId);
+    @Query("SELECT DISTINCT r FROM PlatformRole r LEFT JOIN FETCH r.permissions")
+    List<PlatformRole> findAllWithPermissions();
 
-    List<PlatformRole> findAllByTenantId(Long tenantId);
+    List<PlatformRole> findByIsSystemRoleTrue();
 
-    @Query("SELECT DISTINCT r FROM PlatformRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId = :tenantId")
-    List<PlatformRole> findAllByTenantIdWithPermissions(@Param("tenantId") Long tenantId);
-
-
-
-    List<PlatformRole> findByTenantIdAndIsSystemRoleTrue(Long tenantId);
-
-    List<PlatformRole> findByTenantIdAndIsSystemRoleFalse(Long tenantId);
-
+    List<PlatformRole> findByIsSystemRoleFalse();
 }

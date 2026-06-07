@@ -16,11 +16,10 @@ import java.util.Set;
 @Entity
 @Table(name = "platform_roles",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_role_tenant_name", columnNames = {"tenant_id", "name"})
+                @UniqueConstraint(name = "uk_role_tenant_name", columnNames = { "name"})
         },
         indexes = {
-                @Index(name = "idx_role_tenant_id", columnList = "tenant_id"),
-                @Index(name = "idx_role_tenant_system", columnList = "tenant_id, is_system_role"),
+                @Index(name = "idx_role_tenant_system", columnList = " is_system_role"),
                 @Index(name = "idx_role_name", columnList = "name"),
                 @Index(name = "idx_role_created_at", columnList = "created_at")
         })
@@ -36,8 +35,6 @@ public class PlatformRole {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tenant_id", nullable = false)
-    private Long tenantId;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -181,7 +178,6 @@ public class PlatformRole {
     public String toString() {
         return "PlatformRole{" +
                 "id=" + id +
-                ", tenantId=" + tenantId +
                 ", name='" + name + '\'' +
                 ", description='" + description + '\'' +
                 ", isSystemRole=" + isSystemRole +

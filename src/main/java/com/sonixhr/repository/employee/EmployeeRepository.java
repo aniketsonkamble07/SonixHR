@@ -19,7 +19,7 @@ import java.util.Optional;
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     // =====================================================
-    // BASIC QUERIES - ALL USING Long tenantId
+    // BASIC QUERIES
     // =====================================================
 
     Optional<Employee> findByTenant_IdAndEmployeeCode(Long tenantId, String employeeCode);
@@ -27,7 +27,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findByTenant_Id(Long tenantId);
     Page<Employee> findByTenant_Id(Long tenantId, Pageable pageable);
     Optional<Employee> findByEmail(String email);
-
 
     boolean existsByEmail(String email);
     boolean existsByTenant_IdAndEmail(Long tenantId, String email);
@@ -41,26 +40,32 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Page<Employee> findByTenant_IdAndStatus(Long tenantId, EmployeeStatus status, Pageable pageable);
 
     @Query("SELECT e FROM Employee e WHERE e.manager IS NULL AND e.tenant.id = :tenantId")
-    List<Employee> findByManagerIsNullAndTenant_Id(@Param("tenantId") Long tenantId);
+    List<Employee> findEmployeesWithNoManager(@Param("tenantId") Long tenantId);  // ✅ Kept one version
 
     // =====================================================
     // MANAGER QUERIES
     // =====================================================
 
     @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
-    List<Employee> findByManagerIdAndTenant_Id(@Param("managerId") Long managerId,
-                                               @Param("tenantId") Long tenantId);
+    List<Employee> findByManagerIdAndTenantId(@Param("managerId") Long managerId,
+                                              @Param("tenantId") Long tenantId);
 
     @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
-    Page<Employee> findByManagerIdAndTenant_Id(@Param("managerId") Long managerId,
-                                               @Param("tenantId") Long tenantId,
-                                               Pageable pageable);
+    Page<Employee> findByManagerIdAndTenantId(@Param("managerId") Long managerId,
+                                              @Param("tenantId") Long tenantId,
+                                              Pageable pageable);
+
+    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
+    List<Employee> findByManagerId(@Param("managerId") Long managerId);
+
+    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
+    Page<Employee> findByManagerId(@Param("managerId") Long managerId, Pageable pageable);
 
     boolean existsByManagerIdAndTenant_Id(Long managerId, Long tenantId);
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
-    long countByManagerIdAndTenant_Id(@Param("managerId") Long managerId,
-                                      @Param("tenantId") Long tenantId);
+    long countByManagerIdAndTenantId(@Param("managerId") Long managerId,
+                                     @Param("tenantId") Long tenantId);
 
     // =====================================================
     // DEPARTMENT QUERIES
@@ -71,7 +76,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                                    @Param("departmentName") String departmentName);
 
     @Query("SELECT DISTINCT e.department.name FROM Employee e WHERE e.tenant.id = :tenantId AND e.department IS NOT NULL")
-    List<String> findDistinctDepartmentsByTenant_Id(@Param("tenantId") Long tenantId);
+    List<String> findDistinctDepartmentsByTenantId(@Param("tenantId") Long tenantId);
 
     @Query("SELECT e.department.name, COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId GROUP BY e.department.name")
     List<Object[]> countEmployeesByDepartment(@Param("tenantId") Long tenantId);
@@ -99,9 +104,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Page<Employee> searchEmployeesForAssignment(@Param("tenantId") Long tenantId,
                                                 @Param("query") String query,
                                                 Pageable pageable);
-    /**
-     * Search team members for a manager (simpler version for attendance marking)
-     */
+
     @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId AND " +
             "(LOWER(e.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
@@ -110,6 +113,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> searchTeamMembers(@Param("managerId") Long managerId,
                                      @Param("tenantId") Long tenantId,
                                      @Param("searchTerm") String searchTerm);
+
     // =====================================================
     // COUNT QUERIES
     // =====================================================
@@ -117,18 +121,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     long countByTenant_IdAndStatus(Long tenantId, EmployeeStatus status);
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId")
-    long countByTenant_Id(@Param("tenantId") Long tenantId);
-
-    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = :status")
-    long countByTenant_IdAndStatus2(@Param("tenantId") Long tenantId,
-                                    @Param("status") EmployeeStatus status);
+    long countByTenantId(@Param("tenantId") Long tenantId);  // ✅ Renamed, removed duplicate
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
-    long countByTenantIdAndIsActiveTrue(@Param("tenantId") Long tenantId);
-
-    //  Add this method for counting by tenant ID
-    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId")
-    long countByTenantId(@Param("tenantId") Long tenantId);
+    long countActiveByTenantId(@Param("tenantId") Long tenantId);  // ✅ Renamed for clarity
 
     // =====================================================
     // EMPLOYEE CODE GENERATION QUERIES
@@ -215,19 +211,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                            @Param("date") LocalDate date);
 
     // =====================================================
-    // EMPLOYEE WITHOUT MANAGER
-    // =====================================================
-
-    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.manager IS NULL")
-    List<Employee> findEmployeesWithNoManager(@Param("tenantId") Long tenantId);
-
-    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.manager IS NOT NULL")
-    List<Employee> findEmployeesWithManager(@Param("tenantId") Long tenantId);
-
-    @Query("SELECT e FROM Employee e WHERE e.manager IS NULL AND e.tenant.id = :tenantId")
-    List<Employee> findByManagerIsNullAndTenant_Id2(@Param("tenantId") Long tenantId);
-
-    // =====================================================
     // DEPARTMENT STATISTICS
     // =====================================================
 
@@ -270,67 +253,73 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT e.employmentType, COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId GROUP BY e.employmentType")
     List<Object[]> countByEmploymentType(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT e, (SELECT COUNT(sub) FROM Employee sub WHERE sub.manager.id = e.id) " +
-            "FROM Employee e WHERE e.tenant.id = :tenantId AND e.manager.id = :managerId")
-    Page<Object[]> findTeamMembersWithReportCount(@Param("tenantId") Long tenantId,
-                                                  @Param("managerId") Long managerId,
-                                                  Pageable pageable);
-    //  CORRECT - Uses e.tenant.id through relationship
+    // =====================================================
+    // ROLE QUERIES
+    // =====================================================
+
     @Query("SELECT DISTINCT e FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     List<Employee> findByRolesIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
-    //  CORRECT - Uses e.tenant.id through relationship
     @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     long countUsersByRoleIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
-    // CORRECT - Spring Data JPA will derive this query using getTenantId() method
+    // =====================================================
+    // FIND BY ID WITH TENANT
+    // =====================================================
+
     @Query("SELECT e FROM Employee e WHERE e.id = :id AND e.tenant.id = :tenantId")
     Optional<Employee> findByIdAndTenantId(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-// Add this in the MANAGER QUERIES section
-
-// =====================================================
-// MANAGER QUERIES
-// =====================================================
-
-    //  Add this simple method (without tenant_id for cases where you have the manager object)
-    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
-    List<Employee> findByManagerId(@Param("managerId") Long managerId);
-
-    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
-    Page<Employee> findByManagerId(@Param("managerId") Long managerId, Pageable pageable);
-
-
-// Add to EmployeeRepository.java
-
-// =====================================================
-// LEAVE MANAGEMENT SPECIFIC QUERIES
-// =====================================================
-
-
-
-    /**
-     * Count employees by manager for leave reporting
-     */
-    @Query("SELECT e.manager.id, COUNT(e) FROM Employee e " +
-            "WHERE e.tenant.id = :tenantId AND e.manager IS NOT NULL " +
-            "GROUP BY e.manager.id")
-    List<Object[]> countEmployeesByManager(@Param("tenantId") Long tenantId);
-
-    /**
-     * Find employees with pending leave requests (for notification)
-     */
-    @Query("SELECT DISTINCT e FROM Employee e JOIN LeaveRequest l ON l.employee.id = e.id " +
-            "WHERE e.tenant.id = :tenantId AND l.status = 'PENDING'")
-    List<Employee> findEmployeesWithPendingLeaves(@Param("tenantId") Long tenantId);
-
-    // Add this in the BASIC QUERIES section, after findByEmail(String email)
+    // =====================================================
+    // FETCH JOIN FOR ROLES & PERMISSIONS (CRITICAL FOR AUTH)
+    // =====================================================
 
     @Query("""
     SELECT DISTINCT e FROM Employee e
     LEFT JOIN FETCH e.roles r
     LEFT JOIN FETCH r.permissions
     WHERE e.email = :email
-""")
+    """)
     Optional<Employee> findByEmailWithRolesAndPermissions(@Param("email") String email);
+
+    // =====================================================
+    // LEAVE MANAGEMENT SPECIFIC QUERIES
+    // =====================================================
+
+    @Query("SELECT e.manager.id, COUNT(e) FROM Employee e " +
+            "WHERE e.tenant.id = :tenantId AND e.manager IS NOT NULL " +
+            "GROUP BY e.manager.id")
+    List<Object[]> countEmployeesByManager(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT DISTINCT e FROM Employee e JOIN LeaveRequest l ON l.employee.id = e.id " +
+            "WHERE e.tenant.id = :tenantId AND l.status = 'PENDING'")
+    List<Employee> findEmployeesWithPendingLeaves(@Param("tenantId") Long tenantId);
+
+    // =====================================================
+// UPCOMING BIRTHDAYS & ANNIVERSARIES (Add this section)
+// =====================================================
+
+    /**
+     * Find employees with upcoming birthdays within date range
+     */
+    @Query(value = "SELECT * FROM employees WHERE tenant_id = :tenantId " +
+            "AND date_of_birth IS NOT NULL " +
+            "AND TO_CHAR(date_of_birth, 'MM-DD') BETWEEN TO_CHAR(:startDate, 'MM-DD') AND TO_CHAR(:endDate, 'MM-DD') " +
+            "ORDER BY TO_CHAR(date_of_birth, 'MM-DD')",
+            nativeQuery = true)
+    List<Employee> findEmployeesWithUpcomingBirthdays(@Param("tenantId") Long tenantId,
+                                                      @Param("startDate") LocalDate startDate,
+                                                      @Param("endDate") LocalDate endDate);
+
+    /**
+     * Find employees with upcoming anniversaries within date range
+     */
+    @Query(value = "SELECT * FROM employees WHERE tenant_id = :tenantId " +
+            "AND hire_date IS NOT NULL " +
+            "AND TO_CHAR(hire_date, 'MM-DD') BETWEEN TO_CHAR(:startDate, 'MM-DD') AND TO_CHAR(:endDate, 'MM-DD') " +
+            "ORDER BY TO_CHAR(hire_date, 'MM-DD')",
+            nativeQuery = true)
+    List<Employee> findEmployeesWithUpcomingAnniversaries(@Param("tenantId") Long tenantId,
+                                                          @Param("startDate") LocalDate startDate,
+                                                          @Param("endDate") LocalDate endDate);
 }

@@ -2,13 +2,12 @@ package com.sonixhr.dto.platform;
 
 
 
-import com.sonixhr.enums.PlatformUserStatus;
+import com.sonixhr.enums.UserStatus;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.Set;
-import java.util.UUID;
 
 @Data
 @Builder
@@ -17,7 +16,7 @@ public class PlatformUserResponse {
     private String email;
     private String fullName;
     private String designation;
-    private PlatformUserStatus status;
+    private UserStatus status;
     private Boolean isActive;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;

@@ -80,8 +80,6 @@ public interface ActivationTokenRepository extends JpaRepository<ActivationToken
     // EXISTENCE CHECKS
     // =====================================================
 
-
-
     @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM ActivationToken t " +
             "WHERE t.token = :token AND t.used = false AND t.expiresAt > :now")
     boolean isValidToken(@Param("token") String token, @Param("now") LocalDateTime now);
