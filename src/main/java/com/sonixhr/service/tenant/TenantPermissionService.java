@@ -23,80 +23,126 @@ public class TenantPermissionService {
 
     private final TenantPermissionRepository permissionRepository;
 
-    /**
-     * Initialize all permissions from enum (run once on startup)
-     */
     @jakarta.annotation.PostConstruct
     public void initializePermissions() {
         log.info("Initializing tenant permissions...");
 
         for (TenantPermissionEnum enumPermission : TenantPermissionEnum.values()) {
-            if (permissionRepository.findByPermission(enumPermission).isEmpty()) {
-                TenantPermission permission = TenantPermission.builder()
-                        .permission(enumPermission)
-                        .description(enumPermission.getDescription())
-                        .category(enumPermission.getCategory())
-                        .displayOrder(enumPermission.getOrder())
-                        .build();
-                permissionRepository.save(permission);
-                log.info("Added permission: {}", enumPermission.name());
+            try {
+                if (permissionRepository.findByPermission(enumPermission).isEmpty()) {
+                    TenantPermission permission = TenantPermission.builder()
+                            .permission(enumPermission)
+                            .description(enumPermission.getDescription())
+                            .category(enumPermission.getCategory())
+                            .displayOrder(enumPermission.getOrder())
+                            .build();
+                    permissionRepository.save(permission);
+                    log.info("Added permission: {}", enumPermission.name());
+                }
+            } catch (Exception e) {
+                log.error("Error adding permission: {}", enumPermission.name(), e);
             }
         }
-        log.info("Tenant permissions initialization completed.");
+        log.info("Tenant permissions initialization completed. Total: {}", permissionRepository.count());
     }
 
     /**
      * Get all permissions grouped by category (with caching)
      */
-    @Cacheable(value = "permissions", key = "'grouped'")
+
     public List<PermissionGroupDTO> getGroupedPermissions() {
         log.debug("Fetching grouped permissions from database");
 
-        List<TenantPermission> allPermissions = permissionRepository.findAllByOrderByCategoryAscDisplayOrderAsc();
+        List<TenantPermission> allPermissions;
+        try {
+            // Try to use the ordered method
+            allPermissions = permissionRepository.findAllByOrderByCategoryAscDisplayOrderAsc();
+            log.debug("Found {} permissions with ordering", allPermissions.size());
+        } catch (Exception e) {
+            log.error("Error using ordered query, falling back to findAll()", e);
+            allPermissions = permissionRepository.findAll();
+            log.debug("Found {} permissions with findAll()", allPermissions.size());
+        }
+
+        if (allPermissions == null || allPermissions.isEmpty()) {
+            log.warn("No permissions found in database!");
+            return new ArrayList<>();
+        }
 
         Map<String, List<PermissionGroupDTO.PermissionInfo>> groupedPermissions = new LinkedHashMap<>();
+        int nullCategoryCount = 0;
+        int nullPermissionCount = 0;
 
         for (TenantPermission permission : allPermissions) {
-            PermissionGroupDTO.PermissionInfo info = PermissionGroupDTO.PermissionInfo.builder()
-                    .id(permission.getId())
-                    .name(permission.getPermission().name())
-                    .description(permission.getDescription())
-                    .category(permission.getCategory())
-                    .displayOrder(permission.getDisplayOrder())
-                    .selected(false)  // ✅ Initialize as false
-                    .build();
+            try {
+                // Skip if permission enum is null
+                if (permission.getPermission() == null) {
+                    nullPermissionCount++;
+                    log.warn("Permission with ID {} has null permission enum, skipping", permission.getId());
+                    continue;
+                }
 
-            groupedPermissions.computeIfAbsent(permission.getCategory(), k -> new ArrayList<>()).add(info);
+                // Handle null category - assign to "General" category
+                String category = permission.getCategory();
+                if (category == null || category.trim().isEmpty()) {
+                    category = "General";
+                    nullCategoryCount++;
+                    log.debug("Permission {} has null category, assigning to 'General'", permission.getPermission().name());
+                }
+
+                PermissionGroupDTO.PermissionInfo info = PermissionGroupDTO.PermissionInfo.builder()
+                        .id(permission.getId())
+                        .name(permission.getPermission().name())
+                        .description(permission.getDescription() != null ? permission.getDescription() : "")
+                        .category(category)
+                        .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)
+                        .selected(false)
+                        .build();
+
+                groupedPermissions.computeIfAbsent(category, k -> new ArrayList<>()).add(info);
+
+            } catch (Exception e) {
+                log.error("Error processing permission with ID: {}", permission.getId(), e);
+            }
         }
 
-        List<PermissionGroupDTO> result = new ArrayList<>();
+        if (nullCategoryCount > 0) {
+            log.warn("Found {} permissions with null category, assigned to 'General'", nullCategoryCount);
+        }
+
+        if (nullPermissionCount > 0) {
+            log.warn("Found {} permissions with null permission enum, skipped", nullPermissionCount);
+        }
+
+        // Sort permissions within each group by displayOrder
         for (Map.Entry<String, List<PermissionGroupDTO.PermissionInfo>> entry : groupedPermissions.entrySet()) {
-            // Sort permissions by displayOrder within each group
             entry.getValue().sort(Comparator.comparing(PermissionGroupDTO.PermissionInfo::getDisplayOrder));
-
-            result.add(PermissionGroupDTO.builder()
-                    .groupName(entry.getKey())
-                    .permissions(entry.getValue())
-                    .build());
         }
 
+        // Convert to list and sort by group name
+        List<PermissionGroupDTO> result = groupedPermissions.entrySet().stream()
+                .map(entry -> PermissionGroupDTO.builder()
+                        .groupName(entry.getKey())
+                        .permissions(entry.getValue())
+                        .build())
+                .sorted(Comparator.comparing(PermissionGroupDTO::getGroupName))
+                .collect(Collectors.toList());
+
+        log.debug("Returning {} permission groups", result.size());
         return result;
     }
 
     /**
-     * Get permissions for a specific role with selected status ✅ FIXED
+     * Get permissions for a specific role with selected status
      */
     public List<PermissionGroupDTO> getPermissionsWithRoleSelection(Long roleId, Set<Long> selectedPermissionIds) {
         log.debug("Getting permissions with role selection for roleId: {}", roleId);
 
         List<PermissionGroupDTO> groups = getGroupedPermissions();
-
-        // Handle null selectedPermissionIds
         Set<Long> selectedIds = selectedPermissionIds != null ? selectedPermissionIds : Collections.emptySet();
 
         for (PermissionGroupDTO group : groups) {
             for (PermissionGroupDTO.PermissionInfo permission : group.getPermissions()) {
-                // ✅ Now properly sets the selected flag
                 permission.setSelected(selectedIds.contains(permission.getId()));
             }
         }
@@ -105,73 +151,89 @@ public class TenantPermissionService {
     }
 
     /**
-     * Get permissions by category ✅ NEW
+     * Get permissions by category
      */
     public List<PermissionGroupDTO.PermissionInfo> getPermissionsByCategory(String category) {
         log.debug("Getting permissions by category: {}", category);
 
-        List<TenantPermission> permissions = permissionRepository.findByCategoryOrderByDisplayOrderAsc(category);
+        if (category == null || category.trim().isEmpty()) {
+            log.warn("Category is null or empty");
+            return new ArrayList<>();
+        }
+
+        List<TenantPermission> permissions;
+        try {
+            permissions = permissionRepository.findByCategoryOrderByDisplayOrderAsc(category);
+        } catch (Exception e) {
+            log.error("Error fetching permissions for category: {}", category, e);
+            // Fallback to findByCategory
+            permissions = permissionRepository.findByCategory(category);
+        }
+
+        if (permissions == null || permissions.isEmpty()) {
+            log.warn("No permissions found for category: {}", category);
+            return new ArrayList<>();
+        }
 
         return permissions.stream()
-                .map(p -> PermissionGroupDTO.PermissionInfo.builder()
-                        .id(p.getId())
-                        .name(p.getPermission().name())
-                        .description(p.getDescription())
-                        .category(p.getCategory())
-                        .displayOrder(p.getDisplayOrder())
-                        .selected(false)
-                        .build())
+                .map(p -> {
+                    try {
+                        return PermissionGroupDTO.PermissionInfo.builder()
+                                .id(p.getId())
+                                .name(p.getPermission() != null ? p.getPermission().name() : "UNKNOWN")
+                                .description(p.getDescription() != null ? p.getDescription() : "")
+                                .category(p.getCategory() != null ? p.getCategory() : category)
+                                .displayOrder(p.getDisplayOrder() != null ? p.getDisplayOrder() : 999)
+                                .selected(false)
+                                .build();
+                    } catch (Exception e) {
+                        log.error("Error converting permission to DTO: {}", p.getId(), e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
+
     private PermissionDTO convertToDTO(TenantPermission permission) {
-        if (permission == null) {
+        if (permission == null || permission.getPermission() == null) {
             return null;
         }
 
         return PermissionDTO.builder()
                 .id(permission.getId())
                 .permission(permission.getPermission().name())
-                .description(permission.getDescription())
-                .category(permission.getCategory())
-                .displayOrder(permission.getDisplayOrder())
+                .description(permission.getDescription() != null ? permission.getDescription() : "")
+                .category(permission.getCategory() != null ? permission.getCategory() : "General")
+                .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)
                 .selected(false)
                 .build();
     }
+
     public List<PermissionDTO> getAllPermissionDTOs() {
         log.debug("Getting all permission DTOs");
 
-        return permissionRepository.findAllByOrderByCategoryAscDisplayOrderAsc()
-                .stream()
+        List<TenantPermission> permissions = permissionRepository.findAllByOrderByCategoryAscDisplayOrderAsc();
+
+        return permissions.stream()
                 .map(this::convertToDTO)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
-    /**
-     * Get permission by ID ✅ NEW
-     */
+
     public PermissionDTO getPermissionById(Long id) {
         log.debug("Getting permission by id: {}", id);
 
-        TenantPermission permission = permissionRepository.findById(id)
-                .orElse(null);
+        Optional<TenantPermission> permissionOpt = permissionRepository.findById(id);
 
-        if (permission == null) {
+        if (permissionOpt.isEmpty()) {
             log.warn("Permission not found with id: {}", id);
             return null;
         }
 
-        return PermissionDTO.builder()
-                .id(permission.getId())
-                .permission(permission.getPermission().name())
-                .description(permission.getDescription())
-                .category(permission.getCategory())
-                .displayOrder(permission.getDisplayOrder())
-                .selected(false)
-                .build();
+        return convertToDTO(permissionOpt.get());
     }
 
-    /**
-     * Search permissions by name or description ✅ NEW
-     */
     public List<PermissionDTO> searchPermissions(String query) {
         log.debug("Searching permissions with query: {}", query);
 
@@ -182,47 +244,25 @@ public class TenantPermissionService {
         List<TenantPermission> permissions = permissionRepository.searchPermissions(query);
 
         return permissions.stream()
-                .map(p -> PermissionDTO.builder()
-                        .id(p.getId())
-                        .permission(p.getPermission().name())
-                        .description(p.getDescription())
-                        .category(p.getCategory())
-                        .displayOrder(p.getDisplayOrder())
-                        .selected(false)
-                        .build())
+                .map(this::convertToDTO)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all permission IDs
-     */
     public List<Long> getAllPermissionIds() {
         return permissionRepository.findAll().stream()
                 .map(TenantPermission::getId)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all permissions with pagination ✅ NEW
-     */
     public Page<PermissionDTO> getAllPermissions(Pageable pageable) {
         log.debug("Getting all permissions with pagination: {}", pageable);
 
         Page<TenantPermission> permissionPage = permissionRepository.findAll(pageable);
 
-        return permissionPage.map(p -> PermissionDTO.builder()
-                .id(p.getId())
-                .permission(p.getPermission().name())
-                .description(p.getDescription())
-                .category(p.getCategory())
-                .displayOrder(p.getDisplayOrder())
-                .selected(false)
-                .build());
+        return permissionPage.map(this::convertToDTO);
     }
 
-    /**
-     * Clear permission cache ✅ NEW
-     */
     @CacheEvict(value = "permissions", allEntries = true)
     public void clearCache() {
         log.info("Permission cache cleared");

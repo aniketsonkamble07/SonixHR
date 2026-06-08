@@ -58,6 +58,7 @@ public class EmployeeService {
     @Transactional
     public EmployeeResponse createEmployee(Long tenantId, EmployeeCreateRequest request) {
         log.info("Creating employee for tenant: {}", tenantId);
+        log.debug("Request roleIds: {}", request.getRoleIds());
 
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + tenantId));
@@ -67,37 +68,46 @@ public class EmployeeService {
             throw new BusinessException("Employee with email " + request.getEmail() + " already exists");
         }
 
+        // Validate roles BEFORE building employee
+        if (request.getRoleIds() == null || request.getRoleIds().isEmpty()) {
+            log.error("No roles provided for employee creation");
+            throw new BusinessException("At least one role is required for employee");
+        }
+
+        // Fetch roles
+        List<TenantRole> roles = roleRepository.findAllById(request.getRoleIds());
+        if (roles.isEmpty()) {
+            throw new BusinessException("No valid roles found for the provided role IDs");
+        }
+        log.info("Found {} roles for employee", roles.size());
+
         // Generate employee code
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
 
-        // Build employee
+        // Build employee with roles
         Employee employee = buildEmployeeFromRequest(tenant, request, employeeCode);
+
+        // ✅ Add roles BEFORE save
+        employee.getRoles().addAll(roles);
 
         // Set manager if provided
         if (request.getManagerId() != null) {
             Employee manager = employeeRepository.findById(request.getManagerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with id: " + request.getManagerId()));
             if (!manager.getTenantId().equals(tenantId)) {
                 throw new BusinessException("Manager must be from the same tenant");
             }
             employee.setManager(manager);
         }
 
-        // ✅ Set a default password hash (temporary, will be changed on activation)
-        employee.setPasswordHash(passwordEncoder.encode("Test@123"));
+        // Set default values
+        employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
         employee.setStatus(EmployeeStatus.ACTIVE);
         employee.setActive(true);
 
+        // Save employee (validation will pass because roles are set)
         Employee savedEmployee = employeeRepository.save(employee);
-        log.info("Employee created successfully with code: {}", employeeCode);
-
-        // Assign roles if provided
-        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
-            List<TenantRole> roles = roleRepository.findAllById(request.getRoleIds());
-            savedEmployee.getRoles().addAll(roles);
-            savedEmployee = employeeRepository.save(savedEmployee);
-            log.info("Assigned {} roles to employee", roles.size());
-        }
+        log.info("Employee created successfully with code: {} and {} roles", employeeCode, roles.size());
 
         return convertToResponse(savedEmployee);
     }
