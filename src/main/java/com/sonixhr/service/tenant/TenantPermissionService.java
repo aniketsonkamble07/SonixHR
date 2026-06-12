@@ -29,9 +29,10 @@ public class TenantPermissionService {
 
         for (TenantPermissionEnum enumPermission : TenantPermissionEnum.values()) {
             try {
-                if (permissionRepository.findByPermission(enumPermission).isEmpty()) {
+                // Convert enum to String using .name()
+                if (permissionRepository.findByPermission(enumPermission.name()).isEmpty()) {
                     TenantPermission permission = TenantPermission.builder()
-                            .permission(enumPermission)
+                            .permission(enumPermission.name())  // Store as String
                             .description(enumPermission.getDescription())
                             .category(enumPermission.getCategory())
                             .displayOrder(enumPermission.getOrder())
@@ -49,13 +50,11 @@ public class TenantPermissionService {
     /**
      * Get all permissions grouped by category (with caching)
      */
-
     public List<PermissionGroupDTO> getGroupedPermissions() {
         log.debug("Fetching grouped permissions from database");
 
         List<TenantPermission> allPermissions;
         try {
-            // Try to use the ordered method
             allPermissions = permissionRepository.findAllByOrderByCategoryAscDisplayOrderAsc();
             log.debug("Found {} permissions with ordering", allPermissions.size());
         } catch (Exception e) {
@@ -75,24 +74,24 @@ public class TenantPermissionService {
 
         for (TenantPermission permission : allPermissions) {
             try {
-                // Skip if permission enum is null
-                if (permission.getPermission() == null) {
+                // FIXED: getPermission() returns String, not Enum
+                String permissionName = permission.getPermission();
+                if (permissionName == null) {
                     nullPermissionCount++;
-                    log.warn("Permission with ID {} has null permission enum, skipping", permission.getId());
+                    log.warn("Permission with ID {} has null permission, skipping", permission.getId());
                     continue;
                 }
 
-                // Handle null category - assign to "General" category
                 String category = permission.getCategory();
                 if (category == null || category.trim().isEmpty()) {
                     category = "General";
                     nullCategoryCount++;
-                    log.debug("Permission {} has null category, assigning to 'General'", permission.getPermission().name());
+                    log.debug("Permission {} has null category, assigning to 'General'", permissionName);
                 }
 
                 PermissionGroupDTO.PermissionInfo info = PermissionGroupDTO.PermissionInfo.builder()
                         .id(permission.getId())
-                        .name(permission.getPermission().name())
+                        .name(permissionName)  // Use the String directly
                         .description(permission.getDescription() != null ? permission.getDescription() : "")
                         .category(category)
                         .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)
@@ -111,15 +110,13 @@ public class TenantPermissionService {
         }
 
         if (nullPermissionCount > 0) {
-            log.warn("Found {} permissions with null permission enum, skipped", nullPermissionCount);
+            log.warn("Found {} permissions with null permission, skipped", nullPermissionCount);
         }
 
-        // Sort permissions within each group by displayOrder
         for (Map.Entry<String, List<PermissionGroupDTO.PermissionInfo>> entry : groupedPermissions.entrySet()) {
             entry.getValue().sort(Comparator.comparing(PermissionGroupDTO.PermissionInfo::getDisplayOrder));
         }
 
-        // Convert to list and sort by group name
         List<PermissionGroupDTO> result = groupedPermissions.entrySet().stream()
                 .map(entry -> PermissionGroupDTO.builder()
                         .groupName(entry.getKey())
@@ -166,7 +163,6 @@ public class TenantPermissionService {
             permissions = permissionRepository.findByCategoryOrderByDisplayOrderAsc(category);
         } catch (Exception e) {
             log.error("Error fetching permissions for category: {}", category, e);
-            // Fallback to findByCategory
             permissions = permissionRepository.findByCategory(category);
         }
 
@@ -180,7 +176,7 @@ public class TenantPermissionService {
                     try {
                         return PermissionGroupDTO.PermissionInfo.builder()
                                 .id(p.getId())
-                                .name(p.getPermission() != null ? p.getPermission().name() : "UNKNOWN")
+                                .name(p.getPermission() != null ? p.getPermission() : "UNKNOWN")
                                 .description(p.getDescription() != null ? p.getDescription() : "")
                                 .category(p.getCategory() != null ? p.getCategory() : category)
                                 .displayOrder(p.getDisplayOrder() != null ? p.getDisplayOrder() : 999)
@@ -202,7 +198,7 @@ public class TenantPermissionService {
 
         return PermissionDTO.builder()
                 .id(permission.getId())
-                .permission(permission.getPermission().name())
+                .permission(permission.getPermission())  // This is already a String
                 .description(permission.getDescription() != null ? permission.getDescription() : "")
                 .category(permission.getCategory() != null ? permission.getCategory() : "General")
                 .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)

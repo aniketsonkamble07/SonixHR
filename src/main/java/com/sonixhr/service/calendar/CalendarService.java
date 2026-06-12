@@ -60,13 +60,22 @@ public class CalendarService {
 
         // Build maps for quick lookup
         Map<LocalDate, AttendanceRecord> attendanceMap = attendanceRecords.stream()
-                .collect(Collectors.toMap(AttendanceRecord::getAttendanceDate, a -> a));
+                .collect(Collectors.toMap(AttendanceRecord::getAttendanceDate, a -> a, (a1, a2) -> a1));
 
-        Map<LocalDate, List<LeaveResponseDTO>> leaveMap = approvedLeaves.stream()
-                .collect(Collectors.groupingBy(LeaveResponseDTO::getStartDate));
+        Map<LocalDate, List<LeaveResponseDTO>> leaveMap = new HashMap<>();
+        for (LeaveResponseDTO leave : approvedLeaves) {
+            LocalDate start = leave.getStartDate();
+            LocalDate end = leave.getEndDate();
+            LocalDate current = start.isBefore(startDate) ? startDate : start;
+            LocalDate limit = end.isAfter(endDate) ? endDate : end;
+            while (!current.isAfter(limit)) {
+                leaveMap.computeIfAbsent(current, k -> new ArrayList<>()).add(leave);
+                current = current.plusDays(1);
+            }
+        }
 
         Map<LocalDate, PublicHoliday> holidayMap = holidays.stream()
-                .collect(Collectors.toMap(PublicHoliday::getHolidayDate, h -> h));
+                .collect(Collectors.toMap(PublicHoliday::getHolidayDate, h -> h, (h1, h2) -> h1));
 
         // Build calendar days
         List<CalendarDayDTO> days = new ArrayList<>();

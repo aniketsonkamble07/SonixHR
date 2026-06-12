@@ -1,0 +1,113 @@
+package com.sonixhr.common.base;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.Column;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+
+@MappedSuperclass
+@Getter
+@Setter
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+public abstract class BaseUser extends BaseEntity implements UserDetails {
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @JsonIgnore
+    @Column(nullable = false)
+    private String password;
+
+    @Column(name = "full_name", nullable = false)
+    private String fullName;
+
+    // ❌ REMOVE THIS - Duplicate with BaseEntity.active
+    // @Column(name = "is_active")
+    // @Builder.Default
+    // private boolean isActive = true;
+
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
+    @Column(name = "roles_version")
+    @Builder.Default
+    private Integer rolesVersion = 1;
+
+    @Transient
+    private Collection<? extends GrantedAuthority> cachedAuthorities;
+
+    @Transient
+    private Integer cachedRolesVersion;
+
+    public void incrementRolesVersion() {
+        this.rolesVersion = (this.rolesVersion == null ? 1 : this.rolesVersion + 1);
+    }
+
+    public void clearAuthoritiesCache() {
+        this.cachedAuthorities = null;
+        this.cachedRolesVersion = null;
+    }
+
+    // Helper method to access active from BaseEntity
+    public boolean isActive() {
+        return super.isActive();  // This calls BaseEntity's active field
+    }
+
+    public void setActive(boolean active) {
+        super.setActive(active);
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (cachedAuthorities != null && cachedRolesVersion != null &&
+                cachedRolesVersion.equals(this.rolesVersion)) {
+            return cachedAuthorities;
+        }
+
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        loadAuthorities(authorities);
+
+        this.cachedAuthorities = authorities;
+        this.cachedRolesVersion = this.rolesVersion;
+
+        return authorities;
+    }
+
+    protected abstract void loadAuthorities(Set<GrantedAuthority> authorities);
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return super.isActive();  // Use BaseEntity's active field
+    }
+}

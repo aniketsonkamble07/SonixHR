@@ -8,9 +8,8 @@ public enum UserStatus {
     ACTIVE("Active", "success", "User can log in and perform actions"),
     INACTIVE("Inactive", "secondary", "User cannot log in"),
     SUSPENDED("Suspended", "danger", "Temporarily blocked"),
-    DELETED("Deleted", "danger", "Account has been permanently deleted");
-
-    private final String displayName;
+    DELETED("Deleted", "danger", "Account has been permanently deleted"),
+    PENDING_VERIFICATION("Pending Verification", "warning", "User needs to verify email before logging in");    private final String displayName;
     private final String badgeColor;
     private final String description;
 

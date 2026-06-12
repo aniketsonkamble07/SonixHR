@@ -44,6 +44,14 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     Optional<TenantRole> findByNameAndTenantIdIsNull(String name);
 
     /**
+     * Find role by ID with permissions fetched
+     */
+    @Query("SELECT DISTINCT r FROM TenantRole r " +
+            "LEFT JOIN FETCH r.permissions " +
+            "WHERE r.id = :roleId")
+    Optional<TenantRole> findByIdWithPermissions(@Param("roleId") Long roleId);
+
+    /**
      * Find tenant-specific role
      */
     Optional<TenantRole> findByTenantIdAndName(Long tenantId, String name);
@@ -95,12 +103,13 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     // =====================================================
 
     /**
-     * Get all default roles for a tenant (should be one, but returns list for safety)
+     * Get all default roles for a tenant (should be one, but returns list for
+     * safety)
      */
     List<TenantRole> findByTenantIdAndIsDefaultTrue(Long tenantId);
 
     /**
-     * Get the single default role for a tenant ✅ FIXED - Added this method
+     * Get the single default role for a tenant
      */
     @Query("SELECT r FROM TenantRole r WHERE r.tenantId = :tenantId AND r.isDefault = true")
     Optional<TenantRole> findDefaultRoleByTenantId(@Param("tenantId") Long tenantId);
@@ -111,7 +120,7 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     Optional<TenantRole> findByTenantIdAndIsDefaultTrueAndName(Long tenantId, String name);
 
     /**
-     * Check if tenant has a default role ✅ NEW
+     * Check if tenant has a default role
      */
     boolean existsByTenantIdAndIsDefaultTrue(Long tenantId);
 
@@ -131,7 +140,7 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     List<TenantRole> findAllSystemRoles();
 
     /**
-     * Get system role with permissions ✅ NEW
+     * Get system role with permissions
      */
     @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId IS NULL AND r.name = :name")
     Optional<TenantRole> findSystemRoleWithPermissions(@Param("name") String name);
@@ -147,10 +156,11 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     List<TenantRole> searchRoles(@Param("tenantId") Long tenantId, @Param("searchTerm") String searchTerm);
 
     /**
-     * Search roles with pagination ✅ NEW
+     * Search roles with pagination
      */
     @Query("SELECT r FROM TenantRole r WHERE r.tenantId = :tenantId AND LOWER(r.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
-    Page<TenantRole> searchRoles(@Param("tenantId") Long tenantId, @Param("searchTerm") String searchTerm, Pageable pageable);
+    Page<TenantRole> searchRoles(@Param("tenantId") Long tenantId, @Param("searchTerm") String searchTerm,
+            Pageable pageable);
 
     // =====================================================
     // COUNT QUERIES
@@ -182,14 +192,29 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     // =====================================================
 
     /**
-     * Delete all roles for a tenant ✅ NEW (use with caution)
+     * Delete all roles for a tenant
      */
     void deleteByTenantId(Long tenantId);
+
     Optional<TenantRole> findByNameAndTenantId(String name, Long tenantId);
 
     /**
-     * Find roles by IDs with tenant validation ✅ NEW
+     * Find roles by IDs with tenant validation
      */
     @Query("SELECT r FROM TenantRole r WHERE r.id IN :ids AND r.tenantId = :tenantId")
     List<TenantRole> findAllByIdInAndTenantId(@Param("ids") Set<Long> ids, @Param("tenantId") Long tenantId);
+
+    @Query("SELECT r FROM TenantRole r WHERE r.tenantId = :tenantId AND r.active = true")
+    List<TenantRole> findByTenantIdAndActiveTrue(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT r FROM TenantRole r WHERE r.tenantId = :tenantId AND r.category = :category")
+    List<TenantRole> findByTenantIdAndCategory(@Param("tenantId") Long tenantId,
+            @Param("category") String category);
+
+    @Query("SELECT r.category, COUNT(r) FROM TenantRole r WHERE r.tenantId = :tenantId GROUP BY r.category")
+    List<Object[]> countRolesByCategory(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT COUNT(r) FROM TenantRole r WHERE r.tenantId = :tenantId AND r.active = true")
+    long countByTenantIdAndActiveTrue(@Param("tenantId") Long tenantId);
+
 }

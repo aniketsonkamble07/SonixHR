@@ -1,51 +1,50 @@
 package com.sonixhr.entity.tenant;
 
+import com.sonixhr.common.base.BasePermission;
+import com.sonixhr.common.base.BaseRole;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.TenantPermissionEnum;
-import com.sonixhr.exceptions.BusinessException;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "tenant_roles", uniqueConstraints = {
         @UniqueConstraint(name = "uk_role_tenant_name", columnNames = {"tenant_id", "name"})
 }, indexes = {
         @Index(name = "idx_role_tenant", columnList = "tenant_id"),
         @Index(name = "idx_role_name", columnList = "name"),
-        @Index(name = "idx_role_default", columnList = "is_default")
+        @Index(name = "idx_role_default", columnList = "is_default"),
+        @Index(name = "idx_role_tenant_system", columnList = "is_system_role")
 })
-public class TenantRole {
+@Getter
+@Setter
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class TenantRole extends BaseRole {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "tenant_id", nullable = true)  // CHANGE: nullable = true to allow system/template roles
-    private Long tenantId;  // null = system role (template), non-null = tenant-specific role
-
-    @Column(nullable = false, length = 50)
-    private String name;
-
-    @Column(length = 200)
-    private String description;
+    @Column(name = "tenant_id", nullable = true)
+    private Long tenantId;
 
     @Column(name = "is_default")
     @Builder.Default
     private boolean isDefault = false;
+
+    @Column(name = "is_active")
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "priority")
+    @Builder.Default
+    private Integer priority = 0;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
@@ -60,155 +59,124 @@ public class TenantRole {
     @Builder.Default
     private Set<Employee> employees = new HashSet<>();
 
-    @Column(name = "created_by")
-    private Long createdBy;
+    // ==================== Implement BaseRole Abstract Methods ====================
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Override
+    public Set<TenantPermission> getPermissions() {
+        return permissions;
+    }
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Override
+    @SuppressWarnings("unchecked")
+    public void setPermissions(Set<? extends BasePermission> permissions) {
+        this.permissions = (Set<TenantPermission>) permissions;
+    }
 
-    // =====================================================
-    // HELPER METHODS
-    // =====================================================
+    // ==================== Helper Methods ====================
 
-    /**
-     * Check if this is a system role (template)
-     */
     public boolean isSystemRole() {
-        return tenantId == null;
+        return super.isSystemRole();
     }
 
-    /**
-     * Check if this is a tenant-specific role
-     */
-    public boolean isTenantRole() {
-        return tenantId != null;
+    public void setSystemRole(boolean systemRole) {
+        super.setSystemRole(systemRole);
     }
 
-    /**
-     * Add permission to role (maintains both sides if needed)
-     */
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+
     public void addPermission(TenantPermission permission) {
         if (permission != null) {
             this.permissions.add(permission);
         }
     }
 
-    /**
-     * Remove permission from role
-     */
     public void removePermission(TenantPermission permission) {
-        this.permissions.remove(permission);
-    }
-
-    /**
-     * Add multiple permissions at once
-     */
-    public void addPermissions(Set<TenantPermission> permissions) {
-        if (permissions != null) {
-            this.permissions.addAll(permissions);
+        if (permission != null) {
+            this.permissions.remove(permission);
         }
     }
 
-    /**
-     * Check if role has specific permission
-     */
+    // Check if role has specific permission (by enum)
     public boolean hasPermission(TenantPermissionEnum permissionEnum) {
-        return permissions.stream()
-                .anyMatch(p -> p.getPermission() == permissionEnum);
+        if (permissionEnum == null) return false;
+        return this.permissions.stream()
+                .anyMatch(p -> p.getPermissionName() != null &&
+                        p.getPermissionName().equals(permissionEnum.name()));
     }
 
-    /**
-     * Check if role has any of the given permissions
-     */
-    public boolean hasAnyPermission(TenantPermissionEnum... permissionEnums) {
-        Set<TenantPermissionEnum> permissionSet = Set.of(permissionEnums);
-        return permissions.stream()
-                .anyMatch(p -> permissionSet.contains(p.getPermission()));
+    // Check by string name (for Spring Security)
+    public boolean hasPermission(String permissionName) {
+        if (permissionName == null) return false;
+        return this.permissions.stream()
+                .anyMatch(p -> p.getPermissionName() != null &&
+                        p.getPermissionName().equals(permissionName));
     }
 
-    /**
-     * Get all permission names as strings
-     */
+    // Get all permission names as strings (for Spring Security)
     public Set<String> getPermissionNames() {
-        return permissions.stream()
-                .map(p -> p.getPermission().name())
-                .collect(java.util.stream.Collectors.toSet());
+        if (this.permissions == null || this.permissions.isEmpty()) {
+            return new HashSet<>();
+        }
+        return this.permissions.stream()
+                .filter(p -> p.getPermissionName() != null)
+                .map(TenantPermission::getPermissionName)
+                .collect(Collectors.toSet());
     }
 
-    /**
-     * Check if role is assigned to any employee
-     */
-    public boolean isAssignedToEmployees() {
-        return employees != null && !employees.isEmpty();
+    public int getPermissionCount() {
+        return this.permissions.size();
     }
 
-    /**
-     * Get count of employees with this role
-     */
-    public int getEmployeeCount() {
-        return employees != null ? employees.size() : 0;
-    }
-
-    /**
-     * Check if role is a default role for the tenant
-     */
     public boolean isDefaultRole() {
         return isDefault;
     }
 
-    /**
-     * Set as default role (ensures only one default per tenant)
-     * Note: This method should be called within a service with proper transaction
-     */
     public void setAsDefault() {
         this.isDefault = true;
     }
 
-    /**
-     * Remove default flag
-     */
     public void removeDefaultFlag() {
         this.isDefault = false;
     }
 
-    /**
-     * Validate role before deletion
-     */
-    public void validateForDeletion() {
-        if (isAssignedToEmployees()) {
-            throw new BusinessException("Cannot delete role. It is assigned to " + getEmployeeCount() + " employee(s)");
-        }
-
-        if (isDefaultRole() && !isSystemRole()) {
-            throw new BusinessException("Cannot delete default role. Set another role as default first");
-        }
+    public void activate() {
+        this.active = true;
     }
 
-    /**
-     * Check if this is a super admin role
-     */
-    public boolean isSuperAdminRole() {
-        return "Super Admin".equals(name);
+    public void deactivate() {
+        this.active = false;
     }
 
-    /**
-     * Check if this is an admin role
-     */
-    public boolean isAdminRole() {
-        return "Admin".equals(name);
+    public boolean isAssignedToEmployees() {
+        return employees != null && !employees.isEmpty();
     }
+
+    public int getEmployeeCount() {
+        return employees != null ? employees.size() : 0;
+    }
+
+    // ==================== equals, hashCode, toString ====================
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof TenantRole)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
         TenantRole that = (TenantRole) o;
-        return id != null && Objects.equals(id, that.id);
+        return getId() != null && Objects.equals(getId(), that.getId());
     }
 
     @Override
@@ -218,6 +186,15 @@ public class TenantRole {
 
     @Override
     public String toString() {
-        return "TenantRole{id=" + id + ", name='" + name + "', tenantId=" + tenantId + "}";
+        return "TenantRole{" +
+                "id=" + getId() +
+                ", name='" + getName() + '\'' +
+                ", description='" + getDescription() + '\'' +
+                ", isSystemRole=" + isSystemRole() +
+                ", isDefault=" + isDefault +
+                ", isActive=" + active +
+                ", category='" + getCategory() + '\'' +
+                ", permissionCount=" + getPermissionCount() +
+                '}';
     }
 }

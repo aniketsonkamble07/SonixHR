@@ -3,6 +3,13 @@ package com.sonixhr.enums;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 @Getter
 @RequiredArgsConstructor
 public enum PlatformPermissionEnum {
@@ -38,6 +45,7 @@ public enum PlatformPermissionEnum {
     DELETE_PLATFORM_ROLE("Delete platform role", "Role Management", 4),
     ASSIGN_PLATFORM_ROLE("Assign platform role to users", "Role Management", 5),
     VIEW_PLATFORM_USERS("View platform users", "User Management", 1),
+
     // =====================================================
     // SYSTEM MANAGEMENT
     // =====================================================
@@ -86,4 +94,44 @@ public enum PlatformPermissionEnum {
     private final String description;
     private final String category;
     private final int order;
+
+    // =====================================================
+    // HELPER METHODS
+    // =====================================================
+
+    private static final Map<String, PlatformPermissionEnum> BY_NAME =
+            Arrays.stream(values())
+                    .collect(Collectors.toMap(Enum::name, Function.identity()));
+
+    /**
+     * Get permission enum by name
+     */
+    public static PlatformPermissionEnum fromName(String name) {
+        return BY_NAME.get(name);
+    }
+
+    /**
+     * Check if permission exists by name
+     */
+    public static boolean exists(String name) {
+        return BY_NAME.containsKey(name);
+    }
+
+    /**
+     * Get all permissions in a specific category
+     */
+    public static List<PlatformPermissionEnum> getByCategory(String category) {
+        return Arrays.stream(values())
+                .filter(p -> p.getCategory().equals(category))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all categories
+     */
+    public static Set<String> getAllCategories() {
+        return Arrays.stream(values())
+                .map(PlatformPermissionEnum::getCategory)
+                .collect(Collectors.toSet());
+    }
 }

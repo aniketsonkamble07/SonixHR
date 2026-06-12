@@ -143,20 +143,28 @@ public class PlatformRoleController {
             return null;
         }
 
+        // Handle permission conversion safely
+        List<PlatformRoleResponse.PermissionInfo> permissions = List.of();
+        if (role.getPermissions() != null) {
+            permissions = role.getPermissions().stream()
+                    .map(p -> {
+                        // FIXED: getPermission() returns String, not an enum
+                        String permissionName = p.getPermission();  // This is already a String
+                        return PlatformRoleResponse.PermissionInfo.builder()
+                                .id(p.getId())
+                                .name(permissionName)
+                                .description(p.getDescription())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
         return PlatformRoleResponse.builder()
                 .id(role.getId())
                 .name(role.getName())
                 .description(role.getDescription())
                 .isSystemRole(role.isSystemRole())
-                .permissions(role.getPermissions() != null ?
-                        role.getPermissions().stream()
-                                .map(p -> PlatformRoleResponse.PermissionInfo.builder()
-                                        .id(p.getId())
-                                        .name(p.getPermission() != null ? p.getPermission().name() : null)
-                                        .description(p.getDescription())
-                                        .build())
-                                .collect(Collectors.toList()) :
-                        List.of())
+                .permissions(permissions)
                 .createdAt(role.getCreatedAt())
                 .updatedAt(role.getUpdatedAt())
                 .build();

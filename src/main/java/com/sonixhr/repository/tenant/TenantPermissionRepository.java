@@ -17,18 +17,19 @@ import java.util.Set;
 public interface TenantPermissionRepository extends JpaRepository<TenantPermission, Long> {
 
     // =====================================================
-    // BASIC QUERIES
+    // BASIC QUERIES - ALL USE STRING
     // =====================================================
 
     /**
-     * Find permission by enum value
+     * Find permission by permission name (String)
      */
-    Optional<TenantPermission> findByPermission(TenantPermissionEnum permission);
+    Optional<TenantPermission> findByPermission(String permission);
 
     /**
-     * Find permissions by multiple enum values
+     * Find permissions by multiple permission names (Set of Strings)
+     * ONLY THIS VERSION - REMOVE the Enum version
      */
-    List<TenantPermission> findByPermissionIn(Set<TenantPermissionEnum> permissions);
+    List<TenantPermission> findByPermissionIn(Set<String> permissions);
 
     /**
      * Find permissions by category (unsorted)
@@ -36,7 +37,7 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     List<TenantPermission> findByCategory(String category);
 
     /**
-     * Find permissions by category with sorting ✅ FIXED - Added this method
+     * Find permissions by category with sorting
      */
     List<TenantPermission> findByCategoryOrderByDisplayOrderAsc(String category);
 
@@ -56,7 +57,7 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     List<TenantPermission> findAllByIdIn(@Param("ids") Set<Long> ids);
 
     /**
-     * Find permissions by IDs with pagination ✅ NEW
+     * Find permissions by IDs with pagination
      */
     @Query("SELECT p FROM TenantPermission p WHERE p.id IN :ids")
     Page<TenantPermission> findByIdIn(@Param("ids") Set<Long> ids, Pageable pageable);
@@ -72,7 +73,7 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     List<String> findAllCategories();
 
     /**
-     * Get permissions by category with pagination ✅ NEW
+     * Get permissions by category with pagination
      */
     Page<TenantPermission> findByCategory(String category, Pageable pageable);
 
@@ -89,7 +90,7 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     List<TenantPermission> searchPermissions(@Param("searchTerm") String searchTerm);
 
     /**
-     * Search permissions with pagination ✅ NEW
+     * Search permissions with pagination
      */
     @Query("SELECT p FROM TenantPermission p WHERE " +
             "LOWER(p.permission) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
@@ -97,7 +98,7 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     Page<TenantPermission> searchPermissions(@Param("searchTerm") String searchTerm, Pageable pageable);
 
     /**
-     * Search permissions by category and term ✅ NEW
+     * Search permissions by category and term
      */
     @Query("SELECT p FROM TenantPermission p WHERE " +
             "p.category = :category AND (" +
@@ -117,22 +118,27 @@ public interface TenantPermissionRepository extends JpaRepository<TenantPermissi
     long countRolesByPermissionId(@Param("permissionId") Long permissionId);
 
     /**
-     * Count permissions by category ✅ NEW
+     * Count permissions by category
      */
     @Query("SELECT p.category, COUNT(p) FROM TenantPermission p GROUP BY p.category")
     List<Object[]> countPermissionsByCategory();
 
     /**
-     * Check if permission exists by enum ✅ NEW
+     * Check if permission exists by name (String)
      */
-    boolean existsByPermission(TenantPermissionEnum permission);
+    boolean existsByPermission(String permission);
 
     // =====================================================
     // BULK OPERATIONS
     // =====================================================
 
     /**
-     * Delete permissions by IDs (use with caution) ✅ NEW
+     * Delete permissions by IDs (use with caution)
      */
     void deleteByIdIn(Set<Long> ids);
+
+    // =====================================================
+    // HELPER METHODS - Convert enums to strings at caller level
+    // (No default methods to avoid erasure conflicts)
+    // =====================================================
 }

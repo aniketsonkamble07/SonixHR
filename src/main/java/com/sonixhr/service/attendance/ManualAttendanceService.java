@@ -10,6 +10,9 @@ import com.sonixhr.repository.attendance.ManualAttendanceRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -147,6 +150,7 @@ public class ManualAttendanceService {
      * Mark attendance for today
      */
     @Transactional
+    @CacheEvict(value = "attendance", allEntries = true)
     public AttendanceRecord markAttendance(Long targetEmployeeId, AttendanceStatus status,
                                            String reason, Double overtimeHours,
                                            Employee currentUser) {
@@ -166,6 +170,7 @@ public class ManualAttendanceService {
      * Mark attendance for specific date (with strict date validation)
      */
     @Transactional
+    @CacheEvict(value = "attendance", allEntries = true)
     public AttendanceRecord markAttendanceForDate(Long targetEmployeeId, LocalDate date,
                                                   AttendanceStatus status, String reason,
                                                   Double overtimeHours, Employee currentUser) {
@@ -238,6 +243,7 @@ public class ManualAttendanceService {
      * Mark attendance for multiple team members at once
      */
     @Transactional
+    @CacheEvict(value = "attendance", allEntries = true)
     public List<AttendanceRecord> markTeamAttendance(Long managerId, LocalDate date,
                                                      Map<Long, AttendanceStatus> attendanceMap,
                                                      Map<Long, String> reasonMap,
@@ -282,6 +288,7 @@ public class ManualAttendanceService {
      * Quick mark all team members with same status (for today only)
      */
     @Transactional
+    @CacheEvict(value = "attendance", allEntries = true)
     public List<AttendanceRecord> quickMarkTeamAttendance(Long managerId, AttendanceStatus defaultStatus) {
         log.info("Manager {} quick marking all team members as: {}", managerId, defaultStatus);
 
@@ -301,6 +308,7 @@ public class ManualAttendanceService {
     // =====================================================
 
     @Transactional
+    @CacheEvict(value = "attendance", allEntries = true)
     public AttendanceRecord addOvertime(Long employeeId, LocalDate date, Double overtimeHours,
                                         String reason, Employee currentUser) {
 
@@ -378,8 +386,28 @@ public class ManualAttendanceService {
     public List<ManualTeamMemberAttendanceDTO> getTeamWithTodayAttendance(Long managerId) {
         log.info("Getting team with today's attendance for manager: {}", managerId);
 
-        List<Employee> teamMembers = getTeamMembers(managerId);
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        Long tenantId = manager.getTenant().getId();
+
+        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+        log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
+
         LocalDate today = LocalDate.now(Clock.systemUTC());
+
+        List<Long> employeeIds = teamMembers.stream()
+                .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
+                .map(Employee::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
+        if (!employeeIds.isEmpty()) {
+            List<AttendanceRecord> records = attendanceRepository
+                    .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
+            for (AttendanceRecord record : records) {
+                attendanceMap.put(record.getEmployee().getId(), record);
+            }
+        }
 
         List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
 
@@ -388,9 +416,7 @@ public class ManualAttendanceService {
                 continue;
             }
 
-            Long tenantId = employee.getTenant().getId();
-            Optional<AttendanceRecord> attendance = attendanceRepository
-                    .findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, employee.getId(), today);
+            Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
 
             ManualTeamMemberAttendanceDTO dto = ManualTeamMemberAttendanceDTO.builder()
                     .employeeId(employee.getId())
@@ -489,6 +515,7 @@ public class ManualAttendanceService {
                 tenantId, employeeId, startDate, endDate, pageable);
     }
 
+    @Cacheable(value = "attendance", key = "'today:' + #tenantId + ':' + #employeeId", unless = "#result == null")
     public AttendanceRecord getTodayAttendance(Long employeeId, Long tenantId) {
         LocalDate today = LocalDate.now(Clock.systemUTC());
         return attendanceRepository.findByTenantIdAndEmployeeIdAndAttendanceDate(tenantId, employeeId, today)
@@ -499,6 +526,7 @@ public class ManualAttendanceService {
     // SUMMARY & REPORTS
     // =====================================================
 
+    @Cacheable(value = "attendance", key = "'summary:' + #tenantId + ':' + #employeeId + ':' + #year + ':' + #month", unless = "#result == null")
     public Map<String, Object> getMonthlySummary(Long employeeId, int year, int month, Long tenantId) {
 
         LocalDate startDate = LocalDate.of(year, month, 1);
@@ -573,8 +601,15 @@ public class ManualAttendanceService {
         // Validate date range
         validateDateRange(startDate, endDate);
 
+        // Get manager
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        Long tenantId = manager.getTenant().getId();
+
         // Get manager's team members
-        List<Employee> teamMembers = getTeamMembers(managerId);
+        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+        log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
+
         List<Long> teamIds = teamMembers.stream()
                 .map(Employee::getId)
                 .collect(Collectors.toList());
@@ -588,14 +623,13 @@ public class ManualAttendanceService {
             return emptyResponse;
         }
 
-        // Get tenant ID from manager
-        Employee manager = employeeRepository.findById(managerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
-        Long tenantId = manager.getTenant().getId();
-
         // Get all attendance records for team
         List<AttendanceRecord> allAttendance = attendanceRepository
                 .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, teamIds, startDate, endDate);
+
+        // Group attendance records by employee ID to avoid O(N * M) scanning in loop
+        Map<Long, List<AttendanceRecord>> recordsByEmployee = allAttendance.stream()
+                .collect(Collectors.groupingBy(r -> r.getEmployee().getId()));
 
         // Calculate employee summaries
         Map<String, Object> employeeSummaries = new LinkedHashMap<>();
@@ -608,9 +642,7 @@ public class ManualAttendanceService {
         teamTotals.put("totalOvertime", 0.0);
 
         for (Employee employee : teamMembers) {
-            List<AttendanceRecord> employeeRecords = allAttendance.stream()
-                    .filter(r -> r.getEmployee().getId().equals(employee.getId()))
-                    .collect(Collectors.toList());
+            List<AttendanceRecord> employeeRecords = recordsByEmployee.getOrDefault(employee.getId(), Collections.emptyList());
 
             long present = employeeRecords.stream()
                     .filter(r -> r.getStatus() == AttendanceStatus.PRESENT).count();
@@ -668,6 +700,7 @@ public class ManualAttendanceService {
      * Get attendance calendar view for an employee
      * Returns a map of dates with attendance status for the entire month
      */
+    @Cacheable(value = "attendance", key = "'calendar:' + #tenantId + ':' + #employeeId + ':' + #year + ':' + #month", unless = "#result == null || #result.isEmpty()")
     public Map<LocalDate, Map<String, Object>> getAttendanceCalendar(Long employeeId, int year, int month, Long tenantId) {
         log.info("Getting attendance calendar for employee: {} for {}-{}", employeeId, year, month);
 
@@ -747,32 +780,47 @@ public class ManualAttendanceService {
 
 
 
+    @Cacheable(value = "attendance", key = "'stats:' + #currentUser.tenantId + ':' + #currentUser.id", unless = "#result == null")
     public Map<String, Object> getDashboardStats(Employee currentUser) {
         LocalDate today = LocalDate.now(Clock.systemUTC());
         Long tenantId = currentUser.getTenantId();
 
         List<Long> teamIds;
+        List<AttendanceRecord> todaysRecords;
+
         if (currentUser.isSuperAdmin()) {
             List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
             teamIds = allEmployees.stream()
                     .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
                     .map(Employee::getId)
                     .collect(Collectors.toList());
+            todaysRecords = attendanceRepository.findByTenantIdAndAttendanceDate(tenantId, today);
         } else {
             List<Employee> team = employeeRepository.findByManagerId(currentUser.getId());
             teamIds = team.stream()
                     .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
                     .map(Employee::getId)
                     .collect(Collectors.toList());
+            if (teamIds.isEmpty()) {
+                todaysRecords = Collections.emptyList();
+            } else {
+                todaysRecords = attendanceRepository.findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(
+                        tenantId, teamIds, today, today);
+            }
         }
 
         long totalEmployees = teamIds.size();
-        long presentToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatusIn(
-                tenantId, today, List.of(AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.HALF_DAY));
-        long absentToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatus(
-                tenantId, today, AttendanceStatus.ABSENT);
-        long onLeaveToday = attendanceRepository.countByTenantIdAndAttendanceDateAndStatus(
-                tenantId, today, AttendanceStatus.ON_LEAVE);
+        long presentToday = todaysRecords.stream()
+                .filter(r -> r.getStatus() == AttendanceStatus.PRESENT
+                        || r.getStatus() == AttendanceStatus.LATE
+                        || r.getStatus() == AttendanceStatus.HALF_DAY)
+                .count();
+        long absentToday = todaysRecords.stream()
+                .filter(r -> r.getStatus() == AttendanceStatus.ABSENT)
+                .count();
+        long onLeaveToday = todaysRecords.stream()
+                .filter(r -> r.getStatus() == AttendanceStatus.ON_LEAVE)
+                .count();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("date", today);

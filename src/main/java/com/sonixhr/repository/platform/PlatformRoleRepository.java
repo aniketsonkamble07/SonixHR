@@ -1,25 +1,78 @@
 package com.sonixhr.repository.platform;
 
 import com.sonixhr.entity.platform.PlatformRole;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface PlatformRoleRepository extends JpaRepository<PlatformRole, Long> {
 
-    // ✅ Basic queries (no tenantId)
+    // =====================================================
+    // BASIC QUERIES
+    // =====================================================
+
     boolean existsByName(String name);
     Optional<PlatformRole> findByName(String name);
 
     @Query("SELECT DISTINCT r FROM PlatformRole r LEFT JOIN FETCH r.permissions")
     List<PlatformRole> findAllWithPermissions();
 
-    List<PlatformRole> findByIsSystemRoleTrue();
+    // ✅ FIXED: Change from findByIsSystemRoleTrue to findBySystemRoleTrue
+    List<PlatformRole> findBySystemRoleTrue();
+    List<PlatformRole> findBySystemRoleFalse();
 
-    List<PlatformRole> findByIsSystemRoleFalse();
+    // =====================================================
+    // ADD THESE USEFUL METHODS
+    // =====================================================
+
+    List<PlatformRole> findByCategory(String category);
+
+    @Query("SELECT r FROM PlatformRole r ORDER BY r.priority DESC")
+    List<PlatformRole> findAllOrderByPriorityDesc();
+
+    List<PlatformRole> findByActiveTrue();
+
+    List<PlatformRole> findByNameContainingIgnoreCase(String name);
+
+    Page<PlatformRole> findByCategory(String category, Pageable pageable);
+
+    @Query("SELECT r.category, COUNT(r) FROM PlatformRole r GROUP BY r.category")
+    List<Object[]> countRolesByCategory();
+
+    @Query("SELECT COUNT(u) > 0 FROM PlatformUser u JOIN u.roles r WHERE r.id = :roleId")
+    boolean isRoleAssignedToUsers(@Param("roleId") Long roleId);
+
+    List<PlatformRole> findAllByIdIn(Set<Long> ids);
+
+    Page<PlatformRole> findAll(Pageable pageable);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE PlatformRole r SET r.priority = :priority WHERE r.id = :roleId")
+    int updatePriority(@Param("roleId") Long roleId, @Param("priority") Integer priority);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE PlatformRole r SET r.active = false WHERE r.id IN :roleIds")
+    int bulkDeactivate(@Param("roleIds") Set<Long> roleIds);
+
+    // ✅ FIXED: Change from countByIsSystemRoleTrue to countBySystemRoleTrue
+    long countBySystemRoleTrue();
+    long countBySystemRoleFalse();
+
+    long countByActiveTrue();
+    long countByActiveFalse();
+
+    @Query("SELECT DISTINCT r FROM PlatformRole r LEFT JOIN FETCH r.permissions WHERE r.id = :roleId")
+    Optional<PlatformRole> findByIdWithPermissions(@Param("roleId") Long roleId);
 }

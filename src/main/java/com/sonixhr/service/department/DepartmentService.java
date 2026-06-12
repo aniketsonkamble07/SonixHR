@@ -117,26 +117,31 @@ public class DepartmentService {
 
     public Page<DepartmentResponse> getAllDepartments(Long tenantId, Pageable pageable) {
         Page<Department> departments = departmentRepository.findByTenant_Id(tenantId, pageable);
-        return departments.map(this::convertToResponse);
+        Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
+        return departments.map(dept -> convertToResponseUsingAllCountsMap(dept, countsMap));
     }
 
     public List<DepartmentResponse> getAllDepartmentsList(Long tenantId) {
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
         return departments.stream()
-                .map(this::convertToResponse)
+                .map(dept -> convertToResponseUsingAllCountsMap(dept, countsMap))
                 .collect(Collectors.toList());
     }
-// =====================================================
-// GET EMPLOYEE COUNT (Legacy method for backward compatibility)
-// =====================================================
+
+    // =====================================================
+    // GET EMPLOYEE COUNT (Legacy method for backward compatibility)
+    // =====================================================
 
     public Long getEmployeeCount(Long departmentId, Long tenantId) {
         return getTotalEmployeeCount(departmentId, tenantId);
     }
+
     public Page<DepartmentResponse> searchDepartments(Long tenantId, String query, Pageable pageable) {
         log.info("Searching departments for tenant: {} with query: {}", tenantId, query);
         Page<Department> departments = departmentRepository.searchDepartments(tenantId, query, pageable);
-        return departments.map(this::convertToResponse);
+        Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
+        return departments.map(dept -> convertToResponseUsingAllCountsMap(dept, countsMap));
     }
 
     // =====================================================
@@ -146,30 +151,7 @@ public class DepartmentService {
     public DepartmentResponse getDepartmentWithStats(Long id, Long tenantId) {
         Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
-
-        // Get all employee counts for this department
-        Long totalEmployees = employeeRepository.countByDepartmentIdAndTenantId(department.getId(), tenantId);
-        Long activeEmployees = employeeRepository.countActiveByDepartmentIdAndTenantId(
-                department.getId(), tenantId, EmployeeStatus.ACTIVE);
-        Long onProbationEmployees = employeeRepository.countActiveByDepartmentIdAndTenantId(
-                department.getId(), tenantId, EmployeeStatus.PROBATION);
-
-        // Calculate percentages
-        Double activePercentage = totalEmployees > 0 ? (activeEmployees * 100.0 / totalEmployees) : 0.0;
-
-        return DepartmentResponse.builder()
-                .id(department.getId())
-                .tenantId(department.getTenantId())
-                .name(department.getName())
-                .code(department.getCode())
-                .description(department.getDescription())
-                .totalEmployees(totalEmployees)
-                .activeEmployees(activeEmployees)
-                .onProbationEmployees(onProbationEmployees)
-                .activePercentage(Math.round(activePercentage * 100.0) / 100.0)
-                .createdAt(department.getCreatedAt())
-                .updatedAt(department.getUpdatedAt())
-                .build();
+        return convertToResponse(department);
     }
 
     // =====================================================
@@ -178,22 +160,15 @@ public class DepartmentService {
 
     public List<DepartmentResponse> getAllDepartmentsWithBulkCounts(Long tenantId) {
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
-
-        // Get all employee counts in a single query per department
-        // Or use batch query for better performance
-        Map<Long, Long> totalCounts = new HashMap<>();
-        Map<Long, Long> activeCounts = new HashMap<>();
-
-        for (Department dept : departments) {
-            totalCounts.put(dept.getId(), employeeRepository.countByDepartmentIdAndTenantId(dept.getId(), tenantId));
-            activeCounts.put(dept.getId(), employeeRepository.countActiveByDepartmentIdAndTenantId(
-                    dept.getId(), tenantId, EmployeeStatus.ACTIVE));
-        }
+        Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
 
         return departments.stream()
-                .map(dept -> convertToResponseWithCounts(dept,
-                        totalCounts.getOrDefault(dept.getId(), 0L),
-                        activeCounts.getOrDefault(dept.getId(), 0L)))
+                .map(dept -> {
+                    Map<EmployeeStatus, Long> statusCounts = countsMap.getOrDefault(dept.getId(), Map.of());
+                    long totalEmployees = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+                    long activeEmployees = statusCounts.getOrDefault(EmployeeStatus.ACTIVE, 0L);
+                    return convertToResponseWithCounts(dept, totalEmployees, activeEmployees);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -249,10 +224,12 @@ public class DepartmentService {
         long totalActiveEmployees = 0;
 
         Map<String, Long> departmentWiseCount = new HashMap<>();
+        Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
 
         for (Department dept : departments) {
-            long deptTotal = employeeRepository.countByDepartmentIdAndTenantId(dept.getId(), tenantId);
-            long deptActive = employeeRepository.countActiveByDepartmentIdAndTenantId(dept.getId(), tenantId, EmployeeStatus.ACTIVE);
+            Map<EmployeeStatus, Long> statusCounts = countsMap.getOrDefault(dept.getId(), Map.of());
+            long deptTotal = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+            long deptActive = statusCounts.getOrDefault(EmployeeStatus.ACTIVE, 0L);
 
             totalEmployees += deptTotal;
             totalActiveEmployees += deptActive;
@@ -272,18 +249,46 @@ public class DepartmentService {
     // PRIVATE CONVERSION METHODS
     // =====================================================
 
+    private Map<Long, Map<EmployeeStatus, Long>> getDepartmentCountsMap(Long tenantId) {
+        List<Object[]> countData = employeeRepository.countEmployeesByDepartmentAndStatus(tenantId);
+        Map<Long, Map<EmployeeStatus, Long>> map = new HashMap<>();
+        for (Object[] row : countData) {
+            Long deptId = (Long) row[0];
+            EmployeeStatus status = (EmployeeStatus) row[1];
+            Long count = (Long) row[2];
+            map.computeIfAbsent(deptId, k -> new HashMap<>()).put(status, count);
+        }
+        return map;
+    }
+
+    private Map<EmployeeStatus, Long> getDepartmentStatusCounts(Long tenantId, Long departmentId) {
+        List<Object[]> countData = employeeRepository.countEmployeesByStatusForDepartment(tenantId, departmentId);
+        Map<EmployeeStatus, Long> map = new HashMap<>();
+        for (Object[] row : countData) {
+            EmployeeStatus status = (EmployeeStatus) row[0];
+            Long count = (Long) row[1];
+            map.put(status, count);
+        }
+        return map;
+    }
+
     private DepartmentResponse convertToResponse(Department department) {
-        Long departmentId = department.getId();
-        Long tenantId = department.getTenantId();
+        Map<EmployeeStatus, Long> statusCounts = getDepartmentStatusCounts(department.getTenantId(), department.getId());
+        return convertToResponse(department, statusCounts);
+    }
 
-        // Get employee counts using repository methods
-        Long totalEmployees = employeeRepository.countByDepartmentIdAndTenantId(departmentId, tenantId);
-        Long activeEmployees = employeeRepository.countActiveByDepartmentIdAndTenantId(departmentId, tenantId, EmployeeStatus.ACTIVE);
-        Long onProbationEmployees = employeeRepository.countActiveByDepartmentIdAndTenantId(departmentId, tenantId, EmployeeStatus.PROBATION);
+    private DepartmentResponse convertToResponseUsingAllCountsMap(Department department, Map<Long, Map<EmployeeStatus, Long>> countsMap) {
+        Map<EmployeeStatus, Long> statusCounts = countsMap.getOrDefault(department.getId(), Map.of());
+        return convertToResponse(department, statusCounts);
+    }
 
-        // Calculate percentages
-        Double activePercentage = totalEmployees > 0 ? (activeEmployees * 100.0 / totalEmployees) : 0.0;
-        Double probationPercentage = totalEmployees > 0 ? (onProbationEmployees * 100.0 / totalEmployees) : 0.0;
+    private DepartmentResponse convertToResponse(Department department, Map<EmployeeStatus, Long> statusCounts) {
+        long totalEmployees = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+        long activeEmployees = statusCounts.getOrDefault(EmployeeStatus.ACTIVE, 0L);
+        long onProbationEmployees = statusCounts.getOrDefault(EmployeeStatus.PROBATION, 0L);
+
+        double activePercentage = totalEmployees > 0 ? (activeEmployees * 100.0 / totalEmployees) : 0.0;
+        double probationPercentage = totalEmployees > 0 ? (onProbationEmployees * 100.0 / totalEmployees) : 0.0;
 
         return DepartmentResponse.builder()
                 .id(department.getId())
@@ -295,8 +300,8 @@ public class DepartmentService {
                 .totalEmployees(totalEmployees)
                 .activeEmployees(activeEmployees)
                 .onProbationEmployees(onProbationEmployees)
-                .onLeaveEmployees(0L)  // To be implemented
-                .resignedEmployees(0L)  // To be implemented
+                .onLeaveEmployees(statusCounts.getOrDefault(EmployeeStatus.ON_LEAVE, 0L))
+                .resignedEmployees(statusCounts.getOrDefault(EmployeeStatus.RESIGNED, 0L))
                 // Percentages
                 .activePercentage(Math.round(activePercentage * 100.0) / 100.0)
                 .probationPercentage(Math.round(probationPercentage * 100.0) / 100.0)

@@ -47,7 +47,7 @@ public class Tenant {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private UserStatus status = UserStatus.ACTIVE;  // ✅ Changed to enum
+    private UserStatus status = UserStatus.ACTIVE;
 
     @Column(name = "is_active")
     @Builder.Default

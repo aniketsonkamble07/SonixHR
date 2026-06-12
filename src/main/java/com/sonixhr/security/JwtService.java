@@ -28,6 +28,14 @@ public class JwtService {
     @Value("${app.jwt.refresh-expiration:604800000}")
     private Long refreshExpiration;
 
+    public Long getExpiration() {
+        return expiration;
+    }
+
+    public Long getRefreshExpiration() {
+        return refreshExpiration;
+    }
+
     private final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
     // ========================
@@ -89,19 +97,14 @@ public class JwtService {
                     .parseClaimsJws(token)
                     .getBody();
         } catch (ExpiredJwtException e) {
-            log.warn("JWT token expired: {}", e.getMessage());
             throw e;
         } catch (UnsupportedJwtException e) {
-            log.warn("Unsupported JWT token: {}", e.getMessage());
             throw e;
         } catch (MalformedJwtException e) {
-            log.warn("Malformed JWT token: {}", e.getMessage());
             throw e;
         } catch (SignatureException e) {
-            log.warn("Invalid JWT signature: {}", e.getMessage());
             throw e;
         } catch (IllegalArgumentException e) {
-            log.warn("JWT claims string is empty: {}", e.getMessage());
             throw e;
         }
     }
@@ -216,7 +219,6 @@ public class JwtService {
             final boolean isBlacklisted = isTokenBlacklisted(token);
             return username.equals(userDetails.getUsername()) && !isExpired && !isBlacklisted;
         } catch (JwtException e) {
-            log.error("Token validation failed: {}", e.getMessage());
             return false;
         }
     }
@@ -225,7 +227,6 @@ public class JwtService {
         try {
             return !isTokenExpired(token) && !isTokenBlacklisted(token);
         } catch (JwtException e) {
-            log.error("Token validation failed: {}", e.getMessage());
             return false;
         }
     }
@@ -255,11 +256,9 @@ public class JwtService {
             long ttl = expiration.getTime() - System.currentTimeMillis();
             if (ttl > 0) {
                 tokenBlacklist.add(jti);
-                log.info("Token invalidated: {}", jti);
                 scheduleBlacklistRemoval(jti, ttl);
             }
         } catch (Exception e) {
-            log.error("Failed to invalidate token: {}", e.getMessage());
         }
     }
 
@@ -277,7 +276,6 @@ public class JwtService {
             try {
                 Thread.sleep(ttl);
                 tokenBlacklist.remove(jti);
-                log.debug("Token removed from blacklist: {}", jti);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -299,7 +297,6 @@ public class JwtService {
                 }
             }
         } catch (Exception e) {
-            log.error("Token refresh failed: {}", e.getMessage());
         }
         return Optional.empty();
     }
@@ -312,7 +309,6 @@ public class JwtService {
         try {
             return extractTenantIdAsLong(token);
         } catch (Exception e) {
-            log.error("Failed to extract tenant ID from token: {}", e.getMessage());
             return null;
         }
     }
@@ -321,7 +317,6 @@ public class JwtService {
         try {
             return extractEmployeeId(token);
         } catch (Exception e) {
-            log.error("Failed to extract employee ID from token: {}", e.getMessage());
             return null;
         }
     }
@@ -330,7 +325,6 @@ public class JwtService {
         try {
             return extractEmployeeCode(token);
         } catch (Exception e) {
-            log.error("Failed to extract employee code from token: {}", e.getMessage());
             return null;
         }
     }
@@ -358,5 +352,8 @@ public class JwtService {
     private Key getSignKey() {
         byte[] keyBytes = Base64.getDecoder().decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+    public Integer extractRolesVersion(String token) {
+        return extractClaim(token, claims -> claims.get("rolesVersion", Integer.class));
     }
 }

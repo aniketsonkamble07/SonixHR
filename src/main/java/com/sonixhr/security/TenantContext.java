@@ -25,11 +25,9 @@ public class TenantContext {
 
     public static void setCurrentTenant(Long tenantId) {
         if (tenantId == null) {
-            log.warn("Attempting to set null tenant ID");
             return;
         }
         currentTenant.set(tenantId);
-        log.debug("Tenant context set: {}", tenantId);
     }
 
     public static Long getCurrentTenant() {
@@ -69,7 +67,6 @@ public class TenantContext {
     public static void setCurrentUserId(Long userId) {
         if (userId != null) {
             currentUserId.set(userId);
-            log.debug("User context set: {}", userId);
         }
     }
 
@@ -134,8 +131,7 @@ public class TenantContext {
         if (currentTenant.get() == null) {
             throw new IllegalStateException("Tenant context not set");
         }
-        log.debug("Context validated - Tenant: {}, User: {}, Request: {}",
-                currentTenant.get(), currentUserId.get(), getRequestId());
+
     }
 
     // =====================================================
@@ -155,7 +151,6 @@ public class TenantContext {
         currentUserId.remove();
         requestId.remove();
         depth.remove();
-        log.debug("All tenant context cleared");
     }
 
     // =====================================================

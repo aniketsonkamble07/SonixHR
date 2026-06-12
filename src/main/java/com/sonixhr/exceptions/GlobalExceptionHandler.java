@@ -241,6 +241,29 @@ public class GlobalExceptionHandler {
     }
 
     // =====================================================
+    // HANDLE BASE EXCEPTIONS (Custom Exceptions)
+    // =====================================================
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<Map<String, Object>> handleBaseException(BaseException ex) {
+        log.warn("Custom exception: errorCode={}, statusCode={}, message={}",
+                ex.getErrorCode(), ex.getStatusCode(), ex.getMessage());
+
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        return ResponseEntity
+                .status(status)
+                .body(Map.of(
+                        "success", false,
+                        "errorCode", ex.getErrorCode(),
+                        "message", ex.getUserMessage() != null ? ex.getUserMessage() : ex.getMessage(),
+                        "timestamp", LocalDateTime.now()
+                ));
+    }
+
+    // =====================================================
     // HANDLE ALL OTHER EXCEPTIONS (Fallback)
     // =====================================================
     @ExceptionHandler(Exception.class)

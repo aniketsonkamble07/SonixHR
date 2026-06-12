@@ -25,4 +25,6 @@ public class TenantRoleCreateRequest {
     private Boolean isDefault;
 
     private Set<Long> permissionIds;
+    private String category;
+    private Integer priority;
 }

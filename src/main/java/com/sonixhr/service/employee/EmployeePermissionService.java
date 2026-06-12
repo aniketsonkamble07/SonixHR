@@ -91,7 +91,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Get all permissions with pagination ✅ NEW
+     * Get all permissions with pagination
      */
     public Page<PermissionDTO> getAllPermissions(Pageable pageable) {
         log.debug("Getting all permissions with pagination: {}", pageable);
@@ -109,7 +109,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Get permissions by category ✅ NEW
+     * Get permissions by category
      */
     public List<PermissionGroupDTO.PermissionInfo> getPermissionsByCategory(String category) {
         log.debug("Getting permissions by category: {}", category);
@@ -134,7 +134,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Get permission by ID ✅ NEW
+     * Get permission by ID
      */
     public PermissionDTO getPermissionById(Long id) {
         log.debug("Getting permission by id: {}", id);
@@ -157,7 +157,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Search permissions by name or description ✅ NEW
+     * Search permissions by name or description
      */
     public List<PermissionDTO> searchPermissions(String query) {
         log.debug("Searching permissions with query: {}", query);
@@ -181,7 +181,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Get permissions for a specific role with selected status ✅ FIXED
+     * Get permissions for a specific role with selected status
      */
     public List<PermissionGroupDTO> getPermissionsWithRoleSelection(Long roleId, Set<Long> selectedPermissionIds) {
         log.debug("Getting permissions with role selection for roleId: {}", roleId);
@@ -193,7 +193,6 @@ public class EmployeePermissionService {
 
         for (PermissionGroupDTO group : groups) {
             for (PermissionGroupDTO.PermissionInfo permission : group.getPermissions()) {
-                // ✅ Now properly sets the selected flag
                 permission.setSelected(selectedIds.contains(permission.getId()));
             }
         }
@@ -211,7 +210,7 @@ public class EmployeePermissionService {
     }
 
     /**
-     * Clear permission cache ✅ NEW
+     * Clear permission cache
      */
     @CacheEvict(value = "employeePermissions", allEntries = true)
     public void clearCache() {

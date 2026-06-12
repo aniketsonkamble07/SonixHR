@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,23 +26,29 @@ public interface PlatformUserRepository extends JpaRepository<PlatformUser, Long
     boolean existsByEmail(String email);
 
     // =====================================================
-    // STATUS QUERIES
+    // FETCH WITH RELATIONS (CRITICAL FOR AUTH)
     // =====================================================
 
-    List<PlatformUser> findByStatus(UserStatus status);
-    Page<PlatformUser> findByStatus(UserStatus status, Pageable pageable);
-
-    long countByStatus(UserStatus status);
-
-    // =====================================================
-    // FETCH WITH RELATIONS
-    // =====================================================
+    /**
+     * Find user by email with roles eagerly fetched
+     * This prevents N+1 queries during authentication
+     */
+    @Query("SELECT DISTINCT u FROM PlatformUser u LEFT JOIN FETCH u.roles r WHERE u.email = :email")
+    Optional<PlatformUser> findByEmailWithRoles(@Param("email") String email);
 
     @Query("SELECT DISTINCT u FROM PlatformUser u LEFT JOIN FETCH u.roles WHERE u.id = :id")
     Optional<PlatformUser> findByIdWithRoles(@Param("id") Long id);
 
     @Query("SELECT DISTINCT u FROM PlatformUser u LEFT JOIN FETCH u.roles r LEFT JOIN FETCH r.permissions WHERE u.id = :userId")
     Optional<PlatformUser> findByIdWithRolesAndPermissions(@Param("userId") Long userId);
+
+    // =====================================================
+    // STATUS QUERIES
+    // =====================================================
+
+    List<PlatformUser> findByStatus(UserStatus status);
+    Page<PlatformUser> findByStatus(UserStatus status, Pageable pageable);
+    long countByStatus(UserStatus status);
 
     // =====================================================
     // SEARCH QUERIES
@@ -128,7 +135,7 @@ public interface PlatformUserRepository extends JpaRepository<PlatformUser, Long
     List<Object[]> countUsersByStatus();
 
     @Query("SELECT FUNCTION('DATE', u.createdAt), COUNT(u) FROM PlatformUser u WHERE u.createdAt >= :since GROUP BY FUNCTION('DATE', u.createdAt)")
-    List<Object[]> countNewUsersSince(@Param("since") java.time.LocalDateTime since);
+    List<Object[]> countNewUsersSince(@Param("since") LocalDateTime since);
 
     @Query("SELECT r.name, COUNT(u) FROM PlatformRole r LEFT JOIN r.users u GROUP BY r.id, r.name")
     List<Object[]> countUsersByRole();

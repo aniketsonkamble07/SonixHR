@@ -40,8 +40,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             TenantContext.setCurrentTenant(tenantId);
             TenantContext.incrementDepth();
 
-            log.info("Tenant context initialized - Tenant: {}, Request: {}, Path: {}, Method: {}",
-                    tenantId, requestId, path, request.getMethod());
+
         }
 
         try {
@@ -50,7 +49,6 @@ public class TenantContextFilter extends OncePerRequestFilter {
             TenantContext.decrementDepth();
             if (TenantContext.getDepth() == 0) {
                 TenantContext.clear();
-                log.debug("Tenant context cleared for request: {}", requestId);
             }
         }
     }
@@ -72,7 +70,6 @@ public class TenantContextFilter extends OncePerRequestFilter {
             try {
                 return Long.parseLong(tenantHeader);
             } catch (NumberFormatException e) {
-                log.warn("Invalid tenant ID in header: {}", tenantHeader);
             }
         }
 

@@ -3,6 +3,7 @@ package com.sonixhr.entity.employee;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantRole;
+import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
@@ -90,7 +91,23 @@ public class Employee implements UserDetails {
     private Set<TenantRole> roles = new HashSet<>();
 
     // =====================================================
-    // LOGIN TRACKING (Simple version - no attempt locking)
+    // ROLES VERSION TRACKING (for cache invalidation)
+    // =====================================================
+    @Column(name = "roles_version")
+    @Builder.Default
+    private Integer rolesVersion = 1;
+
+    // =====================================================
+    // CACHED AUTHORITIES (transient - not stored in DB)
+    // =====================================================
+    @Transient
+    private Collection<? extends GrantedAuthority> cachedAuthorities;
+
+    @Transient
+    private Integer cachedRolesVersion;
+
+    // =====================================================
+    // LOGIN TRACKING
     // =====================================================
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -276,6 +293,43 @@ public class Employee implements UserDetails {
     private LocalDateTime updatedAt;
 
     // =====================================================
+    // ROLES VERSION METHODS
+    // =====================================================
+
+    public void incrementRolesVersion() {
+        this.rolesVersion = (this.rolesVersion == null ? 1 : this.rolesVersion + 1);
+    }
+
+    public Integer getRolesVersion() {
+        return rolesVersion;
+    }
+
+    public void setRolesVersion(Integer rolesVersion) {
+        this.rolesVersion = rolesVersion;
+    }
+
+    public void clearAuthoritiesCache() {
+        this.cachedAuthorities = null;
+        this.cachedRolesVersion = null;
+    }
+
+    public Collection<? extends GrantedAuthority> getCachedAuthorities() {
+        return cachedAuthorities;
+    }
+
+    public void setCachedAuthorities(Collection<? extends GrantedAuthority> cachedAuthorities) {
+        this.cachedAuthorities = cachedAuthorities;
+    }
+
+    public Integer getCachedRolesVersion() {
+        return cachedRolesVersion;
+    }
+
+    public void setCachedRolesVersion(Integer cachedRolesVersion) {
+        this.cachedRolesVersion = cachedRolesVersion;
+    }
+
+    // =====================================================
     // HELPER METHODS
     // =====================================================
 
@@ -324,12 +378,14 @@ public class Employee implements UserDetails {
         return status == EmployeeStatus.ON_LEAVE;
     }
 
-    // ✅ No account lock methods - always return true
     public boolean isAccountLocked() {
-        return false; // Account never locked
+        return false;
     }
 
-    // ✅ Safe null checks
+    // =====================================================
+    // PERMISSION METHODS (Single definition)
+    // =====================================================
+
     public Set<String> getEffectivePermissions() {
         if (roles == null || roles.isEmpty()) {
             return Collections.emptySet();
@@ -340,8 +396,8 @@ public class Employee implements UserDetails {
                 .filter(role -> role.getPermissions() != null)
                 .flatMap(role -> role.getPermissions().stream())
                 .filter(Objects::nonNull)
-                .filter(permission -> permission.getPermission() != null)
-                .map(permission -> permission.getPermission().name())
+                .map(TenantPermission::getPermission)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
@@ -350,6 +406,40 @@ public class Employee implements UserDetails {
             return false;
         }
         return getEffectivePermissions().contains(permissionName);
+    }
+
+    // Convenience method for enum-based permission check
+    public boolean hasPermission(TenantPermissionEnum permission) {
+        if (permission == null) {
+            return false;
+        }
+        return hasPermission(permission.name());
+    }
+
+    public boolean hasAnyPermission(String... permissionNames) {
+        if (permissionNames == null || permissionNames.length == 0) {
+            return false;
+        }
+        Set<String> perms = getEffectivePermissions();
+        return Arrays.stream(permissionNames).anyMatch(perms::contains);
+    }
+
+    public boolean hasAnyPermission(TenantPermissionEnum... permissions) {
+        if (permissions == null || permissions.length == 0) {
+            return false;
+        }
+        Set<String> permNames = Arrays.stream(permissions)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toSet());
+        return getEffectivePermissions().stream().anyMatch(permNames::contains);
+    }
+
+    public boolean hasAllPermissions(String... permissionNames) {
+        if (permissionNames == null || permissionNames.length == 0) {
+            return true;
+        }
+        Set<String> perms = getEffectivePermissions();
+        return Arrays.stream(permissionNames).allMatch(perms::contains);
     }
 
     // =====================================================
@@ -435,17 +525,31 @@ public class Employee implements UserDetails {
     }
 
     // =====================================================
-    // UserDetails Implementation
+    // UserDetails Implementation (Single definition)
     // =====================================================
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Return cached authorities if available and version matches
+        if (cachedAuthorities != null && cachedRolesVersion != null &&
+                cachedRolesVersion.equals(this.rolesVersion)) {
+            return cachedAuthorities;
+        }
+
         Set<String> permissions = getEffectivePermissions();
         if (permissions.isEmpty()) {
             return Collections.emptySet();
         }
-        return permissions.stream()
+
+        Collection<SimpleGrantedAuthority> authorities = permissions.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toSet());
+
+        // Cache the authorities
+        this.cachedAuthorities = authorities;
+        this.cachedRolesVersion = this.rolesVersion;
+
+        return authorities;
     }
 
     @Override
@@ -465,7 +569,7 @@ public class Employee implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true; // Always true - no lockout
+        return true;
     }
 
     @Override
@@ -568,7 +672,6 @@ public class Employee implements UserDetails {
             throw new IllegalStateException("Last name is required");
         }
 
-        // Validate that active employee has roles
         if (isActive && (roles == null || roles.isEmpty())) {
             throw new IllegalStateException("Active employee must have at least one role");
         }

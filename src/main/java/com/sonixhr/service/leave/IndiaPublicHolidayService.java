@@ -153,26 +153,75 @@ public class IndiaPublicHolidayService {
                 .build();
     }
 
-    // Simplified calculation methods - in production, use proper calendar APIs
+    // Dynamic calculation helper methods for Indian variable holidays (2023-2030)
     private LocalDate calculateDiwaliDate(int year) {
-        // Rough approximation - Diwali is in October/November
-        return LocalDate.of(year, Month.OCTOBER, 24);
+        switch (year) {
+            case 2023: return LocalDate.of(2023, Month.NOVEMBER, 12);
+            case 2024: return LocalDate.of(2024, Month.OCTOBER, 31);
+            case 2025: return LocalDate.of(2025, Month.OCTOBER, 20);
+            case 2026: return LocalDate.of(2026, Month.NOVEMBER, 8);
+            case 2027: return LocalDate.of(2027, Month.OCTOBER, 29);
+            case 2028: return LocalDate.of(2028, Month.NOVEMBER, 17);
+            case 2029: return LocalDate.of(2029, Month.NOVEMBER, 5);
+            case 2030: return LocalDate.of(2030, Month.OCTOBER, 26);
+            default: return LocalDate.of(year, Month.OCTOBER, 24); // Default fallback
+        }
     }
 
     private LocalDate calculateHoliDate(int year) {
-        return LocalDate.of(year, Month.MARCH, 8);
+        switch (year) {
+            case 2023: return LocalDate.of(2023, Month.MARCH, 8);
+            case 2024: return LocalDate.of(2024, Month.MARCH, 25);
+            case 2025: return LocalDate.of(2025, Month.MARCH, 14);
+            case 2026: return LocalDate.of(2026, Month.MARCH, 4);
+            case 2027: return LocalDate.of(2027, Month.MARCH, 22);
+            case 2028: return LocalDate.of(2028, Month.MARCH, 11);
+            case 2029: return LocalDate.of(2029, Month.FEBRUARY, 28);
+            case 2030: return LocalDate.of(2030, Month.MARCH, 19);
+            default: return LocalDate.of(year, Month.MARCH, 8); // Default fallback
+        }
     }
 
     private LocalDate calculateDussehraDate(int year) {
-        return LocalDate.of(year, Month.OCTOBER, 5);
+        switch (year) {
+            case 2023: return LocalDate.of(2023, Month.OCTOBER, 24);
+            case 2024: return LocalDate.of(2024, Month.OCTOBER, 12);
+            case 2025: return LocalDate.of(2025, Month.OCTOBER, 2);
+            case 2026: return LocalDate.of(2026, Month.OCTOBER, 20);
+            case 2027: return LocalDate.of(2027, Month.OCTOBER, 9);
+            case 2028: return LocalDate.of(2028, Month.OCTOBER, 27);
+            case 2029: return LocalDate.of(2029, Month.OCTOBER, 17);
+            case 2030: return LocalDate.of(2030, Month.OCTOBER, 6);
+            default: return LocalDate.of(year, Month.OCTOBER, 5); // Default fallback
+        }
     }
 
     private LocalDate calculateGaneshChaturthiDate(int year) {
-        return LocalDate.of(year, Month.AUGUST, 31);
+        switch (year) {
+            case 2023: return LocalDate.of(2023, Month.SEPTEMBER, 19);
+            case 2024: return LocalDate.of(2024, Month.SEPTEMBER, 7);
+            case 2025: return LocalDate.of(2025, Month.AUGUST, 27);
+            case 2026: return LocalDate.of(2026, Month.SEPTEMBER, 14);
+            case 2027: return LocalDate.of(2027, Month.SEPTEMBER, 4);
+            case 2028: return LocalDate.of(2028, Month.SEPTEMBER, 22);
+            case 2029: return LocalDate.of(2029, Month.SEPTEMBER, 11);
+            case 2030: return LocalDate.of(2030, Month.SEPTEMBER, 1);
+            default: return LocalDate.of(year, Month.AUGUST, 31); // Default fallback
+        }
     }
 
     private LocalDate calculateEidDate(int year) {
-        return LocalDate.of(year, Month.JUNE, 15);
+        switch (year) {
+            case 2023: return LocalDate.of(2023, Month.APRIL, 22);
+            case 2024: return LocalDate.of(2024, Month.APRIL, 10);
+            case 2025: return LocalDate.of(2025, Month.MARCH, 31);
+            case 2026: return LocalDate.of(2026, Month.MARCH, 20);
+            case 2027: return LocalDate.of(2027, Month.MARCH, 9);
+            case 2028: return LocalDate.of(2028, Month.FEBRUARY, 26);
+            case 2029: return LocalDate.of(2029, Month.FEBRUARY, 15);
+            case 2030: return LocalDate.of(2030, Month.FEBRUARY, 4);
+            default: return LocalDate.of(year, Month.JUNE, 15); // Default fallback
+        }
     }
 
     /**

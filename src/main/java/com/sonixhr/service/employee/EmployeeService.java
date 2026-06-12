@@ -87,7 +87,7 @@ public class EmployeeService {
         // Build employee with roles
         Employee employee = buildEmployeeFromRequest(tenant, request, employeeCode);
 
-        // ✅ Add roles BEFORE save
+        //  Add roles BEFORE save
         employee.getRoles().addAll(roles);
 
         // Set manager if provided
@@ -112,47 +112,6 @@ public class EmployeeService {
         return convertToResponse(savedEmployee);
     }
 
-    // =====================================================
-    // ACTIVATE EMPLOYEE (Set password)
-    // =====================================================
-    @Transactional
-    public Employee activateEmployee(String token, String password, String confirmPassword) {
-        log.info("Activating employee with token: {}", token);
-
-        if (!password.equals(confirmPassword)) {
-            throw new BusinessException("Passwords do not match");
-        }
-
-        validatePasswordStrength(password);
-
-        // Validate token
-        if (activationTokenService.isTokenExpired(token)) {
-            throw new BusinessException("Activation token has expired. Please request a new one.");
-        }
-
-        // Get employee ID from token
-        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
-
-        // Check if already activated
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-
-        if (employee.isActive()) {
-            throw new BusinessException("Account is already activated");
-        }
-
-        activationTokenService.invalidateToken(token);
-
-        employee.setPasswordHash(passwordEncoder.encode(password));
-        employee.setActive(true);
-        employee.setStatus(EmployeeStatus.ACTIVE);
-        employee.setMustChangePassword(true);  // Force password change on first login
-
-        Employee activated = employeeRepository.save(employee);
-        log.info("Employee activated successfully: {}", activated.getEmail());
-
-        return activated;
-    }
 
     // =====================================================
     // UPDATE EMPLOYEE
@@ -730,5 +689,194 @@ public class EmployeeService {
         if (!password.matches(".*[@#$%^&+=!].*")) {
             throw new BusinessException("Password must contain at least one special character");
         }
+    }
+
+    // =====================================================
+// ADD THESE MISSING METHODS
+// =====================================================
+
+    /**
+     * Forgot password - sends reset link to employee email
+     */
+    @Transactional
+    public void forgotPassword(String email) {
+        log.info("Forgot password request for email: {}", email);
+
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
+
+        if (!employee.isActive()) {
+            throw new BusinessException("Cannot reset password for inactive employee");
+        }
+
+        // Generate password reset token
+        String resetToken = activationTokenService.generatePasswordResetTokenForEmployee(employee.getId());
+        String resetLink = baseUrl + "/api/tenant/auth/reset-password?token=" + resetToken;
+
+        // Send reset email
+        emailService.sendPasswordResetEmail(employee.getEmail(), employee.getFullName(), resetLink);
+        log.info("Password reset email sent to: {}", email);
+    }
+
+    /**
+     * Reset password using token from email link
+     */
+    @Transactional
+    public void resetPasswordWithToken(String token, String newPassword, String confirmPassword) {
+        log.info("Resetting password with token");
+
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
+
+        validatePasswordStrength(newPassword);
+
+        // Validate token
+        if (activationTokenService.isTokenExpired(token)) {
+            throw new BusinessException("Reset token has expired. Please request a new one.");
+        }
+
+        // Get employee ID from token
+        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
+
+        // Find employee
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        // Update password
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(false);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        // Invalidate the token
+        activationTokenService.invalidateToken(token);
+
+        log.info("Password reset successfully for employee: {}", employee.getEmail());
+    }
+
+    /**
+     * Activate employee (already exists but ensure it matches)
+     */
+    @Transactional
+    public Employee activateEmployee(String token, String password, String confirmPassword) {
+        log.info("Activating employee with token: {}", token);
+
+        if (!password.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
+
+        validatePasswordStrength(password);
+
+        // Validate token
+        if (activationTokenService.isTokenExpired(token)) {
+            throw new BusinessException("Activation token has expired. Please request a new one.");
+        }
+
+        // Get employee ID from token
+        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
+
+        // Check if already activated
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Account is already activated");
+        }
+
+        // Activate employee
+        employee.setPasswordHash(passwordEncoder.encode(password));
+        employee.setActive(true);
+        employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.setMustChangePassword(true);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        Employee activated = employeeRepository.save(employee);
+
+        // Invalidate the token
+        activationTokenService.invalidateToken(token);
+
+        log.info("Employee activated successfully: {}", activated.getEmail());
+
+        return activated;
+    }
+
+    /**
+     * Resend activation email to employee
+     */
+    @Transactional
+    public void resendActivationEmail(String email) {
+        log.info("Resending activation email to: {}", email);
+
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Employee is already activated");
+        }
+
+        // Generate new activation token
+        String activationToken = activationTokenService.generateTokenForEmployee(employee.getId());
+        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
+
+        // Send activation email
+       // emailService.sendEmployeeActivationEmail(employee.getEmail(), employee.getFullName(), activationLink);
+
+        log.info("Activation email resent to: {}", email);
+    }
+
+    /**
+     * Change password for authenticated employee
+     */
+    @Transactional
+    public void changePassword(Long employeeId, String oldPassword, String newPassword, String confirmPassword) {
+        log.info("Changing password for employee: {}", employeeId);
+
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException("New passwords do not match");
+        }
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
+
+        if (!passwordEncoder.matches(oldPassword, employee.getPassword())) {
+            throw new BusinessException("Current password is incorrect");
+        }
+
+        validatePasswordStrength(newPassword);
+
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(false);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        log.info("Password changed successfully for employee: {}", employeeId);
+    }
+
+    /**
+     * Reset password by admin (without old password)
+     */
+    @Transactional
+    public void resetPasswordByAdmin(Long employeeId, String newPassword) {
+        log.info("Resetting password by admin for employee: {}", employeeId);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
+
+        validatePasswordStrength(newPassword);
+
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(true);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        log.info("Password reset by admin for employee: {}", employeeId);
     }
 }

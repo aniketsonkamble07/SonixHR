@@ -96,37 +96,29 @@ public class LeaveService {
     // =====================================================
 
     /**
-     * Check if a date is a public holiday
+     * Get holiday dates for the tenant within the specified date range
      */
-    private boolean isPublicHoliday(Long tenantId, LocalDate date, TenantLeaveSettings settings) {
+    private Set<LocalDate> getHolidayDatesInRange(Long tenantId, LocalDate startDate, LocalDate endDate, TenantLeaveSettings settings) {
         if (settings == null) {
-            return false;
+            return Collections.emptySet();
         }
 
-        // Check if tenant wants to include holidays
         if (!settings.getIncludeNationalHolidays() && !settings.getIncludeStateHolidays()) {
-            return false;
+            return Collections.emptySet();
         }
 
-        // Check national holidays
-        if (settings.getIncludeNationalHolidays()) {
-            Optional<PublicHoliday> nationalHoliday = holidayRepository
-                    .findByTenantIdAndHolidayDateAndType(tenantId, date, "NATIONAL");
-            if (nationalHoliday.isPresent()) {
-                return true;
+        List<PublicHoliday> holidays = holidayRepository.findByTenantIdAndHolidayDateBetween(tenantId, startDate, endDate);
+        Set<LocalDate> holidayDates = new HashSet<>();
+        for (PublicHoliday h : holidays) {
+            boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && settings.getIncludeNationalHolidays();
+            boolean isState = settings.getIncludeStateHolidays() && 
+                              settings.getState() != null && 
+                              settings.getState().equalsIgnoreCase(h.getRegion());
+            if (isNational || isState) {
+                holidayDates.add(h.getHolidayDate());
             }
         }
-
-        // Check state holidays
-        if (settings.getIncludeStateHolidays() && settings.getState() != null && !settings.getState().isEmpty()) {
-            Optional<PublicHoliday> stateHoliday = holidayRepository
-                    .findByTenantIdAndHolidayDateAndRegion(tenantId, date, settings.getState());
-            if (stateHoliday.isPresent()) {
-                return true;
-            }
-        }
-
-        return false;
+        return holidayDates;
     }
 
     // =====================================================
@@ -141,23 +133,21 @@ public class LeaveService {
         double totalDays = 0;
         LocalDate date = startDate;
 
+        Set<LocalDate> holidayDates = getHolidayDatesInRange(tenantId, startDate, endDate, settings);
+
         while (!date.isAfter(endDate)) {
             boolean isWeekend = isWeekendForTenant(date, settings);
-            boolean isHoliday = isPublicHoliday(tenantId, date, settings);
+            boolean isHoliday = holidayDates.contains(date);
 
             // Decide whether to count this day
             boolean countDay = true;
 
-            // If it's a weekend
-            if (isWeekend) {
-                // Count weekend only if tenant configures to count weekends as leave
-                countDay = settings.getCountWeekendsAsLeave() != null && settings.getCountWeekendsAsLeave();
+            if (isWeekend && (settings.getCountWeekendsAsLeave() == null || !settings.getCountWeekendsAsLeave())) {
+                countDay = false;
             }
 
-            // If it's a holiday
-            if (isHoliday) {
-                // Count holiday only if tenant configures to count holidays as leave
-                countDay = settings.getCountHolidaysAsLeave() != null && settings.getCountHolidaysAsLeave();
+            if (isHoliday && (settings.getCountHolidaysAsLeave() == null || !settings.getCountHolidaysAsLeave())) {
+                countDay = false;
             }
 
             if (countDay) {
@@ -178,9 +168,18 @@ public class LeaveService {
         LocalDate date = leave.getStartDate();
         TenantLeaveSettings settings = settingsRepository.findById(leave.getTenant().getId()).orElse(null);
 
+        Set<LocalDate> holidayDates = getHolidayDatesInRange(leave.getTenant().getId(), leave.getStartDate(), leave.getEndDate(), settings);
+
+        List<AttendanceRecord> existingRecords = attendanceRepository.findByTenantIdAndEmployeeIdAndAttendanceDateBetween(
+                leave.getTenant().getId(), leave.getEmployee().getId(), leave.getStartDate(), leave.getEndDate());
+
+        Set<LocalDate> existingDates = existingRecords.stream()
+                .map(AttendanceRecord::getAttendanceDate)
+                .collect(Collectors.toSet());
+
         while (!date.isAfter(leave.getEndDate())) {
             boolean isWeekend = isWeekendForTenant(date, settings);
-            boolean isHoliday = isPublicHoliday(leave.getTenant().getId(), date, settings);
+            boolean isHoliday = holidayDates.contains(date);
 
             // Skip creating attendance for weekends if they are not counted as working days
             if (isWeekend && (settings == null || !settings.getCountWeekendsAsLeave())) {
@@ -194,11 +193,7 @@ public class LeaveService {
                 continue;
             }
 
-            Optional<AttendanceRecord> existingAttendance = attendanceRepository
-                    .findByTenantIdAndEmployeeIdAndAttendanceDate(
-                            leave.getTenant().getId(), leave.getEmployee().getId(), date);
-
-            if (existingAttendance.isEmpty()) {
+            if (!existingDates.contains(date)) {
                 AttendanceRecord attendance = AttendanceRecord.builder()
                         .tenant(leave.getTenant())
                         .employee(leave.getEmployee())
@@ -308,7 +303,18 @@ public class LeaveService {
         }
 
         if (request.getStartDate().isBefore(LocalDate.now())) {
-            throw new BusinessException("Cannot request leave for past dates");
+            // Allow retroactive leave application for SICK or EMERGENCY types, or if the requester is manager/admin.
+            // For other types, restrict to a maximum 30 days buffer.
+            boolean isRetroactiveAllowed = request.getLeaveType() == LeaveType.SICK 
+                    || request.getLeaveType() == LeaveType.EMERGENCY
+                    || currentUser.isManager()
+                    || currentUser.isSuperAdmin();
+            
+            if (!isRetroactiveAllowed) {
+                if (request.getStartDate().isBefore(LocalDate.now().minusDays(30))) {
+                    throw new BusinessException("Cannot request leave older than 30 days in the past");
+                }
+            }
         }
 
         // Check maximum consecutive leave days
@@ -328,7 +334,8 @@ public class LeaveService {
 
         // Check leave balance (skip for unpaid leave)
         if (request.getLeaveType() != LeaveType.UNPAID) {
-            checkLeaveBalanceWithSettings(employeeId, request.getLeaveType(), totalDays, settings);
+            checkLeaveBalanceWithSettings(employeeId, employee.getTenant().getId(), request.getLeaveType(),
+                    request.getStartDate(), request.getEndDate(), settings);
         }
 
         // Check for overlapping leave
@@ -371,20 +378,42 @@ public class LeaveService {
     }
 
     /**
-     * Check leave balance with tenant settings
+     * Check leave balance with tenant settings (resilient to year-crossing requests)
      */
-    private void checkLeaveBalanceWithSettings(Long employeeId, LeaveType leaveType, double requestedDays,
-                                               TenantLeaveSettings settings) {
-        int year = LocalDate.now().getYear();
-        double usedDays = leaveRepository.getUsedLeaveDays(employeeId, leaveType, year);
-        double availableDays = getAvailableDaysForLeaveType(leaveType, settings);
-        double remainingDays = availableDays - usedDays;
+    private void checkLeaveBalanceWithSettings(Long employeeId, Long tenantId, LeaveType leaveType, 
+                                               LocalDate startDate, LocalDate endDate, TenantLeaveSettings settings) {
+        int startYear = startDate.getYear();
+        int endYear = endDate.getYear();
 
-        if (requestedDays > remainingDays) {
-            throw new BusinessException(String.format(
-                    "Insufficient %s balance. Available: %.1f days, Requested: %.1f days",
-                    leaveType.getDisplayName(), remainingDays, requestedDays));
+        for (int year = startYear; year <= endYear; year++) {
+            double requestedDaysInYear = calculateLeaveDaysInYear(tenantId, startDate, endDate, year, leaveType, settings);
+            if (requestedDaysInYear > 0) {
+                double usedDays = leaveRepository.getUsedLeaveDays(employeeId, leaveType, year);
+                double availableDays = getAvailableDaysForLeaveType(leaveType, settings);
+                double remainingDays = availableDays - usedDays;
+
+                if (requestedDaysInYear > remainingDays) {
+                    throw new BusinessException(String.format(
+                            "Insufficient %s balance for year %d. Available: %.1f days, Requested: %.1f days",
+                            leaveType.getDisplayName(), year, remainingDays, requestedDaysInYear));
+                }
+            }
         }
+    }
+
+    private double calculateLeaveDaysInYear(Long tenantId, LocalDate startDate, LocalDate endDate,
+                                            int year, LeaveType leaveType, TenantLeaveSettings settings) {
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+        
+        LocalDate start = startDate.isBefore(yearStart) ? yearStart : startDate;
+        LocalDate end = endDate.isAfter(yearEnd) ? yearEnd : endDate;
+        
+        if (start.isAfter(end)) {
+            return 0;
+        }
+        
+        return calculateTotalLeaveDays(tenantId, start, end, leaveType, settings);
     }
 
     /**

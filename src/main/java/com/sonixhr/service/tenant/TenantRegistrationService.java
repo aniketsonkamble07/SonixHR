@@ -10,7 +10,7 @@ import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.PlanType;
-import com.sonixhr.enums.UserStatus;  // ✅ ADD THIS IMPORT
+import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.BusinessException;
@@ -59,6 +59,9 @@ public class TenantRegistrationService {
     @Value("${app.trial-days:14}")
     private int defaultTrialDays;
 
+    @Value("${app.bypass-activation:false}")
+    private boolean bypassActivation;
+
     @Transactional
     public TenantRegistrationResponse registerTenant(TenantRegistrationRequest request) {
         log.info("Starting tenant registration for company: {}", request.getCompanyName());
@@ -95,9 +98,9 @@ public class TenantRegistrationService {
 
         // Log the activation link for manual testing
         log.info("==========================================");
-        log.info("🔗 ACTIVATION LINK: {}", activationLink);
-        log.info("📧 Admin Email: {}", superAdminEmployee.getEmail());
-        log.info("🔑 Temporary Password: Admin@123");
+        log.info(" ACTIVATION LINK: {}", activationLink);
+        log.info(" Admin Email: {}", superAdminEmployee.getEmail());
+        log.info("  Temporary Password: Admin@123");
         log.info("==========================================");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
@@ -155,6 +158,8 @@ public class TenantRegistrationService {
 
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
                                 String subdomain, PlanType planType) {
+        UserStatus tenantStatus = bypassActivation ? UserStatus.ACTIVE : UserStatus.PENDING_VERIFICATION;
+        boolean tenantActive = bypassActivation;
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
@@ -164,8 +169,8 @@ public class TenantRegistrationService {
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
-                .status(UserStatus.ACTIVE)  // ✅ FIXED: Use TenantStatus
-                .isActive(true)
+                .status(tenantStatus)
+                .isActive(tenantActive)
                 .planStatus("trial")
                 .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
                 .build();
@@ -196,7 +201,7 @@ public class TenantRegistrationService {
                 .build();
 
         TenantRole savedRole = roleRepository.save(tenantRole);
-        log.info("✅ Created Super Admin role for tenant {} with ID: {} and {} permissions",
+        log.info(" Created Super Admin role for tenant {} with ID: {} and {} permissions",
                 tenantId, savedRole.getId(), savedRole.getPermissions().size());
 
         return savedRole;
@@ -216,7 +221,10 @@ public class TenantRegistrationService {
             superAdminRole = roleRepository.save(superAdminRole);
         }
 
-        // Super Admin is created with ACTIVE status and hardcoded password for testing
+        EmployeeStatus employeeStatus = bypassActivation ? EmployeeStatus.ACTIVE : EmployeeStatus.PROBATION;
+        boolean employeeActive = bypassActivation;
+        String passwordHash = bypassActivation ? passwordEncoder.encode("Admin@123") : passwordEncoder.encode(java.util.UUID.randomUUID().toString());
+
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)
                 .employeeCode(employeeCode)
@@ -228,10 +236,10 @@ public class TenantRegistrationService {
                 .employmentType(EmploymentType.FULL_TIME)
                 .hireDate(LocalDate.now())
                 .probationMonths(0)
-                .status(EmployeeStatus.ACTIVE)
-                .isActive(true)
+                .status(employeeStatus)
+                .isActive(employeeActive)
                 .workLocation("Head Office")
-                .passwordHash(passwordEncoder.encode("Admin@123"))  // Hardcoded for testing
+                .passwordHash(passwordHash)
                 .createdBy(null)
                 .roles(new HashSet<>(Set.of(superAdminRole)))
                 .build();
@@ -283,9 +291,13 @@ public class TenantRegistrationService {
     // =====================================================
 
     private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken, Employee superAdminEmployee) {
+        String msg = bypassActivation ? 
+                "Registration successful! Account is active and password is set to Admin@123." :
+                "Registration successful! Please check your email to activate your account.";
+
         return TenantRegistrationResponse.builder()
                 .success(true)
-                .message("Registration successful! Please check your email to activate your account.")
+                .message(msg)
                 .tenantId(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())

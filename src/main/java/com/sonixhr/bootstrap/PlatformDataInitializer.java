@@ -3,13 +3,11 @@ package com.sonixhr.bootstrap;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
-import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.PlatformPermissionEnum;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
-import com.sonixhr.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -61,17 +59,20 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("=========================================");
     }
 
+    // ✅ KEEP ONLY ONE of these methods
     private void createAllPermissions() {
         log.info("Creating all permissions...");
         int createdCount = 0;
 
         for (PlatformPermissionEnum permEnum : PlatformPermissionEnum.values()) {
-            if (permissionRepository.findByPermission(permEnum).isEmpty()) {
+            // Use .name() to convert enum to String
+            if (permissionRepository.findByPermission(permEnum.name()).isEmpty()) {
                 PlatformPermission permission = PlatformPermission.builder()
-                        .permission(permEnum)
+                        .permission(permEnum.name())  // Store enum name as String
                         .description(permEnum.getDescription())
                         .category(permEnum.getCategory())
                         .displayOrder(permEnum.getOrder())
+                        .active(true)
                         .build();
                 permissionRepository.save(permission);
                 createdCount++;
@@ -80,6 +81,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
         }
         log.info("✅ Created {} new permissions. Total: {}", createdCount, permissionRepository.count());
     }
+
 
     private PlatformRole createSuperAdminRole() {
         log.info("Creating Super Admin role...");
@@ -91,7 +93,10 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     PlatformRole role = PlatformRole.builder()
                             .name("Super Admin")
                             .description("Full platform access - has ALL permissions")
-                            .isSystemRole(true)
+                            .systemRole(true)
+                            .active(true)
+                            .priority(100)
+                            .category("SYSTEM_ADMINISTRATION")
                             .permissions(allPermissions)
                             .build();
 
@@ -115,6 +120,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 .fullName(SUPER_ADMIN_NAME)
                 .designation("System Administrator")
                 .status(UserStatus.ACTIVE)
+                .rolesVersion(1)
                 .build();
 
         superAdmin.getRoles().add(superAdminRole);
@@ -128,7 +134,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("   Role: Super Admin (ALL permissions)");
         log.info("   Authorities: {}", superAdmin.getAuthorities().size());
         log.info("=========================================");
-        log.warn("🔴 PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN!");
+        log.warn("⚠️  PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN!");
         log.info("=========================================");
     }
 
@@ -171,6 +177,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("✅ Default roles created successfully");
     }
 
+    // ✅ KEEP ONLY ONE of these methods - THIS IS THE CORRECT ONE (using .name())
     private void createRoleIfMissing(String roleName, String description, Set<PlatformPermissionEnum> permissionEnums) {
         if (roleRepository.findByName(roleName).isPresent()) {
             log.debug("Role already exists: {}", roleName);
@@ -179,17 +186,28 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
         Set<PlatformPermission> permissions = new HashSet<>();
         for (PlatformPermissionEnum permEnum : permissionEnums) {
-            permissionRepository.findByPermission(permEnum).ifPresent(permissions::add);
+            // Use .name() to convert enum to String
+            permissionRepository.findByPermission(permEnum.name()).ifPresent(permissions::add);
         }
 
         PlatformRole role = PlatformRole.builder()
                 .name(roleName)
                 .description(description)
-                .isSystemRole(false)
+                .systemRole(false)
+                .active(true)
+                .priority(50)
+                .category(determineCategory(roleName))
                 .permissions(permissions)
                 .build();
 
         roleRepository.save(role);
         log.info("✅ Created role: {} with {} permissions", roleName, permissions.size());
+    }
+
+    private String determineCategory(String roleName) {
+        if (roleName.contains("Admin")) return "ADMINISTRATION";
+        if (roleName.contains("Support")) return "SUPPORT";
+        if (roleName.contains("Billing")) return "BILLING";
+        return "CUSTOM";
     }
 }

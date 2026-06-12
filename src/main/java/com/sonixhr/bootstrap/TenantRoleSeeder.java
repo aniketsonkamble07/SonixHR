@@ -3,6 +3,7 @@ package com.sonixhr.bootstrap;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
+import com.sonixhr.enums.TenantPermissionEnum;
 import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
@@ -79,19 +80,20 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createSuperAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
-
-        Optional<TenantRole> existingRole = roleRepository.findByNameAndTenantId("Super Admin", tenantId);
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Super Admin");
         if (existingRole.isPresent()) {
-            log.info("Super Admin role already exists for tenant: {}", tenantId);
+            log.debug("Super Admin role already exists for tenant: {}", tenantId);
             return;
         }
 
-        // Create Super Admin role with ALL permissions
         TenantRole superAdminRole = TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Super Admin")
                 .description("Super Administrator with full access to all tenant features")
                 .isDefault(false)
+                .active(true)
+                .priority(100)
+                .category("ADMINISTRATION")
                 .permissions(new HashSet<>(allPermissions))
                 .build();
 
@@ -100,26 +102,38 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByNameAndTenantId("Admin", tenantId);
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Admin");
         if (existingRole.isPresent()) {
-            log.info("Admin role already exists for tenant: {}", tenantId);
+            log.debug("Admin role already exists for tenant: {}", tenantId);
             return;
         }
 
-        // Admin permissions
+        // Define admin permissions as Strings (enum names)
         Set<String> adminPermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "EMPLOYEE_VIEW_ALL",
-                "EMPLOYEE_CREATE", "EMPLOYEE_EDIT",
-                "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM", "LEAVE_APPROVE_DEPARTMENT",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN", "ATTENDANCE_VIEW_TEAM",
-                "DEPARTMENT_VIEW", "DEPARTMENT_CREATE", "DEPARTMENT_EDIT",
-                "ROLE_VIEW",
-                "REPORT_VIEW_DEPARTMENT", "REPORT_EXPORT",
-                "SETTINGS_VIEW", "VIEW_BILLING"
+                TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
+                TenantPermissionEnum.EMPLOYEE_VIEW_TEAM.name(),
+                TenantPermissionEnum.EMPLOYEE_VIEW_ALL.name(),
+                TenantPermissionEnum.EMPLOYEE_CREATE.name(),
+                TenantPermissionEnum.EMPLOYEE_EDIT.name(),
+                TenantPermissionEnum.LEAVE_REQUEST.name(),
+                TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
+                TenantPermissionEnum.LEAVE_VIEW_TEAM.name(),
+                TenantPermissionEnum.LEAVE_APPROVE_DEPARTMENT.name(),
+                TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
+                TenantPermissionEnum.DEPARTMENT_VIEW.name(),
+                TenantPermissionEnum.DEPARTMENT_CREATE.name(),
+                TenantPermissionEnum.DEPARTMENT_EDIT.name(),
+                TenantPermissionEnum.ROLE_VIEW.name(),
+                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name(),
+                TenantPermissionEnum.REPORT_EXPORT.name(),
+                TenantPermissionEnum.SETTINGS_VIEW.name(),
+                TenantPermissionEnum.VIEW_BILLING.name()
         );
 
         Set<TenantPermission> adminPermissions = allPermissions.stream()
-                .filter(p -> adminPermissionNames.contains(p.getPermission().name()))
+                .filter(p -> adminPermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
 
         TenantRole adminRole = TenantRole.builder()
@@ -127,6 +141,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .name("Admin")
                 .description("Administrator with limited management access")
                 .isDefault(false)
+                .active(true)
+                .priority(80)
+                .category("ADMINISTRATION")
                 .permissions(adminPermissions)
                 .build();
 
@@ -135,21 +152,24 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByNameAndTenantId("Employee", tenantId);
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Employee");
         if (existingRole.isPresent()) {
-            log.info("Employee role already exists for tenant: {}", tenantId);
+            log.debug("Employee role already exists for tenant: {}", tenantId);
             return;
         }
 
-        // Employee permissions
+        // Define employee permissions as Strings (enum names)
         Set<String> employeePermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF",
-                "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_CANCEL_OWN",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN"
+                TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
+                TenantPermissionEnum.LEAVE_REQUEST.name(),
+                TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
+                TenantPermissionEnum.LEAVE_CANCEL_OWN.name(),
+                TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name()
         );
 
         Set<TenantPermission> employeePermissions = allPermissions.stream()
-                .filter(p -> employeePermissionNames.contains(p.getPermission().name()))
+                .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
 
         TenantRole employeeRole = TenantRole.builder()
@@ -157,6 +177,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .name("Employee")
                 .description("Basic employee access - default role for new employees")
                 .isDefault(true)
+                .active(true)
+                .priority(40)
+                .category("EMPLOYMENT")
                 .permissions(employeePermissions)
                 .build();
 
@@ -165,24 +188,30 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createManagerRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByNameAndTenantId("Manager", tenantId);
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Manager");
         if (existingRole.isPresent()) {
-            log.info("Manager role already exists for tenant: {}", tenantId);
+            log.debug("Manager role already exists for tenant: {}", tenantId);
             return;
         }
 
-        // Manager permissions
+        // Define manager permissions as Strings (enum names)
         Set<String> managerPermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM",
-                "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
-                "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN", "ATTENDANCE_VIEW_TEAM",
-                "DEPARTMENT_VIEW",
-                "REPORT_VIEW_DEPARTMENT"
+                TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
+                TenantPermissionEnum.EMPLOYEE_VIEW_TEAM.name(),
+                TenantPermissionEnum.LEAVE_REQUEST.name(),
+                TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
+                TenantPermissionEnum.LEAVE_VIEW_TEAM.name(),
+                TenantPermissionEnum.LEAVE_APPROVE_DEPARTMENT.name(),
+                TenantPermissionEnum.LEAVE_CANCEL_OWN.name(),
+                TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
+                TenantPermissionEnum.DEPARTMENT_VIEW.name(),
+                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name()
         );
 
         Set<TenantPermission> managerPermissions = allPermissions.stream()
-                .filter(p -> managerPermissionNames.contains(p.getPermission().name()))
+                .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
 
         TenantRole managerRole = TenantRole.builder()
@@ -190,6 +219,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .name("Manager")
                 .description("Team manager with people management access")
                 .isDefault(false)
+                .active(true)
+                .priority(60)
+                .category("MANAGEMENT")
                 .permissions(managerPermissions)
                 .build();
 

@@ -27,7 +27,6 @@ public class TokenCleanupFilter extends OncePerRequestFilter {
         } finally {
             // Clear tenant context after request completes
             TenantContext.clear();
-            log.debug("Tenant context cleared in cleanup filter");
         }
     }
 }

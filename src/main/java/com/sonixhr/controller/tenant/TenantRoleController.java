@@ -244,7 +244,6 @@ public class TenantRoleController {
                         role.getPermissions().stream()
                                 .map(p -> TenantRoleResponse.PermissionInfo.builder()
                                         .id(p.getId())
-                                        .name(p.getPermission().name())
                                         .description(p.getDescription())
                                         .category(p.getCategory())
                                         .build())

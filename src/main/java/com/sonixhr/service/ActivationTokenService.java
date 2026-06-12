@@ -1,92 +1,120 @@
 package com.sonixhr.service;
 
-import com.sonixhr.entity.ActivationToken;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.exceptions.BusinessException;
-import com.sonixhr.repository.ActivationTokenRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ActivationTokenService {
 
-    private final ActivationTokenRepository activationTokenRepository;
     private final EmployeeRepository employeeRepository;
     private final PlatformUserRepository platformUserRepository;
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RedisTemplate<String, String> redisTemplate;
 
-    public static final long TOKEN_EXPIRY_HOURS = 24;
-    public static final long PASSWORD_RESET_EXPIRY_HOURS = 1;
+    @Value("${app.activation.token.expiry-hours:24}")
+    private long tokenExpiryHours;
 
-    public static final String TOKEN_TYPE_ACTIVATION = "ACTIVATION";
-    public static final String TOKEN_TYPE_PASSWORD_RESET = "PASSWORD_RESET";
+    @Value("${app.reset.token.expiry-hours:1}")
+    private long resetTokenExpiryHours;
 
-    public static final String USER_TYPE_EMPLOYEE = "EMPLOYEE";
-    public static final String USER_TYPE_PLATFORM = "PLATFORM";
+    // Redis key prefixes
+    private static final String REDIS_PREFIX_EMPLOYEE_ACTIVATION = "activation:employee:";
+    private static final String REDIS_PREFIX_EMPLOYEE_RESET = "reset:employee:";
+    private static final String REDIS_PREFIX_PLATFORM_ACTIVATION = "activation:platform:";
+    private static final String REDIS_PREFIX_PLATFORM_RESET = "reset:platform:";
 
     // =====================================================
-    // EMPLOYEE ACTIVATION METHODS
+    // EMPLOYEE (TENANT) ACTIVATION
     // =====================================================
 
     @Transactional
     public String generateTokenForEmployee(Long employeeId) {
         log.info("Generating activation token for employee: {}", employeeId);
 
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
-                employeeId, TOKEN_TYPE_ACTIVATION);
+        String token = UUID.randomUUID().toString();
+        String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
 
-        String tokenValue = UUID.randomUUID().toString();
-        ActivationToken token = ActivationToken.builder()
-                .token(tokenValue)
-                .userId(employeeId)
-                .userType(USER_TYPE_EMPLOYEE)
-                .tokenType(TOKEN_TYPE_ACTIVATION)
-                .expiresAt(LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS))
-                .used(false)
-                .build();
-        activationTokenRepository.save(token);
+        redisTemplate.opsForValue().set(key, employeeId.toString(), tokenExpiryHours, TimeUnit.HOURS);
 
         log.info("Generated activation token for employee: {}", employeeId);
-        return tokenValue;
+        return token;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Get employee ID from activation token
+     */
+    public Long getEmployeeIdFromToken(String token) {
+        log.debug("Getting employee ID from token: {}", token);
+
+        String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
+        String employeeIdStr = redisTemplate.opsForValue().get(key);
+
+        if (employeeIdStr == null) {
+            // Also check reset token
+            key = REDIS_PREFIX_EMPLOYEE_RESET + token;
+            employeeIdStr = redisTemplate.opsForValue().get(key);
+        }
+
+        if (employeeIdStr == null) {
+            throw new BusinessException("Invalid or expired token");
+        }
+
+        return Long.parseLong(employeeIdStr);
+    }
+
+    /**
+     * Check if token is expired
+     */
     public boolean isTokenExpired(String token) {
-        return activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .isEmpty();
+        String[] keys = {
+                REDIS_PREFIX_EMPLOYEE_ACTIVATION + token,
+                REDIS_PREFIX_EMPLOYEE_RESET + token,
+                REDIS_PREFIX_PLATFORM_ACTIVATION + token,
+                REDIS_PREFIX_PLATFORM_RESET + token
+        };
+
+        for (String key : keys) {
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
+                return false; // Token exists, not expired
+            }
+        }
+        return true; // Token not found (expired or invalid)
     }
 
     @Transactional
     public Employee activateEmployee(String token, String password) {
         log.info("Activating employee with token: {}", token);
 
-        ActivationToken activationToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired activation token"));
+        String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
+        String employeeIdStr = redisTemplate.opsForValue().get(key);
 
-        if (!USER_TYPE_EMPLOYEE.equals(activationToken.getUserType()) ||
-                !TOKEN_TYPE_ACTIVATION.equals(activationToken.getTokenType())) {
-            throw new BusinessException("Invalid token type");
+        if (employeeIdStr == null) {
+            throw new BusinessException("Invalid or expired activation token");
         }
 
-        Employee employee = employeeRepository.findById(activationToken.getUserId())
+        Long employeeId = Long.parseLong(employeeIdStr);
+        Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
         if (employee.isActive()) {
@@ -96,6 +124,8 @@ public class ActivationTokenService {
         employee.setPasswordHash(passwordEncoder.encode(password));
         employee.setActive(true);
         employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
 
         Employee savedEmployee = employeeRepository.save(employee);
 
@@ -106,188 +136,149 @@ public class ActivationTokenService {
             log.info("Tenant activated: {}", tenant.getSubdomain());
         }
 
-        activationToken.setUsed(true);
-        activationTokenRepository.save(activationToken);
-        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), TOKEN_TYPE_ACTIVATION);
+        // Delete used token
+        redisTemplate.delete(key);
 
         log.info("Employee activated successfully: {}", employee.getEmail());
         return savedEmployee;
     }
 
-    @Transactional
-    public void setPassword(String token, String newPassword) {
-        Employee employee = activateEmployee(token, newPassword);
-        log.info("Password set successfully for employee: {}", employee.getEmail());
-    }
-
     // =====================================================
-    // PLATFORM USER ACTIVATION METHODS (SIMPLIFIED)
+    // PLATFORM USER ACTIVATION
     // =====================================================
 
     @Transactional
     public String generateTokenForPlatformUser(Long platformUserId) {
         log.info("Generating activation token for platform user: {}", platformUserId);
 
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
-                platformUserId, TOKEN_TYPE_ACTIVATION);
+        String token = UUID.randomUUID().toString();
+        String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
 
-        String tokenValue = UUID.randomUUID().toString();
-        ActivationToken token = ActivationToken.builder()
-                .token(tokenValue)
-                .userId(platformUserId)
-                .userType(USER_TYPE_PLATFORM)
-                .tokenType(TOKEN_TYPE_ACTIVATION)
-                .expiresAt(LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS))
-                .used(false)
-                .build();
-        activationTokenRepository.save(token);
+        redisTemplate.opsForValue().set(key, platformUserId.toString(), tokenExpiryHours, TimeUnit.HOURS);
 
         log.info("Generated activation token for platform user: {}", platformUserId);
-        return tokenValue;
+        return token;
     }
 
     @Transactional
     public PlatformUser activatePlatformUser(String token, String password) {
         log.info("Activating platform user with token: {}", token);
 
-        ActivationToken activationToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired activation token"));
+        String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
+        String userIdStr = redisTemplate.opsForValue().get(key);
 
-        if (!USER_TYPE_PLATFORM.equals(activationToken.getUserType()) ||
-                !TOKEN_TYPE_ACTIVATION.equals(activationToken.getTokenType())) {
-            throw new BusinessException("Invalid token type");
+        if (userIdStr == null) {
+            throw new BusinessException("Invalid or expired activation token");
         }
 
-        PlatformUser platformUser = platformUserRepository.findById(activationToken.getUserId())
+        Long userId = Long.parseLong(userIdStr);
+        PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
-        // ✅ Simplified: Only check status (SUSPENDED is the only restriction)
-        if (platformUser.getStatus() == UserStatus.ACTIVE) {
+        if (user.getStatus() == UserStatus.ACTIVE) {
             throw new BusinessException("Platform user account is already activated");
         }
 
-        // ✅ Simplified: Only update password and status
-        platformUser.setPassword(passwordEncoder.encode(password));
-        platformUser.setStatus(UserStatus.ACTIVE);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setStatus(UserStatus.ACTIVE);
+        user.setActive(true);
+        user.incrementRolesVersion();
+        user.clearAuthoritiesCache();
 
-        PlatformUser savedUser = platformUserRepository.save(platformUser);
+        PlatformUser savedUser = platformUserRepository.save(user);
 
-        activationToken.setUsed(true);
-        activationTokenRepository.save(activationToken);
-        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), TOKEN_TYPE_ACTIVATION);
+        // Delete used token
+        redisTemplate.delete(key);
 
-        log.info("Platform user activated successfully: {}", platformUser.getEmail());
+        log.info("Platform user activated successfully: {}", user.getEmail());
         return savedUser;
     }
 
-    @Transactional
-    public void setPasswordForPlatformUser(String token, String newPassword) {
-        activatePlatformUser(token, newPassword);
-        log.info("Password set for platform user using token: {}", token);
-    }
-
     // =====================================================
-    // PLATFORM USER PASSWORD RESET METHODS (SIMPLIFIED)
+    // PLATFORM USER PASSWORD RESET
     // =====================================================
 
     @Transactional
     public String generatePasswordResetTokenForPlatformUser(Long platformUserId) {
         log.info("Generating password reset token for platform user: {}", platformUserId);
 
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
-                platformUserId, TOKEN_TYPE_PASSWORD_RESET);
+        String token = UUID.randomUUID().toString();
+        String key = REDIS_PREFIX_PLATFORM_RESET + token;
 
-        String tokenValue = UUID.randomUUID().toString();
-        ActivationToken token = ActivationToken.builder()
-                .token(tokenValue)
-                .userId(platformUserId)
-                .userType(USER_TYPE_PLATFORM)
-                .tokenType(TOKEN_TYPE_PASSWORD_RESET)
-                .expiresAt(LocalDateTime.now().plusHours(PASSWORD_RESET_EXPIRY_HOURS))
-                .used(false)
-                .build();
-        activationTokenRepository.save(token);
+        redisTemplate.opsForValue().set(key, platformUserId.toString(), resetTokenExpiryHours, TimeUnit.HOURS);
 
         log.info("Generated password reset token for platform user: {}", platformUserId);
-        return tokenValue;
+        return token;
     }
 
     @Transactional
     public void resetPasswordForPlatformUser(String token, String newPassword) {
         log.info("Resetting password for platform user with token: {}", token);
 
-        ActivationToken resetToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired reset token"));
+        String key = REDIS_PREFIX_PLATFORM_RESET + token;
+        String userIdStr = redisTemplate.opsForValue().get(key);
 
-        if (!USER_TYPE_PLATFORM.equals(resetToken.getUserType()) ||
-                !TOKEN_TYPE_PASSWORD_RESET.equals(resetToken.getTokenType())) {
-            throw new BusinessException("Invalid token type");
+        if (userIdStr == null) {
+            throw new BusinessException("Invalid or expired reset token");
         }
 
-        PlatformUser platformUser = platformUserRepository.findById(resetToken.getUserId())
+        Long userId = Long.parseLong(userIdStr);
+        PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
-        // ✅ Simplified: Just update password
-        platformUser.setPassword(passwordEncoder.encode(newPassword));
-        platformUserRepository.save(platformUser);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordLastChanged(LocalDateTime.now());
+        user.incrementRolesVersion();
+        user.clearAuthoritiesCache();
 
-        resetToken.setUsed(true);
-        activationTokenRepository.save(resetToken);
-        activationTokenRepository.markAllUserTokensAsUsed(platformUser.getId(), TOKEN_TYPE_PASSWORD_RESET);
+        platformUserRepository.save(user);
 
-        log.info("Password reset successfully for platform user: {}", platformUser.getEmail());
+        // Delete used token
+        redisTemplate.delete(key);
+
+        log.info("Password reset successfully for platform user: {}", user.getEmail());
     }
 
     // =====================================================
-    // EMPLOYEE PASSWORD RESET METHODS
+    // EMPLOYEE PASSWORD RESET
     // =====================================================
 
     @Transactional
     public String generatePasswordResetTokenForEmployee(Long employeeId) {
         log.info("Generating password reset token for employee: {}", employeeId);
 
-        activationTokenRepository.deleteByUserIdAndTokenTypeAndUsedFalse(
-                employeeId, TOKEN_TYPE_PASSWORD_RESET);
+        String token = UUID.randomUUID().toString();
+        String key = REDIS_PREFIX_EMPLOYEE_RESET + token;
 
-        String tokenValue = UUID.randomUUID().toString();
-        ActivationToken token = ActivationToken.builder()
-                .token(tokenValue)
-                .userId(employeeId)
-                .userType(USER_TYPE_EMPLOYEE)
-                .tokenType(TOKEN_TYPE_PASSWORD_RESET)
-                .expiresAt(LocalDateTime.now().plusHours(PASSWORD_RESET_EXPIRY_HOURS))
-                .used(false)
-                .build();
-        activationTokenRepository.save(token);
+        redisTemplate.opsForValue().set(key, employeeId.toString(), resetTokenExpiryHours, TimeUnit.HOURS);
 
         log.info("Generated password reset token for employee: {}", employeeId);
-        return tokenValue;
+        return token;
     }
 
     @Transactional
     public void resetPasswordForEmployee(String token, String newPassword) {
         log.info("Resetting password for employee with token: {}", token);
 
-        ActivationToken resetToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired reset token"));
+        String key = REDIS_PREFIX_EMPLOYEE_RESET + token;
+        String employeeIdStr = redisTemplate.opsForValue().get(key);
 
-        if (!USER_TYPE_EMPLOYEE.equals(resetToken.getUserType()) ||
-                !TOKEN_TYPE_PASSWORD_RESET.equals(resetToken.getTokenType())) {
-            throw new BusinessException("Invalid token type");
+        if (employeeIdStr == null) {
+            throw new BusinessException("Invalid or expired reset token");
         }
 
-        Employee employee = employeeRepository.findById(resetToken.getUserId())
+        Long employeeId = Long.parseLong(employeeIdStr);
+        Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
         employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
         employeeRepository.save(employee);
 
-        resetToken.setUsed(true);
-        activationTokenRepository.save(resetToken);
-        activationTokenRepository.markAllUserTokensAsUsed(employee.getId(), TOKEN_TYPE_PASSWORD_RESET);
+        // Delete used token
+        redisTemplate.delete(key);
 
         log.info("Password reset successfully for employee: {}", employee.getEmail());
     }
@@ -296,53 +287,99 @@ public class ActivationTokenService {
     // TOKEN UTILITY METHODS
     // =====================================================
 
-    @Transactional(readOnly = true)
-    public Long getPlatformUserIdFromToken(String token) {
-        ActivationToken activationToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired token"));
-
-        if (!USER_TYPE_PLATFORM.equals(activationToken.getUserType())) {
-            throw new BusinessException("Token is not for platform user");
-        }
-
-        return activationToken.getUserId();
-    }
-
-    @Transactional(readOnly = true)
-    public Long getEmployeeIdFromToken(String token) {
-        ActivationToken activationToken = activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .orElseThrow(() -> new BusinessException("Invalid or expired token"));
-
-        if (!USER_TYPE_EMPLOYEE.equals(activationToken.getUserType())) {
-            throw new BusinessException("Token is not for employee");
-        }
-
-        return activationToken.getUserId();
-    }
-
-    @Transactional
-    public void invalidateToken(String token) {
-        int updated = activationTokenRepository.markAsUsed(token);
-        if (updated > 0) {
-            log.info("Token invalidated: {}", token);
-        } else {
-            log.warn("Token not found or already used: {}", token);
-        }
-    }
-
-    @Transactional(readOnly = true)
     public boolean isValidToken(String token) {
-        return activationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now())
-                .isPresent();
+        String[] patterns = {
+                REDIS_PREFIX_EMPLOYEE_ACTIVATION + token,
+                REDIS_PREFIX_EMPLOYEE_RESET + token,
+                REDIS_PREFIX_PLATFORM_ACTIVATION + token,
+                REDIS_PREFIX_PLATFORM_RESET + token
+        };
+
+        for (String pattern : patterns) {
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(pattern))) {
+                return true;
+            }
+        }
+        return false;
     }
 
+    public void invalidateToken(String token) {
+        String[] patterns = {
+                REDIS_PREFIX_EMPLOYEE_ACTIVATION + token,
+                REDIS_PREFIX_EMPLOYEE_RESET + token,
+                REDIS_PREFIX_PLATFORM_ACTIVATION + token,
+                REDIS_PREFIX_PLATFORM_RESET + token
+        };
+
+        for (String pattern : patterns) {
+            redisTemplate.delete(pattern);
+        }
+
+        log.info("Token invalidated: {}", token);
+    }
+
+    /**
+     * Get platform user ID from token
+     */
+    public Long getPlatformUserIdFromToken(String token) {
+        log.debug("Getting platform user ID from token: {}", token);
+
+        String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
+        String userIdStr = redisTemplate.opsForValue().get(key);
+
+        if (userIdStr == null) {
+            key = REDIS_PREFIX_PLATFORM_RESET + token;
+            userIdStr = redisTemplate.opsForValue().get(key);
+        }
+
+        if (userIdStr == null) {
+            throw new BusinessException("Invalid or expired token");
+        }
+
+        return Long.parseLong(userIdStr);
+    }
+    // =====================================================
+// ADD THIS MISSING METHOD
+// =====================================================
+
+    /**
+     * Set password for employee using activation token
+     * This is called during tenant registration flow
+     */
     @Transactional
-    public int cleanupExpiredTokens() {
-        int deleted = activationTokenRepository.deleteExpiredTokens(LocalDateTime.now());
-        log.info("Cleaned up {} expired tokens", deleted);
-        return deleted;
+    public void setPassword(String token, String newPassword) {
+        log.info("Setting password with token: {}", token);
+
+        // Get employee ID from token
+        Long employeeId = getEmployeeIdFromToken(token);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new BusinessException("Employee not found"));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Account is already activated");
+        }
+
+        // Set password and activate
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setActive(true);
+        employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        // Activate tenant if needed
+        Tenant tenant = employee.getTenant();
+        if (tenant != null && !tenant.getIsActive()) {
+            tenant.activate();
+            tenantRepository.save(tenant);
+            log.info("Tenant activated: {}", tenant.getSubdomain());
+        }
+
+        // Invalidate the token
+        invalidateToken(token);
+
+        log.info("Password set successfully for employee: {}", employee.getEmail());
     }
 }
