@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@Order(2)
+@Order(3)
 public class TenantRoleSeeder implements ApplicationRunner {
 
     private final TenantRoleRepository roleRepository;
@@ -98,7 +98,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .build();
 
         roleRepository.save(superAdminRole);
-        log.info("✅ Created Super Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
+        log.info("Created Super Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
     }
 
     private void createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -148,7 +148,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .build();
 
         roleRepository.save(adminRole);
-        log.info("✅ Created Admin role for tenant {} with {} permissions", tenantId, adminPermissions.size());
+        log.info("Created Admin role for tenant {} with {} permissions", tenantId, adminPermissions.size());
     }
 
     private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -184,7 +184,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .build();
 
         roleRepository.save(employeeRole);
-        log.info("✅ Created Employee role for tenant {} with {} permissions", tenantId, employeePermissions.size());
+        log.info("Created Employee role for tenant {} with {} permissions", tenantId, employeePermissions.size());
     }
 
     private void createManagerRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -226,6 +226,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .build();
 
         roleRepository.save(managerRole);
-        log.info("✅ Created Manager role for tenant {} with {} permissions", tenantId, managerPermissions.size());
+        log.info(" Created Manager role for tenant {} with {} permissions", tenantId, managerPermissions.size());
     }
 }
