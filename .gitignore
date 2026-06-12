@@ -26,5 +26,4 @@ logs/
 delombok/
 
 # Application secrets
-application-prod.yml
-application-prod.properties
+# (Add specific secrets files if any, but application-prod.properties is needed for Render deployments)
