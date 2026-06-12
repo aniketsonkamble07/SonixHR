@@ -8,7 +8,9 @@ target/
 .vscode/
 
 # Logs
+logs/
 *.log
+*.gz
 
 # OS
 .DS_Store
@@ -25,3 +27,4 @@ delombok/
 
 # Application secrets
 application-prod.yml
+application-prod.properties
