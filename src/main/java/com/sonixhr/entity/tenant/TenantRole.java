@@ -18,10 +18,10 @@ import java.util.stream.Collectors;
 @Table(name = "tenant_roles", uniqueConstraints = {
         @UniqueConstraint(name = "uk_role_tenant_name", columnNames = {"tenant_id", "name"})
 }, indexes = {
-        @Index(name = "idx_role_tenant", columnList = "tenant_id"),
-        @Index(name = "idx_role_name", columnList = "name"),
-        @Index(name = "idx_role_default", columnList = "is_default"),
-        @Index(name = "idx_role_tenant_system", columnList = "is_system_role")
+        @Index(name = "idx_tenant_role_tenant", columnList = "tenant_id"),
+        @Index(name = "idx_tenant_role_name", columnList = "name"),
+        @Index(name = "idx_tenant_role_default", columnList = "is_default"),
+        @Index(name = "idx_tenant_role_tenant_system", columnList = "is_system_role")
 })
 @Getter
 @Setter

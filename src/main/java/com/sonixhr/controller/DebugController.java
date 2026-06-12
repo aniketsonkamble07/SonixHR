@@ -21,17 +21,23 @@ import java.util.Map;
 @Profile("dev")
 @RestController
 @RequestMapping("/api/debug")
-@RequiredArgsConstructor
 public class DebugController {
 
-    @Qualifier("platformUserDetailsService")
     private final UserDetailsService platformUserDetailsService;
-
-    @Qualifier("tenantUserDetailsService")
     private final UserDetailsService employeeDetailsService;
-
     private final PlatformUserRepository platformUserRepository;
     private final PasswordEncoder passwordEncoder;
+
+    public DebugController(
+            @Qualifier("platformUserDetailsService") UserDetailsService platformUserDetailsService,
+            @Qualifier("employeeDetailsService") UserDetailsService employeeDetailsService,
+            PlatformUserRepository platformUserRepository,
+            PasswordEncoder passwordEncoder) {
+        this.platformUserDetailsService = platformUserDetailsService;
+        this.employeeDetailsService = employeeDetailsService;
+        this.platformUserRepository = platformUserRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     /**
      * Debug endpoint for Employee (tenant user)

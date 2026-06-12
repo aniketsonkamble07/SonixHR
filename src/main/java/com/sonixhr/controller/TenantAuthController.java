@@ -35,15 +35,26 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/tenant/auth")
-@RequiredArgsConstructor
 public class TenantAuthController {
 
-    @Qualifier("tenantAuthenticationManager")
     private final AuthenticationManager tenantAuthenticationManager;
     private final JwtService jwtService;
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final TokenBlacklistService tokenBlacklistService;
+
+    public TenantAuthController(
+            @Qualifier("tenantAuthenticationManager") AuthenticationManager tenantAuthenticationManager,
+            JwtService jwtService,
+            EmployeeRepository employeeRepository,
+            EmployeeService employeeService,
+            TokenBlacklistService tokenBlacklistService) {
+        this.tenantAuthenticationManager = tenantAuthenticationManager;
+        this.jwtService = jwtService;
+        this.employeeRepository = employeeRepository;
+        this.employeeService = employeeService;
+        this.tokenBlacklistService = tokenBlacklistService;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {

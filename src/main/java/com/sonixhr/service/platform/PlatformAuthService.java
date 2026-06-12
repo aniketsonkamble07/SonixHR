@@ -38,14 +38,23 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PlatformAuthService {
 
-    @Qualifier("platformAuthenticationManager")
     private final AuthenticationManager platformAuthenticationManager;
     private final PlatformUserRepository platformUserRepository;
     private final JwtService jwtService;
     private final PlatformTokenBlacklistService tokenBlacklistService;
+
+    public PlatformAuthService(
+            @Qualifier("platformAuthenticationManager") AuthenticationManager platformAuthenticationManager,
+            PlatformUserRepository platformUserRepository,
+            JwtService jwtService,
+            PlatformTokenBlacklistService tokenBlacklistService) {
+        this.platformAuthenticationManager = platformAuthenticationManager;
+        this.platformUserRepository = platformUserRepository;
+        this.jwtService = jwtService;
+        this.tokenBlacklistService = tokenBlacklistService;
+    }
 
     /**
      * Authenticates the user, records last login, and returns a token pair.

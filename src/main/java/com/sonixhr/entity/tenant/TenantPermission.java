@@ -15,10 +15,10 @@ import java.util.Objects;
                 @UniqueConstraint(name = "uk_permission_name", columnNames = {"permission"})
         },
         indexes = {
-                @Index(name = "idx_permission_type", columnList = "permission"),
-                @Index(name = "idx_permission_category", columnList = "category"),
-                @Index(name = "idx_permission_active", columnList = "is_active"),
-                @Index(name = "idx_permission_display_order", columnList = "display_order")
+                @Index(name = "idx_tenant_permission_type", columnList = "permission"),
+                @Index(name = "idx_tenant_permission_category", columnList = "category"),
+                @Index(name = "idx_tenant_permission_active", columnList = "is_active"),
+                @Index(name = "idx_tenant_permission_display_order", columnList = "display_order")
         })
 @Getter
 @Setter
