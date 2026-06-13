@@ -51,7 +51,20 @@ public class RedisCacheConfig implements CachingConfigurer {
             // Platform user caches (used by PlatformUserService)
             Map.entry("platformUsers",      Duration.ofMinutes(30)),
             Map.entry("platformUsersPage",  Duration.ofMinutes(5)),
-            Map.entry("platformStatistics", Duration.ofMinutes(5))
+            Map.entry("platformStatistics", Duration.ofMinutes(5)),
+            // Missing caches
+            Map.entry("tenantRolesList",    Duration.ofMinutes(30)),
+            Map.entry("platformRolesList",  Duration.ofMinutes(60)),
+            Map.entry("platformPermissions", Duration.ofMinutes(60)),
+            Map.entry("employeePermissions", Duration.ofMinutes(60)),
+            Map.entry("tenant_user_authorities", Duration.ofMinutes(5)),
+            Map.entry("tenant_role_permissions", Duration.ofMinutes(30)),
+            Map.entry("platform_user_authorities", Duration.ofMinutes(5)),
+            Map.entry("platform_role_permissions", Duration.ofMinutes(60)),
+            Map.entry("tenantRolesLookup", Duration.ofMinutes(30)),
+            Map.entry("departmentsLookup", Duration.ofMinutes(60)),
+            Map.entry("platformRolesLookup", Duration.ofMinutes(60)),
+            Map.entry("tenantUsers",        Duration.ofMinutes(10))
     );
 
     @Bean

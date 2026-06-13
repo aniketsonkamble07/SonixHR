@@ -2,6 +2,8 @@ package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
+import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
+import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
@@ -16,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,7 +55,7 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public TenantRole createRole(TenantRoleCreateRequest request, Long tenantId, Long createdBy) {
         long startTime = System.nanoTime();
         log.info("Creating tenant role: {} for tenant: {}", request.getName(), tenantId);
@@ -161,7 +164,7 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public TenantRole updateRole(Long roleId, TenantRoleCreateRequest request, Long tenantId) {
         log.info("Updating tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -247,7 +250,7 @@ public class TenantRoleService {
     }
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public TenantRole updateRolePermissions(Long roleId, Set<Long> permissionIds, Long tenantId) {
         log.info("Updating permissions for role: {} in tenant: {}", roleId, tenantId);
 
@@ -368,7 +371,8 @@ public class TenantRoleService {
     public TenantRoleResponse getRoleResponseByIdAndTenant(Long roleId, Long tenantId) {
         log.debug("Fetching tenant role DTO: {} for tenant: {}", roleId, tenantId);
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
-        return toResponse(role);
+        long count = employeeRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
+        return toResponse(role, (int) count);
     }
 
     public TenantRole getRoleByIdWithPermissions(Long roleId, Long tenantId) {
@@ -380,18 +384,21 @@ public class TenantRoleService {
     }
 
     @Cacheable(value = "tenantRolesList", key = "#tenantId", unless = "#result == null || #result.isEmpty()")
-    public List<TenantRoleResponse> getAllRolesForTenant(Long tenantId) {
+    public List<TenantRoleSummaryResponse> getAllRolesForTenant(Long tenantId) {
         log.debug("Fetching all roles for tenant: {}", tenantId);
 
         // Check local cache
         if (cacheEnabled) {
             List<TenantRole> cached = tenantRolesCache.get(tenantId);
             if (cached != null) {
-                return cached.stream().map(this::toResponse).collect(Collectors.toList());
+                Map<Long, Integer> roleCounts = getRoleEmployeeCounts(tenantId);
+                return cached.stream()
+                        .map(role -> toSummaryResponse(role, roleCounts.getOrDefault(role.getId(), 0)))
+                        .collect(Collectors.toList());
             }
         }
 
-        List<TenantRole> roles = roleRepository.findAllByTenantIdWithPermissions(tenantId);
+        List<TenantRole> roles = roleRepository.findAllByTenantId(tenantId);
 
         if (cacheEnabled) {
             tenantRolesCache.put(tenantId, roles);
@@ -402,10 +409,92 @@ public class TenantRoleService {
             }
         }
 
-        return roles.stream().map(this::toResponse).collect(Collectors.toList());
+        Map<Long, Integer> roleCounts = getRoleEmployeeCounts(tenantId);
+        return roles.stream()
+                .map(role -> toSummaryResponse(role, roleCounts.getOrDefault(role.getId(), 0)))
+                .collect(Collectors.toList());
     }
 
-    public TenantRoleResponse toResponse(TenantRole role) {
+    public TenantRoleSummaryResponse toSummaryResponse(TenantRole role, Integer employeeCount) {
+        if (role == null) {
+            return null;
+        }
+
+        return TenantRoleSummaryResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .description(role.getDescription())
+                .isDefault(role.isDefault())
+                .employeeCount(employeeCount)
+                .createdAt(role.getCreatedAt())
+                .updatedAt(role.getUpdatedAt())
+                .build();
+    }
+
+    public TenantRoleLookupResponse toLookupResponse(TenantRole role) {
+        if (role == null) {
+            return null;
+        }
+
+        return TenantRoleLookupResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .isDefault(role.isDefault())
+                .build();
+    }
+
+    @Cacheable(value = "tenantRolesLookup", key = "#tenantId", unless = "#result == null || #result.isEmpty()")
+    public List<TenantRoleLookupResponse> getRoleLookupForTenant(Long tenantId) {
+        log.debug("Fetching role lookup for tenant: {}", tenantId);
+
+        // Check local cache
+        if (cacheEnabled) {
+            List<TenantRole> cached = tenantRolesCache.get(tenantId);
+            if (cached != null) {
+                return cached.stream()
+                        .map(this::toLookupResponse)
+                        .collect(Collectors.toList());
+            }
+        }
+
+        List<TenantRole> roles = roleRepository.findAllByTenantId(tenantId);
+
+        if (cacheEnabled) {
+            tenantRolesCache.put(tenantId, roles);
+            // Also cache individual roles
+            for (TenantRole role : roles) {
+                String cacheKey = buildCacheKey(tenantId, role.getId());
+                roleCache.put(cacheKey, role);
+            }
+        }
+
+        return roles.stream()
+                .map(this::toLookupResponse)
+                .collect(Collectors.toList());
+    }
+
+    public TenantRoleSummaryResponse toSummaryResponse(TenantRole role) {
+        if (role == null) {
+            return null;
+        }
+        int count = 0;
+        if (role.getTenantId() != null && role.getId() != null) {
+            count = (int) employeeRepository.countUsersByRoleIdAndTenantId(role.getId(), role.getTenantId());
+        }
+        return toSummaryResponse(role, count);
+    }
+
+    private Map<Long, Integer> getRoleEmployeeCounts(Long tenantId) {
+        List<Object[]> counts = employeeRepository.countEmployeesForRolesByTenantId(tenantId);
+        return counts.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> ((Long) row[1]).intValue(),
+                        (v1, v2) -> v1
+                ));
+    }
+
+    public TenantRoleResponse toResponse(TenantRole role, Integer employeeCount) {
         if (role == null) {
             return null;
         }
@@ -425,10 +514,21 @@ public class TenantRoleService {
                                         .build())
                                 .collect(Collectors.toList()) :
                         List.of())
-                .employeeCount(role.getEmployeeCount())
+                .employeeCount(employeeCount)
                 .createdAt(role.getCreatedAt())
                 .updatedAt(role.getUpdatedAt())
                 .build();
+    }
+
+    public TenantRoleResponse toResponse(TenantRole role) {
+        if (role == null) {
+            return null;
+        }
+        int count = 0;
+        if (role.getTenantId() != null && role.getId() != null) {
+            count = (int) employeeRepository.countUsersByRoleIdAndTenantId(role.getId(), role.getTenantId());
+        }
+        return toResponse(role, count);
     }
 
     /**
@@ -465,7 +565,7 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public void deleteRole(Long roleId, Long tenantId) {
         log.info("Deleting tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -504,7 +604,7 @@ public class TenantRoleService {
      * Hard delete role (use with caution)
      */
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public void hardDeleteRole(Long roleId, Long tenantId) {
         log.warn("Hard deleting tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -535,7 +635,7 @@ public class TenantRoleService {
      * Activate a deactivated role
      */
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList"}, allEntries = true)
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public TenantRole activateRole(Long roleId, Long tenantId) {
         log.info("Activating tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -580,7 +680,12 @@ public class TenantRoleService {
     }
 
     @Transactional
-    @CacheEvict(value = "tenantUsers", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId"),
+        @CacheEvict(value = "tenantUsers", allEntries = true)
+    })
     public void assignRoleToUser(Long roleId, Long userId, Long tenantId) {
         log.info("Assigning role {} to user {} in tenant {}", roleId, userId, tenantId);
 
@@ -618,7 +723,12 @@ public class TenantRoleService {
      * Assign multiple roles to user in batch
      */
     @Transactional
-    @CacheEvict(value = "tenantUsers", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", allEntries = true),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId"),
+        @CacheEvict(value = "tenantUsers", allEntries = true)
+    })
     public void assignRolesToUser(Set<Long> roleIds, Long userId, Long tenantId) {
         log.info("Assigning {} roles to user {} in tenant {}", roleIds.size(), userId, tenantId);
 
@@ -659,7 +769,12 @@ public class TenantRoleService {
     }
 
     @Transactional
-    @CacheEvict(value = "tenantUsers", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId"),
+        @CacheEvict(value = "tenantUsers", allEntries = true)
+    })
     public void removeRoleFromUser(Long roleId, Long userId, Long tenantId) {
         log.info("Removing role {} from user {} in tenant {}", roleId, userId, tenantId);
 
@@ -732,6 +847,7 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
+    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
     public TenantRole setDefaultRole(Long roleId, Long tenantId) {
         log.info("Setting default role: {} for tenant: {}", roleId, tenantId);
 

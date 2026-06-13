@@ -2,6 +2,7 @@ package com.sonixhr.controller.department;
 
 import com.sonixhr.dto.department.DepartmentRequest;
 import com.sonixhr.dto.department.DepartmentResponse;
+import com.sonixhr.dto.department.DepartmentLookupResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.department.DepartmentService;
@@ -138,6 +139,18 @@ public class DepartmentController {
 
         List<DepartmentResponse> response = departmentService.getAllDepartmentsList(tenantId);
         log.debug("Found {} departments", response.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/lookup")
+    public ResponseEntity<List<DepartmentLookupResponse>> getDepartmentLookup() {
+
+        Employee currentEmployee = getCurrentEmployee();
+        Long tenantId = currentEmployee.getTenantId();
+
+        log.debug("Getting department lookup for tenant: {}", tenantId);
+
+        List<DepartmentLookupResponse> response = departmentService.getDepartmentLookup(tenantId);
         return ResponseEntity.ok(response);
     }
 

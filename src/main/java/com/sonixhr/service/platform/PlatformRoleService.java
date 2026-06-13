@@ -2,6 +2,7 @@ package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
+import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
@@ -51,7 +52,7 @@ public class PlatformRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList"}, allEntries = true)
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public PlatformRole createRole(PlatformRoleCreateRequest request, Long createdBy) {
         long startTime = System.nanoTime();
         log.info("Creating platform role: {}", request.getName());
@@ -150,7 +151,7 @@ public class PlatformRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList"}, allEntries = true)
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public PlatformRole updateRole(Long roleId, PlatformRoleCreateRequest request) {
         log.info("Updating platform role: {}", roleId);
 
@@ -209,7 +210,7 @@ public class PlatformRoleService {
     }
 
     @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList"}, allEntries = true)
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public PlatformRole updateRolePermissions(Long roleId, Set<Long> permissionIds) {
         log.info("Updating permissions for role: {}", roleId);
 
@@ -316,6 +317,26 @@ public class PlatformRoleService {
         return roles.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Cacheable(value = "platformRolesLookup", unless = "#result == null || #result.isEmpty()")
+    public List<PlatformRoleLookupResponse> getPlatformRoleLookup() {
+        log.debug("Fetching all platform roles for lookup");
+        return roleRepository.findAll().stream()
+                .filter(PlatformRole::isActive)
+                .map(this::toLookupResponse)
+                .collect(Collectors.toList());
+    }
+
+    public PlatformRoleLookupResponse toLookupResponse(PlatformRole role) {
+        if (role == null) {
+            return null;
+        }
+        return PlatformRoleLookupResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .isSystemRole(role.isSystemRole())
+                .build();
+    }
+
     public PlatformRoleResponse toResponse(PlatformRole role) {
         if (role == null) {
             return null;
@@ -368,7 +389,7 @@ public class PlatformRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList"}, allEntries = true)
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public void deleteRole(Long roleId) {
         log.info("Deleting platform role: {}", roleId);
 
@@ -399,7 +420,7 @@ public class PlatformRoleService {
      * Hard delete role (use with caution)
      */
     @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList"}, allEntries = true)
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public void hardDeleteRole(Long roleId) {
         log.warn("Hard deleting platform role: {}", roleId);
 

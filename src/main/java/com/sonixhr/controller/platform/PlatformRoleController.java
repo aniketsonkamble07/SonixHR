@@ -2,6 +2,7 @@ package com.sonixhr.controller.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
+import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
@@ -42,7 +43,7 @@ public class PlatformRoleController {
 
         // ✅ Platform roles are global, no tenantId needed
         PlatformRole role = roleService.createRole(request, currentAdmin.getId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(role));
+        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.toResponse(role));
     }
 
     @PutMapping("/{roleId}/permissions")
@@ -56,7 +57,7 @@ public class PlatformRoleController {
 
         // ✅ Platform roles are global, no tenantId needed
         PlatformRole updated = roleService.updateRolePermissions(roleId, permissionIds);
-        return ResponseEntity.ok(toResponse(updated));
+        return ResponseEntity.ok(roleService.toResponse(updated));
     }
 
     @GetMapping
@@ -65,6 +66,14 @@ public class PlatformRoleController {
         log.debug("Getting all platform roles");
 
         List<PlatformRoleResponse> roles = roleService.getAllRoles();
+        return ResponseEntity.ok(roles);
+    }
+
+    @GetMapping("/lookup")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES') or hasAuthority('SUPER_ADMIN')")
+    public ResponseEntity<List<PlatformRoleLookupResponse>> getRoleLookup() {
+        log.debug("Getting platform roles lookup");
+        List<PlatformRoleLookupResponse> roles = roleService.getPlatformRoleLookup();
         return ResponseEntity.ok(roles);
     }
 
@@ -87,7 +96,7 @@ public class PlatformRoleController {
         log.info("Platform admin {} updating role: {}", currentAdmin.getEmail(), roleId);
 
         PlatformRole updated = roleService.updateRole(roleId, request);
-        return ResponseEntity.ok(toResponse(updated));
+        return ResponseEntity.ok(roleService.toResponse(updated));
     }
 
     @DeleteMapping("/{roleId}")
@@ -138,35 +147,5 @@ public class PlatformRoleController {
         return ResponseEntity.noContent().build();
     }
 
-    private PlatformRoleResponse toResponse(PlatformRole role) {
-        if (role == null) {
-            return null;
-        }
 
-        // Handle permission conversion safely
-        List<PlatformRoleResponse.PermissionInfo> permissions = List.of();
-        if (role.getPermissions() != null) {
-            permissions = role.getPermissions().stream()
-                    .map(p -> {
-                        // FIXED: getPermission() returns String, not an enum
-                        String permissionName = p.getPermission();  // This is already a String
-                        return PlatformRoleResponse.PermissionInfo.builder()
-                                .id(p.getId())
-                                .name(permissionName)
-                                .description(p.getDescription())
-                                .build();
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        return PlatformRoleResponse.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .description(role.getDescription())
-                .isSystemRole(role.isSystemRole())
-                .permissions(permissions)
-                .createdAt(role.getCreatedAt())
-                .updatedAt(role.getUpdatedAt())
-                .build();
-    }
 }

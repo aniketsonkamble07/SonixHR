@@ -294,6 +294,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     long countUsersByRoleIdAndTenantId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
+    @Query("SELECT r.id, COUNT(e) FROM Employee e JOIN e.roles r WHERE e.tenant.id = :tenantId GROUP BY r.id")
+    List<Object[]> countEmployeesForRolesByTenantId(@Param("tenantId") Long tenantId);
+
     @Query("SELECT e.id, e.email FROM Employee e JOIN e.roles r WHERE r.id = :roleId AND e.tenant.id = :tenantId")
     List<Object[]> findUserIdsAndEmailsByRoleId(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 

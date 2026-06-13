@@ -4,6 +4,7 @@ import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
+import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.service.employee.EmployeeService;
@@ -125,14 +126,14 @@ public class EmployeeController {
 
     @GetMapping
     @Operation(summary = "Get all employees", description = "Retrieves all employees for the tenant with pagination")
-    public ResponseEntity<Page<EmployeeResponse>> getAllEmployees(
+    public ResponseEntity<Page<EmployeeSummaryResponse>> getAllEmployees(
             @AuthenticationPrincipal Employee currentEmployee,
             @Parameter(description = "Pagination parameters")
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get all employees for tenant: {}", tenantId);
-        Page<EmployeeResponse> response = employeeService.getAllEmployees(tenantId, pageable);
+        Page<EmployeeSummaryResponse> response = employeeService.getAllEmployees(tenantId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -142,7 +143,7 @@ public class EmployeeController {
 
     @GetMapping("/status/{status}")
     @Operation(summary = "Get employees by status", description = "Retrieves employees filtered by status")
-    public ResponseEntity<Page<EmployeeResponse>> getEmployeesByStatus(
+    public ResponseEntity<Page<EmployeeSummaryResponse>> getEmployeesByStatus(
             @Parameter(description = "Employee Status", required = true)
             @PathVariable EmployeeStatus status,
             @AuthenticationPrincipal Employee currentEmployee,
@@ -151,7 +152,7 @@ public class EmployeeController {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get employees with status: {} for tenant: {}", status, tenantId);
-        Page<EmployeeResponse> response = employeeService.getEmployeesByStatus(tenantId, status, pageable);
+        Page<EmployeeSummaryResponse> response = employeeService.getEmployeesByStatus(tenantId, status, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -161,14 +162,14 @@ public class EmployeeController {
 
     @GetMapping("/department/name/{departmentName}")
     @Operation(summary = "Get employees by department name", description = "Retrieves employees filtered by department name")
-    public ResponseEntity<List<EmployeeResponse>> getEmployeesByDepartmentName(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getEmployeesByDepartmentName(
             @Parameter(description = "Department name", required = true)
             @PathVariable String departmentName,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get employees in department: {} for tenant: {}", departmentName, tenantId);
-        List<EmployeeResponse> response = employeeService.getEmployeesByDepartmentName(tenantId, departmentName);
+        List<EmployeeSummaryResponse> response = employeeService.getEmployeesByDepartmentName(tenantId, departmentName);
         return ResponseEntity.ok(response);
     }
 
@@ -178,7 +179,7 @@ public class EmployeeController {
 
     @GetMapping("/managers/{managerId}/team")
     @Operation(summary = "Get team members", description = "Retrieves all employees reporting to a manager")
-    public ResponseEntity<Page<EmployeeResponse>> getTeamMembers(
+    public ResponseEntity<Page<EmployeeSummaryResponse>> getTeamMembers(
             @Parameter(description = "Manager ID", required = true)
             @PathVariable Long managerId,
             @AuthenticationPrincipal Employee currentEmployee,
@@ -187,7 +188,7 @@ public class EmployeeController {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get team members for manager: {} in tenant: {}", managerId, tenantId);
-        Page<EmployeeResponse> response = employeeService.getTeamMembersPaginated(tenantId, managerId, pageable);
+        Page<EmployeeSummaryResponse> response = employeeService.getTeamMembersPaginated(tenantId, managerId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -197,14 +198,14 @@ public class EmployeeController {
 
     @GetMapping("/my-team")
     @Operation(summary = "Get my team", description = "Retrieves all employees reporting to the current employee")
-    public ResponseEntity<Page<EmployeeResponse>> getMyTeam(
+    public ResponseEntity<Page<EmployeeSummaryResponse>> getMyTeam(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
 
         Long tenantId = currentEmployee.getTenantId();
         Long managerId = currentEmployee.getId();
         log.info("REST request to get team for manager: {} in tenant: {}", managerId, tenantId);
-        Page<EmployeeResponse> response = employeeService.getTeamMembersPaginated(tenantId, managerId, pageable);
+        Page<EmployeeSummaryResponse> response = employeeService.getTeamMembersPaginated(tenantId, managerId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -214,12 +215,12 @@ public class EmployeeController {
 
     @GetMapping("/organization-chart")
     @Operation(summary = "Get organization chart", description = "Retrieves the complete organization hierarchy")
-    public ResponseEntity<List<EmployeeResponse>> getOrganizationChart(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getOrganizationChart(
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get organization chart for tenant: {}", tenantId);
-        List<EmployeeResponse> response = employeeService.getOrganizationChart(tenantId);
+        List<EmployeeSummaryResponse> response = employeeService.getOrganizationChart(tenantId);
         return ResponseEntity.ok(response);
     }
 
@@ -289,7 +290,7 @@ public class EmployeeController {
 
     @GetMapping("/search")
     @Operation(summary = "Search employees", description = "Searches employees by name, email, code, etc.")
-    public ResponseEntity<Page<EmployeeResponse>> searchEmployees(
+    public ResponseEntity<Page<EmployeeSummaryResponse>> searchEmployees(
             @Parameter(description = "Search term", required = true)
             @RequestParam String searchTerm,
             @AuthenticationPrincipal Employee currentEmployee,
@@ -298,7 +299,7 @@ public class EmployeeController {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to search employees with term: {} for tenant: {}", searchTerm, tenantId);
-        Page<EmployeeResponse> response = employeeService.searchEmployees(tenantId, searchTerm, pageable);
+        Page<EmployeeSummaryResponse> response = employeeService.searchEmployees(tenantId, searchTerm, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -341,14 +342,14 @@ public class EmployeeController {
 
     @GetMapping("/upcoming/birthdays")
     @Operation(summary = "Get upcoming birthdays", description = "Retrieves employees with birthdays in next N days")
-    public ResponseEntity<List<EmployeeResponse>> getUpcomingBirthdays(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getUpcomingBirthdays(
             @Parameter(description = "Number of days to look ahead", example = "30")
             @RequestParam(defaultValue = "30") int days,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get upcoming birthdays for tenant: {} in next {} days", tenantId, days);
-        List<EmployeeResponse> response = employeeService.getUpcomingBirthdays(tenantId, days);
+        List<EmployeeSummaryResponse> response = employeeService.getUpcomingBirthdays(tenantId, days);
         return ResponseEntity.ok(response);
     }
 
@@ -358,14 +359,14 @@ public class EmployeeController {
 
     @GetMapping("/upcoming/anniversaries")
     @Operation(summary = "Get upcoming work anniversaries", description = "Retrieves employees with work anniversaries in next N days")
-    public ResponseEntity<List<EmployeeResponse>> getUpcomingAnniversaries(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getUpcomingAnniversaries(
             @Parameter(description = "Number of days to look ahead", example = "30")
             @RequestParam(defaultValue = "30") int days,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get upcoming anniversaries for tenant: {} in next {} days", tenantId, days);
-        List<EmployeeResponse> response = employeeService.getUpcomingAnniversaries(tenantId, days);
+        List<EmployeeSummaryResponse> response = employeeService.getUpcomingAnniversaries(tenantId, days);
         return ResponseEntity.ok(response);
     }
 
@@ -436,13 +437,13 @@ public class EmployeeController {
     @GetMapping("/{managerId}/team/list")
     @Operation(summary = "Get team members list",
             description = "Retrieves all direct reports of a manager")
-    public ResponseEntity<List<EmployeeResponse>> getTeamMembersList(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getTeamMembersList(
             @Parameter(description = "Manager ID", required = true)
             @PathVariable Long managerId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
-        List<EmployeeResponse> team = employeeService.getTeamMembers(managerId, tenantId);
+        List<EmployeeSummaryResponse> team = employeeService.getTeamMembers(managerId, tenantId);
         return ResponseEntity.ok(team);
     }
 
@@ -453,13 +454,13 @@ public class EmployeeController {
     @GetMapping("/{managerId}/subordinates")
     @Operation(summary = "Get all subordinates",
             description = "Retrieves all employees under a manager (complete hierarchy)")
-    public ResponseEntity<List<EmployeeResponse>> getAllSubordinates(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getAllSubordinates(
             @Parameter(description = "Manager ID", required = true)
             @PathVariable Long managerId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
-        List<EmployeeResponse> subordinates = employeeService.getAllSubordinates(managerId, tenantId);
+        List<EmployeeSummaryResponse> subordinates = employeeService.getAllSubordinates(managerId, tenantId);
         return ResponseEntity.ok(subordinates);
     }
 
@@ -470,13 +471,13 @@ public class EmployeeController {
     @GetMapping("/{employeeId}/manager-chain")
     @Operation(summary = "Get manager chain",
             description = "Retrieves the complete reporting chain of an employee")
-    public ResponseEntity<List<EmployeeResponse>> getManagerChain(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getManagerChain(
             @Parameter(description = "Employee ID", required = true)
             @PathVariable Long employeeId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
-        Long tenantId = currentEmployee. getTenantId();
-        List<EmployeeResponse> chain = employeeService.getManagerChain(employeeId, tenantId);
+        Long tenantId = currentEmployee.getTenantId();
+        List<EmployeeSummaryResponse> chain = employeeService.getManagerChain(employeeId, tenantId);
         return ResponseEntity.ok(chain);
     }
 
@@ -504,11 +505,11 @@ public class EmployeeController {
     @GetMapping("/no-manager")
     @Operation(summary = "Get employees with no manager",
             description = "Retrieves all employees who don't report to anyone")
-    public ResponseEntity<List<EmployeeResponse>> getEmployeesWithNoManager(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getEmployeesWithNoManager(
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
-        List<EmployeeResponse> employees = employeeService.getEmployeesWithNoManager(tenantId);
+        List<EmployeeSummaryResponse> employees = employeeService.getEmployeesWithNoManager(tenantId);
         return ResponseEntity.ok(employees);
     }
 }

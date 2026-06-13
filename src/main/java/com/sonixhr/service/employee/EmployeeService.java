@@ -4,6 +4,7 @@ import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
+import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
@@ -18,6 +19,8 @@ import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +59,11 @@ public class EmployeeService {
     // CREATE EMPLOYEE
     // =====================================================
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", allEntries = true),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public EmployeeResponse createEmployee(Long tenantId, EmployeeCreateRequest request) {
         log.info("Creating employee for tenant: {}", tenantId);
         log.debug("Request roleIds: {}", request.getRoleIds());
@@ -204,35 +212,35 @@ public class EmployeeService {
     // =====================================================
     // GET TEAM MEMBERS (Paginated)
     // =====================================================
-    public Page<EmployeeResponse> getTeamMembersPaginated(Long tenantId, Long managerId, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> getTeamMembersPaginated(Long tenantId, Long managerId, Pageable pageable) {
         log.info("Getting team members for manager: {} with pagination", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId, pageable)
-                .map(this::convertToResponse);
+                .map(this::convertToSummaryResponse);
     }
 
     // =====================================================
     // GET TEAM MEMBERS (List)
     // =====================================================
-    public List<EmployeeResponse> getTeamMembers(Long managerId, Long tenantId) {
+    public List<EmployeeSummaryResponse> getTeamMembers(Long managerId, Long tenantId) {
         log.info("Getting team members for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId)
                 .stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
     // =====================================================
     // GET ALL SUBORDINATES
     // =====================================================
-    public List<EmployeeResponse> getAllSubordinates(Long managerId, Long tenantId) {
+    public List<EmployeeSummaryResponse> getAllSubordinates(Long managerId, Long tenantId) {
         log.info("Getting all subordinates for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         List<Employee> allSubordinates = new ArrayList<>();
         collectAllSubordinates(managerId, tenantId, allSubordinates);
         return allSubordinates.stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
@@ -247,7 +255,7 @@ public class EmployeeService {
     // =====================================================
     // GET MANAGER CHAIN
     // =====================================================
-    public List<EmployeeResponse> getManagerChain(Long employeeId, Long tenantId) {
+    public List<EmployeeSummaryResponse> getManagerChain(Long employeeId, Long tenantId) {
         log.info("Getting manager chain for employee: {}", employeeId);
         Employee employee = findEmployeeByIdAndTenant(employeeId, tenantId);
         List<Employee> chain = new ArrayList<>();
@@ -257,18 +265,18 @@ public class EmployeeService {
             current = current.getManager();
         }
         return chain.stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
     // =====================================================
     // GET EMPLOYEES WITH NO MANAGER
     // =====================================================
-    public List<EmployeeResponse> getEmployeesWithNoManager(Long tenantId) {
+    public List<EmployeeSummaryResponse> getEmployeesWithNoManager(Long tenantId) {
         log.info("Getting employees with no manager for tenant: {}", tenantId);
         return employeeRepository.findEmployeesWithNoManager(tenantId)
                 .stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
@@ -321,35 +329,35 @@ public class EmployeeService {
     // =====================================================
     // GET ALL EMPLOYEES
     // =====================================================
-    public Page<EmployeeResponse> getAllEmployees(Long tenantId, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> getAllEmployees(Long tenantId, Pageable pageable) {
         return employeeRepository.findByTenant_Id(tenantId, pageable)
-                .map(this::convertToResponse);
+                .map(this::convertToSummaryResponse);
     }
 
     // =====================================================
     // GET EMPLOYEES BY STATUS
     // =====================================================
-    public Page<EmployeeResponse> getEmployeesByStatus(Long tenantId, EmployeeStatus status, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> getEmployeesByStatus(Long tenantId, EmployeeStatus status, Pageable pageable) {
         return employeeRepository.findByTenant_IdAndStatus(tenantId, status, pageable)
-                .map(this::convertToResponse);
+                .map(this::convertToSummaryResponse);
     }
 
     // =====================================================
     // GET EMPLOYEES BY DEPARTMENT NAME
     // =====================================================
     @Transactional(readOnly = true)
-    public List<EmployeeResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
+    public List<EmployeeSummaryResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
         log.debug("Fetching employees in department: {} for tenant: {}", departmentName, tenantId);
         return employeeRepository.findByTenantIdAndDepartmentName(tenantId, departmentName)
                 .stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
     // =====================================================
     // GET ORGANIZATION CHART
     // =====================================================
-    public List<EmployeeResponse> getOrganizationChart(Long tenantId) {
+    public List<EmployeeSummaryResponse> getOrganizationChart(Long tenantId) {
         log.debug("Getting organization chart for tenant: {}", tenantId);
 
         // Get all employees with their managers in one query
@@ -370,8 +378,8 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
-    private EmployeeResponse buildHierarchyResponse(Employee employee, Map<Long, List<Employee>> managerToSubordinates) {
-        EmployeeResponse response = convertToResponse(employee);
+    private EmployeeSummaryResponse buildHierarchyResponse(Employee employee, Map<Long, List<Employee>> managerToSubordinates) {
+        EmployeeSummaryResponse response = convertToSummaryResponse(employee);
         List<Employee> subordinates = managerToSubordinates.getOrDefault(employee.getId(), Collections.emptyList());
         response.setDirectReports(subordinates.stream()
                 .map(sub -> buildHierarchyResponse(sub, managerToSubordinates))
@@ -427,15 +435,20 @@ public class EmployeeService {
     // =====================================================
     // SEARCH EMPLOYEES
     // =====================================================
-    public Page<EmployeeResponse> searchEmployees(Long tenantId, String searchTerm, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> searchEmployees(Long tenantId, String searchTerm, Pageable pageable) {
         return employeeRepository.searchEmployees(tenantId, searchTerm, pageable)
-                .map(this::convertToResponse);
+                .map(this::convertToSummaryResponse);
     }
 
     // =====================================================
     // DELETE EMPLOYEE (SOFT DELETE)
     // =====================================================
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", allEntries = true),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public void deleteEmployee(Long id, Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         List<Employee> subordinates = employeeRepository.findByManagerIdAndTenantId(id, tenantId);
@@ -465,7 +478,7 @@ public class EmployeeService {
     // =====================================================
     // GET UPCOMING BIRTHDAYS
     // =====================================================
-    public List<EmployeeResponse> getUpcomingBirthdays(Long tenantId, int days) {
+    public List<EmployeeSummaryResponse> getUpcomingBirthdays(Long tenantId, int days) {
         log.debug("Getting upcoming birthdays for tenant: {} within {} days", tenantId, days);
 
         LocalDate today = LocalDate.now();
@@ -473,14 +486,14 @@ public class EmployeeService {
 
         return employeeRepository.findEmployeesWithUpcomingBirthdays(tenantId, today, futureDate)
                 .stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
     // =====================================================
     // GET UPCOMING ANNIVERSARIES
     // =====================================================
-    public List<EmployeeResponse> getUpcomingAnniversaries(Long tenantId, int days) {
+    public List<EmployeeSummaryResponse> getUpcomingAnniversaries(Long tenantId, int days) {
         log.debug("Getting upcoming anniversaries for tenant: {} within {} days", tenantId, days);
 
         LocalDate today = LocalDate.now();
@@ -488,7 +501,7 @@ public class EmployeeService {
 
         return employeeRepository.findEmployeesWithUpcomingAnniversaries(tenantId, today, futureDate)
                 .stream()
-                .map(this::convertToResponse)
+                .map(this::convertToSummaryResponse)
                 .collect(Collectors.toList());
     }
 
@@ -592,6 +605,28 @@ public class EmployeeService {
                 .updatedAt(employee.getUpdatedAt())
                 .createdBy(employee.getCreatedBy())
                 .updatedBy(employee.getUpdatedBy())
+                .build();
+    }
+
+    private EmployeeSummaryResponse convertToSummaryResponse(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+        return EmployeeSummaryResponse.builder()
+                .id(employee.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .firstName(employee.getFirstName())
+                .lastName(employee.getLastName())
+                .fullName(employee.getFullName())
+                .email(employee.getEmail())
+                .phone(employee.getPhone())
+                .position(employee.getPosition())
+                .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
+                .status(employee.getStatus())
+                .isActive(employee.isActive())
+                .profilePictureUrl(employee.getProfilePictureUrl())
+                .hireDate(employee.getHireDate())
+                .managerName(employee.getManager() != null ? employee.getManager().getFullName() : null)
                 .build();
     }
 

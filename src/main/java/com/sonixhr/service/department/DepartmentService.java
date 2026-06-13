@@ -2,7 +2,10 @@ package com.sonixhr.service.department;
 
 import com.sonixhr.dto.department.DepartmentRequest;
 import com.sonixhr.dto.department.DepartmentResponse;
+import com.sonixhr.dto.department.DepartmentLookupResponse;
 import com.sonixhr.entity.department.Department;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.exceptions.BusinessException;
@@ -38,6 +41,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
+    @CacheEvict(value = "departmentsLookup", key = "#tenantId")
     public DepartmentResponse createDepartment(Long tenantId, DepartmentRequest request) {
         log.info("Creating department for tenant: {}", tenantId);
 
@@ -73,6 +77,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
+    @CacheEvict(value = "departmentsLookup", key = "#tenantId")
     public DepartmentResponse updateDepartment(Long id, Long tenantId, DepartmentRequest request) {
         log.info("Updating department: {} for tenant: {}", id, tenantId);
 
@@ -177,6 +182,7 @@ public class DepartmentService {
     // =====================================================
 
     @Transactional
+    @CacheEvict(value = "departmentsLookup", key = "#tenantId")
     public void deleteDepartment(Long id, Long tenantId) {
         log.info("Deleting department: {} for tenant: {}", id, tenantId);
 
@@ -325,5 +331,25 @@ public class DepartmentService {
                 .createdAt(department.getCreatedAt())
                 .updatedAt(department.getUpdatedAt())
                 .build();
+    }
+
+    public DepartmentLookupResponse toLookupResponse(Department department) {
+        if (department == null) {
+            return null;
+        }
+        return DepartmentLookupResponse.builder()
+                .id(department.getId())
+                .name(department.getName())
+                .code(department.getCode())
+                .build();
+    }
+
+    @Cacheable(value = "departmentsLookup", key = "#tenantId", unless = "#result == null || #result.isEmpty()")
+    public List<DepartmentLookupResponse> getDepartmentLookup(Long tenantId) {
+        log.debug("Fetching department lookup for tenant: {}", tenantId);
+        List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        return departments.stream()
+                .map(this::toLookupResponse)
+                .collect(Collectors.toList());
     }
 }

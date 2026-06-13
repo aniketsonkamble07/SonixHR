@@ -1,6 +1,7 @@
 package com.sonixhr.controller.platform;
 
 import com.sonixhr.dto.PermissionGroupDTO;
+import com.sonixhr.dto.PermissionDTO;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.service.platform.PlatformPermissionService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -29,9 +31,11 @@ public class PlatformPermissionController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES') or hasAuthority('SUPER_ADMIN')")
-    public ResponseEntity<List<PlatformPermission>> getAllPermissions() {
+    public ResponseEntity<List<PermissionDTO>> getAllPermissions() {
         log.info("REST request to get all platform permissions");
-        List<PlatformPermission> permissions = permissionService.getAllPermissions();
+        List<PermissionDTO> permissions = permissionService.getAllPermissions().stream()
+                .map(PlatformPermission::toDTO)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(permissions);
     }
 }

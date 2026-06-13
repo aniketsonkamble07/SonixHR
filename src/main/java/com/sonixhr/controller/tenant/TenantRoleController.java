@@ -3,6 +3,8 @@ package com.sonixhr.controller.tenant;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
+import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
+import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.service.tenant.TenantRoleService;
@@ -49,7 +51,7 @@ public class TenantRoleController {
                 currentEmployee.getEmail(), request.getName(), tenantId);
 
         TenantRole role = roleService.createRole(request, tenantId, currentEmployee.getId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(role));
+        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.toResponse(role));
     }
 
     /**
@@ -67,7 +69,7 @@ public class TenantRoleController {
                 currentEmployee.getEmail(), roleId, tenantId);
 
         TenantRole updated = roleService.updateRolePermissions(roleId, permissionIds, tenantId);
-        return ResponseEntity.ok(toResponse(updated));
+        return ResponseEntity.ok(roleService.toResponse(updated));
     }
 
     /**
@@ -75,13 +77,25 @@ public class TenantRoleController {
      */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_VIEW', 'EMPLOYEE_VIEW_ALL')")
-    public ResponseEntity<List<TenantRoleResponse>> getAllRoles(
+    public ResponseEntity<List<TenantRoleSummaryResponse>> getAllRoles(
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = getCurrentTenantId(currentEmployee);
         log.debug("Getting all roles for tenant: {}", tenantId);
 
-        List<TenantRoleResponse> roles = roleService.getAllRolesForTenant(tenantId);
+        List<TenantRoleSummaryResponse> roles = roleService.getAllRolesForTenant(tenantId);
+        return ResponseEntity.ok(roles);
+    }
+
+    @GetMapping("/lookup")
+    @PreAuthorize("hasAnyAuthority('ROLE_VIEW', 'EMPLOYEE_VIEW_ALL')")
+    public ResponseEntity<List<TenantRoleLookupResponse>> getRoleLookup(
+            @AuthenticationPrincipal Employee currentEmployee) {
+
+        Long tenantId = getCurrentTenantId(currentEmployee);
+        log.debug("Getting role lookup for tenant: {}", tenantId);
+
+        List<TenantRoleLookupResponse> roles = roleService.getRoleLookupForTenant(tenantId);
         return ResponseEntity.ok(roles);
     }
 
@@ -97,7 +111,7 @@ public class TenantRoleController {
         log.debug("Getting default roles for tenant: {}", tenantId);
 
         List<TenantRole> roles = roleService.getDefaultRolesForTenant(tenantId);
-        return ResponseEntity.ok(roles.stream().map(this::toResponse).collect(Collectors.toList()));
+        return ResponseEntity.ok(roles.stream().map(roleService::toResponse).collect(Collectors.toList()));
     }
 
     /**
@@ -131,7 +145,7 @@ public class TenantRoleController {
                 currentEmployee.getEmail(), roleId, tenantId);
 
         TenantRole updated = roleService.updateRole(roleId, request, tenantId);
-        return ResponseEntity.ok(toResponse(updated));
+        return ResponseEntity.ok(roleService.toResponse(updated));
     }
 
     /**
@@ -223,36 +237,14 @@ public class TenantRoleController {
                 currentEmployee.getEmail(), roleId, tenantId);
 
         TenantRole role = roleService.setDefaultRole(roleId, tenantId);
-        return ResponseEntity.ok(toResponse(role));
+        return ResponseEntity.ok(roleService.toResponse(role));
     }
 
     // =====================================================
     // PRIVATE HELPER METHODS
     // =====================================================
 
-    private TenantRoleResponse toResponse(TenantRole role) {
-        if (role == null) {
-            return null;
-        }
 
-        return TenantRoleResponse.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .description(role.getDescription())
-                .isDefault(role.isDefault())
-                .permissions(role.getPermissions() != null ?
-                        role.getPermissions().stream()
-                                .map(p -> TenantRoleResponse.PermissionInfo.builder()
-                                        .id(p.getId())
-                                        .description(p.getDescription())
-                                        .category(p.getCategory())
-                                        .build())
-                                .collect(Collectors.toList()) :
-                        List.of())
-                .createdAt(role.getCreatedAt())
-                .updatedAt(role.getUpdatedAt())
-                .build();
-    }
 
     private EmployeeResponse toEmployeeResponse(Employee employee) {
         if (employee == null) {
