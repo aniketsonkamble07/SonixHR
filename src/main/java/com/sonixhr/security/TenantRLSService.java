@@ -223,11 +223,15 @@ public class TenantRLSService {
     private void flushMetrics() {
         if (redisTemplate == null) return;
 
-        metricsBuffer.forEach((key, value) -> {
-            redisTemplate.opsForHash().increment(key, "total", value);
-            redisTemplate.expire(key, 1, TimeUnit.HOURS);
-        });
-        metricsBuffer.clear();
+        try {
+            metricsBuffer.forEach((key, value) -> {
+                redisTemplate.opsForHash().increment(key, "total", value);
+                redisTemplate.expire(key, 1, TimeUnit.HOURS);
+            });
+            metricsBuffer.clear();
+        } catch (Exception e) {
+            log.warn("Failed to flush metrics to Redis: {}", e.getMessage());
+        }
     }
 
     /**
@@ -353,20 +357,24 @@ public class TenantRLSService {
 
         // L2: Try Redis cache
         if (cacheEnabled && redisTemplate != null) {
-            String cacheKey = REDIS_KEY_TENANT_CONFIG + tenantId;
-            Map<Object, Object> redisCached = redisTemplate.opsForHash().entries(cacheKey);
+            try {
+                String cacheKey = REDIS_KEY_TENANT_CONFIG + tenantId;
+                Map<Object, Object> redisCached = redisTemplate.opsForHash().entries(cacheKey);
 
-            if (!redisCached.isEmpty()) {
-                TenantConfig config = TenantConfig.builder()
-                        .tenantName((String) redisCached.get("tenantName"))
-                        .schemaName((String) redisCached.get("schemaName"))
-                        .isActive(Boolean.TRUE.equals(redisCached.get("isActive")))
-                        .config((String) redisCached.get("config"))
-                        .build();
+                if (redisCached != null && !redisCached.isEmpty()) {
+                    TenantConfig config = TenantConfig.builder()
+                            .tenantName((String) redisCached.get("tenantName"))
+                            .schemaName((String) redisCached.get("schemaName"))
+                            .isActive(Boolean.TRUE.equals(redisCached.get("isActive")))
+                            .config((String) redisCached.get("config"))
+                            .build();
 
-                // Populate L1 cache
-                localTenantCache.put(tenantId, config);
-                return config;
+                    // Populate L1 cache
+                    localTenantCache.put(tenantId, config);
+                    return config;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get tenant config from Redis: {}", e.getMessage());
             }
         }
 
@@ -377,7 +385,11 @@ public class TenantRLSService {
         if (config != null && cacheEnabled) {
             localTenantCache.put(tenantId, config);
             if (redisTemplate != null) {
-                cacheTenantConfig(tenantId);
+                try {
+                    cacheTenantConfig(tenantId);
+                } catch (Exception e) {
+                    log.warn("Failed to cache tenant config in Redis: {}", e.getMessage());
+                }
             }
         }
 
@@ -424,8 +436,12 @@ public class TenantRLSService {
 
         // Clear L2 cache
         if (redisTemplate != null) {
-            String cacheKey = REDIS_KEY_TENANT_CONFIG + tenantId;
-            redisTemplate.delete(cacheKey);
+            try {
+                String cacheKey = REDIS_KEY_TENANT_CONFIG + tenantId;
+                redisTemplate.delete(cacheKey);
+            } catch (Exception e) {
+                log.warn("Failed to delete tenant cache from Redis: {}", e.getMessage());
+            }
         }
 
         log.info("Invalidated tenant cache for ID: {}", tenantId);
@@ -438,9 +454,13 @@ public class TenantRLSService {
         localTenantCache.clear();
 
         if (redisTemplate != null) {
-            Set<String> keys = redisTemplate.keys(REDIS_KEY_TENANT_CONFIG + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
+            try {
+                Set<String> keys = redisTemplate.keys(REDIS_KEY_TENANT_CONFIG + "*");
+                if (keys != null && !keys.isEmpty()) {
+                    redisTemplate.delete(keys);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to clear tenant caches from Redis: {}", e.getMessage());
             }
         }
 
@@ -607,17 +627,22 @@ public class TenantRLSService {
             return Map.of();
         }
 
-        // Flush pending metrics before reading
-        flushMetrics();
+        try {
+            // Flush pending metrics before reading
+            flushMetrics();
 
-        String metricKey = REDIS_KEY_TENANT_METRICS + tenantId + ":requests";
-        Map<Object, Object> metrics = redisTemplate.opsForHash().entries(metricKey);
+            String metricKey = REDIS_KEY_TENANT_METRICS + tenantId + ":requests";
+            Map<Object, Object> metrics = redisTemplate.opsForHash().entries(metricKey);
 
-        if (metrics.isEmpty()) {
+            if (metrics == null || metrics.isEmpty()) {
+                return Map.of("total", 0L);
+            }
+
+            return metrics;
+        } catch (Exception e) {
+            log.warn("Failed to get tenant metrics from Redis: {}", e.getMessage());
             return Map.of("total", 0L);
         }
-
-        return metrics;
     }
 
     /**

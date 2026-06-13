@@ -5,9 +5,12 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cache.support.CompositeCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Configuration
 @EnableCaching
-public class RedisCacheConfig {
+public class RedisCacheConfig implements CachingConfigurer {
 
     // FIX: original Map.of() only holds 10 entries — bumped to Map.ofEntries().
     // Added platformUsers, platformUsersPage, platformStatistics so @Cacheable
@@ -166,5 +169,30 @@ public class RedisCacheConfig {
                         .fromSerializer(serializer))
                 .disableCachingNullValues()
                 .prefixCacheNameWith("sonixhr:");
+    }
+
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Redis cache GET failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+                log.warn("Redis cache PUT failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Redis cache EVICT failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException exception, Cache cache) {
+                log.warn("Redis cache CLEAR failed in cache '{}'. Error: {}", cache.getName(), exception.getMessage());
+            }
+        };
     }
 }

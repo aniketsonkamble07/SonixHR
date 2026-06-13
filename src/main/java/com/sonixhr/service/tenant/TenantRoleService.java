@@ -340,7 +340,6 @@ public class TenantRoleService {
     // GET METHODS (Optimized with caching)
     // =====================================================
 
-    @Cacheable(value = "tenantRoles", key = "#roleId + ':' + #tenantId", unless = "#result == null")
     public TenantRole getRoleByIdAndTenant(Long roleId, Long tenantId) {
         log.debug("Fetching tenant role from DB: {} for tenant: {}", roleId, tenantId);
 
@@ -365,6 +364,13 @@ public class TenantRoleService {
         return role;
     }
 
+    @Cacheable(value = "tenantRoles", key = "#roleId + ':' + #tenantId", unless = "#result == null")
+    public TenantRoleResponse getRoleResponseByIdAndTenant(Long roleId, Long tenantId) {
+        log.debug("Fetching tenant role DTO: {} for tenant: {}", roleId, tenantId);
+        TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
+        return toResponse(role);
+    }
+
     public TenantRole getRoleByIdWithPermissions(Long roleId, Long tenantId) {
         log.debug("Fetching tenant role with permissions: {} for tenant: {}", roleId, tenantId);
 
@@ -374,14 +380,14 @@ public class TenantRoleService {
     }
 
     @Cacheable(value = "tenantRolesList", key = "#tenantId", unless = "#result == null || #result.isEmpty()")
-    public List<TenantRole> getAllRolesForTenant(Long tenantId) {
+    public List<TenantRoleResponse> getAllRolesForTenant(Long tenantId) {
         log.debug("Fetching all roles for tenant: {}", tenantId);
 
         // Check local cache
         if (cacheEnabled) {
             List<TenantRole> cached = tenantRolesCache.get(tenantId);
             if (cached != null) {
-                return cached;
+                return cached.stream().map(this::toResponse).collect(Collectors.toList());
             }
         }
 
@@ -396,7 +402,33 @@ public class TenantRoleService {
             }
         }
 
-        return roles;
+        return roles.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public TenantRoleResponse toResponse(TenantRole role) {
+        if (role == null) {
+            return null;
+        }
+
+        return TenantRoleResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .description(role.getDescription())
+                .isDefault(role.isDefault())
+                .permissions(role.getPermissions() != null ?
+                        role.getPermissions().stream()
+                                .map(p -> TenantRoleResponse.PermissionInfo.builder()
+                                        .id(p.getId())
+                                        .name(p.getPermissionName())
+                                        .description(p.getEffectiveDescription())
+                                        .category(p.getEffectiveCategory())
+                                        .build())
+                                .collect(Collectors.toList()) :
+                        List.of())
+                .employeeCount(role.getEmployeeCount())
+                .createdAt(role.getCreatedAt())
+                .updatedAt(role.getUpdatedAt())
+                .build();
     }
 
     /**

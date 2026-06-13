@@ -1,5 +1,7 @@
 package com.sonixhr.entity.platform;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.sonixhr.common.base.BasePermission;
 import com.sonixhr.common.base.BaseRole;
 import jakarta.persistence.*;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class PlatformRole extends BaseRole {
 
     @Column(name = "is_active")
@@ -58,6 +61,7 @@ public class PlatformRole extends BaseRole {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @Builder.Default
+    @JsonIgnore
     private Set<PlatformUser> users = new HashSet<>();
 
     // ==================== Implement BaseRole Abstract Methods ====================

@@ -1,6 +1,7 @@
 package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
+import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
@@ -265,7 +266,6 @@ public class PlatformRoleService {
     // GET METHODS
     // =====================================================
 
-    @Cacheable(value = "platformRoles", key = "#roleId", unless = "#result == null")
     public PlatformRole getRoleById(Long roleId) {
         log.debug("Fetching platform role from DB: {}", roleId);
 
@@ -286,14 +286,21 @@ public class PlatformRoleService {
         return role;
     }
 
+    @Cacheable(value = "platformRoles", key = "#roleId", unless = "#result == null")
+    public PlatformRoleResponse getRoleResponseById(Long roleId) {
+        log.debug("Fetching platform role DTO: {}", roleId);
+        PlatformRole role = getRoleById(roleId);
+        return toResponse(role);
+    }
+
     @Cacheable(value = "platformRolesList", unless = "#result == null || #result.isEmpty()")
-    public List<PlatformRole> getAllRoles() {
+    public List<PlatformRoleResponse> getAllRoles() {
         log.debug("Fetching all platform roles from DB");
 
         if (cacheEnabled) {
             List<PlatformRole> cached = allRolesCache.get("all");
             if (cached != null) {
-                return cached;
+                return cached.stream().map(this::toResponse).collect(Collectors.toList());
             }
         }
 
@@ -306,7 +313,34 @@ public class PlatformRoleService {
             }
         }
 
-        return roles;
+        return roles.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public PlatformRoleResponse toResponse(PlatformRole role) {
+        if (role == null) {
+            return null;
+        }
+
+        List<PlatformRoleResponse.PermissionInfo> permissions = List.of();
+        if (role.getPermissions() != null) {
+            permissions = role.getPermissions().stream()
+                    .map(p -> PlatformRoleResponse.PermissionInfo.builder()
+                            .id(p.getId())
+                            .name(p.getPermission())
+                            .description(p.getDescription())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        return PlatformRoleResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .description(role.getDescription())
+                .isSystemRole(role.isSystemRole())
+                .permissions(permissions)
+                .createdAt(role.getCreatedAt())
+                .updatedAt(role.getUpdatedAt())
+                .build();
     }
 
     /**

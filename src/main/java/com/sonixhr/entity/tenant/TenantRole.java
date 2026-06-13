@@ -1,5 +1,7 @@
 package com.sonixhr.entity.tenant;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.sonixhr.common.base.BasePermission;
 import com.sonixhr.common.base.BaseRole;
 import com.sonixhr.entity.employee.Employee;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class TenantRole extends BaseRole {
 
     @Column(name = "tenant_id", nullable = true)
@@ -57,6 +60,7 @@ public class TenantRole extends BaseRole {
 
     @ManyToMany(mappedBy = "roles")
     @Builder.Default
+    @JsonIgnore
     private Set<Employee> employees = new HashSet<>();
 
     // ==================== Implement BaseRole Abstract Methods ====================

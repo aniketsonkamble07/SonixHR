@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +39,75 @@ public class ActivationTokenService {
     @Value("${app.reset.token.expiry-hours:1}")
     private long resetTokenExpiryHours;
 
+    // Fallback in-memory token store (used when Redis is down)
+    private final Map<String, TokenInfo> fallbackTokenStore = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class TokenInfo {
+        final String value;
+        final long expiryTime;
+
+        TokenInfo(String value, long ttlHours) {
+            this.value = value;
+            this.expiryTime = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(ttlHours);
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() > expiryTime;
+        }
+    }
+
+    private void setToken(String key, String value, long ttlHours) {
+        try {
+            redisTemplate.opsForValue().set(key, value, ttlHours, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.warn("Redis is down, storing token in-memory. Error: {}", e.getMessage());
+            fallbackTokenStore.put(key, new TokenInfo(value, ttlHours));
+        }
+    }
+
+    private String getToken(String key) {
+        try {
+            return redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            log.warn("Redis is down, retrieving token from in-memory fallback. Error: {}", e.getMessage());
+            TokenInfo info = fallbackTokenStore.get(key);
+            if (info != null) {
+                if (info.isExpired()) {
+                    fallbackTokenStore.remove(key);
+                    return null;
+                }
+                return info.value;
+            }
+            return null;
+        }
+    }
+
+    private boolean hasToken(String key) {
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        } catch (Exception e) {
+            log.warn("Redis is down, checking token in-memory fallback. Error: {}", e.getMessage());
+            TokenInfo info = fallbackTokenStore.get(key);
+            if (info != null) {
+                if (info.isExpired()) {
+                    fallbackTokenStore.remove(key);
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+    }
+
+    private void deleteToken(String key) {
+        try {
+            redisTemplate.delete(key);
+        } catch (Exception e) {
+            log.warn("Redis is down, deleting token from in-memory fallback. Error: {}", e.getMessage());
+            fallbackTokenStore.remove(key);
+        }
+    }
+
     // Redis key prefixes
     private static final String REDIS_PREFIX_EMPLOYEE_ACTIVATION = "activation:employee:";
     private static final String REDIS_PREFIX_EMPLOYEE_RESET = "reset:employee:";
@@ -55,7 +125,7 @@ public class ActivationTokenService {
         String token = UUID.randomUUID().toString();
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
 
-        redisTemplate.opsForValue().set(key, employeeId.toString(), tokenExpiryHours, TimeUnit.HOURS);
+        setToken(key, employeeId.toString(), tokenExpiryHours);
 
         log.info("Generated activation token for employee: {}", employeeId);
         return token;
@@ -68,12 +138,12 @@ public class ActivationTokenService {
         log.debug("Getting employee ID from token: {}", token);
 
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
-        String employeeIdStr = redisTemplate.opsForValue().get(key);
+        String employeeIdStr = getToken(key);
 
         if (employeeIdStr == null) {
             // Also check reset token
             key = REDIS_PREFIX_EMPLOYEE_RESET + token;
-            employeeIdStr = redisTemplate.opsForValue().get(key);
+            employeeIdStr = getToken(key);
         }
 
         if (employeeIdStr == null) {
@@ -95,7 +165,7 @@ public class ActivationTokenService {
         };
 
         for (String key : keys) {
-            if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
+            if (hasToken(key)) {
                 return false; // Token exists, not expired
             }
         }
@@ -107,7 +177,7 @@ public class ActivationTokenService {
         log.info("Activating employee with token: {}", token);
 
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
-        String employeeIdStr = redisTemplate.opsForValue().get(key);
+        String employeeIdStr = getToken(key);
 
         if (employeeIdStr == null) {
             throw new BusinessException("Invalid or expired activation token");
@@ -137,7 +207,7 @@ public class ActivationTokenService {
         }
 
         // Delete used token
-        redisTemplate.delete(key);
+        deleteToken(key);
 
         log.info("Employee activated successfully: {}", employee.getEmail());
         return savedEmployee;
@@ -154,7 +224,7 @@ public class ActivationTokenService {
         String token = UUID.randomUUID().toString();
         String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
 
-        redisTemplate.opsForValue().set(key, platformUserId.toString(), tokenExpiryHours, TimeUnit.HOURS);
+        setToken(key, platformUserId.toString(), tokenExpiryHours);
 
         log.info("Generated activation token for platform user: {}", platformUserId);
         return token;
@@ -165,7 +235,7 @@ public class ActivationTokenService {
         log.info("Activating platform user with token: {}", token);
 
         String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
-        String userIdStr = redisTemplate.opsForValue().get(key);
+        String userIdStr = getToken(key);
 
         if (userIdStr == null) {
             throw new BusinessException("Invalid or expired activation token");
@@ -188,7 +258,7 @@ public class ActivationTokenService {
         PlatformUser savedUser = platformUserRepository.save(user);
 
         // Delete used token
-        redisTemplate.delete(key);
+        deleteToken(key);
 
         log.info("Platform user activated successfully: {}", user.getEmail());
         return savedUser;
@@ -205,7 +275,7 @@ public class ActivationTokenService {
         String token = UUID.randomUUID().toString();
         String key = REDIS_PREFIX_PLATFORM_RESET + token;
 
-        redisTemplate.opsForValue().set(key, platformUserId.toString(), resetTokenExpiryHours, TimeUnit.HOURS);
+        setToken(key, platformUserId.toString(), resetTokenExpiryHours);
 
         log.info("Generated password reset token for platform user: {}", platformUserId);
         return token;
@@ -216,7 +286,7 @@ public class ActivationTokenService {
         log.info("Resetting password for platform user with token: {}", token);
 
         String key = REDIS_PREFIX_PLATFORM_RESET + token;
-        String userIdStr = redisTemplate.opsForValue().get(key);
+        String userIdStr = getToken(key);
 
         if (userIdStr == null) {
             throw new BusinessException("Invalid or expired reset token");
@@ -234,7 +304,7 @@ public class ActivationTokenService {
         platformUserRepository.save(user);
 
         // Delete used token
-        redisTemplate.delete(key);
+        deleteToken(key);
 
         log.info("Password reset successfully for platform user: {}", user.getEmail());
     }
@@ -250,7 +320,7 @@ public class ActivationTokenService {
         String token = UUID.randomUUID().toString();
         String key = REDIS_PREFIX_EMPLOYEE_RESET + token;
 
-        redisTemplate.opsForValue().set(key, employeeId.toString(), resetTokenExpiryHours, TimeUnit.HOURS);
+        setToken(key, employeeId.toString(), resetTokenExpiryHours);
 
         log.info("Generated password reset token for employee: {}", employeeId);
         return token;
@@ -261,7 +331,7 @@ public class ActivationTokenService {
         log.info("Resetting password for employee with token: {}", token);
 
         String key = REDIS_PREFIX_EMPLOYEE_RESET + token;
-        String employeeIdStr = redisTemplate.opsForValue().get(key);
+        String employeeIdStr = getToken(key);
 
         if (employeeIdStr == null) {
             throw new BusinessException("Invalid or expired reset token");
@@ -278,7 +348,7 @@ public class ActivationTokenService {
         employeeRepository.save(employee);
 
         // Delete used token
-        redisTemplate.delete(key);
+        deleteToken(key);
 
         log.info("Password reset successfully for employee: {}", employee.getEmail());
     }
@@ -296,7 +366,7 @@ public class ActivationTokenService {
         };
 
         for (String pattern : patterns) {
-            if (Boolean.TRUE.equals(redisTemplate.hasKey(pattern))) {
+            if (hasToken(pattern)) {
                 return true;
             }
         }
@@ -312,7 +382,7 @@ public class ActivationTokenService {
         };
 
         for (String pattern : patterns) {
-            redisTemplate.delete(pattern);
+            deleteToken(pattern);
         }
 
         log.info("Token invalidated: {}", token);
@@ -325,11 +395,11 @@ public class ActivationTokenService {
         log.debug("Getting platform user ID from token: {}", token);
 
         String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
-        String userIdStr = redisTemplate.opsForValue().get(key);
+        String userIdStr = getToken(key);
 
         if (userIdStr == null) {
             key = REDIS_PREFIX_PLATFORM_RESET + token;
-            userIdStr = redisTemplate.opsForValue().get(key);
+            userIdStr = getToken(key);
         }
 
         if (userIdStr == null) {
@@ -338,9 +408,6 @@ public class ActivationTokenService {
 
         return Long.parseLong(userIdStr);
     }
-    // =====================================================
-// ADD THIS MISSING METHOD
-// =====================================================
 
     /**
      * Set password for employee using activation token

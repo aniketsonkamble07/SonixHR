@@ -36,6 +36,14 @@ public interface PlatformUserRepository extends JpaRepository<PlatformUser, Long
     @Query("SELECT DISTINCT u FROM PlatformUser u LEFT JOIN FETCH u.roles r WHERE u.email = :email")
     Optional<PlatformUser> findByEmailWithRoles(@Param("email") String email);
 
+    @Query("""
+    SELECT DISTINCT u FROM PlatformUser u
+    LEFT JOIN FETCH u.roles r
+    LEFT JOIN FETCH r.permissions
+    WHERE u.email = :email
+    """)
+    Optional<PlatformUser> findByEmailWithRolesAndPermissions(@Param("email") String email);
+
     @Query("SELECT DISTINCT u FROM PlatformUser u LEFT JOIN FETCH u.roles WHERE u.id = :id")
     Optional<PlatformUser> findByIdWithRoles(@Param("id") Long id);
 

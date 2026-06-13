@@ -81,8 +81,8 @@ public class TenantRoleController {
         Long tenantId = getCurrentTenantId(currentEmployee);
         log.debug("Getting all roles for tenant: {}", tenantId);
 
-        List<TenantRole> roles = roleService.getAllRolesForTenant(tenantId);
-        return ResponseEntity.ok(roles.stream().map(this::toResponse).collect(Collectors.toList()));
+        List<TenantRoleResponse> roles = roleService.getAllRolesForTenant(tenantId);
+        return ResponseEntity.ok(roles);
     }
 
     /**
@@ -112,8 +112,8 @@ public class TenantRoleController {
         Long tenantId = getCurrentTenantId(currentEmployee);
         log.debug("Getting role with id: {} for tenant: {}", roleId, tenantId);
 
-        TenantRole role = roleService.getRoleByIdAndTenant(roleId, tenantId);
-        return ResponseEntity.ok(toResponse(role));
+        TenantRoleResponse role = roleService.getRoleResponseByIdAndTenant(roleId, tenantId);
+        return ResponseEntity.ok(role);
     }
 
     /**

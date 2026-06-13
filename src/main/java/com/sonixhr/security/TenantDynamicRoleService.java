@@ -165,8 +165,12 @@ public class TenantDynamicRoleService {
 
         // Also invalidate Redis cache
         if (cacheEnabled && redisTemplate != null) {
-            String cacheKey = REDIS_KEY_TENANT_USER_AUTHORITIES + email + ":" + tenantId;
-            redisTemplate.delete(cacheKey);
+            try {
+                String cacheKey = REDIS_KEY_TENANT_USER_AUTHORITIES + email + ":" + tenantId;
+                redisTemplate.delete(cacheKey);
+            } catch (Exception e) {
+                log.warn("Failed to delete employee authority cache from Redis: {}", e.getMessage());
+            }
         }
     }
 
@@ -175,11 +179,15 @@ public class TenantDynamicRoleService {
      */
     public void invalidateTenantCache(Long tenantId) {
         if (cacheEnabled && redisTemplate != null) {
-            String pattern = REDIS_KEY_TENANT_USER_AUTHORITIES + "*:" + tenantId;
-            Set<String> keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-                log.info("Invalidated {} authority caches for tenant: {}", keys.size(), tenantId);
+            try {
+                String pattern = REDIS_KEY_TENANT_USER_AUTHORITIES + "*:" + tenantId;
+                Set<String> keys = redisTemplate.keys(pattern);
+                if (keys != null && !keys.isEmpty()) {
+                    redisTemplate.delete(keys);
+                    log.info("Invalidated {} authority caches for tenant: {}", keys.size(), tenantId);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to delete tenant authority caches from Redis: {}", e.getMessage());
             }
         }
     }

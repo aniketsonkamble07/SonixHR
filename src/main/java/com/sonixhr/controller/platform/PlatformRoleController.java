@@ -64,8 +64,8 @@ public class PlatformRoleController {
     public ResponseEntity<List<PlatformRoleResponse>> getAllRoles() {
         log.debug("Getting all platform roles");
 
-        List<PlatformRole> roles = roleService.getAllRoles();
-        return ResponseEntity.ok(roles.stream().map(this::toResponse).collect(Collectors.toList()));
+        List<PlatformRoleResponse> roles = roleService.getAllRoles();
+        return ResponseEntity.ok(roles);
     }
 
     @GetMapping("/{roleId}")
@@ -73,8 +73,8 @@ public class PlatformRoleController {
     public ResponseEntity<PlatformRoleResponse> getRole(@PathVariable Long roleId) {
         log.debug("Getting platform role with id: {}", roleId);
 
-        PlatformRole role = roleService.getRoleById(roleId);
-        return ResponseEntity.ok(toResponse(role));
+        PlatformRoleResponse role = roleService.getRoleResponseById(roleId);
+        return ResponseEntity.ok(role);
     }
 
     @PutMapping("/{roleId}")

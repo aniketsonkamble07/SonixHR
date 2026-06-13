@@ -69,7 +69,7 @@ public class PlatformUserDetailsService implements UserDetailsService {
 
         log.info("Loading platform user from DB: {}", email);
 
-        PlatformUser user = platformUserRepository.findByEmail(email)
+        PlatformUser user = platformUserRepository.findByEmailWithRolesAndPermissions(email)
                 .orElseThrow(() -> {
                     log.warn("Platform user not found: {}", email);
                     return new UsernameNotFoundException("Platform user not found: " + email);
@@ -96,7 +96,7 @@ public class PlatformUserDetailsService implements UserDetailsService {
         log.info("Force-reloading platform user: {}", email);
         userCache.invalidate(email);
 
-        PlatformUser user = platformUserRepository.findByEmail(email)
+        PlatformUser user = platformUserRepository.findByEmailWithRolesAndPermissions(email)
                 .orElseThrow(() -> {
                     log.warn("Platform user not found: {}", email);
                     return new UsernameNotFoundException("Platform user not found: " + email);
