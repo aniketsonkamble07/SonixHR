@@ -2,7 +2,7 @@ package com.sonixhr.enums.leave;
 
 public enum WeekendConfig {
     SATURDAY_SUNDAY("Saturday & Sunday"),
-    FRIDAY_SATURDAY("Friday & Saturday"),
+
     SUNDAY_ONLY("Sunday Only"),
     CUSTOM("Custom Days");
 

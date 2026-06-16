@@ -15,12 +15,12 @@ import com.sonixhr.repository.leave.PublicHolidayRepository;
 import com.sonixhr.repository.leave.TenantLeaveSettingsRepository;
 import com.sonixhr.service.attendance.ManualAttendanceService;
 import com.sonixhr.service.leave.LeaveService;
+import com.sonixhr.service.leave.LeaveConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
@@ -37,6 +37,7 @@ public class CalendarService {
     private final EmployeeRepository employeeRepository;
     private final TenantLeaveSettingsRepository settingsRepository;
     private final PublicHolidayRepository holidayRepository;
+    private final LeaveConfigurationService leaveConfigService;
 
     /**
      * Get employee calendar by combining attendance, leave, and holiday data
@@ -74,7 +75,23 @@ public class CalendarService {
             }
         }
 
-        Map<LocalDate, PublicHoliday> holidayMap = holidays.stream()
+        // Filter holidays based on tenant's regional settings
+        List<PublicHoliday> filteredHolidays = new ArrayList<>();
+        if (settings != null) {
+            for (PublicHoliday h : holidays) {
+                boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && Boolean.TRUE.equals(settings.getIncludeNationalHolidays());
+                boolean isState = Boolean.TRUE.equals(settings.getIncludeStateHolidays()) && 
+                                  settings.getState() != null && 
+                                  settings.getState().equalsIgnoreCase(h.getRegion());
+                if (isNational || isState) {
+                    filteredHolidays.add(h);
+                }
+            }
+        } else {
+            filteredHolidays = holidays;
+        }
+
+        Map<LocalDate, PublicHoliday> holidayMap = filteredHolidays.stream()
                 .collect(Collectors.toMap(PublicHoliday::getHolidayDate, h -> h, (h1, h2) -> h1));
 
         // Build calendar days
@@ -88,21 +105,34 @@ public class CalendarService {
             List<LeaveResponseDTO> leaves = leaveMap.get(currentDate);
             PublicHoliday holiday = holidayMap.get(currentDate);
 
+            boolean isWeekend = leaveConfigService.isWeekendForEmployee(currentDate, employee, settings);
+            boolean isHoliday = holiday != null;
+
+            List<LeaveResponseDTO> activeLeavesForDay = leaves;
+            if (leaves != null && !leaves.isEmpty()) {
+                boolean countWeekend = settings != null && Boolean.TRUE.equals(settings.getCountWeekendsAsLeave());
+                boolean countHoliday = settings != null && Boolean.TRUE.equals(settings.getCountHolidaysAsLeave());
+
+                if ((isWeekend && !countWeekend) || (isHoliday && !countHoliday)) {
+                    activeLeavesForDay = Collections.emptyList();
+                }
+            }
+
             CalendarDayDTO day = CalendarDayDTO.builder()
                     .date(date)
                     .dayOfMonth(date.getDayOfMonth())
                     .dayOfWeek(date.getDayOfWeek().toString())
                     .dayOfWeekValue(date.getDayOfWeek().getValue())
-                    .isWeekend(isWeekend(date, settings))
+                    .isWeekend(isWeekend)
                     .isPast(date.isBefore(today))
                     .isToday(date.equals(today))
-                    .type(getDayType(attendance, leaves, holiday))
-                    .status(getDayStatus(attendance, leaves, holiday))
-                    .displayName(getDisplayName(attendance, leaves, holiday))
-                    .color(getDayColor(attendance, leaves, holiday))
-                    .description(getDescription(attendance, leaves, holiday))
+                    .type(getDayType(attendance, activeLeavesForDay, holiday, isWeekend))
+                    .status(getDayStatus(attendance, activeLeavesForDay, holiday, isWeekend))
+                    .displayName(getDisplayName(attendance, activeLeavesForDay, holiday, isWeekend))
+                    .color(getDayColor(attendance, activeLeavesForDay, holiday, isWeekend))
+                    .description(getDescription(attendance, activeLeavesForDay, holiday))
                     .overtimeHours(attendance != null ? attendance.getOvertimeHours() : null)
-                    .leaveType(getLeaveType(leaves))
+                    .leaveType(getLeaveType(activeLeavesForDay))
                     .build();
 
             days.add(day);
@@ -125,7 +155,7 @@ public class CalendarService {
     // HELPER METHODS FOR DETERMINING DAY TYPE
     // =====================================================
 
-    private CalendarDayType getDayType(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday) {
+    private CalendarDayType getDayType(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday, boolean isWeekend) {
         if (holiday != null) {
             return CalendarDayType.HOLIDAY;
         }
@@ -135,10 +165,13 @@ public class CalendarService {
         if (attendance != null) {
             return CalendarDayType.ATTENDANCE;
         }
+        if (isWeekend) {
+            return CalendarDayType.WEEKEND;
+        }
         return CalendarDayType.ABSENT;
     }
 
-    private CalendarAttendanceStatus getDayStatus(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday) {
+    private CalendarAttendanceStatus getDayStatus(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday, boolean isWeekend) {
         if (holiday != null) {
             return CalendarAttendanceStatus.HOLIDAY;
         }
@@ -148,10 +181,13 @@ public class CalendarService {
         if (attendance != null) {
             return mapAttendanceStatus(attendance.getStatus());
         }
+        if (isWeekend) {
+            return CalendarAttendanceStatus.WEEKEND;
+        }
         return CalendarAttendanceStatus.ABSENT;
     }
 
-    private String getDisplayName(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday) {
+    private String getDisplayName(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday, boolean isWeekend) {
         if (holiday != null) {
             return holiday.getName();
         }
@@ -161,10 +197,13 @@ public class CalendarService {
         if (attendance != null) {
             return attendance.getStatus().getDisplayName();
         }
+        if (isWeekend) {
+            return "Weekend";
+        }
         return "Absent";
     }
 
-    private String getDayColor(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday) {
+    private String getDayColor(AttendanceRecord attendance, List<LeaveResponseDTO> leaves, PublicHoliday holiday, boolean isWeekend) {
         if (holiday != null) {
             return "#9c27b0";
         }
@@ -173,6 +212,9 @@ public class CalendarService {
         }
         if (attendance != null) {
             return getAttendanceColor(attendance.getStatus());
+        }
+        if (isWeekend) {
+            return "#475569";
         }
         return "#9e9e9e";
     }
@@ -200,35 +242,6 @@ public class CalendarService {
     // =====================================================
     // UTILITY METHODS
     // =====================================================
-
-    private boolean isWeekend(LocalDate date, TenantLeaveSettings settings) {
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-
-        if (settings == null) {
-            return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-        }
-
-        switch (settings.getWeekendConfig()) {
-            case SATURDAY_SUNDAY:
-                return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-            case FRIDAY_SATURDAY:
-                return dayOfWeek == DayOfWeek.FRIDAY || dayOfWeek == DayOfWeek.SATURDAY;
-            case SUNDAY_ONLY:
-                return dayOfWeek == DayOfWeek.SUNDAY;
-            case CUSTOM:
-                return isCustomWeekend(date, settings.getCustomWeekendDays());
-            default:
-                return false;
-        }
-    }
-
-    private boolean isCustomWeekend(LocalDate date, String customWeekendDays) {
-        if (customWeekendDays == null || customWeekendDays.isEmpty()) {
-            return false;
-        }
-        String dayOfWeek = date.getDayOfWeek().toString();
-        return customWeekendDays.contains(dayOfWeek);
-    }
 
     private CalendarAttendanceStatus mapAttendanceStatus(AttendanceStatus status) {
         switch (status) {
@@ -258,9 +271,11 @@ public class CalendarService {
             case SICK: return "#2196f3";
             case EARNED: return "#ff9800";
             case EMERGENCY: return "#f44336";
-            case MATERNITY: return "#9c27b0";
-            case PATERNITY: return "#3f51b5";
-            default: return "#9c27b0";
+            case MATERNITY: return "#e91e63";
+            case PATERNITY: return "#00bcd4";
+            case COMPENSATORY: return "#9c27b0";
+            case UNPAID:
+            default: return "#9e9e9e";
         }
     }
 

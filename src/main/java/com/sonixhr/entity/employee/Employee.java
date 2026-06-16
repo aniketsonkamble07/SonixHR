@@ -7,6 +7,7 @@ import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -262,6 +263,13 @@ public class Employee implements UserDetails {
     @Column(name = "custom_fields", columnDefinition = "jsonb")
     @Builder.Default
     private Map<String, Object> customFields = new HashMap<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "weekend_config")
+    private WeekendConfig weekendConfig;
+
+    @Column(name = "custom_weekend_days")
+    private String customWeekendDays;
 
     // =====================================================
     // SOCIAL LINKS

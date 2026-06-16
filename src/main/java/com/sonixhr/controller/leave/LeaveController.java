@@ -1,26 +1,28 @@
 package com.sonixhr.controller.leave;
 
+import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.leave.LeaveRequestDTO;
 import com.sonixhr.dto.leave.LeaveResponseDTO;
+import com.sonixhr.dto.leave.LeaveSettingsDTO;
 import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.entity.leave.TenantLeaveSettings;
 import com.sonixhr.enums.leave.LeaveStatus;
+import com.sonixhr.enums.leave.WeekendConfig;
+import com.sonixhr.service.employee.EmployeeService;
+import com.sonixhr.service.leave.LeaveConfigurationService;
 import com.sonixhr.service.leave.LeaveService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -30,180 +32,121 @@ import java.util.Map;
 public class LeaveController {
 
     private final LeaveService leaveService;
+    private final LeaveConfigurationService leaveConfigService;
+    private final EmployeeService employeeService;
 
     // =====================================================
-    // EMPLOYEE ENDPOINTS
+    // TENANT LEAVE SETTINGS
     // =====================================================
 
-    /**
-     * Request a new leave
-     */
-    @PostMapping("/request")
-    @PreAuthorize("hasAnyAuthority('REQUEST_LEAVE', 'SUPER_ADMIN')")
+    @GetMapping("/settings")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_VIEW')")
+    public ResponseEntity<TenantLeaveSettings> getTenantLeaveSettings(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to get leave settings for tenant: {}", tenantId);
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenantId);
+        return ResponseEntity.ok(settings);
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
+    public ResponseEntity<TenantLeaveSettings> updateTenantLeaveSettings(
+            @Valid @RequestBody LeaveSettingsDTO dto,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to update leave settings for tenant: {}", tenantId);
+        TenantLeaveSettings settings = leaveConfigService.updateTenantSettings(tenantId, dto);
+        return ResponseEntity.ok(settings);
+    }
+
+    // =====================================================
+    // EMPLOYEE LEAVE SETTINGS OVERRIDE
+    // =====================================================
+
+    @PutMapping("/employees/{employeeId}/settings")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'EMPLOYEE_EDIT')")
+    public ResponseEntity<EmployeeResponse> updateEmployeeLeaveSettings(
+            @PathVariable Long employeeId,
+            @RequestParam WeekendConfig weekendConfig,
+            @RequestParam(required = false) String customWeekendDays,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to update leave settings override for employee: {} by tenant admin: {}", employeeId, currentEmployee.getId());
+        leaveConfigService.updateEmployeeSettings(tenantId, employeeId, weekendConfig, customWeekendDays);
+        EmployeeResponse response = employeeService.getEmployeeById(employeeId, tenantId);
+        return ResponseEntity.ok(response);
+    }
+
+    // =====================================================
+    // LEAVE REQUESTS
+    // =====================================================
+
+    @PostMapping
     public ResponseEntity<LeaveResponseDTO> requestLeave(
             @Valid @RequestBody LeaveRequestDTO request,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Employee {} requesting leave", currentUser.getEmail());
-        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(
-                currentUser.getId(), request, currentUser);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to request leave for employee: {}", currentEmployee.getId());
+        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(currentEmployee.getId(), request, currentEmployee);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    /**
-     * Get my leave requests
-     */
-    @GetMapping("/my-leaves")
-    @PreAuthorize("hasAnyAuthority('VIEW_LEAVE', 'SUPER_ADMIN')")
-    public ResponseEntity<List<LeaveResponseDTO>> getMyLeaves(
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Getting my leaves for employee: {}", currentUser.getEmail());
-        List<LeaveResponseDTO> leaves = leaveService.getMyLeaves(currentUser.getId());
-        return ResponseEntity.ok(leaves);
-    }
-
-    /**
-     * Get my leave balance
-     */
-    @GetMapping("/my-balance")
-    @PreAuthorize("hasAnyAuthority('VIEW_LEAVE', 'SUPER_ADMIN')")
-    public ResponseEntity<Map<String, Object>> getMyLeaveBalance(
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Getting leave balance for employee: {}", currentUser.getEmail());
-        Map<String, Object> balance = leaveService.getLeaveBalanceWithTenantSettings(
-                currentUser.getId(), currentUser.getTenantId());
-        return ResponseEntity.ok(balance);
-    }
-
-    /**
-     * Cancel my leave request
-     */
-    @DeleteMapping("/{leaveId}/cancel")
-    @PreAuthorize("hasAnyAuthority('CANCEL_LEAVE', 'SUPER_ADMIN')")
-    public ResponseEntity<LeaveResponseDTO> cancelLeave(
-            @PathVariable Long leaveId,
-            @RequestParam String reason,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Employee {} cancelling leave: {}", currentUser.getEmail(), leaveId);
-        LeaveResponseDTO response = leaveService.cancelLeave(leaveId, currentUser.getId(), reason);
+    @GetMapping("/my")
+    public ResponseEntity<java.util.List<LeaveResponseDTO>> getMyLeaves(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to get own leaves for employee: {}", currentEmployee.getId());
+        java.util.List<LeaveResponseDTO> response = leaveService.getMyLeaves(currentEmployee.getId());
         return ResponseEntity.ok(response);
     }
 
-    // =====================================================
-    // MANAGER ENDPOINTS
-    // =====================================================
-
-    /**
-     * Get team leave requests (pending by default)
-     */
     @GetMapping("/team")
-    @PreAuthorize("hasAnyAuthority('MANAGE_TEAM_LEAVE', 'SUPER_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_TEAM')")
     public ResponseEntity<Page<LeaveResponseDTO>> getTeamLeaveRequests(
             @RequestParam(required = false) LeaveStatus status,
-            @AuthenticationPrincipal Employee currentUser,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-
-        log.info("Manager {} getting team leave requests", currentUser.getEmail());
-        Page<LeaveResponseDTO> leaves = leaveService.getTeamLeaveRequests(
-                currentUser.getId(), currentUser.getTenantId(), status, pageable);
-        return ResponseEntity.ok(leaves);
+            @AuthenticationPrincipal Employee currentEmployee,
+            @PageableDefault(size = 20) Pageable pageable) {
+        log.info("REST request to get team leave requests for manager: {}", currentEmployee.getId());
+        Page<LeaveResponseDTO> response = leaveService.getTeamLeaveRequests(
+                currentEmployee.getId(), currentEmployee.getTenantId(), status, pageable);
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * Approve a leave request
-     */
-    @PostMapping("/{leaveId}/approve")
-    @PreAuthorize("hasAnyAuthority('APPROVE_LEAVE', 'SUPER_ADMIN')")
+    @PutMapping("/{id}/approve")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'LEAVE_APPROVE_ANY') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_APPROVE_DEPARTMENT') or #currentEmployee.isManager()")
     public ResponseEntity<LeaveResponseDTO> approveLeave(
-            @PathVariable Long leaveId,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Manager {} approving leave: {}", currentUser.getEmail(), leaveId);
-        LeaveResponseDTO response = leaveService.approveLeave(
-                leaveId, currentUser.getId(), currentUser.getFullName());
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to approve leave request: {} by {}", id, currentEmployee.getFullName());
+        LeaveResponseDTO response = leaveService.approveLeave(id, currentEmployee.getId(), currentEmployee.getFullName());
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Reject a leave request
-     */
-    @PostMapping("/{leaveId}/reject")
-    @PreAuthorize("hasAnyAuthority('REJECT_LEAVE', 'SUPER_ADMIN')")
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'LEAVE_APPROVE_ANY') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_APPROVE_DEPARTMENT') or #currentEmployee.isManager()")
     public ResponseEntity<LeaveResponseDTO> rejectLeave(
-            @PathVariable Long leaveId,
-            @RequestParam String reason,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Manager {} rejecting leave: {}", currentUser.getEmail(), leaveId);
-        LeaveResponseDTO response = leaveService.rejectLeave(
-                leaveId, reason, currentUser.getId(), currentUser.getFullName());
+            @PathVariable Long id,
+            @RequestParam String rejectionReason,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to reject leave request: {} by {}", id, currentEmployee.getFullName());
+        LeaveResponseDTO response = leaveService.rejectLeave(id, rejectionReason, currentEmployee.getId(), currentEmployee.getFullName());
         return ResponseEntity.ok(response);
     }
 
-    // =====================================================
-    // CALENDAR ENDPOINTS
-    // =====================================================
-
-    /**
-     * Get approved leaves for calendar view
-     */
-    @GetMapping("/calendar")
-    @PreAuthorize("hasAnyAuthority('VIEW_LEAVE', 'SUPER_ADMIN')")
-    public ResponseEntity<List<LeaveResponseDTO>> getLeavesForCalendar(
-            @RequestParam int year,
-            @RequestParam int month,
-            @RequestParam(required = false) Long employeeId,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        Long targetEmployeeId = employeeId != null ? employeeId : currentUser.getId();
-
-        log.info("Getting leaves for calendar for employee: {} for {}-{}", targetEmployeeId, year, month);
-
-        List<LeaveResponseDTO> leaves = leaveService.getApprovedLeavesForCalendar(
-                targetEmployeeId, currentUser.getTenantId(), year, month);
-
-        return ResponseEntity.ok(leaves);
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<LeaveResponseDTO> cancelLeave(
+            @PathVariable Long id,
+            @RequestParam(required = false) String cancellationReason,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to cancel leave request: {} by employee: {}", id, currentEmployee.getId());
+        LeaveResponseDTO response = leaveService.cancelLeave(id, currentEmployee.getId(), cancellationReason);
+        return ResponseEntity.ok(response);
     }
 
-    // =====================================================
-    // ADMIN ENDPOINTS
-    // =====================================================
-
-    /**
-     * Get all leave requests for tenant (Admin only)
-     */
-    @GetMapping("/admin/all")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-    public ResponseEntity<Page<LeaveResponseDTO>> getAllLeaveRequests(
-            @RequestParam(required = false) LeaveStatus status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @AuthenticationPrincipal Employee currentUser,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-
-        log.info("Admin {} getting all leave requests", currentUser.getEmail());
-
-        // Implementation for admin to get all leaves with filters
-        // You can add this method to LeaveService if needed
-        return ResponseEntity.ok(Page.empty());
-    }
-
-    /**
-     * Get leave balance for any employee (Admin only)
-     */
-    @GetMapping("/admin/balance/{employeeId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-    public ResponseEntity<Map<String, Object>> getEmployeeLeaveBalance(
-            @PathVariable Long employeeId,
-            @AuthenticationPrincipal Employee currentUser) {
-
-        log.info("Admin {} getting leave balance for employee: {}", currentUser.getEmail(), employeeId);
-
-        Map<String, Object> balance = leaveService.getLeaveBalanceWithTenantSettings(
-                employeeId, currentUser.getTenantId());
+    @GetMapping("/balance")
+    public ResponseEntity<Map<String, Object>> getLeaveBalance(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to get leave balance for employee: {}", currentEmployee.getId());
+        Map<String, Object> balance = leaveService.getLeaveBalanceWithTenantSettings(currentEmployee.getId(), currentEmployee.getTenantId());
         return ResponseEntity.ok(balance);
     }
 }

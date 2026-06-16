@@ -159,6 +159,9 @@ public class EmployeeService {
             employee.setManager(newManager);
         }
 
+        if (request.getWeekendConfig() != null) employee.setWeekendConfig(request.getWeekendConfig());
+        if (request.getCustomWeekendDays() != null) employee.setCustomWeekendDays(request.getCustomWeekendDays());
+
         employee.setUpdatedBy(getCurrentEmployeeId());
         Employee updatedEmployee = employeeRepository.save(employee);
         log.info("Employee updated successfully: {}", id);
@@ -535,6 +538,8 @@ public class EmployeeService {
                 .status(EmployeeStatus.PROBATION)
                 .isActive(false)
                 .createdBy(getCurrentEmployeeId())
+                .weekendConfig(request.getWeekendConfig())
+                .customWeekendDays(request.getCustomWeekendDays())
                 .build();
     }
 
@@ -601,6 +606,8 @@ public class EmployeeService {
                 .linkedinUrl(employee.getLinkedinUrl())
                 .githubUrl(employee.getGithubUrl())
                 .twitterUrl(employee.getTwitterUrl())
+                .weekendConfig(employee.getWeekendConfig())
+                .customWeekendDays(employee.getCustomWeekendDays())
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .createdBy(employee.getCreatedBy())

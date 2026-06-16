@@ -131,13 +131,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
 
             String authHeader = request.getHeader("Authorization");
+            String token = null;
 
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            } else {
+                token = request.getParameter("token");
+            }
+
+            if (token == null || token.isEmpty()) {
                 filterChain.doFilter(request, response);
                 return;
             }
-
-            String token = authHeader.substring(7);
 
             // Check cache for existing authentication
             if (cacheEnabled) {

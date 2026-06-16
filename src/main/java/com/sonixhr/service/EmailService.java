@@ -301,4 +301,74 @@ public class EmailService {
             log.error("Failed to send account activated notification to: {}", to, e);
         }
     }
+
+    // =====================================================
+    // LEAVE STATUS NOTIFICATIONS
+    // =====================================================
+
+    @Async
+    public void sendLeaveStatusNotification(String to, String employeeName, String leaveType,
+                                             String startDate, String endDate, String status, String actionBy) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send leave status email to: {}", to);
+            return;
+        }
+
+        log.info("Sending leave status notification email to: {}", to);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Leave Request " + status + " - SonixHR");
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #4F46E5;">Leave Request Update</h2>
+                        <p>Hello <strong>%s</strong>,</p>
+                        <p>Your leave request has been reviewed.</p>
+                        <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
+                            <tr style="background-color: #f8f9fa;">
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Leave Type</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Duration</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s to %s</td>
+                            </tr>
+                            <tr style="background-color: #f8f9fa;">
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Status</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold; color: %s;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Actioned By</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
+                            </tr>
+                        </table>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">This is an automated notification. Please do not reply directly to this email.</p>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, 
+                employeeName, 
+                leaveType, 
+                startDate, 
+                endDate, 
+                "APPROVED".equalsIgnoreCase(status) ? "#10B981" : "#EF4444", 
+                status, 
+                actionBy);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Leave status notification email sent successfully to: {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send leave status email to: {}", to, e);
+        }
+    }
 }

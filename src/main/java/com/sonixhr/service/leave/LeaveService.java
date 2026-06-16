@@ -2,6 +2,7 @@ package com.sonixhr.service.leave;
 
 import com.sonixhr.dto.leave.LeaveRequestDTO;
 import com.sonixhr.dto.leave.LeaveResponseDTO;
+import com.sonixhr.service.EmailService;
 import com.sonixhr.entity.attendance.AttendanceRecord;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.leave.LeaveRequest;
@@ -11,6 +12,7 @@ import com.sonixhr.enums.attendance.AttendanceStatus;
 import com.sonixhr.enums.leave.LeaveStatus;
 import com.sonixhr.enums.leave.LeaveType;
 import com.sonixhr.exceptions.BusinessException;
+import com.sonixhr.exceptions.LeavePoliciesNotConfiguredException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.attendance.ManualAttendanceRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
@@ -24,7 +26,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -42,54 +43,9 @@ public class LeaveService {
     private final ManualAttendanceRepository attendanceRepository;
     private final TenantLeaveSettingsRepository settingsRepository;
     private final PublicHolidayRepository holidayRepository;
-
-    // =====================================================
-    // WEEKEND CHECK BASED ON TENANT CONFIGURATION
-    // =====================================================
-
-    /**
-     * Check if a date is a weekend based on tenant configuration
-     */
-    private boolean isWeekendForTenant(LocalDate date, TenantLeaveSettings settings) {
-        if (settings == null) {
-            // Default: Saturday and Sunday are weekends
-            DayOfWeek dayOfWeek = date.getDayOfWeek();
-            return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-        }
-
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-
-        switch (settings.getWeekendConfig()) {
-            case SATURDAY_SUNDAY:
-                return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-            case FRIDAY_SATURDAY:
-                return dayOfWeek == DayOfWeek.FRIDAY || dayOfWeek == DayOfWeek.SATURDAY;
-            case SUNDAY_ONLY:
-                return dayOfWeek == DayOfWeek.SUNDAY;
-            case CUSTOM:
-                return isCustomWeekend(date, settings.getCustomWeekendDays());
-            default:
-                return false;
-        }
-    }
-
-    /**
-     * Parse custom weekend days from JSON configuration
-     */
-    private boolean isCustomWeekend(LocalDate date, String customWeekendDays) {
-        if (customWeekendDays == null || customWeekendDays.isEmpty()) {
-            return false;
-        }
-
-        try {
-            // Expected format: {"days": ["FRIDAY", "SATURDAY"]}
-            String dayOfWeek = date.getDayOfWeek().toString();
-            return customWeekendDays.contains(dayOfWeek);
-        } catch (Exception e) {
-            log.warn("Error parsing custom weekend days: {}", customWeekendDays);
-            return false;
-        }
-    }
+    private final LeaveConfigurationService leaveConfigService;
+    private final EmailService emailService;
+    private final NotificationService notificationService;
 
     // =====================================================
     // PUBLIC HOLIDAY CHECK
@@ -126,17 +82,17 @@ public class LeaveService {
     // =====================================================
 
     /**
-     * Calculate total leave days excluding weekends and holidays based on tenant settings
+     * Calculate total leave days excluding weekends and holidays based on settings
      */
-    private double calculateTotalLeaveDays(Long tenantId, LocalDate startDate, LocalDate endDate,
+    private double calculateTotalLeaveDays(Employee employee, LocalDate startDate, LocalDate endDate,
                                            LeaveType leaveType, TenantLeaveSettings settings) {
         double totalDays = 0;
         LocalDate date = startDate;
 
-        Set<LocalDate> holidayDates = getHolidayDatesInRange(tenantId, startDate, endDate, settings);
+        Set<LocalDate> holidayDates = getHolidayDatesInRange(employee.getTenant().getId(), startDate, endDate, settings);
 
         while (!date.isAfter(endDate)) {
-            boolean isWeekend = isWeekendForTenant(date, settings);
+            boolean isWeekend = leaveConfigService.isWeekendForEmployee(date, employee, settings);
             boolean isHoliday = holidayDates.contains(date);
 
             // Decide whether to count this day
@@ -178,7 +134,7 @@ public class LeaveService {
                 .collect(Collectors.toSet());
 
         while (!date.isAfter(leave.getEndDate())) {
-            boolean isWeekend = isWeekendForTenant(date, settings);
+            boolean isWeekend = leaveConfigService.isWeekendForEmployee(date, leave.getEmployee(), settings);
             boolean isHoliday = holidayDates.contains(date);
 
             // Skip creating attendance for weekends if they are not counted as working days
@@ -221,63 +177,93 @@ public class LeaveService {
      * Get leave balance considering tenant settings
      */
     public Map<String, Object> getLeaveBalanceWithTenantSettings(Long employeeId, Long tenantId) {
-        TenantLeaveSettings settings = settingsRepository.findById(tenantId)
-                .orElseThrow(() -> new BusinessException("Tenant leave settings not configured. Please contact admin."));
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenantId);
 
         int year = LocalDate.now().getYear();
         Map<String, Object> balance = new LinkedHashMap<>();
 
-        // Get used leave days for each type
-        double casualUsed = leaveRepository.getUsedLeaveDays(employeeId, LeaveType.CASUAL, year);
-        double sickUsed = leaveRepository.getUsedLeaveDays(employeeId, LeaveType.SICK, year);
-        double earnedUsed = leaveRepository.getUsedLeaveDays(employeeId, LeaveType.EARNED, year);
-        double emergencyUsed = leaveRepository.getUsedLeaveDays(employeeId, LeaveType.EMERGENCY, year);
+        Map<String, Object> leavePolicies = settings.getLeavePolicies();
+        if (leavePolicies == null) {
+            leavePolicies = TenantLeaveSettings.createDefaultPolicies();
+        }
 
-        // Calculate remaining
-        balance.put("CASUAL", Map.of(
-                "total", settings.getCasualLeavePerYear(),
-                "used", casualUsed,
-                "remaining", Math.max(0, settings.getCasualLeavePerYear() - casualUsed),
-                "color", "#4caf50"
-        ));
-        balance.put("SICK", Map.of(
-                "total", settings.getSickLeavePerYear(),
-                "used", sickUsed,
-                "remaining", Math.max(0, settings.getSickLeavePerYear() - sickUsed),
-                "color", "#2196f3"
-        ));
-        balance.put("EARNED", Map.of(
-                "total", settings.getEarnedLeavePerYear(),
-                "used", earnedUsed,
-                "remaining", Math.max(0, settings.getEarnedLeavePerYear() - earnedUsed),
-                "color", "#ff9800"
-        ));
-        balance.put("EMERGENCY", Map.of(
-                "total", 3,
-                "used", emergencyUsed,
-                "remaining", Math.max(0, 3 - emergencyUsed),
-                "color", "#f44336"
-        ));
-        balance.put("UNPAID", Map.of(
-                "total", "Unlimited",
-                "used", 0,
-                "remaining", "Unlimited",
-                "color", "#9e9e9e"
-        ));
+        double totalUsed = 0.0;
+        double totalAvailable = 0.0;
+
+        for (LeaveType leaveType : LeaveType.values()) {
+            Object policyObj = leavePolicies.get(leaveType.name());
+            boolean allowed = false;
+
+            if (policyObj instanceof Map) {
+                Map<?, ?> policy = (Map<?, ?>) policyObj;
+                allowed = Boolean.TRUE.equals(policy.get("allowed"));
+
+                // Gender eligibility filter for the balance screen
+                Object genderEligibilityObj = policy.get("genderEligibility");
+                if (genderEligibilityObj != null) {
+                    String eligibility = genderEligibilityObj.toString().trim().toUpperCase();
+                    if (!"ALL".equals(eligibility)) {
+                        com.sonixhr.enums.Gender empGender = employee.getGender();
+                        if (empGender == null || !empGender.name().equals(eligibility)) {
+                            allowed = false; // Exclude if gender doesn't match
+                        }
+                    }
+                }
+            }
+
+            if (!allowed) {
+                continue;
+            }
+
+            double used = leaveRepository.getUsedLeaveDays(employeeId, leaveType, year);
+            double availableDays = getAvailableDaysForLeaveType(employee, leaveType, year, settings);
+
+            if (!leaveType.hasLimit()) {
+                balance.put(leaveType.name(), Map.of(
+                        "total", "Unlimited",
+                        "used", used,
+                        "remaining", "Unlimited",
+                        "color", getLeaveColor(leaveType)
+                ));
+            } else {
+                balance.put(leaveType.name(), Map.of(
+                        "total", availableDays,
+                        "used", used,
+                        "remaining", Math.max(0, availableDays - used),
+                        "color", getLeaveColor(leaveType)
+                ));
+                totalUsed += used;
+                totalAvailable += availableDays;
+            }
+        }
 
         // Add summary
-        double totalUsed = casualUsed + sickUsed + earnedUsed + emergencyUsed;
-        double totalAvailable = settings.getCasualLeavePerYear() + settings.getSickLeavePerYear() +
-                settings.getEarnedLeavePerYear() + 3;
-
         balance.put("summary", Map.of(
                 "totalUsed", totalUsed,
                 "totalAvailable", totalAvailable,
-                "remaining", totalAvailable - totalUsed,
-                "utilizationPercentage", totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0
+                "remaining", Math.max(0.0, totalAvailable - totalUsed),
+                "utilizationPercentage", totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0,
+                "policiesConfigured", settings.getPoliciesConfigured() != null && settings.getPoliciesConfigured()
         ));
 
         return balance;
+    }
+
+    private String getLeaveColor(LeaveType type) {
+        switch (type) {
+            case CASUAL: return "#4caf50";
+            case SICK: return "#2196f3";
+            case EARNED: return "#ff9800";
+            case EMERGENCY: return "#f44336";
+            case MATERNITY: return "#e91e63";
+            case PATERNITY: return "#00bcd4";
+            case COMPENSATORY: return "#9c27b0";
+            case UNPAID:
+            default: return "#9e9e9e";
+        }
     }
 
     // =====================================================
@@ -294,8 +280,55 @@ public class LeaveService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
-        TenantLeaveSettings settings = settingsRepository.findById(employee.getTenant().getId())
-                .orElseThrow(() -> new BusinessException("Tenant leave settings not configured. Please contact admin."));
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(employee.getTenant().getId());
+
+        // First-time configuration check
+        if (settings.getPoliciesConfigured() == null || !settings.getPoliciesConfigured()) {
+            throw new LeavePoliciesNotConfiguredException("Leave policies have not been configured for your company yet. Please ask your administrator to configure leave settings first.");
+        }
+
+        // Policy validation
+        Map<String, Object> leavePolicies = settings.getLeavePolicies();
+        if (leavePolicies == null) {
+            leavePolicies = TenantLeaveSettings.createDefaultPolicies();
+        }
+
+        Object policyObj = leavePolicies.get(request.getLeaveType().name());
+        if (policyObj instanceof Map) {
+            Map<?, ?> policy = (Map<?, ?>) policyObj;
+
+            // 1. Allowed Check
+            if (!Boolean.TRUE.equals(policy.get("allowed"))) {
+                throw new BusinessException(request.getLeaveType().getDisplayName() + " is not enabled for this tenant");
+            }
+
+            // 2. Gender Eligibility Check
+            Object genderEligibilityObj = policy.get("genderEligibility");
+            if (genderEligibilityObj != null) {
+                String eligibility = genderEligibilityObj.toString().trim().toUpperCase();
+                if (!"ALL".equals(eligibility)) {
+                    com.sonixhr.enums.Gender empGender = employee.getGender();
+                    if (empGender == null || !empGender.name().equals(eligibility)) {
+                        throw new BusinessException(String.format("Employee is not eligible for %s based on gender", request.getLeaveType().getDisplayName()));
+                    }
+                }
+            }
+
+            // 3. Minimum Service Period Check
+            Object minServiceObj = policy.get("minimumServiceMonths");
+            if (minServiceObj instanceof Number) {
+                int minServiceMonths = ((Number) minServiceObj).intValue();
+                long serviceMonths = employee.getHireDate() != null 
+                        ? ChronoUnit.MONTHS.between(employee.getHireDate(), LocalDate.now()) 
+                        : 0;
+                if (serviceMonths < minServiceMonths) {
+                    throw new BusinessException(String.format("Employee does not meet the minimum service requirement of %d months for %s. Current service: %d months", 
+                            minServiceMonths, request.getLeaveType().getDisplayName(), serviceMonths));
+                }
+            }
+        } else {
+            throw new BusinessException(request.getLeaveType().getDisplayName() + " is not configured for this tenant");
+        }
 
         // Validate dates
         if (request.getStartDate().isAfter(request.getEndDate())) {
@@ -317,24 +350,23 @@ public class LeaveService {
             }
         }
 
-        // Check maximum consecutive leave days
-        long daysBetween = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
-        if (daysBetween > settings.getMaxConsecutiveLeaveDays()) {
-            throw new BusinessException("Cannot request more than " + settings.getMaxConsecutiveLeaveDays() +
-                    " consecutive leave days");
-        }
-
         // Calculate total leave days based on tenant settings
-        double totalDays = calculateTotalLeaveDays(employee.getTenant().getId(),
+        double totalDays = calculateTotalLeaveDays(employee,
                 request.getStartDate(), request.getEndDate(), request.getLeaveType(), settings);
 
         if (totalDays <= 0) {
             throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
         }
 
-        // Check leave balance (skip for unpaid leave)
-        if (request.getLeaveType() != LeaveType.UNPAID) {
-            checkLeaveBalanceWithSettings(employeeId, employee.getTenant().getId(), request.getLeaveType(),
+        // Check maximum consecutive leave days
+        if (settings.getMaxConsecutiveLeaveDays() != null && totalDays > settings.getMaxConsecutiveLeaveDays()) {
+            throw new BusinessException("Cannot request more than " + settings.getMaxConsecutiveLeaveDays() +
+                    " consecutive leave days");
+        }
+
+        // Check leave balance (skip for unpaid/unlimited leaves)
+        if (request.getLeaveType().hasLimit()) {
+            checkLeaveBalanceWithSettings(employee, employee.getTenant().getId(), request.getLeaveType(),
                     request.getStartDate(), request.getEndDate(), settings);
         }
 
@@ -380,16 +412,16 @@ public class LeaveService {
     /**
      * Check leave balance with tenant settings (resilient to year-crossing requests)
      */
-    private void checkLeaveBalanceWithSettings(Long employeeId, Long tenantId, LeaveType leaveType, 
+    private void checkLeaveBalanceWithSettings(Employee employee, Long tenantId, LeaveType leaveType, 
                                                LocalDate startDate, LocalDate endDate, TenantLeaveSettings settings) {
         int startYear = startDate.getYear();
         int endYear = endDate.getYear();
 
         for (int year = startYear; year <= endYear; year++) {
-            double requestedDaysInYear = calculateLeaveDaysInYear(tenantId, startDate, endDate, year, leaveType, settings);
+            double requestedDaysInYear = calculateLeaveDaysInYear(employee, tenantId, startDate, endDate, year, leaveType, settings);
             if (requestedDaysInYear > 0) {
-                double usedDays = leaveRepository.getUsedLeaveDays(employeeId, leaveType, year);
-                double availableDays = getAvailableDaysForLeaveType(leaveType, settings);
+                double usedDays = leaveRepository.getUsedLeaveDays(employee.getId(), leaveType, year);
+                double availableDays = getAvailableDaysForLeaveType(employee, leaveType, year, settings);
                 double remainingDays = availableDays - usedDays;
 
                 if (requestedDaysInYear > remainingDays) {
@@ -401,7 +433,7 @@ public class LeaveService {
         }
     }
 
-    private double calculateLeaveDaysInYear(Long tenantId, LocalDate startDate, LocalDate endDate,
+    private double calculateLeaveDaysInYear(Employee employee, Long tenantId, LocalDate startDate, LocalDate endDate,
                                             int year, LeaveType leaveType, TenantLeaveSettings settings) {
         LocalDate yearStart = LocalDate.of(year, 1, 1);
         LocalDate yearEnd = LocalDate.of(year, 12, 31);
@@ -413,20 +445,65 @@ public class LeaveService {
             return 0;
         }
         
-        return calculateTotalLeaveDays(tenantId, start, end, leaveType, settings);
+        return calculateTotalLeaveDays(employee, start, end, leaveType, settings);
     }
 
     /**
      * Get available days for leave type based on tenant settings
      */
-    private double getAvailableDaysForLeaveType(LeaveType leaveType, TenantLeaveSettings settings) {
-        switch (leaveType) {
-            case CASUAL: return settings.getCasualLeavePerYear();
-            case SICK: return settings.getSickLeavePerYear();
-            case EARNED: return settings.getEarnedLeavePerYear();
-            case EMERGENCY: return 3;
-            default: return Double.MAX_VALUE;
+    private double getAvailableDaysForLeaveType(Employee employee, LeaveType leaveType, int year, TenantLeaveSettings settings) {
+        double baseDays = 0;
+        boolean carryForward = false;
+        double maxCarryForwardDays = 0;
+        boolean foundPolicy = false;
+
+        if (settings != null && settings.getLeavePolicies() != null && settings.getLeavePolicies().containsKey(leaveType.name())) {
+            Object policyObj = settings.getLeavePolicies().get(leaveType.name());
+            if (policyObj instanceof Map) {
+                Map<?, ?> policy = (Map<?, ?>) policyObj;
+                Object days = policy.get("daysPerYear");
+                if (days instanceof Number) {
+                    baseDays = ((Number) days).doubleValue();
+                }
+                carryForward = Boolean.TRUE.equals(policy.get("carryForward"));
+                Object maxCf = policy.get("maxCarryForwardDays");
+                if (maxCf instanceof Number) {
+                    maxCarryForwardDays = ((Number) maxCf).doubleValue();
+                }
+                foundPolicy = true;
+            }
         }
+
+        if (!foundPolicy) {
+            switch (leaveType) {
+                case CASUAL: baseDays = settings.getCasualLeavePerYear(); break;
+                case SICK: baseDays = settings.getSickLeavePerYear(); break;
+                case EARNED: baseDays = settings.getEarnedLeavePerYear(); break;
+                case EMERGENCY: baseDays = settings.getEmergencyLeavePerYear() != null ? settings.getEmergencyLeavePerYear() : leaveType.getDefaultDaysPerYear(); break;
+                case MATERNITY: baseDays = settings.getMaternityLeavePerYear() != null ? settings.getMaternityLeavePerYear() : leaveType.getDefaultDaysPerYear(); break;
+                case PATERNITY: baseDays = settings.getPaternityLeavePerYear() != null ? settings.getPaternityLeavePerYear() : leaveType.getDefaultDaysPerYear(); break;
+                case UNPAID: baseDays = settings.getUnpaidLeavePerYear() != null ? settings.getUnpaidLeavePerYear() : leaveType.getDefaultDaysPerYear(); break;
+                case COMPENSATORY: baseDays = settings.getCompensatoryLeavePerYear() != null ? settings.getCompensatoryLeavePerYear() : leaveType.getDefaultDaysPerYear(); break;
+                default:
+                    if (leaveType.hasLimit()) {
+                        baseDays = leaveType.getDefaultDaysPerYear();
+                    } else {
+                        return Double.MAX_VALUE;
+                    }
+            }
+        }
+
+        // Apply carry forward logic if enabled
+        if (carryForward && employee != null && employee.getHireDate() != null && employee.getHireDate().getYear() < year) {
+            int prevYear = year - 1;
+            double prevUsed = leaveRepository.getUsedLeaveDays(employee.getId(), leaveType, prevYear);
+            double prevAvailable = getAvailableDaysForLeaveType(employee, leaveType, prevYear, settings);
+            double prevRemaining = Math.max(0.0, prevAvailable - prevUsed);
+            double carriedOver = Math.min(prevRemaining, maxCarryForwardDays);
+            return baseDays + carriedOver;
+        }
+
+        return baseDays;
     }
 
     // =====================================================
@@ -460,6 +537,25 @@ public class LeaveService {
             throw new BusinessException("Only pending leave requests can be approved");
         }
 
+        Employee approver = employeeRepository.findById(approverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Approver employee not found"));
+
+        if (!approver.getTenantId().equals(leave.getTenant().getId())) {
+            throw new BusinessException("Access denied: Approver belongs to a different tenant");
+        }
+
+        Employee requester = leave.getEmployee();
+        boolean isDirectManager = requester.getManager() != null && requester.getManager().getId().equals(approverId);
+        boolean hasApproveAny = approver.hasPermission("LEAVE_APPROVE_ANY");
+        boolean hasApproveDept = approver.hasPermission("LEAVE_APPROVE_DEPARTMENT") &&
+                requester.getDepartment() != null &&
+                approver.getDepartment() != null &&
+                requester.getDepartment().getId().equals(approver.getDepartment().getId());
+
+        if (!isDirectManager && !hasApproveAny && !hasApproveDept) {
+            throw new BusinessException("You are not authorized to approve this leave request");
+        }
+
         leave.setStatus(LeaveStatus.APPROVED);
         leave.setApprovedBy(approverId);
         leave.setApprovedByName(approverName);
@@ -470,6 +566,28 @@ public class LeaveService {
 
         LeaveRequest saved = leaveRepository.save(leave);
         log.info("Leave request {} approved", leaveId);
+
+        try {
+            emailService.sendLeaveStatusNotification(
+                    leave.getEmployee().getEmail(),
+                    leave.getEmployee().getFullName(),
+                    leave.getLeaveType().getDisplayName(),
+                    leave.getStartDate().toString(),
+                    leave.getEndDate().toString(),
+                    "APPROVED",
+                    approverName
+            );
+
+            notificationService.sendNotification(
+                    leave.getEmployee(),
+                    "Leave Request Approved",
+                    String.format("Your leave request for %s (%s to %s) has been approved by %s.",
+                            leave.getLeaveType().getDisplayName(), leave.getStartDate(), leave.getEndDate(), approverName),
+                    "LEAVE_STATUS"
+            );
+        } catch (Exception e) {
+            log.error("Failed to send leave approval notifications", e);
+        }
 
         return convertToResponse(saved);
     }
@@ -489,6 +607,25 @@ public class LeaveService {
             throw new BusinessException("Only pending leave requests can be rejected");
         }
 
+        Employee rejector = employeeRepository.findById(rejectorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rejector employee not found"));
+
+        if (!rejector.getTenantId().equals(leave.getTenant().getId())) {
+            throw new BusinessException("Access denied: Rejector belongs to a different tenant");
+        }
+
+        Employee requester = leave.getEmployee();
+        boolean isDirectManager = requester.getManager() != null && requester.getManager().getId().equals(rejectorId);
+        boolean hasApproveAny = rejector.hasPermission("LEAVE_APPROVE_ANY");
+        boolean hasApproveDept = rejector.hasPermission("LEAVE_APPROVE_DEPARTMENT") &&
+                requester.getDepartment() != null &&
+                rejector.getDepartment() != null &&
+                requester.getDepartment().getId().equals(rejector.getDepartment().getId());
+
+        if (!isDirectManager && !hasApproveAny && !hasApproveDept) {
+            throw new BusinessException("You are not authorized to reject this leave request");
+        }
+
         leave.setStatus(LeaveStatus.REJECTED);
         leave.setRejectionReason(rejectionReason);
         leave.setApprovedBy(rejectorId);
@@ -497,6 +634,28 @@ public class LeaveService {
 
         LeaveRequest saved = leaveRepository.save(leave);
         log.info("Leave request {} rejected", leaveId);
+
+        try {
+            emailService.sendLeaveStatusNotification(
+                    leave.getEmployee().getEmail(),
+                    leave.getEmployee().getFullName(),
+                    leave.getLeaveType().getDisplayName(),
+                    leave.getStartDate().toString(),
+                    leave.getEndDate().toString(),
+                    "REJECTED",
+                    rejectorName
+            );
+
+            notificationService.sendNotification(
+                    leave.getEmployee(),
+                    "Leave Request Rejected",
+                    String.format("Your leave request for %s (%s to %s) has been rejected by %s. Reason: %s",
+                            leave.getLeaveType().getDisplayName(), leave.getStartDate(), leave.getEndDate(), rejectorName, rejectionReason),
+                    "LEAVE_STATUS"
+            );
+        } catch (Exception e) {
+            log.error("Failed to send leave rejection notifications", e);
+        }
 
         return convertToResponse(saved);
     }

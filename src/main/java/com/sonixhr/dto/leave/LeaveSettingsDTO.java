@@ -5,12 +5,17 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeaveSettingsDTO {
+
+    private Map<String, Object> leavePolicies;
+
+    private Boolean policiesConfigured;
 
     private Long tenantId;
 
@@ -25,6 +30,11 @@ public class LeaveSettingsDTO {
     private Integer casualLeavePerYear;
     private Integer sickLeavePerYear;
     private Integer earnedLeavePerYear;
+    private Integer emergencyLeavePerYear;
+    private Integer maternityLeavePerYear;
+    private Integer paternityLeavePerYear;
+    private Integer unpaidLeavePerYear;
+    private Integer compensatoryLeavePerYear;
     private Integer maxConsecutiveLeaveDays;
 
     // Approval settings

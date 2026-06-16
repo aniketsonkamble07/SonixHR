@@ -452,6 +452,63 @@ public class ManualAttendanceService {
         return employeeRepository.searchTeamMembers(managerId, tenantId, searchTerm.toLowerCase());
     }
 
+    public List<ManualTeamMemberAttendanceDTO> searchTeamWithTodayAttendance(Long managerId, String searchTerm) {
+        log.info("Searching team with today's attendance for manager: {} with term: {}", managerId, searchTerm);
+
+        List<Employee> teamMembers = searchTeamMembers(managerId, searchTerm);
+        if (teamMembers.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        Long tenantId = manager.getTenant().getId();
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+
+        List<Long> employeeIds = teamMembers.stream()
+                .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
+                .map(Employee::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
+        if (!employeeIds.isEmpty()) {
+            List<AttendanceRecord> records = attendanceRepository
+                    .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
+            for (AttendanceRecord record : records) {
+                attendanceMap.put(record.getEmployee().getId(), record);
+            }
+        }
+
+        List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
+
+        for (Employee employee : teamMembers) {
+            if (employee.getHireDate() != null && employee.getHireDate().isAfter(today)) {
+                continue;
+            }
+
+            Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
+
+            ManualTeamMemberAttendanceDTO dto = ManualTeamMemberAttendanceDTO.builder()
+                    .employeeId(employee.getId())
+                    .employeeCode(employee.getEmployeeCode())
+                    .employeeName(employee.getFullName())
+                    .email(employee.getEmail())
+                    .position(employee.getPosition())
+                    .profilePicture(employee.getProfilePictureUrl())
+                    .hireDate(employee.getHireDate())
+                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
+                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
+                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
+                    .isMarked(attendance.isPresent())
+                    .build();
+
+            teamAttendance.add(dto);
+        }
+
+        return teamAttendance;
+    }
+
+
     // =====================================================
     // VIEW ATTENDANCE
     // =====================================================

@@ -112,6 +112,17 @@ public class ManualAttendanceController {
         return ResponseEntity.ok(attendanceService.getTeamWithTodayAttendance(currentUser.getId()));
     }
 
+    @GetMapping("/team/search")
+    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'SUPER_ADMIN')")
+    public ResponseEntity<List<ManualTeamMemberAttendanceDTO>> searchTeamWithTodayAttendance(
+            @RequestParam String searchTerm,
+            @AuthenticationPrincipal Employee currentUser) {
+
+        log.info("REST request to search team members with term: {} by manager: {}", searchTerm, currentUser.getId());
+        List<ManualTeamMemberAttendanceDTO> results = attendanceService.searchTeamWithTodayAttendance(currentUser.getId(), searchTerm);
+        return ResponseEntity.ok(results);
+    }
+
     @GetMapping("/team/summary")
     @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_ALL', 'SUPER_ADMIN')")  // ✅ Updated
     public ResponseEntity<ManualTeamAttendanceSummaryResponse> getTeamAttendanceSummary(

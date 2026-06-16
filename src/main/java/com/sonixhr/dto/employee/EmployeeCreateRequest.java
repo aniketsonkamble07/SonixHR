@@ -1,6 +1,7 @@
 package com.sonixhr.dto.employee;
 
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -55,4 +56,7 @@ public class EmployeeCreateRequest {
     @Builder.Default
     private Integer probationMonths = 3;
     private Set<Long> roleIds;
+
+    private WeekendConfig weekendConfig;
+    private String customWeekendDays;
 }

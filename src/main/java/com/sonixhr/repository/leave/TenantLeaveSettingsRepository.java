@@ -28,12 +28,20 @@ public interface TenantLeaveSettingsRepository extends JpaRepository<TenantLeave
 
     @Modifying
     @Query("UPDATE TenantLeaveSettings t SET t.casualLeavePerYear = :casual, " +
-            "t.sickLeavePerYear = :sick, t.earnedLeavePerYear = :earned " +
+            "t.sickLeavePerYear = :sick, t.earnedLeavePerYear = :earned, " +
+            "t.emergencyLeavePerYear = :emergency, t.maternityLeavePerYear = :maternity, " +
+            "t.paternityLeavePerYear = :paternity, t.unpaidLeavePerYear = :unpaid, " +
+            "t.compensatoryLeavePerYear = :compensatory " +
             "WHERE t.tenantId = :tenantId")
     int updateLeaveBalances(@Param("tenantId") Long tenantId,
                             @Param("casual") Integer casual,
                             @Param("sick") Integer sick,
-                            @Param("earned") Integer earned);
+                            @Param("earned") Integer earned,
+                            @Param("emergency") Integer emergency,
+                            @Param("maternity") Integer maternity,
+                            @Param("paternity") Integer paternity,
+                            @Param("unpaid") Integer unpaid,
+                            @Param("compensatory") Integer compensatory);
 
     @Modifying
     @Query("UPDATE TenantLeaveSettings t SET t.country = :country, t.state = :state, " +

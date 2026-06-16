@@ -3,6 +3,7 @@ package com.sonixhr.dto.employee;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.leave.WeekendConfig;
 import lombok.Builder;
 import lombok.Data;
 
@@ -91,6 +92,9 @@ public class EmployeeResponse {
     private String linkedinUrl;
     private String githubUrl;
     private String twitterUrl;
+
+    private WeekendConfig weekendConfig;
+    private String customWeekendDays;
 
     // =====================================================
     // ORGANIZATIONAL HIERARCHY
