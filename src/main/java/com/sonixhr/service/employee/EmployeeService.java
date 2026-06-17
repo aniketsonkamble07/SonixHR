@@ -616,7 +616,6 @@ public class EmployeeService {
                 .bankDetails(employee.getBankDetails())
                 .documents(employee.getDocuments())
                 .certifications(employee.getCertifications())
-                .customFields(employee.getCustomFields())
                 .linkedinUrl(employee.getLinkedinUrl())
                 .githubUrl(employee.getGithubUrl())
                 .twitterUrl(employee.getTwitterUrl())

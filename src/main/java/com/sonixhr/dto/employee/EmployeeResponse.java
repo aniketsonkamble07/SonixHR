@@ -85,7 +85,7 @@ public class EmployeeResponse {
     private Map<String, Object> bankDetails;
     private Map<String, Object> documents;
     private Map<String, Object> certifications;
-    private Map<String, Object> customFields;
+
 
     // =====================================================
     // SOCIAL LINKS

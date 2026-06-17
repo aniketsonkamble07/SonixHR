@@ -48,12 +48,10 @@ public class EmployeeProfileUpdateRequest {
     private String githubUrl;
     private String twitterUrl;
 
-    // Custom Fields
-    private Map<String, Object> customFields;private Long departmentId;
-
     // =====================================================
     // ONLY SUPER ADMIN / HR CAN UPDATE
     // =====================================================
+    private Long departmentId;
     private String position;
     private String workLocation;
     private Long managerId;

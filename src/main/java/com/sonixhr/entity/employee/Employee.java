@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 
 @Data
 @Entity
-@ToString(exclude = {"documents", "certifications", "customFields", "bankDetails"})
+@ToString(exclude = {"documents", "certifications", "bankDetails"})
 @Table(name = "employees", uniqueConstraints = {
         @UniqueConstraint(name = "uk_employee_code_tenant", columnNames = {"tenant_id", "employee_code"}),
         @UniqueConstraint(name = "uk_employee_email_tenant", columnNames = {"tenant_id", "email"})
@@ -145,7 +145,7 @@ public class Employee implements UserDetails {
     private MaritalStatus maritalStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "blood_group", length = 5)
+    @Column(name = "blood_group", length = 20)
     private BloodGroup bloodGroup;
 
     @Column(length = 50)
@@ -264,10 +264,6 @@ public class Employee implements UserDetails {
     @Builder.Default
     private Map<String, Object> certifications = new HashMap<>();
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "custom_fields", columnDefinition = "jsonb")
-    @Builder.Default
-    private Map<String, Object> customFields = new HashMap<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "weekend_config")
@@ -529,9 +525,6 @@ public class Employee implements UserDetails {
         return certifications != null ? certifications : new HashMap<>();
     }
 
-    public Map<String, Object> getCustomFields() {
-        return customFields != null ? customFields : new HashMap<>();
-    }
 
     public Map<String, Object> getBankDetails() {
         return bankDetails != null ? bankDetails : new HashMap<>();

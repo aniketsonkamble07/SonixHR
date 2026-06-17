@@ -94,7 +94,6 @@ public class EmployeeSelfService {
         if (request.getLinkedinUrl() != null) employee.setLinkedinUrl(request.getLinkedinUrl());
         if (request.getGithubUrl() != null) employee.setGithubUrl(request.getGithubUrl());
         if (request.getTwitterUrl() != null) employee.setTwitterUrl(request.getTwitterUrl());
-        if (request.getCustomFields() != null) employee.setCustomFields(request.getCustomFields());
     }
 
     private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, Long tenantId) {
