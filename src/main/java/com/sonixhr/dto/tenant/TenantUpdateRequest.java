@@ -25,8 +25,4 @@ public class TenantUpdateRequest {
 
     @Pattern(regexp = "^[+]?[0-9]{10,15}$", message = "Invalid phone number format")
     private String adminPhone;
-
-    @Pattern(regexp = "^[a-z0-9-]+$", message = "Subdomain can only contain lowercase letters, numbers, and hyphens")
-    @Size(min = 3, max = 100, message = "Subdomain must be between 3 and 100 characters")
-    private String subdomain;
 }

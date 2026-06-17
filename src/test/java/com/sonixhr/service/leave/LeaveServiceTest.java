@@ -28,6 +28,8 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -126,7 +128,7 @@ class LeaveServiceTest {
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
-        when(leaveRepository.getUsedLeaveDays(eq(101L), any(LeaveType.class), anyInt())).thenReturn(0.0);
+        when(leaveRepository.getUsedLeaveDaysByType(eq(101L), anyInt())).thenReturn(java.util.Collections.emptyList());
 
         Map<String, Object> balance = leaveService.getLeaveBalanceWithTenantSettings(101L, 1L);
 
@@ -437,5 +439,275 @@ class LeaveServiceTest {
         assertEquals(800L, response.getId());
         assertEquals(LeaveStatus.PENDING, response.getStatus());
     }
+
+    @Test
+    void approveLeave_shouldRejectIfSelfApproval() {
+        LeaveRequest leave = new LeaveRequest();
+        leave.setId(999L);
+        leave.setStatus(LeaveStatus.PENDING);
+        leave.setEmployee(mockEmployee);
+        leave.setTenant(mockEmployee.getTenant());
+
+        when(leaveRepository.findById(999L)).thenReturn(Optional.of(leave));
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                leaveService.approveLeave(999L, 101L, "John Doe")
+        );
+        assertTrue(ex.getMessage().contains("You cannot approve your own leave request"));
+    }
+
+    @Test
+    void rejectLeave_shouldRejectIfSelfRejection() {
+        LeaveRequest leave = new LeaveRequest();
+        leave.setId(999L);
+        leave.setStatus(LeaveStatus.PENDING);
+        leave.setEmployee(mockEmployee);
+        leave.setTenant(mockEmployee.getTenant());
+
+        when(leaveRepository.findById(999L)).thenReturn(Optional.of(leave));
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                leaveService.rejectLeave(999L, "Not needed", 101L, "John Doe")
+        );
+        assertTrue(ex.getMessage().contains("You cannot reject your own leave request"));
+    }
+
+    @Test
+    void requestLeaveWithTenantSettings_shouldExcludeWeekends_whenCountWeekendsAsLeaveIsFalse() {
+        // Set countWeekendsAsLeave to false
+        mockSettings.setCountWeekendsAsLeave(false);
+        mockSettings.setCountHolidaysAsLeave(false);
+
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+        when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
+        when(leaveRepository.getUsedLeaveDays(eq(101L), eq(LeaveType.CASUAL), anyInt())).thenReturn(0.0);
+
+        // Define Saturday & Sunday. 2026-06-20 is Saturday, 2026-06-21 is Sunday.
+        LocalDate sat = LocalDate.of(2026, 6, 20);
+        LocalDate sun = LocalDate.of(2026, 6, 21);
+        LocalDate mon = LocalDate.of(2026, 6, 22);
+
+        when(leaveConfigService.isWeekendForEmployee(sat, mockEmployee, mockSettings)).thenReturn(true);
+        when(leaveConfigService.isWeekendForEmployee(sun, mockEmployee, mockSettings)).thenReturn(true);
+        when(leaveConfigService.isWeekendForEmployee(mon, mockEmployee, mockSettings)).thenReturn(false);
+
+        when(leaveRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> {
+            LeaveRequest req = invocation.getArgument(0);
+            req.setId(1001L);
+            return req;
+        });
+
+        LeaveRequestDTO request = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(sat)
+                .endDate(mon) // Saturday, Sunday, Monday
+                .reason("Weekend test")
+                .build();
+
+        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(101L, request, mockEmployee);
+
+        assertNotNull(response);
+        assertEquals(1.0, response.getTotalDays()); // Only Monday is counted
+    }
+
+    @Test
+    void requestLeaveWithTenantSettings_shouldIncludeWeekends_whenCountWeekendsAsLeaveIsTrue() {
+        // Set countWeekendsAsLeave to true
+        mockSettings.setCountWeekendsAsLeave(true);
+        mockSettings.setCountHolidaysAsLeave(false);
+
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+        when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
+        when(leaveRepository.getUsedLeaveDays(eq(101L), eq(LeaveType.CASUAL), anyInt())).thenReturn(0.0);
+
+        LocalDate sat = LocalDate.of(2026, 6, 20);
+        LocalDate sun = LocalDate.of(2026, 6, 21);
+        LocalDate mon = LocalDate.of(2026, 6, 22);
+
+        when(leaveConfigService.isWeekendForEmployee(sat, mockEmployee, mockSettings)).thenReturn(true);
+        when(leaveConfigService.isWeekendForEmployee(sun, mockEmployee, mockSettings)).thenReturn(true);
+        when(leaveConfigService.isWeekendForEmployee(mon, mockEmployee, mockSettings)).thenReturn(false);
+
+        when(leaveRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> {
+            LeaveRequest req = invocation.getArgument(0);
+            req.setId(1002L);
+            return req;
+        });
+
+        LeaveRequestDTO request = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(sat)
+                .endDate(mon)
+                .reason("Weekend test")
+                .build();
+
+        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(101L, request, mockEmployee);
+
+        assertNotNull(response);
+        assertEquals(3.0, response.getTotalDays()); // Saturday, Sunday, Monday are all counted
+    }
+
+    @Test
+    void requestLeaveWithTenantSettings_shouldReject_whenExceedsMaxConsecutiveLeaveDays() {
+        mockSettings.setMaxConsecutiveLeaveDays(5);
+
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+        when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
+
+        LeaveRequestDTO request = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(10)) // 10 days
+                .reason("Long leave")
+                .build();
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                leaveService.requestLeaveWithTenantSettings(101L, request, mockEmployee)
+        );
+        assertTrue(ex.getMessage().contains("Cannot request more than 5 consecutive leave days"));
+    }
+
+    @Test
+    void requestLeaveWithTenantSettings_shouldAutoApprove_whenLeaveApprovalRequiredIsFalse() {
+        mockSettings.setLeaveApprovalRequired(false);
+
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+        when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
+        when(leaveRepository.getUsedLeaveDays(eq(101L), eq(LeaveType.CASUAL), anyInt())).thenReturn(0.0);
+        when(leaveRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> {
+            LeaveRequest req = invocation.getArgument(0);
+            req.setId(1003L);
+            return req;
+        });
+
+        LeaveRequestDTO request = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(2))
+                .reason("No approval needed")
+                .build();
+
+        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(101L, request, mockEmployee);
+
+        assertNotNull(response);
+        assertEquals(LeaveStatus.APPROVED, response.getStatus());
+        assertEquals(101L, response.getApprovedBy());
+    }
+
+    @Test
+    void requestLeaveWithTenantSettings_shouldAutoApprove_whenRequesterIsManagerAndAutoApproveEnabled() {
+        mockSettings.setLeaveApprovalRequired(true);
+        mockSettings.setAutoApproveForManager(true);
+
+        // Employee is a manager. Let's mock a manager.
+        com.sonixhr.entity.tenant.TenantRole managerRole = new com.sonixhr.entity.tenant.TenantRole();
+        managerRole.setName("MANAGER");
+        mockEmployee.setRoles(Set.of(managerRole));
+
+        when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
+        when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
+        when(leaveRepository.getUsedLeaveDays(eq(101L), eq(LeaveType.CASUAL), anyInt())).thenReturn(0.0);
+        when(leaveRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> {
+            LeaveRequest req = invocation.getArgument(0);
+            req.setId(1004L);
+            return req;
+        });
+
+        LeaveRequestDTO request = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(2))
+                .reason("Manager auto approve")
+                .build();
+
+        LeaveResponseDTO response = leaveService.requestLeaveWithTenantSettings(101L, request, mockEmployee);
+
+        assertNotNull(response);
+        assertEquals(LeaveStatus.APPROVED, response.getStatus());
+        assertEquals(101L, response.getApprovedBy());
+    }
+
+    @Test
+    void approveLeave_shouldApprove_whenApproverIsDepartmentManager() {
+        LeaveRequest leave = new LeaveRequest();
+        leave.setId(999L);
+        leave.setStatus(LeaveStatus.PENDING);
+        leave.setEmployee(mockEmployee);
+        leave.setTenant(mockEmployee.getTenant());
+        leave.setStartDate(LocalDate.now().plusDays(1));
+        leave.setEndDate(LocalDate.now().plusDays(2));
+        leave.setLeaveType(LeaveType.CASUAL);
+
+        com.sonixhr.entity.department.Department dept = new com.sonixhr.entity.department.Department();
+        dept.setId(5L);
+        mockEmployee.setDepartment(dept);
+
+        Employee approver = new Employee();
+        approver.setId(202L);
+        approver.setFirstName("Jane");
+        approver.setLastName("Manager");
+        approver.setTenant(mockEmployee.getTenant());
+        approver.setDepartment(dept);
+
+        // Approver has LEAVE_APPROVE_DEPARTMENT permission
+        com.sonixhr.entity.tenant.TenantRole deptApproverRole = new com.sonixhr.entity.tenant.TenantRole();
+        com.sonixhr.entity.tenant.TenantPermission perm = new com.sonixhr.entity.tenant.TenantPermission();
+        perm.setPermission("LEAVE_APPROVE_DEPARTMENT");
+        deptApproverRole.setPermissions(Set.of(perm));
+        approver.setRoles(Set.of(deptApproverRole));
+
+        when(leaveRepository.findById(999L)).thenReturn(Optional.of(leave));
+        when(employeeRepository.findById(202L)).thenReturn(Optional.of(approver));
+        when(settingsRepository.findById(1L)).thenReturn(Optional.of(mockSettings));
+        when(leaveRepository.save(any(LeaveRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LeaveResponseDTO response = leaveService.approveLeave(999L, 202L, "Jane Manager");
+
+        assertNotNull(response);
+        assertEquals(LeaveStatus.APPROVED, response.getStatus());
+        assertEquals(202L, response.getApprovedBy());
+    }
+
+    @Test
+    void approveLeave_shouldReject_whenApproverIsNotAuthorized() {
+        LeaveRequest leave = new LeaveRequest();
+        leave.setId(999L);
+        leave.setStatus(LeaveStatus.PENDING);
+        leave.setEmployee(mockEmployee);
+        leave.setTenant(mockEmployee.getTenant());
+        leave.setStartDate(LocalDate.now().plusDays(1));
+        leave.setEndDate(LocalDate.now().plusDays(2));
+        leave.setLeaveType(LeaveType.CASUAL);
+
+        com.sonixhr.entity.department.Department dept1 = new com.sonixhr.entity.department.Department();
+        dept1.setId(5L);
+        mockEmployee.setDepartment(dept1);
+
+        com.sonixhr.entity.department.Department dept2 = new com.sonixhr.entity.department.Department();
+        dept2.setId(6L);
+
+        Employee approver = new Employee();
+        approver.setId(202L);
+        approver.setTenant(mockEmployee.getTenant());
+        approver.setDepartment(dept2);
+
+        // Approver only has LEAVE_APPROVE_DEPARTMENT but for a different department
+        com.sonixhr.entity.tenant.TenantRole deptApproverRole = new com.sonixhr.entity.tenant.TenantRole();
+        com.sonixhr.entity.tenant.TenantPermission perm = new com.sonixhr.entity.tenant.TenantPermission();
+        perm.setPermission("LEAVE_APPROVE_DEPARTMENT");
+        deptApproverRole.setPermissions(Set.of(perm));
+        approver.setRoles(Set.of(deptApproverRole));
+
+        when(leaveRepository.findById(999L)).thenReturn(Optional.of(leave));
+        when(employeeRepository.findById(202L)).thenReturn(Optional.of(approver));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                leaveService.approveLeave(999L, 202L, "Jane Manager")
+        );
+        assertTrue(ex.getMessage().contains("You are not authorized to approve this leave request"));
+    }
 }
+
 

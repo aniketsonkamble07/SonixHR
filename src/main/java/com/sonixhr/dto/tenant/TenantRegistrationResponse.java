@@ -22,7 +22,6 @@ public class TenantRegistrationResponse {
     private Long tenantId;
     private String tenantCode;
     private String companyName;
-    private String subdomain;
 
     // Plan info
     private String planType;
@@ -57,14 +56,13 @@ public class TenantRegistrationResponse {
     private LocalDateTime deletedAt;
 
     // Helper method for success response
-    public static TenantRegistrationResponse success(String message, Long tenantId, String subdomain,
+    public static TenantRegistrationResponse success(String message, Long tenantId,
                                                      String planType, LocalDateTime trialEndsAt,
                                                      String activationToken) {
         return TenantRegistrationResponse.builder()
                 .success(true)
                 .message(message)
                 .tenantId(tenantId)
-                .subdomain(subdomain)
                 .planType(planType)
                 .planStatus("trial")
                 .trialEndsAt(trialEndsAt)
@@ -77,7 +75,7 @@ public class TenantRegistrationResponse {
 
     // NEW: Success response with Super Admin employee details
     public static TenantRegistrationResponse successWithEmployee(String message, Long tenantId,
-                                                                 String subdomain, String planType,
+                                                                 String planType,
                                                                  LocalDateTime trialEndsAt, String activationToken,
                                                                  Long employeeId, String employeeCode,
                                                                  String fullName, String email) {
@@ -85,7 +83,6 @@ public class TenantRegistrationResponse {
                 .success(true)
                 .message(message)
                 .tenantId(tenantId)
-                .subdomain(subdomain)
                 .planType(planType)
                 .planStatus("trial")
                 .trialEndsAt(trialEndsAt)

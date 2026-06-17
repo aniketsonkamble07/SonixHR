@@ -16,12 +16,10 @@ import java.util.Objects;
 @Entity
 @Table(name = "tenants",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_tenant_code", columnNames = "tenant_code"),
-                @UniqueConstraint(name = "uk_tenant_subdomain", columnNames = "subdomain")
+                @UniqueConstraint(name = "uk_tenant_code", columnNames = "tenant_code")
         },
         indexes = {
                 @Index(name = "idx_tenant_code", columnList = "tenant_code"),
-                @Index(name = "idx_tenant_subdomain", columnList = "subdomain"),
                 @Index(name = "idx_tenant_status", columnList = "status"),
                 @Index(name = "idx_tenant_is_active", columnList = "is_active")
         })
@@ -40,9 +38,6 @@ public class Tenant {
 
     @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
-
-    @Column(unique = true, nullable = false, length = 100)
-    private String subdomain;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -170,9 +165,6 @@ public class Tenant {
         if (companyName == null || companyName.isEmpty()) {
             throw new IllegalStateException("Company name is required");
         }
-        if (subdomain == null || subdomain.isEmpty()) {
-            throw new IllegalStateException("Subdomain is required");
-        }
         if (adminEmail == null || !adminEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             throw new IllegalStateException("Valid admin email is required");
         }
@@ -199,7 +191,6 @@ public class Tenant {
                 "id=" + id +
                 ", tenantCode='" + tenantCode + '\'' +
                 ", companyName='" + companyName + '\'' +
-                ", subdomain='" + subdomain + '\'' +
                 ", status=" + status +
                 ", isActive=" + isActive +
                 ", planType=" + planType +

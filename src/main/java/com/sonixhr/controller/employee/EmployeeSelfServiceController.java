@@ -2,6 +2,7 @@ package com.sonixhr.controller.employee;
 
 import com.sonixhr.dto.employee.EmployeeProfileUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
+import com.sonixhr.dto.employee.MyOrgChartResponse;
 import com.sonixhr.service.employee.EmployeeSelfService;
 import com.sonixhr.security.TenantContext;
 import jakarta.validation.Valid;
@@ -52,6 +53,22 @@ public class EmployeeSelfServiceController {
         log.info("Employee {} updating their profile", email);
 
         EmployeeResponse response = employeeSelfService.updateEmployeeProfile(tenantId, email, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // =====================================================
+    // Get my personalized organization chart
+    // =====================================================
+    @GetMapping("/organization-chart")
+    public ResponseEntity<MyOrgChartResponse> getMyOrgChart(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String email = userDetails.getUsername();
+        Long tenantId = TenantContext.getCurrentTenant();
+
+        log.info("Employee {} viewing their personalized org chart", email);
+
+        MyOrgChartResponse response = employeeSelfService.getMyOrgChart(tenantId, email);
         return ResponseEntity.ok(response);
     }
 }

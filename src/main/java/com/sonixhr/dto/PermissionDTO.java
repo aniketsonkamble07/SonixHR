@@ -26,21 +26,7 @@ public class PermissionDTO {
     // ✅ Optional: Add if you have icons in your system
     // private String icon;
 
-    // Static factory method for easy creation from entity
-    public static PermissionDTO fromEntity(com.sonixhr.entity.employee.EmployeePermission entity) {
-        if (entity == null) {
-            return null;
-        }
 
-        return PermissionDTO.builder()
-                .id(entity.getId())
-                .permission(entity.getPermission() != null ? entity.getPermission().name() : null)
-                .description(entity.getDescription())
-                .category(entity.getCategory())
-                .displayOrder(entity.getDisplayOrder())
-                .selected(false)
-                .build();
-    }
 
     // For enum-based permissions
     public static PermissionDTO fromEnum(com.sonixhr.enums.TenantPermissionEnum permissionEnum) {

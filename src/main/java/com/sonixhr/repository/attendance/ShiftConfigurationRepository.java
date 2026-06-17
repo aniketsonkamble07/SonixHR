@@ -24,6 +24,8 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
 
     Optional<ShiftConfiguration> findByTenantIdAndIsActiveTrue(Long tenantId);
 
+    Optional<ShiftConfiguration> findByTenantIdAndIsDefaultTrueAndIsActiveTrue(Long tenantId);
+
     List<ShiftConfiguration> findAllByIsActiveTrue();
 
     Optional<ShiftConfiguration> findByShiftCode(String shiftCode);

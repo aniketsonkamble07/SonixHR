@@ -4,6 +4,7 @@ import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.entity.tenant.TenantPermission;
+import com.sonixhr.entity.attendance.ShiftConfiguration;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
@@ -159,6 +160,10 @@ public class Employee implements UserDetails {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     private Department department;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shift_id")
+    private ShiftConfiguration shift;
 
     @Column(length = 100)
     private String position;

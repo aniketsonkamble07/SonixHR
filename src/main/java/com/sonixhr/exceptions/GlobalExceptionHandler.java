@@ -153,8 +153,6 @@ public class GlobalExceptionHandler {
         if (ex.getMessage().contains("unique constraint")) {
             if (ex.getMessage().contains("email")) {
                 message = "This email is already registered";
-            } else if (ex.getMessage().contains("subdomain")) {
-                message = "This subdomain is already taken";
             } else if (ex.getMessage().contains("tenant_code")) {
                 message = "This tenant code already exists";
             } else {
@@ -288,7 +286,6 @@ public class GlobalExceptionHandler {
 
     private String getFriendlyMessage(String fieldName, String defaultMessage) {
         Map<String, String> friendlyMessages = Map.of(
-                "subdomain", "Subdomain should only contain lowercase letters, numbers, and hyphens",
                 "adminEmail", "Please enter a valid email address (e.g., name@company.com)",
                 "companyName", "Company name is required",
                 "adminName", "Admin name is required",

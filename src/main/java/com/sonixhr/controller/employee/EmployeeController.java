@@ -42,6 +42,7 @@ public class EmployeeController {
     // =====================================================
 
     @PostMapping
+    @PreAuthorize("hasAuthority('EMPLOYEE_CREATE')")
     @Operation(summary = "Create a new employee", description = "Creates a new employee for the authenticated tenant")
     public ResponseEntity<EmployeeResponse> createEmployee(
             @Valid @RequestBody EmployeeCreateRequest request,
@@ -60,6 +61,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM') or #id == principal.id")
     @Operation(summary = "Get employee by ID", description = "Retrieves employee details by ID")
     public ResponseEntity<EmployeeResponse> getEmployeeById(
             @Parameter(description = "Employee ID", required = true)
@@ -77,6 +79,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/code/{employeeCode}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM') or #employeeCode == principal.employeeCode")
     @Operation(summary = "Get employee by code", description = "Retrieves employee details by employee code")
     public ResponseEntity<EmployeeResponse> getEmployeeByCode(
             @Parameter(description = "Employee Code", required = true)
@@ -94,6 +97,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/email/{email}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM') or #email == principal.email")
     @Operation(summary = "Get employee by email", description = "Retrieves employee details by email")
     public ResponseEntity<EmployeeResponse> getEmployeeByEmail(
             @Parameter(description = "Email address", required = true)
@@ -125,6 +129,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get all employees", description = "Retrieves all employees for the tenant with pagination")
     public ResponseEntity<Page<EmployeeSummaryResponse>> getAllEmployees(
             @AuthenticationPrincipal Employee currentEmployee,
@@ -142,6 +147,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get employees by status", description = "Retrieves employees filtered by status")
     public ResponseEntity<Page<EmployeeSummaryResponse>> getEmployeesByStatus(
             @Parameter(description = "Employee Status", required = true)
@@ -161,6 +167,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/department/name/{departmentName}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM')")
     @Operation(summary = "Get employees by department name", description = "Retrieves employees filtered by department name")
     public ResponseEntity<List<EmployeeSummaryResponse>> getEmployeesByDepartmentName(
             @Parameter(description = "Department name", required = true)
@@ -178,6 +185,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/managers/{managerId}/team")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL') or #managerId == principal.id")
     @Operation(summary = "Get team members", description = "Retrieves all employees reporting to a manager")
     public ResponseEntity<Page<EmployeeSummaryResponse>> getTeamMembers(
             @Parameter(description = "Manager ID", required = true)
@@ -197,6 +205,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/my-team")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get my team", description = "Retrieves all employees reporting to the current employee")
     public ResponseEntity<Page<EmployeeSummaryResponse>> getMyTeam(
             @AuthenticationPrincipal Employee currentEmployee,
@@ -214,6 +223,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/organization-chart")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get organization chart", description = "Retrieves the complete organization hierarchy")
     public ResponseEntity<List<EmployeeSummaryResponse>> getOrganizationChart(
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -229,6 +239,7 @@ public class EmployeeController {
     // =====================================================
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT') or #id == principal.id")
     @Operation(summary = "Update employee", description = "Updates an existing employee")
     public ResponseEntity<EmployeeResponse> updateEmployee(
             @Parameter(description = "Employee ID", required = true)
@@ -248,6 +259,7 @@ public class EmployeeController {
     // =====================================================
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_EDIT', 'ROLE_ASSIGN')")
     @Operation(summary = "Update employee status", description = "Updates the status of an employee")
     public ResponseEntity<Void> updateEmployeeStatus(
             @Parameter(description = "Employee ID", required = true)
@@ -271,6 +283,7 @@ public class EmployeeController {
     // =====================================================
 
     @PostMapping("/{id}/confirm")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_EDIT', 'ROLE_ASSIGN')")
     @Operation(summary = "Confirm employee", description = "Confirms an employee after probation period")
     public ResponseEntity<Void> confirmEmployee(
             @Parameter(description = "Employee ID", required = true)
@@ -289,6 +302,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Search employees", description = "Searches employees by name, email, code, etc.")
     public ResponseEntity<Page<EmployeeSummaryResponse>> searchEmployees(
             @Parameter(description = "Search term", required = true)
@@ -308,6 +322,7 @@ public class EmployeeController {
     // =====================================================
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('EMPLOYEE_DELETE')")
     @Operation(summary = "Delete employee", description = "Soft deletes an employee")
     public ResponseEntity<Void> deleteEmployee(
             @Parameter(description = "Employee ID", required = true)
@@ -326,6 +341,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/statistics/departments")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get department statistics", description = "Retrieves employee count by department")
     public ResponseEntity<List<DepartmentStat>> getDepartmentStatistics(
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -341,6 +357,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/upcoming/birthdays")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get upcoming birthdays", description = "Retrieves employees with birthdays in next N days")
     public ResponseEntity<List<EmployeeSummaryResponse>> getUpcomingBirthdays(
             @Parameter(description = "Number of days to look ahead", example = "30")
@@ -358,6 +375,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/upcoming/anniversaries")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get upcoming work anniversaries", description = "Retrieves employees with work anniversaries in next N days")
     public ResponseEntity<List<EmployeeSummaryResponse>> getUpcomingAnniversaries(
             @Parameter(description = "Number of days to look ahead", example = "30")
@@ -375,6 +393,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/search/assignment")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Search employees for manager assignment",
             description = "Searches employees by name, email, or code for assignment dropdown")
     public ResponseEntity<Page<EmployeeSearchResponse>> searchEmployeesForAssignment(
@@ -395,6 +414,7 @@ public class EmployeeController {
     // =====================================================
 
     @PutMapping("/by-code/{employeeCode}/manager")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT')")
     @Operation(summary = "Assign manager by employee code",
             description = "Assigns a manager to an employee using their employee codes")
     public ResponseEntity<EmployeeResponse> assignManagerByCode(
@@ -416,6 +436,7 @@ public class EmployeeController {
     // =====================================================
 
     @DeleteMapping("/by-code/{employeeCode}/manager")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT')")
     @Operation(summary = "Remove manager",
             description = "Removes the manager from an employee")
     public ResponseEntity<Void> removeManager(
@@ -435,6 +456,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/{managerId}/team/list")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL') or #managerId == principal.id")
     @Operation(summary = "Get team members list",
             description = "Retrieves all direct reports of a manager")
     public ResponseEntity<List<EmployeeSummaryResponse>> getTeamMembersList(
@@ -452,6 +474,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/{managerId}/subordinates")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL') or #managerId == principal.id")
     @Operation(summary = "Get all subordinates",
             description = "Retrieves all employees under a manager (complete hierarchy)")
     public ResponseEntity<List<EmployeeSummaryResponse>> getAllSubordinates(
@@ -469,6 +492,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/{employeeId}/manager-chain")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL') or #employeeId == principal.id")
     @Operation(summary = "Get manager chain",
             description = "Retrieves the complete reporting chain of an employee")
     public ResponseEntity<List<EmployeeSummaryResponse>> getManagerChain(
@@ -486,6 +510,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/{employeeId}/is-manager")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_TEAM', 'EMPLOYEE_VIEW_ALL') or #employeeId == principal.id")
     @Operation(summary = "Check if employee is manager",
             description = "Returns true if the employee has direct reports")
     public ResponseEntity<Boolean> isManager(
@@ -503,6 +528,7 @@ public class EmployeeController {
     // =====================================================
 
     @GetMapping("/no-manager")
+    @PreAuthorize("hasAuthority('EMPLOYEE_VIEW_ALL')")
     @Operation(summary = "Get employees with no manager",
             description = "Retrieves all employees who don't report to anyone")
     public ResponseEntity<List<EmployeeSummaryResponse>> getEmployeesWithNoManager(

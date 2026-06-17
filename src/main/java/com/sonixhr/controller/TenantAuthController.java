@@ -5,6 +5,7 @@ import com.sonixhr.dto.LoginRequest;
 import com.sonixhr.dto.LoginResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.repository.employee.EmployeeRepository;
+import com.sonixhr.repository.attendance.ShiftConfigurationRepository;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.security.TokenBlacklistService;
 import com.sonixhr.security.TokenPair;
@@ -42,22 +43,27 @@ public class TenantAuthController {
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final ShiftConfigurationRepository shiftConfigurationRepository;
 
     public TenantAuthController(
             @Qualifier("tenantAuthenticationManager") AuthenticationManager tenantAuthenticationManager,
             JwtService jwtService,
             EmployeeRepository employeeRepository,
             EmployeeService employeeService,
-            TokenBlacklistService tokenBlacklistService) {
+            TokenBlacklistService tokenBlacklistService,
+            ShiftConfigurationRepository shiftConfigurationRepository) {
         this.tenantAuthenticationManager = tenantAuthenticationManager;
         this.jwtService = jwtService;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.shiftConfigurationRepository = shiftConfigurationRepository;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType) {
         log.info("Login request for tenant user: {}", request.getEmail());
 
         try {
@@ -69,9 +75,17 @@ public class TenantAuthController {
 
             // Update last login details
             employee.setLastLoginAt(java.time.LocalDateTime.now());
+            if (employee.getShift() == null) {
+                shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(employee.getTenantId())
+                        .ifPresent(employee::setShift);
+            }
             employeeRepository.save(employee);
 
             TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
+
+            // Register active session & invalidate previous one of same clientType
+            String finalClientType = clientType != null ? clientType : "WEB";
+            tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
 
             log.info("Tenant user logged in successfully: {}", employee.getEmail());
 
@@ -118,7 +132,9 @@ public class TenantAuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<LoginResponse> refreshToken(@RequestParam String refreshToken) {
+    public ResponseEntity<LoginResponse> refreshToken(
+            @RequestParam String refreshToken,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType) {
         log.info("Token refresh request for tenant");
 
         try {
@@ -137,6 +153,10 @@ public class TenantAuthController {
                 }
 
                 TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
+
+                // Register active session & invalidate previous one of same clientType
+                String finalClientType = clientType != null ? clientType : "WEB";
+                tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
 
                 return ResponseEntity.ok(LoginResponse.builder()
                         .accessToken(tokenPair.getAccessToken())
@@ -158,7 +178,9 @@ public class TenantAuthController {
     }
 
     @PostMapping("/activate")
-    public ResponseEntity<Map<String, Object>> activateUser(@Valid @RequestBody ActivationRequest request) {
+    public ResponseEntity<Map<String, Object>> activateUser(
+            @Valid @RequestBody ActivationRequest request,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType) {
         log.info("Activating tenant user with token: {}", request.getToken());
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
@@ -172,6 +194,10 @@ public class TenantAuthController {
         );
 
         TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
+
+        // Register active session & invalidate previous one of same clientType
+        String finalClientType = clientType != null ? clientType : "WEB";
+        tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);

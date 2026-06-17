@@ -193,6 +193,17 @@ public class LeaveService {
         double totalUsed = 0.0;
         double totalAvailable = 0.0;
 
+        // Fetch used leave days grouped by type in a single query
+        List<Object[]> usedDaysRaw = leaveRepository.getUsedLeaveDaysByType(employeeId, year);
+        Map<LeaveType, Double> usedDaysMap = new HashMap<>();
+        if (usedDaysRaw != null) {
+            for (Object[] row : usedDaysRaw) {
+                if (row[0] instanceof LeaveType) {
+                    usedDaysMap.put((LeaveType) row[0], ((Number) row[1]).doubleValue());
+                }
+            }
+        }
+
         for (LeaveType leaveType : LeaveType.values()) {
             Object policyObj = leavePolicies.get(leaveType.name());
             boolean allowed = false;
@@ -218,7 +229,7 @@ public class LeaveService {
                 continue;
             }
 
-            double used = leaveRepository.getUsedLeaveDays(employeeId, leaveType, year);
+            double used = usedDaysMap.getOrDefault(leaveType, 0.0);
             double availableDays = getAvailableDaysForLeaveType(employee, leaveType, year, settings);
 
             if (!leaveType.hasLimit()) {
@@ -533,29 +544,11 @@ public class LeaveService {
         LeaveRequest leave = leaveRepository.findById(leaveId)
                 .orElseThrow(() -> new ResourceNotFoundException("Leave request not found"));
 
-        if (leave.getStatus() != LeaveStatus.PENDING) {
-            throw new BusinessException("Only pending leave requests can be approved");
-        }
-
         Employee approver = employeeRepository.findById(approverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Approver employee not found"));
 
-        if (!approver.getTenantId().equals(leave.getTenant().getId())) {
-            throw new BusinessException("Access denied: Approver belongs to a different tenant");
-        }
-
-        Employee requester = leave.getEmployee();
-        boolean isDirectManager = requester.getManager() != null && requester.getManager().getId().equals(approverId);
-        boolean hasApproveAny = approver.hasPermission("LEAVE_APPROVE_ANY");
-        boolean hasApproveDept = approver.hasPermission("LEAVE_APPROVE_DEPARTMENT") &&
-                requester.getDepartment() != null &&
-                approver.getDepartment() != null &&
-                requester.getDepartment().getId().equals(approver.getDepartment().getId());
-
-        if (!isDirectManager && !hasApproveAny && !hasApproveDept) {
-            throw new BusinessException("You are not authorized to approve this leave request");
-        }
-
+        validateApproverAuthority(leave, approver, "approve");
+        
         leave.setStatus(LeaveStatus.APPROVED);
         leave.setApprovedBy(approverId);
         leave.setApprovedByName(approverName);
@@ -603,28 +596,10 @@ public class LeaveService {
         LeaveRequest leave = leaveRepository.findById(leaveId)
                 .orElseThrow(() -> new ResourceNotFoundException("Leave request not found"));
 
-        if (leave.getStatus() != LeaveStatus.PENDING) {
-            throw new BusinessException("Only pending leave requests can be rejected");
-        }
-
         Employee rejector = employeeRepository.findById(rejectorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rejector employee not found"));
 
-        if (!rejector.getTenantId().equals(leave.getTenant().getId())) {
-            throw new BusinessException("Access denied: Rejector belongs to a different tenant");
-        }
-
-        Employee requester = leave.getEmployee();
-        boolean isDirectManager = requester.getManager() != null && requester.getManager().getId().equals(rejectorId);
-        boolean hasApproveAny = rejector.hasPermission("LEAVE_APPROVE_ANY");
-        boolean hasApproveDept = rejector.hasPermission("LEAVE_APPROVE_DEPARTMENT") &&
-                requester.getDepartment() != null &&
-                rejector.getDepartment() != null &&
-                requester.getDepartment().getId().equals(rejector.getDepartment().getId());
-
-        if (!isDirectManager && !hasApproveAny && !hasApproveDept) {
-            throw new BusinessException("You are not authorized to reject this leave request");
-        }
+        validateApproverAuthority(leave, rejector, "reject");
 
         leave.setStatus(LeaveStatus.REJECTED);
         leave.setRejectionReason(rejectionReason);
@@ -658,6 +633,33 @@ public class LeaveService {
         }
 
         return convertToResponse(saved);
+    }
+
+    private void validateApproverAuthority(LeaveRequest leave, Employee approver, String action) {
+        if (leave.getStatus() != LeaveStatus.PENDING) {
+            throw new BusinessException("Only pending leave requests can be " + (action.equals("approve") ? "approved" : "rejected"));
+        }
+
+        if (!approver.getTenantId().equals(leave.getTenant().getId())) {
+            throw new BusinessException("Access denied: Approver belongs to a different tenant");
+        }
+
+        Employee requester = leave.getEmployee();
+
+        if (requester.getId().equals(approver.getId())) {
+            throw new BusinessException("You cannot " + action + " your own leave request");
+        }
+
+        boolean isDirectManager = requester.getManager() != null && requester.getManager().getId().equals(approver.getId());
+        boolean hasApproveAny = approver.hasPermission("LEAVE_APPROVE_ANY");
+        boolean hasApproveDept = approver.hasPermission("LEAVE_APPROVE_DEPARTMENT") &&
+                requester.getDepartment() != null &&
+                approver.getDepartment() != null &&
+                requester.getDepartment().getId().equals(approver.getDepartment().getId());
+
+        if (!isDirectManager && !hasApproveAny && !hasApproveDept) {
+            throw new BusinessException("You are not authorized to " + action + " this leave request");
+        }
     }
 
     // =====================================================

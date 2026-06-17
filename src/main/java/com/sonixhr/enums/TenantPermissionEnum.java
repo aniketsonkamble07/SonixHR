@@ -40,6 +40,14 @@ public enum TenantPermissionEnum {
     ATTENDANCE_VIEW_ALL("View all attendance records", "Attendance Management", 5),
     ATTENDANCE_EDIT("Edit attendance records", "Attendance Management", 6),
     ATTENDANCE_EXPORT("Export attendance reports", "Attendance Management", 7),
+    SHIFT_CREATE("Create shift configurations", "Attendance Management", 8),
+    SHIFT_UPDATE("Update shift configurations", "Attendance Management", 9),
+    SHIFT_VIEW("View shift configurations", "Attendance Management", 10),
+    SHIFT_VIEW_ALL("View all shift configurations", "Attendance Management", 11),
+    SHIFT_ADMIN("Manage shifts", "Attendance Management", 12),
+    SHIFT_DELETE("Delete shift configurations", "Attendance Management", 13),
+    ATTENDANCE_MARK("Mark attendance", "Attendance Management", 14),
+    ATTENDANCE_VIEW("View attendance logs", "Attendance Management", 15),
 
     // =====================================================
     // DEPARTMENT MANAGEMENT

@@ -203,7 +203,7 @@ public class ActivationTokenService {
         if (tenant != null && !tenant.getIsActive()) {
             tenant.activate();
             tenantRepository.save(tenant);
-            log.info("Tenant activated: {}", tenant.getSubdomain());
+            log.info("Tenant activated: {}", tenant.getCompanyName());
         }
 
         // Delete used token
@@ -441,7 +441,7 @@ public class ActivationTokenService {
         if (tenant != null && !tenant.getIsActive()) {
             tenant.activate();
             tenantRepository.save(tenant);
-            log.info("Tenant activated: {}", tenant.getSubdomain());
+            log.info("Tenant activated: {}", tenant.getCompanyName());
         }
 
         // Invalidate the token

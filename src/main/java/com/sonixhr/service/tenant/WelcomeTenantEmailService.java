@@ -52,7 +52,7 @@ public class WelcomeTenantEmailService {
 
         try {
             String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=";
-            String tenantUrl = "https://" + tenant.getSubdomain() + ".sonixhr.com";
+            String tenantUrl = baseUrl;
             String trialEndDate = tenant.getTrialEndsAt() != null ?
                     tenant.getTrialEndsAt().format(DATE_FORMATTER) :
                     LocalDate.now().plusDays(14).format(DATE_FORMATTER);
@@ -127,7 +127,7 @@ public class WelcomeTenantEmailService {
 
     @Async
     public void sendTenantWelcomeEmail(String to, String adminName, String companyName,
-                                       String subdomain, String activationToken,
+                                       String activationToken,
                                        String planName, int trialDays) {
         if (!emailEnabled) {
             log.info("Email sending disabled. Would send tenant welcome email to: {}", to);
@@ -136,7 +136,7 @@ public class WelcomeTenantEmailService {
 
         // ✅ FIXED: Correct activation endpoint
         String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationToken;
-        String tenantUrl = "https://" + subdomain + ".sonixhr.com";
+        String tenantUrl = baseUrl;
         String trialEndDate = LocalDate.now().plusDays(trialDays).format(DATE_FORMATTER);
 
         String subject = "Welcome to SonixHR - Activate Your Account";

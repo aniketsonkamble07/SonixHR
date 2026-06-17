@@ -1,7 +1,6 @@
 package com.sonixhr.controller.tenant;
 
 import com.sonixhr.dto.SetPasswordRequest;
-import com.sonixhr.dto.tenant.SubdomainCheckResponse;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.exceptions.BusinessException;
@@ -16,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/public")
@@ -27,38 +28,23 @@ public class TenantRegistrationController {
     private final TenantRepository tenantRepository;
     private final EmployeeRepository employeeRepository;
 
-    /**
-     * Check if a subdomain is available for registration
-     */
-    @GetMapping("/check-subdomain")
-    public ResponseEntity<SubdomainCheckResponse> checkSubdomain(@RequestParam String subdomain) {
-        log.debug("Checking subdomain availability: {}", subdomain);
 
-        if (subdomain == null || subdomain.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(new SubdomainCheckResponse(false, "Subdomain is required"));
-        }
-
-        boolean available = !tenantRepository.existsBySubdomain(subdomain.toLowerCase());
-        String message = available ? "Subdomain is available" : "Subdomain already taken";
-
-        return ResponseEntity.ok(new SubdomainCheckResponse(available, message));
-    }
 
     /**
      * Check if an email is already registered
      */
     @GetMapping("/check-email")
-    public ResponseEntity<SubdomainCheckResponse> checkEmail(@RequestParam String email) {
+    public ResponseEntity<Map<String, Object>> checkEmail(@RequestParam String email) {
         log.debug("Checking email availability: {}", email);
 
         if (email == null || email.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(new SubdomainCheckResponse(false, "Email is required"));
+            return ResponseEntity.badRequest().body(Map.of("available", false, "message", "Email is required"));
         }
 
         boolean available = !employeeRepository.existsByEmail(email.toLowerCase());
         String message = available ? "Email is available" : "Email already registered";
 
-        return ResponseEntity.ok(new SubdomainCheckResponse(available, message));
+        return ResponseEntity.ok(Map.of("available", available, "message", message));
     }
 
     /**

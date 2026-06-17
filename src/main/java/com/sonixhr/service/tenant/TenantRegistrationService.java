@@ -23,6 +23,9 @@ import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
 import com.sonixhr.service.employee.EmployeeCodeGenerator;
+import com.sonixhr.service.attendance.ShiftConfigurationService;
+import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
+import com.sonixhr.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -52,6 +56,7 @@ public class TenantRegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;
     private final EmployeeCodeGenerator employeeCodeGenerator;
+    private final ShiftConfigurationService shiftConfigurationService;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -74,10 +79,9 @@ public class TenantRegistrationService {
 
         // 3. Generate unique identifiers
         String tenantCode = generateUniqueTenantCode(request.getCompanyName());
-        String subdomain = generateUniqueSubdomain(request.getSubdomain());
 
         // 4. Create Tenant
-        Tenant tenant = createTenant(request, tenantCode, subdomain, planType);
+        Tenant tenant = createTenant(request, tenantCode, planType);
         log.info("Tenant created with ID: {}", tenant.getId());
 
         // 5. Create Super Admin role for this tenant (with all global permissions)
@@ -105,7 +109,55 @@ public class TenantRegistrationService {
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
+        // 9. Create default General 9-5 shift configuration
+        createDefaultShift(tenant.getId(), superAdminEmployee.getId());
+
         return buildResponse(tenant, activationToken, superAdminEmployee);
+    }
+
+    private void createDefaultShift(Long tenantId, Long adminEmployeeId) {
+        log.info("Creating default shift configuration for tenant: {}", tenantId);
+
+        ShiftConfigurationRequestDTO shiftRequest = ShiftConfigurationRequestDTO.builder()
+                .shiftName("General 9-5")
+                .shiftCode("GENERAL_9-5")
+                .shiftDescription("Default general shift from 9:00 AM to 5:00 PM")
+                .startTime(LocalTime.of(9, 0))
+                .endTime(LocalTime.of(17, 0))
+                .breakDurationMinutes(60)
+                .minBreakMinutes(30)
+                .maxBreakMinutes(90)
+                .lateGraceMinutes(15)
+                .earlyExitGraceMinutes(15)
+                .checkinBufferBefore(60)
+                .checkoutBufferAfter(60)
+                .fullDayHours(8.0)
+                .halfDayHours(4.0)
+                .quarterDayHours(2.0)
+                .allowOvertime(true)
+                .overtimeMultiplier(1.5)
+                .overtimeThresholdMinutes(30)
+                .maxOvertimeHoursPerDay(4.0)
+                .weeklyOffs(List.of("SATURDAY", "SUNDAY"))
+                .alternateWeekOff(false)
+                .effectiveFrom(LocalDate.now())
+                .build();
+
+        Long previousTenantId = TenantContext.getCurrentTenant();
+        try {
+            TenantContext.setCurrentTenant(tenantId);
+            shiftConfigurationService.createShiftConfiguration(shiftRequest, tenantId, adminEmployeeId);
+            log.info("Default shift 'General 9-5' created successfully for tenant: {}", tenantId);
+        } catch (Exception e) {
+            log.error("Failed to create default shift for tenant: " + tenantId, e);
+            throw new BusinessException("Failed to initialize default shift configuration: " + e.getMessage());
+        } finally {
+            if (previousTenantId != null) {
+                TenantContext.setCurrentTenant(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     // =====================================================
@@ -115,9 +167,6 @@ public class TenantRegistrationService {
     private void validateUniqueness(TenantRegistrationRequest request) {
         if (tenantRepository.existsByCompanyName(request.getCompanyName())) {
             throw new DuplicateResourceException("Company name already exists: " + request.getCompanyName());
-        }
-        if (tenantRepository.existsBySubdomain(request.getSubdomain())) {
-            throw new DuplicateResourceException("Subdomain already taken: " + request.getSubdomain());
         }
         if (employeeRepository.existsByEmail(request.getAdminEmail())) {
             throw new DuplicateResourceException("Email already registered: " + request.getAdminEmail());
@@ -142,28 +191,13 @@ public class TenantRegistrationService {
         return code.toUpperCase();
     }
 
-    private String generateUniqueSubdomain(String requestedSubdomain) {
-        String subdomain = requestedSubdomain.toLowerCase().replaceAll("[^a-z0-9]", "");
-        if (subdomain.isEmpty()) {
-            subdomain = "company";
-        }
-        String original = subdomain;
-        int counter = 1;
-        while (tenantRepository.existsBySubdomain(subdomain)) {
-            subdomain = original + counter;
-            counter++;
-        }
-        return subdomain;
-    }
-
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
-                                String subdomain, PlanType planType) {
+                                PlanType planType) {
         UserStatus tenantStatus = bypassActivation ? UserStatus.ACTIVE : UserStatus.PENDING_VERIFICATION;
         boolean tenantActive = bypassActivation;
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
-                .subdomain(subdomain)
                 .planType(planType)
                 .maxEmployees(planType.getMaxEmployees())
                 .adminName(request.getAdminName())
@@ -301,7 +335,6 @@ public class TenantRegistrationService {
                 .tenantId(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())
-                .subdomain(tenant.getSubdomain())
                 .planType(tenant.getPlanType() != null ? tenant.getPlanType().getCode() : null)
                 .planStatus(tenant.getPlanStatus())
                 .trialEndsAt(tenant.getTrialEndsAt())

@@ -19,13 +19,11 @@ import java.util.Optional;
 public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     // ===== Basic Finders =====
-    Optional<Tenant> findBySubdomain(String subdomain);
     Optional<Tenant> findByTenantCode(String tenantCode);
     Optional<Tenant> findByCompanyName(String companyName);
     Optional<Tenant> findByCompanyNameIgnoreCase(String companyName);
 
     // ===== Existence Checks =====
-    boolean existsBySubdomain(String subdomain);
     boolean existsByTenantCode(String tenantCode);
     boolean existsByAdminEmail(String adminEmail);
     boolean existsByCompanyName(String companyName);
@@ -63,12 +61,10 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     @Query("SELECT t FROM Tenant t WHERE " +
             "(:companyName IS NULL OR LOWER(t.companyName) LIKE LOWER(CONCAT('%', :companyName, '%'))) AND " +
             "(:status IS NULL OR t.status = :status) AND " +
-            "(:isActive IS NULL OR t.isActive = :isActive) AND " +
-            "(:subdomain IS NULL OR LOWER(t.subdomain) LIKE LOWER(CONCAT('%', :subdomain, '%')))")
+            "(:isActive IS NULL OR t.isActive = :isActive)")
     Page<Tenant> searchTenants(@Param("companyName") String companyName,
                                @Param("status") String status,
                                @Param("isActive") Boolean isActive,
-                               @Param("subdomain") String subdomain,
                                Pageable pageable);
 
     // ===== Count Queries =====
@@ -115,12 +111,6 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
      */
     @Query("SELECT t FROM Tenant t WHERE t.adminEmail LIKE CONCAT('%@', :domain)")
     List<Tenant> findByAdminEmailDomain(@Param("domain") String domain);
-
-    /**
-     * Check if subdomain exists (case insensitive)
-     */
-    @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE LOWER(t.subdomain) = LOWER(:subdomain)")
-    boolean existsBySubdomainIgnoreCase(@Param("subdomain") String subdomain);
 
     /**
      * Check if tenant code exists (case insensitive)

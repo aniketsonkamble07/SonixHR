@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -61,6 +62,7 @@ public class DepartmentController {
     // =====================================================
 
     @PostMapping
+    @PreAuthorize("hasAuthority('DEPARTMENT_CREATE')")
     public ResponseEntity<DepartmentResponse> createDepartment(
             @Valid @RequestBody DepartmentRequest request) {
 
@@ -80,6 +82,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<DepartmentResponse> getDepartmentById(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -96,6 +99,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/{id}/stats")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<DepartmentResponse> getDepartmentWithStats(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -112,6 +116,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Page<DepartmentResponse>> getAllDepartments(
             @PageableDefault(size = 20) Pageable pageable) {
 
@@ -130,6 +135,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/list")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<List<DepartmentResponse>> getAllDepartmentsList() {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -143,6 +149,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/lookup")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<List<DepartmentLookupResponse>> getDepartmentLookup() {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -159,6 +166,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/bulk-stats")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<List<DepartmentResponse>> getAllDepartmentsWithBulkCounts() {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -175,6 +183,7 @@ public class DepartmentController {
     // =====================================================
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('DEPARTMENT_EDIT')")
     public ResponseEntity<DepartmentResponse> updateDepartment(
             @PathVariable Long id,
             @Valid @RequestBody DepartmentRequest request) {
@@ -194,6 +203,7 @@ public class DepartmentController {
     // =====================================================
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('DEPARTMENT_DELETE')")
     public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -210,6 +220,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/{id}/employee-count/total")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Long> getTotalEmployeeCount(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -222,6 +233,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{id}/employee-count/active")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Long> getActiveEmployeeCount(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -234,6 +246,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{id}/employee-count/probation")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Long> getOnProbationCount(@PathVariable Long id) {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -250,6 +263,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Map<String, Object>> getDepartmentDashboard() {
 
         Employee currentEmployee = getCurrentEmployee();
@@ -266,6 +280,7 @@ public class DepartmentController {
     // =====================================================
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyAuthority('DEPARTMENT_VIEW', 'EMPLOYEE_VIEW_ALL')")
     public ResponseEntity<Page<DepartmentResponse>> searchDepartments(
             @RequestParam String query,
             @PageableDefault(size = 20) Pageable pageable) {

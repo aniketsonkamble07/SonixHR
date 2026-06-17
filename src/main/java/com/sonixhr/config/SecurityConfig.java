@@ -57,7 +57,7 @@ public class SecurityConfig {
         this.permissionEvaluator = permissionEvaluator;
     }
 
-    //  ADD THIS MISSING PASSWORD ENCODER BEAN
+    // ADD THIS MISSING PASSWORD ENCODER BEAN
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
@@ -70,8 +70,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(unauthorizedHandler)
-                        .accessDeniedHandler(accessDeniedHandler)
-                )
+                        .accessDeniedHandler(accessDeniedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -84,16 +83,14 @@ public class SecurityConfig {
                                 "/api/tenant/register",
                                 "/api/employee/auth/activate",
                                 "/api/tenant/auth/login",
-                                "/api/tenant/verify-subdomain/**",
                                 "/api/forgot-password/**",
                                 "/api/employee/auth/activate",
                                 "/api/reset-password/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/api-docs/**"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+                                "/api-docs/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -137,8 +134,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
-                "http://localhost:8081"
-        ));
+                "http://localhost:8081"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization", "Content-Type", "X-Tenant-ID", "X-Request-ID", "Accept", "Origin"));

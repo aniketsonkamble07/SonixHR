@@ -30,7 +30,6 @@ public class TenantSeeder implements ApplicationRunner {
             try {
                 TenantRegistrationRequest request = TenantRegistrationRequest.builder()
                         .companyName("Acme Corporation")
-                        .subdomain("acme")
                         .adminEmail("admin@acme.com")
                         .adminName("Acme Admin")
                         .adminPhone("9876543210")

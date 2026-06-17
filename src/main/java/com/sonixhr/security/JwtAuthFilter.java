@@ -55,8 +55,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/health",
             "/actuator/health",
             "/api/tenants/register",
-            "/error"
-    );
+            "/error");
 
     private static final List<PathPattern> WILDCARD_PATTERNS = List.of(
             new PathPattern("/api/auth/", true),
@@ -67,10 +66,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             new PathPattern("/v3/api-docs/", true),
             new PathPattern("/api-docs/", true),
             new PathPattern("/api/debug/", true),
-            new PathPattern("/api/tenants/verify-subdomain/", true),
             new PathPattern("/api/forgot-password/", true),
-            new PathPattern("/api/reset-password/", true)
-    );
+            new PathPattern("/api/reset-password/", true));
 
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/**",
@@ -86,24 +83,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/health",
             "/actuator/health",
             "/api/tenants/register",
-            "/api/tenants/verify-subdomain/**",
             "/api/forgot-password/**",
             "/api/reset-password/**",
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/api-docs/**",
             "/error",
-            "/api/debug/**"
-    );
+            "/api/debug/**");
 
-    private record PathPattern(String prefix, boolean isWildcard) {}
+    private record PathPattern(String prefix, boolean isWildcard) {
+    }
 
     public JwtAuthFilter(
             JwtService jwtService,
             @Lazy TenantRLSService tenantRLSService,
             PlatformUserDetailsService platformUserDetailsService,
-            EmployeeDetailsService employeeDetailsService
-    ) {
+            EmployeeDetailsService employeeDetailsService) {
         this.jwtService = jwtService;
         this.tenantRLSService = tenantRLSService;
         this.platformUserDetailsService = platformUserDetailsService;
@@ -112,8 +107,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
+            HttpServletResponse response,
+            FilterChain filterChain)
             throws ServletException, IOException {
 
         long startTime = System.nanoTime();
@@ -234,8 +229,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Collection<? extends GrantedAuthority> authorities = extractAuthorities(claims, userDetails);
 
                     // Create authentication token
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userDetails,
+                            null, authorities);
 
                     // Store additional info in details
                     Map<String, Object> detailsMap = new HashMap<>();
@@ -320,7 +315,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      * Check if roles need to be reloaded based on version
      */
     private boolean needRolesReload(UserDetails userDetails, Integer tokenRolesVersion) {
-        if (tokenRolesVersion == null) return false;
+        if (tokenRolesVersion == null)
+            return false;
 
         if (userDetails instanceof com.sonixhr.entity.platform.PlatformUser) {
             com.sonixhr.entity.platform.PlatformUser user = (com.sonixhr.entity.platform.PlatformUser) userDetails;
@@ -360,7 +356,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return authorities;
     }
 
-
     /**
      * Clean up tenant context
      */
@@ -385,11 +380,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         userDetailsCache.remove(cacheKey);
 
         // Also clear auth cache entries for this user
-        authCache.entrySet().removeIf(entry ->
-                entry.getValue() != null &&
-                        entry.getValue().getPrincipal() instanceof UserDetails &&
-                        ((UserDetails) entry.getValue().getPrincipal()).getUsername().equals(username)
-        );
+        authCache.entrySet().removeIf(entry -> entry.getValue() != null &&
+                entry.getValue().getPrincipal() instanceof UserDetails &&
+                ((UserDetails) entry.getValue().getPrincipal()).getUsername().equals(username));
 
         log.debug("Invalidated cache for user: {} ({})", username, userType);
     }
@@ -411,8 +404,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return Map.of(
                 "userDetailsCacheSize", userDetailsCache.size(),
                 "authCacheSize", authCache.size(),
-                "publicPathCacheSize", publicPathCache.size()
-        );
+                "publicPathCacheSize", publicPathCache.size());
     }
 
     /**

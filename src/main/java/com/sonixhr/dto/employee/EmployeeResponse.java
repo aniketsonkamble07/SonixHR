@@ -47,6 +47,7 @@ public class EmployeeResponse {
     private DepartmentInfo department;
     private String position;
     private ManagerInfo manager;
+    private ShiftInfo shift;
     private EmploymentType employmentType;
     private String workLocation;
     private LocalDate hireDate;
@@ -128,6 +129,15 @@ public class EmployeeResponse {
         private Long id;
         private String name;
         private String code;
+    }
+    @Data
+    @Builder
+    public static class ShiftInfo {
+        private Long id;
+        private String shiftName;
+        private String shiftCode;
+        private String startTime;
+        private String endTime;
     }
 
 }

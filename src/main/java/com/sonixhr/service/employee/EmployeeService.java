@@ -17,6 +17,7 @@ import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
+import com.sonixhr.repository.attendance.ShiftConfigurationRepository;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
 import org.springframework.cache.annotation.CacheEvict;
@@ -51,6 +52,7 @@ public class EmployeeService {
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final TenantRoleRepository roleRepository;
+    private final ShiftConfigurationRepository shiftConfigurationRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -112,6 +114,10 @@ public class EmployeeService {
         employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
         employee.setStatus(EmployeeStatus.ACTIVE);
         employee.setActive(true);
+
+        // Fetch default shift for tenant and assign
+        shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(tenantId)
+                .ifPresent(employee::setShift);
 
         // Save employee (validation will pass because roles are set)
         Employee savedEmployee = employeeRepository.save(employee);
@@ -543,7 +549,7 @@ public class EmployeeService {
                 .build();
     }
 
-    private EmployeeResponse convertToResponse(Employee employee) {
+    public EmployeeResponse convertToResponse(Employee employee) {
         return EmployeeResponse.builder()
                 .id(employee.getId())
                 .tenantId(employee.getTenantId())
@@ -576,6 +582,14 @@ public class EmployeeService {
                                 employee.getManager().getDepartment().getName() : null)
                         .employeeCode(employee.getManager().getEmployeeCode())
                         .build() : null)
+                .shift(employee.getShift() != null ?
+                        EmployeeResponse.ShiftInfo.builder()
+                                .id(employee.getShift().getId())
+                                .shiftName(employee.getShift().getShiftName())
+                                .shiftCode(employee.getShift().getShiftCode())
+                                .startTime(employee.getShift().getStartTime() != null ? employee.getShift().getStartTime().toString() : null)
+                                .endTime(employee.getShift().getEndTime() != null ? employee.getShift().getEndTime().toString() : null)
+                                .build() : null)
                 .employmentType(employee.getEmploymentType())
                 .workLocation(employee.getWorkLocation())
                 .hireDate(employee.getHireDate())
@@ -615,7 +629,7 @@ public class EmployeeService {
                 .build();
     }
 
-    private EmployeeSummaryResponse convertToSummaryResponse(Employee employee) {
+    public EmployeeSummaryResponse convertToSummaryResponse(Employee employee) {
         if (employee == null) {
             return null;
         }
@@ -835,6 +849,12 @@ public class EmployeeService {
         employee.setMustChangePassword(true);
         employee.incrementRolesVersion();
         employee.clearAuthoritiesCache();
+
+        // Assign default shift if null
+        if (employee.getShift() == null) {
+            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(employee.getTenantId())
+                    .ifPresent(employee::setShift);
+        }
 
         Employee activated = employeeRepository.save(employee);
 

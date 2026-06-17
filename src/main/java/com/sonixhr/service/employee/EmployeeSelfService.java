@@ -2,6 +2,8 @@ package com.sonixhr.service.employee;
 
 import com.sonixhr.dto.employee.EmployeeProfileUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
+import com.sonixhr.dto.employee.EmployeeSummaryResponse;
+import com.sonixhr.dto.employee.MyOrgChartResponse;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.exceptions.BusinessException;
@@ -15,6 +17,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +29,7 @@ public class EmployeeSelfService {
 
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
+    private final EmployeeService employeeService;
 
     // =====================================================
     // Update employee profile (self-service)
@@ -60,7 +67,7 @@ public class EmployeeSelfService {
 
         Employee updatedEmployee = employeeRepository.save(employee);
         log.info("Profile updated successfully for employee: {}", email);
-        return convertToResponse(updatedEmployee);
+        return employeeService.convertToResponse(updatedEmployee);
     }
 
     private void updatePersonalInfo(Employee employee, EmployeeProfileUpdateRequest request) {
@@ -156,7 +163,7 @@ public class EmployeeSelfService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         String.format("Employee not found with email: %s", email)));
 
-        return convertToResponse(employee);
+        return employeeService.convertToResponse(employee);
     }
 
     // =====================================================
@@ -168,76 +175,47 @@ public class EmployeeSelfService {
     }
 
     // =====================================================
-    // PRIVATE HELPER METHOD - Convert Employee to Response
+    // Get personalized organization chart
     // =====================================================
+    public MyOrgChartResponse getMyOrgChart(Long tenantId, String email) {
+        log.info("Fetching personalized org chart for employee: {}", email);
 
-    private EmployeeResponse convertToResponse(Employee employee) {
-        return EmployeeResponse.builder()
-                .id(employee.getId())
-                .tenantId(employee.getTenantId())
-                .employeeCode(employee.getEmployeeCode())
-                .firstName(employee.getFirstName())
-                .lastName(employee.getLastName())
-                .fullName(employee.getFullName())
-                .initials(employee.getInitials())
-                .email(employee.getEmail())
-                .phone(employee.getPhone())
-                .dateOfBirth(employee.getDateOfBirth())
-                .gender(employee.getGender())
-                .maritalStatus(employee.getMaritalStatus())
-                .bloodGroup(employee.getBloodGroup())
-                .nationality(employee.getNationality())
-                .personalEmail(employee.getPersonalEmail())
-                .department(employee.getDepartment() != null ?
-                        EmployeeResponse.DepartmentInfo.builder()
-                                .id(employee.getDepartment().getId())
-                                .name(employee.getDepartment().getName())
-                                .code(employee.getDepartment().getCode())
-                                .build() : null)
-                .position(employee.getPosition())
-                .manager(employee.getManager() != null ? EmployeeResponse.ManagerInfo.builder()
-                        .id(employee.getManager().getId())
-                        .fullName(employee.getManager().getFullName())
-                        .email(employee.getManager().getEmail())
-                        .position(employee.getManager().getPosition())
-                        .department(employee.getManager().getDepartment() != null ?
-                                employee.getManager().getDepartment().getName() : null)
-                        .employeeCode(employee.getManager().getEmployeeCode())
-                        .build() : null)
-                .employmentType(employee.getEmploymentType())
-                .workLocation(employee.getWorkLocation())
-                .hireDate(employee.getHireDate())
-                .probationMonths(employee.getProbationMonths())
-                .confirmationDate(employee.getConfirmationDate())
-                .resignationDate(employee.getResignationDate())
-                .lastWorkingDate(employee.getLastWorkingDate())
-                .tenureInMonths(employee.getTenureInMonths())
-                .status(employee.getStatus())
-                .isActive(employee.isActive())
-                .address(employee.getAddress())
-                .city(employee.getCity())
-                .state(employee.getState())
-                .country(employee.getCountry())
-                .postalCode(employee.getPostalCode())
-                .permanentAddress(employee.getPermanentAddress())
-                .emergencyContactName(employee.getEmergencyContactName())
-                .emergencyContactPhone(employee.getEmergencyContactPhone())
-                .emergencyContactRelation(employee.getEmergencyContactRelation())
-                .emergencyContactEmail(employee.getEmergencyContactEmail())
-                .secondaryEmergencyName(employee.getSecondaryEmergencyName())
-                .secondaryEmergencyPhone(employee.getSecondaryEmergencyPhone())
-                .profilePictureUrl(employee.getProfilePictureUrl())
-                .bankDetails(employee.getBankDetails())
-                .documents(employee.getDocuments())
-                .certifications(employee.getCertifications())
-                .customFields(employee.getCustomFields())
-                .linkedinUrl(employee.getLinkedinUrl())
-                .githubUrl(employee.getGithubUrl())
-                .twitterUrl(employee.getTwitterUrl())
-                .createdAt(employee.getCreatedAt())
-                .updatedAt(employee.getUpdatedAt())
-                .createdBy(employee.getCreatedBy())
-                .updatedBy(employee.getUpdatedBy())
+        Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        // 1. Current Employee Summary
+        EmployeeSummaryResponse selfSummary = employeeService.convertToSummaryResponse(employee);
+
+        // 2. Manager Chain (Traverse up)
+        List<EmployeeSummaryResponse> managerChain = new ArrayList<>();
+        Employee currentManager = employee.getManager();
+        while (currentManager != null) {
+            managerChain.add(employeeService.convertToSummaryResponse(currentManager));
+            currentManager = currentManager.getManager();
+        }
+
+        // 3. Peers (Colleagues reporting to same manager, excluding self)
+        List<EmployeeSummaryResponse> peers = new ArrayList<>();
+        if (employee.getManager() != null) {
+            peers = employeeRepository.findByManagerIdAndTenantId(employee.getManager().getId(), tenantId)
+                    .stream()
+                    .filter(peer -> !peer.getId().equals(employee.getId()))
+                    .map(employeeService::convertToSummaryResponse)
+                    .collect(Collectors.toList());
+        }
+
+        // 4. Direct Reports
+        List<EmployeeSummaryResponse> directReports = employeeRepository.findByManagerIdAndTenantId(employee.getId(), tenantId)
+                .stream()
+                .map(employeeService::convertToSummaryResponse)
+                .collect(Collectors.toList());
+
+        return MyOrgChartResponse.builder()
+                .employee(selfSummary)
+                .managerChain(managerChain)
+                .peers(peers)
+                .directReports(directReports)
                 .build();
     }
+
 }
