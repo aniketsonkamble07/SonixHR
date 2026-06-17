@@ -102,12 +102,12 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // SEARCH QUERIES
     // =====================================================
 
-    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND " +
+    @Query("SELECT e FROM Employee e LEFT JOIN e.department d WHERE e.tenant.id = :tenantId AND " +
             "(LOWER(e.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(e.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(e.employeeCode) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            "LOWER(e.department.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "(d IS NOT NULL AND LOWER(d.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) OR " +
             "LOWER(e.position) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<Employee> searchEmployees(@Param("tenantId") Long tenantId,
                                    @Param("searchTerm") String searchTerm,

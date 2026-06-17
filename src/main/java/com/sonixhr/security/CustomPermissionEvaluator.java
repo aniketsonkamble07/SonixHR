@@ -8,11 +8,15 @@ import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
 
-@Component
+@Component("permissionEvaluator")
 @RequiredArgsConstructor
 public class CustomPermissionEvaluator implements PermissionEvaluator {
 
     private final PermissionService permissionService;
+
+    public boolean hasPermission(Authentication auth, String permission) {
+        return permissionService.hasPermission(auth, permission);
+    }
 
     @Override
     public boolean hasPermission(Authentication auth, Object targetDomainObject, Object permission) {
