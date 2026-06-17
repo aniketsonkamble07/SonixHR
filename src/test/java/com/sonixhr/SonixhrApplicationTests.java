@@ -52,15 +52,6 @@ class SonixhrApplicationTests {
 
 	@Test
 	void contextLoadsAndSeedsDefaultTenantAndShift() throws Exception {
-		// Print columns of employees table
-		java.util.List<String> columns = jdbcTemplate.queryForList(
-			"SELECT column_name FROM information_schema.columns WHERE table_name = 'employees'",
-			String.class
-		);
-		System.out.println("====================================================");
-		System.out.println("EMPLOYEES TABLE COLUMNS: " + columns);
-		System.out.println("====================================================");
-
 		// Clean up database for deterministic test within a committed transaction
 		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
 			try {

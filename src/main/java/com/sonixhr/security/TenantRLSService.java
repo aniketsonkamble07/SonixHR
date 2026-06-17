@@ -60,9 +60,13 @@ public class TenantRLSService {
 
         try {
             // Use parameterized query instead of string concatenation
-            jdbcTemplate.update(
+            jdbcTemplate.execute(
                     "SELECT set_config('app.current_tenant_id', ?, false)",
-                    tenantId.toString()
+                    (org.springframework.jdbc.core.PreparedStatementCallback<Object>) ps -> {
+                        ps.setString(1, tenantId.toString());
+                        ps.execute();
+                        return null;
+                    }
             );
             currentTenant.set(tenantId);
 
@@ -160,9 +164,13 @@ public class TenantRLSService {
         }
 
         try {
-            jdbcTemplate.update(
+            jdbcTemplate.execute(
                     "SELECT set_config('app.current_user_id', ?, false)",
-                    userId.toString()
+                    (org.springframework.jdbc.core.PreparedStatementCallback<Object>) ps -> {
+                        ps.setString(1, userId.toString());
+                        ps.execute();
+                        return null;
+                    }
             );
             currentUserId.set(userId);
 
@@ -181,9 +189,14 @@ public class TenantRLSService {
     public void setContext(Long tenantId, Long userId) {
         // Batch the updates if possible
         if (tenantId != null && userId != null) {
-            jdbcTemplate.update(
+            jdbcTemplate.execute(
                     "SELECT set_config('app.current_tenant_id', ?, false), set_config('app.current_user_id', ?, false)",
-                    tenantId.toString(), userId.toString()
+                    (org.springframework.jdbc.core.PreparedStatementCallback<Object>) ps -> {
+                        ps.setString(1, tenantId.toString());
+                        ps.setString(2, userId.toString());
+                        ps.execute();
+                        return null;
+                    }
             );
             currentTenant.set(tenantId);
             currentUserId.set(userId);
@@ -240,7 +253,7 @@ public class TenantRLSService {
     @Transactional
     public void clearCurrentTenantInDB() {
         try {
-            jdbcTemplate.update("SELECT set_config('app.current_tenant_id', NULL, false)");
+            jdbcTemplate.execute("SELECT set_config('app.current_tenant_id', NULL, false)");
             currentTenant.remove();
 
             if (log.isDebugEnabled()) {
@@ -257,7 +270,7 @@ public class TenantRLSService {
     @Transactional
     public void clearCurrentUserIdInDB() {
         try {
-            jdbcTemplate.update("SELECT set_config('app.current_user_id', NULL, false)");
+            jdbcTemplate.execute("SELECT set_config('app.current_user_id', NULL, false)");
             currentUserId.remove();
 
             if (log.isDebugEnabled()) {
@@ -275,7 +288,7 @@ public class TenantRLSService {
     public void clearAllContexts() {
         // Batch clear both in one call
         try {
-            jdbcTemplate.update("""
+            jdbcTemplate.execute("""
                 SELECT set_config('app.current_tenant_id', NULL, false),
                        set_config('app.current_user_id', NULL, false)
             """);
