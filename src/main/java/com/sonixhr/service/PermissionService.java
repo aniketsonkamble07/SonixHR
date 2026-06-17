@@ -154,7 +154,7 @@ public class PermissionService {
         }
 
         if (principal instanceof Employee) {
-            return ((Employee) principal).hasPermission("SUPER_ADMIN");
+            return ((Employee) principal).isSuperAdmin();
         }
 
         return false;

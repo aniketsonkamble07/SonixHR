@@ -70,13 +70,13 @@ public class TenantRoleSeeder implements ApplicationRunner {
         createSuperAdminRole(tenantId, allPermissions);
 
         // Create Admin role for this tenant
-        createAdminRole(tenantId, allPermissions);
+        // createAdminRole(tenantId, allPermissions);
 
         // Create Employee role for this tenant
-        createEmployeeRole(tenantId, allPermissions);
+        // createEmployeeRole(tenantId, allPermissions);
 
         // Create Manager role for this tenant
-        createManagerRole(tenantId, allPermissions);
+        // createManagerRole(tenantId, allPermissions);
     }
 
     private void createSuperAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -90,7 +90,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .tenantId(tenantId)
                 .name("Super Admin")
                 .description("Super Administrator with full access to all tenant features")
-                .isDefault(false)
+                .isDefault(true)
                 .active(true)
                 .priority(100)
                 .category("ADMINISTRATION")
