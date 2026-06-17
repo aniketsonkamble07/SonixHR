@@ -1,5 +1,6 @@
 package com.sonixhr.service.leave;
 
+import com.sonixhr.dto.leave.LeavePolicyDTO;
 import com.sonixhr.dto.leave.LeaveRequestDTO;
 import com.sonixhr.dto.leave.LeaveResponseDTO;
 import com.sonixhr.entity.employee.Employee;
@@ -124,7 +125,7 @@ class LeaveServiceTest {
                 "genderEligibility", "MALE"
         ));
 
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
@@ -158,7 +159,8 @@ class LeaveServiceTest {
                 "carryForward", false,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
@@ -185,7 +187,8 @@ class LeaveServiceTest {
                 "carryForward", false,
                 "genderEligibility", "FEMALE"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
@@ -213,7 +216,8 @@ class LeaveServiceTest {
                 "minimumServiceMonths", 6,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         // Employee with 2 months service (hired 2 months ago)
         mockEmployee.setHireDate(LocalDate.now().minusMonths(2));
@@ -244,7 +248,8 @@ class LeaveServiceTest {
                 "minimumServiceMonths", 6,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
@@ -284,7 +289,8 @@ class LeaveServiceTest {
                 "minimumServiceMonths", 0,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         // Employee was hired 2 years ago (so eligible for prev year calculations)
         mockEmployee.setHireDate(LocalDate.now().minusYears(2));
@@ -351,7 +357,8 @@ class LeaveServiceTest {
                 "carryForward", false,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         when(employeeRepository.findById(101L)).thenReturn(Optional.of(mockEmployee));
         when(leaveConfigService.getTenantSettings(1L)).thenReturn(mockSettings);
@@ -390,7 +397,8 @@ class LeaveServiceTest {
                 "minimumServiceMonths", 0,
                 "genderEligibility", "ALL"
         ));
-        mockSettings.setLeavePolicies(policies);
+        mockSettings.setLeavePolicies(convertPolicies(policies));
+
 
         // Employee hired in currentYear - 3
         int currentYear = LocalDate.now().getYear();
@@ -707,6 +715,48 @@ class LeaveServiceTest {
                 leaveService.approveLeave(999L, 202L, "Jane Manager")
         );
         assertTrue(ex.getMessage().contains("You are not authorized to approve this leave request"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, LeavePolicyDTO> convertPolicies(Map<String, Object> rawPolicies) {
+        Map<String, LeavePolicyDTO> typedPolicies = new HashMap<>();
+        for (Map.Entry<String, Object> entry : rawPolicies.entrySet()) {
+            if (entry.getValue() instanceof Map) {
+                Map<?, ?> map = (Map<?, ?>) entry.getValue();
+                
+                Integer daysPerYear = null;
+                Object dpy = map.get("daysPerYear");
+                if (dpy instanceof Number) {
+                    daysPerYear = ((Number) dpy).intValue();
+                }
+
+                Integer maxCarryForwardDays = null;
+                Object mcf = map.get("maxCarryForwardDays");
+                if (mcf instanceof Number) {
+                    maxCarryForwardDays = ((Number) mcf).intValue();
+                }
+
+                Integer minimumServiceMonths = null;
+                Object msm = map.get("minimumServiceMonths");
+                if (msm instanceof Number) {
+                    minimumServiceMonths = ((Number) msm).intValue();
+                }
+
+                LeavePolicyDTO dto = LeavePolicyDTO.builder()
+                        .allowed((Boolean) map.get("allowed"))
+                        .daysPerYear(daysPerYear)
+                        .carryForward((Boolean) map.get("carryForward"))
+                        .maxCarryForwardDays(maxCarryForwardDays)
+                        .minimumServiceMonths(minimumServiceMonths)
+                        .genderEligibility((String) map.get("genderEligibility"))
+                        .probationPeriodAllowed((Boolean) map.get("probationPeriodAllowed"))
+                        .roleEligibility((List<String>) map.get("roleEligibility"))
+                        .prorated((Boolean) map.get("prorated"))
+                        .build();
+                typedPolicies.put(entry.getKey(), dto);
+            }
+        }
+        return typedPolicies;
     }
 }
 

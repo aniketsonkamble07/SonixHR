@@ -59,61 +59,37 @@ public class LeaveConfigurationService {
             settings.setLeavePolicies(dto.getLeavePolicies());
             
             // Sync legacy fields for compatibility
-            Object casualPolicy = dto.getLeavePolicies().get("CASUAL");
-            if (casualPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) casualPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setCasualLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO casualPolicy = dto.getLeavePolicies().get("CASUAL");
+            if (casualPolicy != null && casualPolicy.getDaysPerYear() != null) {
+                settings.setCasualLeavePerYear(casualPolicy.getDaysPerYear());
             }
-            Object sickPolicy = dto.getLeavePolicies().get("SICK");
-            if (sickPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) sickPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setSickLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO sickPolicy = dto.getLeavePolicies().get("SICK");
+            if (sickPolicy != null && sickPolicy.getDaysPerYear() != null) {
+                settings.setSickLeavePerYear(sickPolicy.getDaysPerYear());
             }
-            Object earnedPolicy = dto.getLeavePolicies().get("EARNED");
-            if (earnedPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) earnedPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setEarnedLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO earnedPolicy = dto.getLeavePolicies().get("EARNED");
+            if (earnedPolicy != null && earnedPolicy.getDaysPerYear() != null) {
+                settings.setEarnedLeavePerYear(earnedPolicy.getDaysPerYear());
             }
-            Object emergencyPolicy = dto.getLeavePolicies().get("EMERGENCY");
-            if (emergencyPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) emergencyPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setEmergencyLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO emergencyPolicy = dto.getLeavePolicies().get("EMERGENCY");
+            if (emergencyPolicy != null && emergencyPolicy.getDaysPerYear() != null) {
+                settings.setEmergencyLeavePerYear(emergencyPolicy.getDaysPerYear());
             }
-            Object maternityPolicy = dto.getLeavePolicies().get("MATERNITY");
-            if (maternityPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) maternityPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setMaternityLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO maternityPolicy = dto.getLeavePolicies().get("MATERNITY");
+            if (maternityPolicy != null && maternityPolicy.getDaysPerYear() != null) {
+                settings.setMaternityLeavePerYear(maternityPolicy.getDaysPerYear());
             }
-            Object paternityPolicy = dto.getLeavePolicies().get("PATERNITY");
-            if (paternityPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) paternityPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setPaternityLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO paternityPolicy = dto.getLeavePolicies().get("PATERNITY");
+            if (paternityPolicy != null && paternityPolicy.getDaysPerYear() != null) {
+                settings.setPaternityLeavePerYear(paternityPolicy.getDaysPerYear());
             }
-            Object unpaidPolicy = dto.getLeavePolicies().get("UNPAID");
-            if (unpaidPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) unpaidPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setUnpaidLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO unpaidPolicy = dto.getLeavePolicies().get("UNPAID");
+            if (unpaidPolicy != null && unpaidPolicy.getDaysPerYear() != null) {
+                settings.setUnpaidLeavePerYear(unpaidPolicy.getDaysPerYear());
             }
-            Object compensatoryPolicy = dto.getLeavePolicies().get("COMPENSATORY");
-            if (compensatoryPolicy instanceof Map) {
-                Object days = ((Map<?, ?>) compensatoryPolicy).get("daysPerYear");
-                if (days instanceof Number) {
-                    settings.setCompensatoryLeavePerYear(((Number) days).intValue());
-                }
+            com.sonixhr.dto.leave.LeavePolicyDTO compensatoryPolicy = dto.getLeavePolicies().get("COMPENSATORY");
+            if (compensatoryPolicy != null && compensatoryPolicy.getDaysPerYear() != null) {
+                settings.setCompensatoryLeavePerYear(compensatoryPolicy.getDaysPerYear());
             }
         }
         if (dto.getWeekendConfig() != null) settings.setWeekendConfig(dto.getWeekendConfig());
@@ -287,7 +263,7 @@ public class LeaveConfigurationService {
     /**
      * Get all leave policies map for a tenant.
      */
-    public Map<String, Object> getLeavePolicies(Long tenantId) {
+    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> getLeavePolicies(Long tenantId) {
         TenantLeaveSettings settings = getTenantSettings(tenantId);
         return settings.getLeavePolicies();
     }
@@ -296,9 +272,9 @@ public class LeaveConfigurationService {
      * Update/insert a policy configuration for a specific leave type.
      */
     @Transactional
-    public Map<String, Object> updateLeavePolicy(Long tenantId, String leaveTypeStr, Map<String, Object> policyUpdate) {
+    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updateLeavePolicy(Long tenantId, String leaveTypeStr, com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate) {
         TenantLeaveSettings settings = getTenantSettings(tenantId);
-        Map<String, Object> policies = settings.getLeavePolicies();
+        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> policies = settings.getLeavePolicies();
         if (policies == null) {
             policies = TenantLeaveSettings.createDefaultPolicies();
         }
@@ -308,18 +284,17 @@ public class LeaveConfigurationService {
         settings.setLeavePolicies(policies);
 
         // Sync legacy daysPerYear field if updated
-        Object days = policyUpdate.get("daysPerYear");
-        if (days instanceof Number) {
-            int daysInt = ((Number) days).intValue();
+        Integer days = policyUpdate.getDaysPerYear();
+        if (days != null) {
             switch (leaveTypeStr.toUpperCase()) {
-                case "CASUAL": settings.setCasualLeavePerYear(daysInt); break;
-                case "SICK": settings.setSickLeavePerYear(daysInt); break;
-                case "EARNED": settings.setEarnedLeavePerYear(daysInt); break;
-                case "EMERGENCY": settings.setEmergencyLeavePerYear(daysInt); break;
-                case "MATERNITY": settings.setMaternityLeavePerYear(daysInt); break;
-                case "PATERNITY": settings.setPaternityLeavePerYear(daysInt); break;
-                case "UNPAID": settings.setUnpaidLeavePerYear(daysInt); break;
-                case "COMPENSATORY": settings.setCompensatoryLeavePerYear(daysInt); break;
+                case "CASUAL": settings.setCasualLeavePerYear(days); break;
+                case "SICK": settings.setSickLeavePerYear(days); break;
+                case "EARNED": settings.setEarnedLeavePerYear(days); break;
+                case "EMERGENCY": settings.setEmergencyLeavePerYear(days); break;
+                case "MATERNITY": settings.setMaternityLeavePerYear(days); break;
+                case "PATERNITY": settings.setPaternityLeavePerYear(days); break;
+                case "UNPAID": settings.setUnpaidLeavePerYear(days); break;
+                case "COMPENSATORY": settings.setCompensatoryLeavePerYear(days); break;
             }
         }
 

@@ -13,7 +13,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class LeaveSettingsDTO {
 
-    private Map<String, Object> leavePolicies;
+    private java.util.Map<String, LeavePolicyDTO> leavePolicies;
 
     private Boolean policiesConfigured;
 

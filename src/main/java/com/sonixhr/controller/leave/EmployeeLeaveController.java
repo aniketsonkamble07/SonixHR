@@ -57,4 +57,14 @@ public class EmployeeLeaveController {
         LeaveResponseDTO response = leaveService.cancelLeave(id, currentEmployee.getId(), cancellationReason);
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<LeaveResponseDTO> updateLeave(
+            @PathVariable Long id,
+            @Valid @RequestBody LeaveRequestDTO request,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to update leave request: {} by employee: {}", id, currentEmployee.getId());
+        LeaveResponseDTO response = leaveService.updateLeaveRequest(id, currentEmployee.getId(), request, currentEmployee);
+        return ResponseEntity.ok(response);
+    }
 }

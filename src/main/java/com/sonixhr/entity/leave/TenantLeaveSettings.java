@@ -29,90 +29,114 @@ public class TenantLeaveSettings {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "leave_policies", columnDefinition = "jsonb")
     @Builder.Default
-    private Map<String, Object> leavePolicies = createDefaultPolicies();
+    private Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = createDefaultPolicies();
 
-    public static Map<String, Object> createDefaultPolicies() {
-        Map<String, Object> policies = new HashMap<>();
+    public static Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> createDefaultPolicies() {
+        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> policies = new HashMap<>();
         
         // CASUAL
-        policies.put("CASUAL", Map.of(
-                "allowed", true,
-                "daysPerYear", 12,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("CASUAL", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(12)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
         
         // SICK
-        policies.put("SICK", Map.of(
-                "allowed", true,
-                "daysPerYear", 12,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("SICK", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(12)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
         
         // EARNED
-        policies.put("EARNED", Map.of(
-                "allowed", true,
-                "daysPerYear", 15,
-                "carryForward", true,
-                "maxCarryForwardDays", 30,
-                "minimumServiceMonths", 6,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("EARNED", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(15)
+                .carryForward(true)
+                .maxCarryForwardDays(30)
+                .minimumServiceMonths(6)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(false)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(true)
+                .build());
 
         // EMERGENCY
-        policies.put("EMERGENCY", Map.of(
-                "allowed", true,
-                "daysPerYear", 3,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("EMERGENCY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(3)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
 
         // MATERNITY
-        policies.put("MATERNITY", Map.of(
-                "allowed", true,
-                "daysPerYear", 84,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "FEMALE"
-        ));
+        policies.put("MATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(84)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("FEMALE")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
 
         // PATERNITY
-        policies.put("PATERNITY", Map.of(
-                "allowed", true,
-                "daysPerYear", 5,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "MALE"
-        ));
+        policies.put("PATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(5)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("MALE")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
 
         // UNPAID
-        policies.put("UNPAID", Map.of(
-                "allowed", true,
-                "daysPerYear", 0,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("UNPAID", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(0)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
 
         // COMPENSATORY
-        policies.put("COMPENSATORY", Map.of(
-                "allowed", true,
-                "daysPerYear", 0,
-                "carryForward", false,
-                "maxCarryForwardDays", 0,
-                "minimumServiceMonths", 0,
-                "genderEligibility", "ALL"
-        ));
+        policies.put("COMPENSATORY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(0)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .roleEligibility(java.util.Collections.emptyList())
+                .prorated(false)
+                .build());
         
         return policies;
     }

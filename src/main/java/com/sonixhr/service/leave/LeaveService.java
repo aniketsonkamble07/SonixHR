@@ -185,7 +185,7 @@ public class LeaveService {
         int year = LocalDate.now().getYear();
         Map<String, Object> balance = new LinkedHashMap<>();
 
-        Map<String, Object> leavePolicies = settings.getLeavePolicies();
+        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = settings.getLeavePolicies();
         if (leavePolicies == null) {
             leavePolicies = TenantLeaveSettings.createDefaultPolicies();
         }
@@ -205,17 +205,16 @@ public class LeaveService {
         }
 
         for (LeaveType leaveType : LeaveType.values()) {
-            Object policyObj = leavePolicies.get(leaveType.name());
+            com.sonixhr.dto.leave.LeavePolicyDTO policy = leavePolicies.get(leaveType.name());
             boolean allowed = false;
 
-            if (policyObj instanceof Map) {
-                Map<?, ?> policy = (Map<?, ?>) policyObj;
-                allowed = Boolean.TRUE.equals(policy.get("allowed"));
+            if (policy != null) {
+                allowed = Boolean.TRUE.equals(policy.getAllowed());
 
                 // Gender eligibility filter for the balance screen
-                Object genderEligibilityObj = policy.get("genderEligibility");
-                if (genderEligibilityObj != null) {
-                    String eligibility = genderEligibilityObj.toString().trim().toUpperCase();
+                String eligibility = policy.getGenderEligibility();
+                if (eligibility != null) {
+                    eligibility = eligibility.trim().toUpperCase();
                     if (!"ALL".equals(eligibility)) {
                         com.sonixhr.enums.Gender empGender = employee.getGender();
                         if (empGender == null || !empGender.name().equals(eligibility)) {
@@ -299,24 +298,22 @@ public class LeaveService {
         }
 
         // Policy validation
-        Map<String, Object> leavePolicies = settings.getLeavePolicies();
+        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = settings.getLeavePolicies();
         if (leavePolicies == null) {
             leavePolicies = TenantLeaveSettings.createDefaultPolicies();
         }
 
-        Object policyObj = leavePolicies.get(request.getLeaveType().name());
-        if (policyObj instanceof Map) {
-            Map<?, ?> policy = (Map<?, ?>) policyObj;
-
+        com.sonixhr.dto.leave.LeavePolicyDTO policy = leavePolicies.get(request.getLeaveType().name());
+        if (policy != null) {
             // 1. Allowed Check
-            if (!Boolean.TRUE.equals(policy.get("allowed"))) {
+            if (!Boolean.TRUE.equals(policy.getAllowed())) {
                 throw new BusinessException(request.getLeaveType().getDisplayName() + " is not enabled for this tenant");
             }
 
             // 2. Gender Eligibility Check
-            Object genderEligibilityObj = policy.get("genderEligibility");
-            if (genderEligibilityObj != null) {
-                String eligibility = genderEligibilityObj.toString().trim().toUpperCase();
+            String eligibility = policy.getGenderEligibility();
+            if (eligibility != null) {
+                eligibility = eligibility.trim().toUpperCase();
                 if (!"ALL".equals(eligibility)) {
                     com.sonixhr.enums.Gender empGender = employee.getGender();
                     if (empGender == null || !empGender.name().equals(eligibility)) {
@@ -326,9 +323,8 @@ public class LeaveService {
             }
 
             // 3. Minimum Service Period Check
-            Object minServiceObj = policy.get("minimumServiceMonths");
-            if (minServiceObj instanceof Number) {
-                int minServiceMonths = ((Number) minServiceObj).intValue();
+            Integer minServiceMonths = policy.getMinimumServiceMonths();
+            if (minServiceMonths != null) {
                 long serviceMonths = employee.getHireDate() != null 
                         ? ChronoUnit.MONTHS.between(employee.getHireDate(), LocalDate.now()) 
                         : 0;
@@ -339,7 +335,7 @@ public class LeaveService {
             }
 
             // 4. Probation Period Eligibility Check
-            Object probationAllowedObj = policy.get("probationPeriodAllowed");
+            Boolean probationAllowedObj = policy.getProbationPeriodAllowed();
             if (probationAllowedObj != null && Boolean.FALSE.equals(probationAllowedObj)) {
                 if (employee.getStatus() != null && employee.getStatus().isOnProbation()) {
                     throw new BusinessException(String.format("Employee is not eligible for %s during probation period", request.getLeaveType().getDisplayName()));
@@ -347,16 +343,13 @@ public class LeaveService {
             }
 
             // 5. Role Eligibility Check
-            Object roleEligibilityObj = policy.get("roleEligibility");
-            if (roleEligibilityObj instanceof java.util.Collection) {
-                java.util.Collection<?> eligibleRoles = (java.util.Collection<?>) roleEligibilityObj;
-                if (!eligibleRoles.isEmpty()) {
-                    boolean hasEligibleRole = employee.getRoles().stream()
-                            .anyMatch(r -> eligibleRoles.contains(r.getName()));
-                    if (!hasEligibleRole) {
-                        throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
-                                request.getLeaveType().getDisplayName(), eligibleRoles));
-                    }
+            java.util.List<String> eligibleRoles = policy.getRoleEligibility();
+            if (eligibleRoles != null && !eligibleRoles.isEmpty()) {
+                boolean hasEligibleRole = employee.getRoles().stream()
+                        .anyMatch(r -> eligibleRoles.contains(r.getName()));
+                if (!hasEligibleRole) {
+                    throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
+                            request.getLeaveType().getDisplayName(), eligibleRoles));
                 }
             }
         } else {
@@ -491,15 +484,14 @@ public class LeaveService {
         boolean foundPolicy = false;
 
         if (settings != null && settings.getLeavePolicies() != null && settings.getLeavePolicies().containsKey(leaveType.name())) {
-            Object policyObj = settings.getLeavePolicies().get(leaveType.name());
-            if (policyObj instanceof Map) {
-                Map<?, ?> policy = (Map<?, ?>) policyObj;
-                Object days = policy.get("daysPerYear");
-                if (days instanceof Number) {
-                    baseDays = ((Number) days).doubleValue();
+            com.sonixhr.dto.leave.LeavePolicyDTO policy = settings.getLeavePolicies().get(leaveType.name());
+            if (policy != null) {
+                Integer days = policy.getDaysPerYear();
+                if (days != null) {
+                    baseDays = days.doubleValue();
                 }
                 // Accrual Pro-rata Check
-                Object proratedObj = policy.get("prorated");
+                Boolean proratedObj = policy.getProrated();
                 if (proratedObj != null && Boolean.TRUE.equals(proratedObj)) {
                     int currentYear = LocalDate.now().getYear();
                     if (year == currentYear) {
@@ -509,10 +501,10 @@ public class LeaveService {
                         baseDays = 0.0;
                     }
                 }
-                carryForward = Boolean.TRUE.equals(policy.get("carryForward"));
-                Object maxCf = policy.get("maxCarryForwardDays");
-                if (maxCf instanceof Number) {
-                    maxCarryForwardDays = ((Number) maxCf).doubleValue();
+                carryForward = Boolean.TRUE.equals(policy.getCarryForward());
+                Integer maxCf = policy.getMaxCarryForwardDays();
+                if (maxCf != null) {
+                    maxCarryForwardDays = maxCf.doubleValue();
                 }
                 foundPolicy = true;
             }
@@ -736,6 +728,159 @@ public class LeaveService {
         }
         log.info("Removed attendance records for cancelled leave from {} to {}",
                 leave.getStartDate(), leave.getEndDate());
+    }
+
+    // =====================================================
+    // UPDATE LEAVE REQUEST
+    // =====================================================
+
+    @Transactional
+    public LeaveResponseDTO updateLeaveRequest(Long leaveId, Long employeeId, LeaveRequestDTO request, Employee currentUser) {
+        log.info("Updating leave request: {} by employee: {}", leaveId, employeeId);
+
+        LeaveRequest leave = leaveRepository.findById(leaveId)
+                .orElseThrow(() -> new ResourceNotFoundException("Leave request not found"));
+
+        if (!leave.getEmployee().getId().equals(employeeId)) {
+            throw new BusinessException("You can only update your own leave requests");
+        }
+
+        if (leave.getStatus() != LeaveStatus.PENDING) {
+            throw new BusinessException("Only pending leave requests can be updated");
+        }
+
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(leave.getTenant().getId());
+
+        // Policy validation
+        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = settings.getLeavePolicies();
+        if (leavePolicies == null) {
+            leavePolicies = TenantLeaveSettings.createDefaultPolicies();
+        }
+
+        com.sonixhr.dto.leave.LeavePolicyDTO policy = leavePolicies.get(request.getLeaveType().name());
+        if (policy != null) {
+            // 1. Allowed Check
+            if (!Boolean.TRUE.equals(policy.getAllowed())) {
+                throw new BusinessException(request.getLeaveType().getDisplayName() + " is not enabled for this tenant");
+            }
+
+            // 2. Gender Eligibility Check
+            String eligibility = policy.getGenderEligibility();
+            if (eligibility != null) {
+                eligibility = eligibility.trim().toUpperCase();
+                if (!"ALL".equals(eligibility)) {
+                    com.sonixhr.enums.Gender empGender = leave.getEmployee().getGender();
+                    if (empGender == null || !empGender.name().equals(eligibility)) {
+                        throw new BusinessException(String.format("Employee is not eligible for %s based on gender", request.getLeaveType().getDisplayName()));
+                    }
+                }
+            }
+
+            // 3. Minimum Service Period Check
+            Integer minServiceMonths = policy.getMinimumServiceMonths();
+            if (minServiceMonths != null) {
+                long serviceMonths = leave.getEmployee().getHireDate() != null 
+                        ? ChronoUnit.MONTHS.between(leave.getEmployee().getHireDate(), LocalDate.now()) 
+                        : 0;
+                if (serviceMonths < minServiceMonths) {
+                    throw new BusinessException(String.format("Employee does not meet the minimum service requirement of %d months for %s. Current service: %d months", 
+                            minServiceMonths, request.getLeaveType().getDisplayName(), serviceMonths));
+                }
+            }
+
+            // 4. Probation Period Eligibility Check
+            Boolean probationAllowedObj = policy.getProbationPeriodAllowed();
+            if (probationAllowedObj != null && Boolean.FALSE.equals(probationAllowedObj)) {
+                if (leave.getEmployee().getStatus() != null && leave.getEmployee().getStatus().isOnProbation()) {
+                    throw new BusinessException(String.format("Employee is not eligible for %s during probation period", request.getLeaveType().getDisplayName()));
+                }
+            }
+
+            // 5. Role Eligibility Check
+            java.util.List<String> eligibleRoles = policy.getRoleEligibility();
+            if (eligibleRoles != null && !eligibleRoles.isEmpty()) {
+                boolean hasEligibleRole = leave.getEmployee().getRoles().stream()
+                        .anyMatch(r -> eligibleRoles.contains(r.getName()));
+                if (!hasEligibleRole) {
+                    throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
+                            request.getLeaveType().getDisplayName(), eligibleRoles));
+                }
+            }
+        } else {
+            throw new BusinessException(request.getLeaveType().getDisplayName() + " is not configured for this tenant");
+        }
+
+        // Validate dates
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new BusinessException("Start date cannot be after end date");
+        }
+
+        if (request.getStartDate().isBefore(LocalDate.now())) {
+            boolean isRetroactiveAllowed = request.getLeaveType() == LeaveType.SICK 
+                    || request.getLeaveType() == LeaveType.EMERGENCY
+                    || currentUser.isManager()
+                    || currentUser.isSuperAdmin();
+            
+            if (!isRetroactiveAllowed) {
+                if (request.getStartDate().isBefore(LocalDate.now().minusDays(30))) {
+                    throw new BusinessException("Cannot request leave older than 30 days in the past");
+                }
+            }
+        }
+
+        // Calculate total leave days based on tenant settings
+        double totalDays = calculateTotalLeaveDays(leave.getEmployee(),
+                request.getStartDate(), request.getEndDate(), request.getLeaveType(), settings);
+
+        if (totalDays <= 0) {
+            throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
+        }
+
+        // Check maximum consecutive leave days
+        if (settings.getMaxConsecutiveLeaveDays() != null && totalDays > settings.getMaxConsecutiveLeaveDays()) {
+            throw new BusinessException("Cannot request more than " + settings.getMaxConsecutiveLeaveDays() +
+                    " consecutive leave days");
+        }
+
+        // Check leave balance (skip for unpaid/unlimited leaves)
+        if (request.getLeaveType().hasLimit()) {
+            checkLeaveBalanceWithSettings(leave.getEmployee(), leave.getTenant().getId(), request.getLeaveType(),
+                    request.getStartDate(), request.getEndDate(), settings);
+        }
+
+        // Check for overlapping leave requests (excluding this leave request ID)
+        if (leaveRepository.hasOverlappingLeaveExcludingSelf(employeeId, leaveId, request.getStartDate(), request.getEndDate())) {
+            throw new BusinessException("You already have a pending or approved leave in this date range");
+        }
+
+        // Determine if auto-approval is needed
+        boolean autoApprove = !settings.getLeaveApprovalRequired() ||
+                (settings.getAutoApproveForManager() && currentUser.isManager());
+
+        LeaveStatus initialStatus = autoApprove ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
+
+        leave.setLeaveType(request.getLeaveType());
+        leave.setStartDate(request.getStartDate());
+        leave.setEndDate(request.getEndDate());
+        leave.setTotalDays(totalDays);
+        leave.setReason(request.getReason());
+        leave.setStatus(initialStatus);
+
+        if (autoApprove) {
+            leave.setApprovedBy(currentUser.getId());
+            leave.setApprovedByName(currentUser.getFullName());
+            leave.setApprovedAt(LocalDateTime.now());
+            log.info("Leave request auto-approved on update for employee: {}", employeeId);
+        }
+
+        LeaveRequest saved = leaveRepository.save(leave);
+
+        // If auto-approved, create attendance records
+        if (autoApprove) {
+            createAttendanceForLeaveDays(saved);
+        }
+
+        return convertToResponse(saved);
     }
 
     // =====================================================
