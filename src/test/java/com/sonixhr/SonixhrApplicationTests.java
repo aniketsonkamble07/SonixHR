@@ -48,7 +48,10 @@ class SonixhrApplicationTests {
 	private com.sonixhr.controller.employee.EmployeeController employeeController;
 
 	@Autowired
-	private com.sonixhr.controller.leave.LeaveController leaveController;
+	private com.sonixhr.controller.leave.EmployeeLeaveController employeeLeaveController;
+
+	@Autowired
+	private com.sonixhr.controller.leave.LeaveManagementController leaveManagementController;
 
 	@Autowired
 	private com.sonixhr.repository.department.DepartmentRepository departmentRepository;
@@ -441,7 +444,7 @@ class SonixhrApplicationTests {
 
 		// 1. Check leave balance (should succeed and return CASUAL balance info)
 		org.springframework.http.ResponseEntity<java.util.Map<String, Object>> balanceResponse =
-				leaveController.getLeaveBalance(employee);
+				employeeLeaveController.getLeaveBalance(employee);
 		assertNotNull(balanceResponse.getBody());
 		assertTrue(balanceResponse.getBody().containsKey("CASUAL"));
 
@@ -460,7 +463,7 @@ class SonixhrApplicationTests {
 				.build();
 
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> applyResponse =
-				leaveController.requestLeave(leaveRequest, employee);
+				employeeLeaveController.requestLeave(leaveRequest, employee);
 		assertNotNull(applyResponse.getBody());
 		assertEquals(com.sonixhr.enums.leave.LeaveStatus.PENDING, applyResponse.getBody().getStatus());
 		Long leaveId = applyResponse.getBody().getId();
@@ -474,10 +477,297 @@ class SonixhrApplicationTests {
 
 		// 4. Approve leave request
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> approveResponse =
-				leaveController.approveLeave(leaveId, manager);
+				leaveManagementController.approveLeave(leaveId, manager);
 		assertNotNull(approveResponse.getBody());
 		assertEquals(com.sonixhr.enums.leave.LeaveStatus.APPROVED, approveResponse.getBody().getStatus());
 		assertEquals(manager.getId(), approveResponse.getBody().getApprovedBy());
+
+		// 5. Test employee leave setting override
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.employee.EmployeeResponse> overrideResponse =
+				leaveManagementController.updateEmployeeLeaveSettings(
+						employee.getId(),
+						com.sonixhr.enums.leave.WeekendConfig.CUSTOM,
+						"SATURDAY",
+						manager
+				);
+		assertNotNull(overrideResponse.getBody());
+
+		// 6. Test getTenantLeaveSettings & updateTenantLeaveSettings
+		org.springframework.http.ResponseEntity<com.sonixhr.entity.leave.TenantLeaveSettings> settingsRes =
+				leaveManagementController.getTenantLeaveSettings(manager);
+		assertNotNull(settingsRes.getBody());
+
+		com.sonixhr.dto.leave.LeaveSettingsDTO settingsDTO = new com.sonixhr.dto.leave.LeaveSettingsDTO();
+		settingsDTO.setCasualLeavePerYear(15);
+		settingsDTO.setSickLeavePerYear(12);
+		settingsDTO.setEarnedLeavePerYear(20);
+		settingsDTO.setLeaveApprovalRequired(true);
+		settingsDTO.setAutoApproveForManager(true);
+		settingsDTO.setCountWeekendsAsLeave(false);
+		settingsDTO.setCountHolidaysAsLeave(false);
+		settingsDTO.setWeekendConfig(com.sonixhr.enums.leave.WeekendConfig.SATURDAY_SUNDAY);
+
+		org.springframework.http.ResponseEntity<com.sonixhr.entity.leave.TenantLeaveSettings> updatedSettingsRes =
+				leaveManagementController.updateTenantLeaveSettings(settingsDTO, manager);
+		assertNotNull(updatedSettingsRes.getBody());
+		assertEquals(Integer.valueOf(15), updatedSettingsRes.getBody().getCasualLeavePerYear());
+
+		// 7. Test getTeamLeaveRequests
+		org.springframework.http.ResponseEntity<org.springframework.data.domain.Page<com.sonixhr.dto.leave.LeaveResponseDTO>> teamRequests =
+				leaveManagementController.getTeamLeaveRequests(null, manager, org.springframework.data.domain.PageRequest.of(0, 10));
+		assertNotNull(teamRequests.getBody());
+		assertTrue(teamRequests.getBody().getTotalElements() > 0);
+
+		// 8. Authenticate back as employee to test getMyLeaves, cancelLeave
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "password", employee.getAuthorities()
+				)
+		);
+
+		org.springframework.http.ResponseEntity<java.util.List<com.sonixhr.dto.leave.LeaveResponseDTO>> myLeaves =
+				employeeLeaveController.getMyLeaves(employee);
+		assertNotNull(myLeaves.getBody());
+		assertTrue(myLeaves.getBody().size() > 0);
+
+		// Apply for a second leave to test cancellation
+		com.sonixhr.dto.leave.LeaveRequestDTO secondRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.SICK)
+				.startDate(startDate.plusDays(10))
+				.endDate(startDate.plusDays(11))
+				.reason("Sick leave")
+				.build();
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> secondApply =
+				employeeLeaveController.requestLeave(secondRequest, employee);
+		assertNotNull(secondApply.getBody());
+		Long secondLeaveId = secondApply.getBody().getId();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> cancelRes =
+				employeeLeaveController.cancelLeave(secondLeaveId, "Feeling better", employee);
+		assertNotNull(cancelRes.getBody());
+		assertEquals(com.sonixhr.enums.leave.LeaveStatus.CANCELLED, cancelRes.getBody().getStatus());
+
+		// Apply for a third leave to test rejection
+		com.sonixhr.dto.leave.LeaveRequestDTO thirdRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.EMERGENCY)
+				.startDate(startDate.plusDays(20))
+				.endDate(startDate.plusDays(21))
+				.reason("Personal emergency")
+				.build();
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> thirdApply =
+				employeeLeaveController.requestLeave(thirdRequest, employee);
+		assertNotNull(thirdApply.getBody());
+		Long thirdLeaveId = thirdApply.getBody().getId();
+
+		// Authenticate as manager to reject
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						manager, "password", manager.getAuthorities()
+				)
+		);
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> rejectRes =
+				leaveManagementController.rejectLeave(thirdLeaveId, "Insufficient documentation", manager);
+		assertNotNull(rejectRes.getBody());
+		assertEquals(com.sonixhr.enums.leave.LeaveStatus.REJECTED, rejectRes.getBody().getStatus());
+
+		// Clean context
+		com.sonixhr.security.TenantContext.clear();
+		org.springframework.security.core.context.SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	@org.springframework.transaction.annotation.Transactional
+	void testExtendedLeavePoliciesAndValidation() throws Exception {
+		// Clean database
+		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+			jdbcTemplate.execute("TRUNCATE TABLE employees, tenant_subscriptions, shift_configurations, tenant_roles, tenants CASCADE");
+		});
+
+		// Seed default tenant
+		tenantSeeder.run(null);
+
+		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
+		
+		// Set up Tenant Leave Settings (Ensure policiesConfigured is true)
+		com.sonixhr.entity.leave.TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenant.getId());
+		settings.setPoliciesConfigured(true);
+		tenantLeaveSettingsRepository.save(settings);
+
+		// Get seeded Super Admin role
+		com.sonixhr.entity.tenant.TenantRole superAdminRole = tenantRoleRepository.findAll().get(0);
+
+		// Create Department
+		com.sonixhr.entity.department.Department department = com.sonixhr.entity.department.Department.builder()
+				.tenant(tenant)
+				.name("QA")
+				.code("QA")
+				.isActive(true)
+				.build();
+		department = departmentRepository.save(department);
+
+		// Create Manager
+		com.sonixhr.entity.employee.Employee manager = com.sonixhr.entity.employee.Employee.builder()
+				.tenant(tenant)
+				.employeeCode("MGR002")
+				.firstName("Alice")
+				.lastName("Manager")
+				.email("alice.mgr@acme.com")
+				.phone("9876543231")
+				.position("QA Manager")
+				.employmentType(com.sonixhr.enums.employee.EmploymentType.FULL_TIME)
+				.hireDate(java.time.LocalDate.now().minusYears(1))
+				.status(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE)
+				.isActive(true)
+				.passwordHash("hashed")
+				.department(department)
+				.roles(new java.util.HashSet<>(java.util.List.of(superAdminRole)))
+				.build();
+		manager = employeeRepository.save(manager);
+
+		// Create Employee (Requester in PROBATION status, reporting to manager)
+		com.sonixhr.entity.employee.Employee employee = com.sonixhr.entity.employee.Employee.builder()
+				.tenant(tenant)
+				.employeeCode("EMP002")
+				.firstName("Bob")
+				.lastName("Tester")
+				.email("bob.tester@acme.com")
+				.phone("9876543232")
+				.position("QA Engineer")
+				.employmentType(com.sonixhr.enums.employee.EmploymentType.FULL_TIME)
+				.hireDate(java.time.LocalDate.now())
+				.status(com.sonixhr.enums.employee.EmployeeStatus.PROBATION)
+				.isActive(true)
+				.passwordHash("hashed")
+				.department(department)
+				.manager(manager)
+				.roles(new java.util.HashSet<>(java.util.List.of(superAdminRole)))
+				.build();
+		employee = employeeRepository.save(employee);
+
+		// 1. Get policies map via manager (admin role)
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						manager, "password", manager.getAuthorities()
+				)
+		);
+		com.sonixhr.security.TenantContext.setCurrentTenant(tenant.getId());
+
+		org.springframework.http.ResponseEntity<java.util.Map<String, Object>> policiesRes =
+				leaveManagementController.getLeavePolicies(manager);
+		assertNotNull(policiesRes.getBody());
+		assertTrue(policiesRes.getBody().containsKey("CASUAL"));
+
+		// 2. Update CASUAL leave policy:
+		//    - allowed = true
+		//    - daysPerYear = 12
+		//    - probationPeriodAllowed = false
+		//    - roleEligibility = ["ROLE_PERMANENT"]
+		//    - prorated = true
+		java.util.Map<String, Object> casualPolicyUpdate = new java.util.HashMap<>();
+		casualPolicyUpdate.put("allowed", true);
+		casualPolicyUpdate.put("daysPerYear", 12);
+		casualPolicyUpdate.put("probationPeriodAllowed", false);
+		casualPolicyUpdate.put("roleEligibility", java.util.List.of("ROLE_PERMANENT"));
+		casualPolicyUpdate.put("prorated", true);
+
+		org.springframework.http.ResponseEntity<java.util.Map<String, Object>> updatedPoliciesRes =
+				leaveManagementController.updateLeavePolicy("CASUAL", casualPolicyUpdate, manager);
+		assertNotNull(updatedPoliciesRes.getBody());
+		
+		// 3. Authenticate as Bob (still in probation)
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "password", employee.getAuthorities()
+				)
+		);
+
+		// Apply should fail due to probation check
+		java.time.LocalDate startDate = java.time.LocalDate.now().plusDays(1);
+		while (startDate.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || startDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+			startDate = startDate.plusDays(1);
+		}
+		com.sonixhr.dto.leave.LeaveRequestDTO leaveRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.CASUAL)
+				.startDate(startDate)
+				.endDate(startDate)
+				.reason("Holiday")
+				.build();
+
+		try {
+			employeeLeaveController.requestLeave(leaveRequest, employee);
+			org.junit.jupiter.api.Assertions.fail("Should have failed validation for probation period");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("probation"));
+		}
+
+		// 4. Change Bob status to ACTIVE (remove probation barrier)
+		employee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE);
+		employee = employeeRepository.save(employee);
+
+		// Re-authenticate Bob
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "password", employee.getAuthorities()
+				)
+		);
+
+		// Apply should fail due to role check (missing ROLE_PERMANENT)
+		try {
+			employeeLeaveController.requestLeave(leaveRequest, employee);
+			org.junit.jupiter.api.Assertions.fail("Should have failed validation for role eligibility");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("role"));
+		}
+
+		// 5. Add ROLE_PERMANENT to Bob
+		com.sonixhr.entity.tenant.TenantRole permanentRole = com.sonixhr.entity.tenant.TenantRole.builder()
+				.tenantId(tenant.getId())
+				.name("ROLE_PERMANENT")
+				.active(true)
+				.build();
+		permanentRole = tenantRoleRepository.save(permanentRole);
+		employee.getRoles().add(permanentRole);
+		employee = employeeRepository.save(employee);
+
+		// Re-authenticate Bob
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "password", employee.getAuthorities()
+				)
+		);
+
+		// Get leave balance - CASUAL remaining should be prorated: 12 * (currentMonth / 12)
+		org.springframework.http.ResponseEntity<java.util.Map<String, Object>> balanceResponse =
+				employeeLeaveController.getLeaveBalance(employee);
+		assertNotNull(balanceResponse.getBody());
+		
+		@SuppressWarnings("unchecked")
+		java.util.Map<String, Object> casualBalance = (java.util.Map<String, Object>) balanceResponse.getBody().get("CASUAL");
+		assertNotNull(casualBalance);
+		
+		double expectedProrated = 12.0 * ((double) java.time.LocalDate.now().getMonthValue() / 12.0);
+		assertEquals(expectedProrated, (Double) casualBalance.get("total"), 0.001);
+
+		// 6. Request leave exceeding expected prorated balance - should fail
+		com.sonixhr.dto.leave.LeaveRequestDTO excessiveRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.CASUAL)
+				.startDate(startDate)
+				.endDate(startDate.plusDays(10)) // Too many days
+				.reason("Excessive leave")
+				.build();
+
+		try {
+			employeeLeaveController.requestLeave(excessiveRequest, employee);
+			org.junit.jupiter.api.Assertions.fail("Should have failed validation for insufficient prorated balance");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Insufficient"));
+		}
+
+		// Request valid leave (1 day) - should succeed
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> requestRes =
+				employeeLeaveController.requestLeave(leaveRequest, employee);
+		assertNotNull(requestRes.getBody());
+		assertEquals(com.sonixhr.enums.leave.LeaveStatus.PENDING, requestRes.getBody().getStatus());
 
 		// Clean context
 		com.sonixhr.security.TenantContext.clear();

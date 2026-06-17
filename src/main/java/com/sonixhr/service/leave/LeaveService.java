@@ -337,6 +337,28 @@ public class LeaveService {
                             minServiceMonths, request.getLeaveType().getDisplayName(), serviceMonths));
                 }
             }
+
+            // 4. Probation Period Eligibility Check
+            Object probationAllowedObj = policy.get("probationPeriodAllowed");
+            if (probationAllowedObj != null && Boolean.FALSE.equals(probationAllowedObj)) {
+                if (employee.getStatus() != null && employee.getStatus().isOnProbation()) {
+                    throw new BusinessException(String.format("Employee is not eligible for %s during probation period", request.getLeaveType().getDisplayName()));
+                }
+            }
+
+            // 5. Role Eligibility Check
+            Object roleEligibilityObj = policy.get("roleEligibility");
+            if (roleEligibilityObj instanceof java.util.Collection) {
+                java.util.Collection<?> eligibleRoles = (java.util.Collection<?>) roleEligibilityObj;
+                if (!eligibleRoles.isEmpty()) {
+                    boolean hasEligibleRole = employee.getRoles().stream()
+                            .anyMatch(r -> eligibleRoles.contains(r.getName()));
+                    if (!hasEligibleRole) {
+                        throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
+                                request.getLeaveType().getDisplayName(), eligibleRoles));
+                    }
+                }
+            }
         } else {
             throw new BusinessException(request.getLeaveType().getDisplayName() + " is not configured for this tenant");
         }
@@ -475,6 +497,17 @@ public class LeaveService {
                 Object days = policy.get("daysPerYear");
                 if (days instanceof Number) {
                     baseDays = ((Number) days).doubleValue();
+                }
+                // Accrual Pro-rata Check
+                Object proratedObj = policy.get("prorated");
+                if (proratedObj != null && Boolean.TRUE.equals(proratedObj)) {
+                    int currentYear = LocalDate.now().getYear();
+                    if (year == currentYear) {
+                        double elapsedMonths = LocalDate.now().getMonthValue();
+                        baseDays = baseDays * (elapsedMonths / 12.0);
+                    } else if (year > currentYear) {
+                        baseDays = 0.0;
+                    }
                 }
                 carryForward = Boolean.TRUE.equals(policy.get("carryForward"));
                 Object maxCf = policy.get("maxCarryForwardDays");

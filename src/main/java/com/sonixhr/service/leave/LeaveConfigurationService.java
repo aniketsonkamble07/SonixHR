@@ -283,4 +283,47 @@ public class LeaveConfigurationService {
 
         return isWeekend || isHoliday;
     }
+
+    /**
+     * Get all leave policies map for a tenant.
+     */
+    public Map<String, Object> getLeavePolicies(Long tenantId) {
+        TenantLeaveSettings settings = getTenantSettings(tenantId);
+        return settings.getLeavePolicies();
+    }
+
+    /**
+     * Update/insert a policy configuration for a specific leave type.
+     */
+    @Transactional
+    public Map<String, Object> updateLeavePolicy(Long tenantId, String leaveTypeStr, Map<String, Object> policyUpdate) {
+        TenantLeaveSettings settings = getTenantSettings(tenantId);
+        Map<String, Object> policies = settings.getLeavePolicies();
+        if (policies == null) {
+            policies = TenantLeaveSettings.createDefaultPolicies();
+        }
+
+        // Update the policy map for the target leave type
+        policies.put(leaveTypeStr.toUpperCase(), policyUpdate);
+        settings.setLeavePolicies(policies);
+
+        // Sync legacy daysPerYear field if updated
+        Object days = policyUpdate.get("daysPerYear");
+        if (days instanceof Number) {
+            int daysInt = ((Number) days).intValue();
+            switch (leaveTypeStr.toUpperCase()) {
+                case "CASUAL": settings.setCasualLeavePerYear(daysInt); break;
+                case "SICK": settings.setSickLeavePerYear(daysInt); break;
+                case "EARNED": settings.setEarnedLeavePerYear(daysInt); break;
+                case "EMERGENCY": settings.setEmergencyLeavePerYear(daysInt); break;
+                case "MATERNITY": settings.setMaternityLeavePerYear(daysInt); break;
+                case "PATERNITY": settings.setPaternityLeavePerYear(daysInt); break;
+                case "UNPAID": settings.setUnpaidLeavePerYear(daysInt); break;
+                case "COMPENSATORY": settings.setCompensatoryLeavePerYear(daysInt); break;
+            }
+        }
+
+        settingsRepository.save(settings);
+        return policies;
+    }
 }
