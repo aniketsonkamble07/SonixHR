@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
     private final PlatformRoleRepository roleRepository;
     private final PlatformUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
     private static final String SUPER_ADMIN_PASSWORD = "Admin@123";
@@ -41,6 +43,15 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("=========================================");
         log.info("Platform Data Initializer Started");
         log.info("=========================================");
+
+        // Run DDL update for blood_group column
+        try {
+            log.info("Altering employees.blood_group column type to VARCHAR(20) if necessary...");
+            jdbcTemplate.execute("ALTER TABLE employees ALTER COLUMN blood_group TYPE VARCHAR(20)");
+            log.info("Successfully altered employees.blood_group column type.");
+        } catch (Exception e) {
+            log.warn("Could not alter employees.blood_group column (table might not exist or column already altered): {}", e.getMessage());
+        }
 
         // Step 1: Create all permissions
         createAllPermissions();
