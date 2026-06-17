@@ -178,18 +178,11 @@ public class EmployeeSelfService {
             return false;
         }
 
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof Employee) {
-            Employee emp = (Employee) principal;
-            return emp.isSuperAdmin() || emp.isAdmin() || emp.hasRole("HR") || emp.hasRole("Human Resources");
-        } else if (principal instanceof PlatformUser) {
-            PlatformUser pu = (PlatformUser) principal;
-            return pu.isSuperAdmin() || pu.hasRole("ADMIN") || pu.hasRole("HR");
-        }
-
-        // Check if user has HR role
+        // Standard RBAC: check if user has permission to edit employee records,
+        // or check if their authorities list explicitly includes fallback HR/Admin roles.
         return authentication.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("HR") ||
+                .anyMatch(auth -> auth.getAuthority().equals("EMPLOYEE_EDIT") ||
+                        auth.getAuthority().equals("HR") ||
                         auth.getAuthority().equals("ROLE_HR") ||
                         auth.getAuthority().equals("ADMIN") ||
                         auth.getAuthority().equals("ROLE_ADMIN"));
