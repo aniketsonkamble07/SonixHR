@@ -1,8 +1,6 @@
 package com.sonixhr.entity.platform;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.sonixhr.common.base.BasePermission;
-import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.common.base.BaseUser;
 import com.sonixhr.enums.UserStatus;
 import jakarta.persistence.*;

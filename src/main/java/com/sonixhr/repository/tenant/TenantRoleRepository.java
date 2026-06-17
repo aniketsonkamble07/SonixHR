@@ -1,6 +1,5 @@
 package com.sonixhr.repository.tenant;
-
-import com.sonixhr.entity.tenant.TenantPermission;
+ 
 import com.sonixhr.entity.tenant.TenantRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -80,4 +80,8 @@ public class LeaveRequest {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "is_half_day")
+    @Builder.Default
+    private Boolean isHalfDay = false;
 }

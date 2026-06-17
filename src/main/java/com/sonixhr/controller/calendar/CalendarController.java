@@ -19,6 +19,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/calendar")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class CalendarController {
 
     private final CalendarService calendarService;

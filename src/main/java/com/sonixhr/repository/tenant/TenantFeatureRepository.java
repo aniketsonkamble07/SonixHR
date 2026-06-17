@@ -5,8 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-
+ 
 public interface TenantFeatureRepository extends JpaRepository<TenantFeature, Long> {
     List<TenantFeature> findByTenantIdAndIsEnabledTrue(Long tenantId);
     Optional<TenantFeature> findByTenantIdAndFeatureName(Long tenantId, String featureName);

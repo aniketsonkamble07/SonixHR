@@ -25,6 +25,7 @@ import java.util.Set;
 @Component
 @RequiredArgsConstructor
 @Order(1)
+@SuppressWarnings("null")
 public class PlatformDataInitializer implements ApplicationRunner {
 
     private final PlatformPermissionRepository permissionRepository;

@@ -2,26 +2,19 @@ package com.sonixhr.dto.calendar;
 
 import com.sonixhr.enums.calendar.CalendarAttendanceStatus;
 import com.sonixhr.enums.calendar.CalendarDayType;
-import com.sonixhr.enums.leave.LeaveType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
+ 
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Map;
-
+ 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CalendarDayDTO {
 
-    private Long employeeId;
-    private String employeeName;
-    private String employeeCode;
     private LocalDate date;
     private int dayOfMonth;
     private String dayOfWeek;

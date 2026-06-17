@@ -2,6 +2,7 @@ package com.sonixhr.controller.tenant;
 
 import com.sonixhr.dto.attendance.ShiftConfigurationDTO;
 import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
+import com.sonixhr.dto.attendance.ShiftConfigurationSummaryDTO;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.service.attendance.ShiftConfigurationService;
 import lombok.RequiredArgsConstructor;
@@ -164,11 +165,11 @@ public class ShiftConfigurationController {
 
     @GetMapping("/all")
     @PreAuthorize("hasPermission('SHIFT_VIEW_ALL')")
-    public ResponseEntity<List<ShiftConfigurationDTO>> getAllShifts(
+    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllShifts(
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
-        List<ShiftConfigurationDTO> shifts = shiftConfigurationService.getAllShiftConfigurations(tenantId);
+        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllShiftConfigurationsSummary(tenantId);
         return ResponseEntity.ok(shifts);
     }
 
@@ -185,8 +186,8 @@ public class ShiftConfigurationController {
 
     @GetMapping("/active")
     @PreAuthorize("hasPermission('SHIFT_VIEW_ALL')")
-    public ResponseEntity<List<ShiftConfigurationDTO>> getAllActiveShifts() {
-        List<ShiftConfigurationDTO> shifts = shiftConfigurationService.getAllActiveShifts();
+    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts() {
+        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllActiveShiftsSummary();
         return ResponseEntity.ok(shifts);
     }
 

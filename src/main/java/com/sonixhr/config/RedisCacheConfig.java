@@ -22,6 +22,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -31,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Configuration
 @EnableCaching
+@SuppressWarnings("null")
 public class RedisCacheConfig implements CachingConfigurer {
 
     // FIX: original Map.of() only holds 10 entries — bumped to Map.ofEntries().
@@ -188,22 +191,22 @@ public class RedisCacheConfig implements CachingConfigurer {
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override
-            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+            public void handleCacheGetError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key) {
                 log.warn("Redis cache GET failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
             }
 
             @Override
-            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+            public void handleCachePutError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key, @Nullable Object value) {
                 log.warn("Redis cache PUT failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
             }
 
             @Override
-            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+            public void handleCacheEvictError(@NonNull RuntimeException exception, @NonNull Cache cache, @NonNull Object key) {
                 log.warn("Redis cache EVICT failed for key '{}' in cache '{}'. Error: {}", key, cache.getName(), exception.getMessage());
             }
 
             @Override
-            public void handleCacheClearError(RuntimeException exception, Cache cache) {
+            public void handleCacheClearError(@NonNull RuntimeException exception, @NonNull Cache cache) {
                 log.warn("Redis cache CLEAR failed in cache '{}'. Error: {}", cache.getName(), exception.getMessage());
             }
         };

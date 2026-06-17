@@ -53,9 +53,7 @@ public interface PlatformRoleRepository extends JpaRepository<PlatformRole, Long
     boolean isRoleAssignedToUsers(@Param("roleId") Long roleId);
 
     List<PlatformRole> findAllByIdIn(Set<Long> ids);
-
-    Page<PlatformRole> findAll(Pageable pageable);
-
+ 
     @Modifying
     @Transactional
     @Query("UPDATE PlatformRole r SET r.priority = :priority WHERE r.id = :roleId")

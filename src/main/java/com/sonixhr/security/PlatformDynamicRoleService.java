@@ -1,6 +1,5 @@
 package com.sonixhr.security;
 
-import com.sonixhr.common.base.BasePermission;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
@@ -15,28 +14,28 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
-
+ 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
+ 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlatformDynamicRoleService {
-
+ 
     private final PlatformUserRepository platformUserRepository;
     private final PlatformRoleRepository platformRoleRepository;
     private final RedisTemplate<String, Object> redisTemplate;
-
+ 
     @Value("${app.platform.role.cache.enabled:true}")
     private boolean cacheEnabled;
-
+ 
     @Value("${app.platform.role.cache.ttl-minutes:30}")
     private long cacheTtlMinutes;
-
+ 
     private static final String REDIS_KEY_PLATFORM_USER_AUTHORITIES = "platform:user:authorities:";
-    private static final String REDIS_KEY_PLATFORM_ROLE_PERMISSIONS = "platform:role:permissions:";
 
     /**
      * Load platform user authorities dynamically from database

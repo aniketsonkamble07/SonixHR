@@ -1,12 +1,13 @@
 package com.sonixhr.controller.tenant;
-
-import com.sonixhr.dto.employee.EmployeeResponse;
+ 
+import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantRole;
+import com.sonixhr.service.employee.EmployeeService;
 import com.sonixhr.service.tenant.TenantRoleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class TenantRoleController {
 
     private final TenantRoleService roleService;
+    private final EmployeeService employeeService;
 
     private Long getCurrentTenantId(Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
@@ -170,7 +172,7 @@ public class TenantRoleController {
      */
     @GetMapping("/{roleId}/users")
     @PreAuthorize("hasAnyAuthority('ROLE_VIEW', 'EMPLOYEE_VIEW_ALL')")
-    public ResponseEntity<List<EmployeeResponse>> getUsersByRole(
+    public ResponseEntity<List<EmployeeSummaryResponse>> getUsersByRole(
             @PathVariable Long roleId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
@@ -180,8 +182,8 @@ public class TenantRoleController {
         List<Employee> users = roleService.getUsersByRole(roleId, tenantId);
 
         // ✅ Convert to DTO
-        List<EmployeeResponse> responses = users.stream()
-                .map(this::toEmployeeResponse)
+        List<EmployeeSummaryResponse> responses = users.stream()
+                .map(employeeService::convertToSummaryResponse)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(responses);
@@ -240,32 +242,4 @@ public class TenantRoleController {
         return ResponseEntity.ok(roleService.toResponse(role));
     }
 
-    // =====================================================
-    // PRIVATE HELPER METHODS
-    // =====================================================
-
-
-
-    private EmployeeResponse toEmployeeResponse(Employee employee) {
-        if (employee == null) {
-            return null;
-        }
-
-        return EmployeeResponse.builder()
-                .id(employee.getId())
-                .employeeCode(employee.getEmployeeCode())
-                .firstName(employee.getFirstName())
-                .lastName(employee.getLastName())
-                .fullName(employee.getFullName())
-                .email(employee.getEmail())
-                .position(employee.getPosition())
-                .department(employee.getDepartment() != null ?
-                        EmployeeResponse.DepartmentInfo.builder()
-                                .id(employee.getDepartment().getId())
-                                .name(employee.getDepartment().getName())
-                                .build() : null)
-                .status(employee.getStatus())
-                .isActive(employee.isActive())
-                .build();
-    }
 }

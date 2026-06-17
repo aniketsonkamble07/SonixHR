@@ -3,7 +3,6 @@ package com.sonixhr.controller;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.repository.platform.PlatformUserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
@@ -160,7 +159,7 @@ public class DebugController {
 
         // Test employee loading (should fail for platform user)
         try {
-            UserDetails employee = employeeDetailsService.loadUserByUsername(email);
+            employeeDetailsService.loadUserByUsername(email);
             result.put("employeeExists", true);
             log.info("Employee found (unexpected for platform user)");
         } catch (Exception e) {

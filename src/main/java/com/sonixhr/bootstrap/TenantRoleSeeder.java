@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 @Order(3)
+@SuppressWarnings({"null", "unused"})
 public class TenantRoleSeeder implements ApplicationRunner {
 
     private final TenantRoleRepository roleRepository;

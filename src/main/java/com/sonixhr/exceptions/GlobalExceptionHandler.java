@@ -195,7 +195,8 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException ex) {
 
         String parameterName = ex.getName();
-        String requiredType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+        Class<?> reqType = ex.getRequiredType();
+        String requiredType = reqType != null ? reqType.getSimpleName() : "unknown";
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)

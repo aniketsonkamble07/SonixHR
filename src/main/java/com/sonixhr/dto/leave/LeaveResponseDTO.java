@@ -33,4 +33,5 @@ public class LeaveResponseDTO {
     private String approvedByName;
     private LocalDateTime approvedAt;
     private LocalDateTime createdAt;
+    private Boolean isHalfDay;
 }

@@ -1,7 +1,5 @@
 package com.sonixhr.exceptions;
-
-import com.sonixhr.exceptions.BaseException;
-
+ 
 public class ResourceNotFoundException extends BaseException {
 
     public ResourceNotFoundException(String resourceName, Object id) {

@@ -8,8 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.UUID;
-
+ 
 @Entity
 @Table(name = "tenant_usage_stats", indexes = {
         @Index(name = "idx_usage_tenant_date", columnList = "tenant_id, stat_date")

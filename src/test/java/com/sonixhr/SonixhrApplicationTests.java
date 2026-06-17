@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
+@SuppressWarnings("null")
 class SonixhrApplicationTests {
 
 	@Autowired
@@ -52,6 +53,9 @@ class SonixhrApplicationTests {
 
 	@Autowired
 	private com.sonixhr.controller.leave.LeaveManagementController leaveManagementController;
+
+	@Autowired
+	private com.sonixhr.controller.attendance.ManualAttendanceController manualAttendanceController;
 
 	@Autowired
 	private com.sonixhr.repository.department.DepartmentRepository departmentRepository;
@@ -493,7 +497,7 @@ class SonixhrApplicationTests {
 		assertNotNull(overrideResponse.getBody());
 
 		// 6. Test getTenantLeaveSettings & updateTenantLeaveSettings
-		org.springframework.http.ResponseEntity<com.sonixhr.entity.leave.TenantLeaveSettings> settingsRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveSettingsDTO> settingsRes =
 				leaveManagementController.getTenantLeaveSettings(manager);
 		assertNotNull(settingsRes.getBody());
 
@@ -507,7 +511,7 @@ class SonixhrApplicationTests {
 		settingsDTO.setCountHolidaysAsLeave(false);
 		settingsDTO.setWeekendConfig(com.sonixhr.enums.leave.WeekendConfig.SATURDAY_SUNDAY);
 
-		org.springframework.http.ResponseEntity<com.sonixhr.entity.leave.TenantLeaveSettings> updatedSettingsRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveSettingsDTO> updatedSettingsRes =
 				leaveManagementController.updateTenantLeaveSettings(settingsDTO, manager);
 		assertNotNull(updatedSettingsRes.getBody());
 		assertEquals(Integer.valueOf(15), updatedSettingsRes.getBody().getCasualLeavePerYear());
@@ -661,17 +665,15 @@ class SonixhrApplicationTests {
 		//    - allowed = true
 		//    - daysPerYear = 12
 		//    - probationPeriodAllowed = false
-		//    - roleEligibility = ["ROLE_PERMANENT"]
 		//    - prorated = true
 		com.sonixhr.dto.leave.LeavePolicyDTO casualPolicyUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
 				.allowed(true)
 				.daysPerYear(12)
 				.probationPeriodAllowed(false)
-				.roleEligibility(java.util.List.of("ROLE_PERMANENT"))
 				.prorated(true)
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updatedPoliciesRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updatedPoliciesRes =
 				leaveManagementController.updateLeavePolicy("CASUAL", casualPolicyUpdate, manager);
 		assertNotNull(updatedPoliciesRes.getBody());
 		
@@ -712,25 +714,7 @@ class SonixhrApplicationTests {
 				)
 		);
 
-		// Apply should fail due to role check (missing ROLE_PERMANENT)
-		try {
-			employeeLeaveController.requestLeave(leaveRequest, employee);
-			org.junit.jupiter.api.Assertions.fail("Should have failed validation for role eligibility");
-		} catch (com.sonixhr.exceptions.BusinessException ex) {
-			assertTrue(ex.getMessage().contains("role"));
-		}
-
-		// 5. Add ROLE_PERMANENT to Bob
-		com.sonixhr.entity.tenant.TenantRole permanentRole = com.sonixhr.entity.tenant.TenantRole.builder()
-				.tenantId(tenant.getId())
-				.name("ROLE_PERMANENT")
-				.active(true)
-				.build();
-		permanentRole = tenantRoleRepository.save(permanentRole);
-		employee.getRoles().add(permanentRole);
-		employee = employeeRepository.save(employee);
-
-		// Re-authenticate Bob
+		// 5. Re-authenticate Bob
 		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
 				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
 						employee, "password", employee.getAuthorities()
@@ -936,10 +920,10 @@ class SonixhrApplicationTests {
 				.genderEligibility("ALL")
 				.build();
 		
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> casualRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> casualRes =
 				leaveManagementController.updateCasualPolicy(casualUpdate, manager);
 		assertNotNull(casualRes.getBody());
-		assertEquals(14, casualRes.getBody().get("CASUAL").getDaysPerYear());
+		assertEquals(14, casualRes.getBody().getDaysPerYear());
 
 		// Test SICK Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO sickUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -949,10 +933,10 @@ class SonixhrApplicationTests {
 				.genderEligibility("ALL")
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> sickRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> sickRes =
 				leaveManagementController.updateSickPolicy(sickUpdate, manager);
 		assertNotNull(sickRes.getBody());
-		assertEquals(10, sickRes.getBody().get("SICK").getDaysPerYear());
+		assertEquals(10, sickRes.getBody().getDaysPerYear());
 
 		// Test EARNED Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO earnedUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -961,10 +945,10 @@ class SonixhrApplicationTests {
 				.carryForward(true)
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> earnedRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> earnedRes =
 				leaveManagementController.updateEarnedPolicy(earnedUpdate, manager);
 		assertNotNull(earnedRes.getBody());
-		assertEquals(18, earnedRes.getBody().get("EARNED").getDaysPerYear());
+		assertEquals(18, earnedRes.getBody().getDaysPerYear());
 
 		// Test EMERGENCY Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO emergencyUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -972,10 +956,10 @@ class SonixhrApplicationTests {
 				.daysPerYear(4)
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> emergencyRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> emergencyRes =
 				leaveManagementController.updateEmergencyPolicy(emergencyUpdate, manager);
 		assertNotNull(emergencyRes.getBody());
-		assertEquals(4, emergencyRes.getBody().get("EMERGENCY").getDaysPerYear());
+		assertEquals(4, emergencyRes.getBody().getDaysPerYear());
 
 		// Test MATERNITY Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO maternityUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -984,10 +968,10 @@ class SonixhrApplicationTests {
 				.genderEligibility("FEMALE")
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> maternityRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> maternityRes =
 				leaveManagementController.updateMaternityPolicy(maternityUpdate, manager);
 		assertNotNull(maternityRes.getBody());
-		assertEquals(90, maternityRes.getBody().get("MATERNITY").getDaysPerYear());
+		assertEquals(90, maternityRes.getBody().getDaysPerYear());
 
 		// Test PATERNITY Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO paternityUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -996,10 +980,10 @@ class SonixhrApplicationTests {
 				.genderEligibility("MALE")
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> paternityRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> paternityRes =
 				leaveManagementController.updatePaternityPolicy(paternityUpdate, manager);
 		assertNotNull(paternityRes.getBody());
-		assertEquals(6, paternityRes.getBody().get("PATERNITY").getDaysPerYear());
+		assertEquals(6, paternityRes.getBody().getDaysPerYear());
 
 		// Test UNPAID Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO unpaidUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -1007,10 +991,10 @@ class SonixhrApplicationTests {
 				.daysPerYear(5)
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> unpaidRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> unpaidRes =
 				leaveManagementController.updateUnpaidPolicy(unpaidUpdate, manager);
 		assertNotNull(unpaidRes.getBody());
-		assertEquals(5, unpaidRes.getBody().get("UNPAID").getDaysPerYear());
+		assertEquals(5, unpaidRes.getBody().getDaysPerYear());
 
 		// Test COMPENSATORY Policy update
 		com.sonixhr.dto.leave.LeavePolicyDTO compensatoryUpdate = com.sonixhr.dto.leave.LeavePolicyDTO.builder()
@@ -1018,10 +1002,238 @@ class SonixhrApplicationTests {
 				.daysPerYear(8)
 				.build();
 
-		org.springframework.http.ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> compensatoryRes =
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> compensatoryRes =
 				leaveManagementController.updateCompensatoryPolicy(compensatoryUpdate, manager);
 		assertNotNull(compensatoryRes.getBody());
-		assertEquals(8, compensatoryRes.getBody().get("COMPENSATORY").getDaysPerYear());
+		assertEquals(8, compensatoryRes.getBody().getDaysPerYear());
+
+		// Clean context
+		com.sonixhr.security.TenantContext.clear();
+		org.springframework.security.core.context.SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	@org.springframework.transaction.annotation.Transactional
+	void testAttendanceStatusValidation() throws Exception {
+		// Clean database
+		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+			jdbcTemplate.execute("TRUNCATE TABLE employees, tenant_subscriptions, shift_configurations, tenant_roles, tenants CASCADE");
+		});
+
+		// Seed default tenant
+		tenantSeeder.run(null);
+
+		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
+		com.sonixhr.entity.employee.Employee manager = employeeRepository.findByEmailWithRolesAndPermissions("admin@acme.com")
+				.orElseThrow(() -> new AssertionError("Manager employee not found"));
+
+		// Create a target employee
+		com.sonixhr.entity.employee.Employee targetEmployee = com.sonixhr.entity.employee.Employee.builder()
+				.tenant(tenant)
+				.employeeCode("EMP009")
+				.email("target@acme.com")
+				.passwordHash("hashed")
+				.firstName("Target")
+				.lastName("User")
+				.hireDate(java.time.LocalDate.now().minusDays(10))
+				.status(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE)
+				.isActive(true)
+				.manager(manager)
+				.roles(new java.util.HashSet<>(tenantRoleRepository.findAll()))
+				.build();
+		
+		targetEmployee = employeeRepository.save(targetEmployee);
+
+		// Simulate authenticated context for manager
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						manager, "Admin@123", manager.getAuthorities()
+				)
+		);
+		com.sonixhr.security.TenantContext.setCurrentTenant(tenant.getId());
+
+		// 1. Mark attendance for ACTIVE employee should succeed
+		com.sonixhr.dto.attendance.ManualAttendanceMarkRequest request = new com.sonixhr.dto.attendance.ManualAttendanceMarkRequest();
+		request.setEmployeeId(targetEmployee.getId());
+		request.setAttendanceDate(java.time.LocalDate.now());
+		request.setStatus(com.sonixhr.enums.attendance.AttendanceStatus.PRESENT);
+		request.setReason("Regular Day");
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.attendance.ManualAttendanceRecordResponse> response =
+				manualAttendanceController.markAttendance(request, manager);
+		assertNotNull(response.getBody());
+		assertEquals(com.sonixhr.enums.attendance.AttendanceStatus.PRESENT, response.getBody().getStatus());
+
+		// 2. Set employee status to RESIGNED with future lastWorkingDate (notice period / pending resignation) - should succeed
+		targetEmployee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.RESIGNED);
+		targetEmployee.setLastWorkingDate(java.time.LocalDate.now().plusDays(2));
+		targetEmployee = employeeRepository.save(targetEmployee);
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.attendance.ManualAttendanceRecordResponse> resignedResponse =
+				manualAttendanceController.markAttendance(request, manager);
+		assertNotNull(resignedResponse.getBody());
+		assertEquals(com.sonixhr.enums.attendance.AttendanceStatus.PRESENT, resignedResponse.getBody().getStatus());
+
+		// Now set lastWorkingDate to in the past - should fail
+		targetEmployee.setLastWorkingDate(java.time.LocalDate.now().minusDays(1));
+		employeeRepository.save(targetEmployee);
+
+		try {
+			manualAttendanceController.markAttendance(request, manager);
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for resigned employee after notice period");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Cannot mark attendance for an employee with status") || ex.getMessage().contains("last working date"));
+		}
+
+		// 3. Set employee status to TERMINATED and mark attendance should fail
+		targetEmployee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.TERMINATED);
+		targetEmployee.setLastWorkingDate(null);
+		employeeRepository.save(targetEmployee);
+
+		try {
+			manualAttendanceController.markAttendance(request, manager);
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for terminated employee");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Cannot mark attendance for an employee with status"));
+		}
+
+		// 4. Set employee status to SUSPENDED and mark attendance should fail
+		targetEmployee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.SUSPENDED);
+		employeeRepository.save(targetEmployee);
+
+		try {
+			manualAttendanceController.markAttendance(request, manager);
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for suspended employee");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Cannot mark attendance for an employee with status"));
+		}
+
+		// 5. Set employee status to INVITED and mark attendance should fail
+		targetEmployee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.INVITED);
+		employeeRepository.save(targetEmployee);
+
+		try {
+			manualAttendanceController.markAttendance(request, manager);
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for invited employee");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Cannot mark attendance for an employee with status"));
+		}
+
+		// 6. Set employee status to ON_LEAVE and mark attendance status to PRESENT should fail
+		targetEmployee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.ON_LEAVE);
+		employeeRepository.save(targetEmployee);
+
+		try {
+			manualAttendanceController.markAttendance(request, manager); // request status is PRESENT
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for marking ON_LEAVE employee as PRESENT");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("because their employee status is ON LEAVE"));
+		}
+
+		// 7. Set employee status to ON_LEAVE and mark attendance status to ON_LEAVE should succeed
+		com.sonixhr.dto.attendance.ManualAttendanceMarkRequest onLeaveRequest = new com.sonixhr.dto.attendance.ManualAttendanceMarkRequest();
+		onLeaveRequest.setEmployeeId(targetEmployee.getId());
+		onLeaveRequest.setAttendanceDate(java.time.LocalDate.now());
+		onLeaveRequest.setStatus(com.sonixhr.enums.attendance.AttendanceStatus.ON_LEAVE);
+		onLeaveRequest.setReason("On Annual Leave");
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.attendance.ManualAttendanceRecordResponse> onLeaveResponse =
+				manualAttendanceController.markAttendance(onLeaveRequest, manager);
+		assertNotNull(onLeaveResponse.getBody());
+		assertEquals(com.sonixhr.enums.attendance.AttendanceStatus.ON_LEAVE, onLeaveResponse.getBody().getStatus());
+
+		// 8. Add overtime for ON_LEAVE employee should fail
+		com.sonixhr.dto.attendance.ManualOvertimeRequest overtimeRequest = new com.sonixhr.dto.attendance.ManualOvertimeRequest();
+		overtimeRequest.setEmployeeId(targetEmployee.getId());
+		overtimeRequest.setDate(java.time.LocalDate.now());
+		overtimeRequest.setOvertimeHours(2.0);
+		overtimeRequest.setReason("Late support");
+
+		try {
+			manualAttendanceController.addOvertime(overtimeRequest, manager);
+			org.junit.jupiter.api.Assertions.fail("Should have thrown BusinessException for adding overtime to ON_LEAVE employee");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Cannot add overtime for an employee who is currently ON LEAVE"));
+		}
+
+		// Clean context
+		com.sonixhr.security.TenantContext.clear();
+		org.springframework.security.core.context.SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	@org.springframework.transaction.annotation.Transactional
+	void testHalfDayLeaveRequest() throws Exception {
+		// Clean database
+		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+			jdbcTemplate.execute("TRUNCATE TABLE employees, tenant_subscriptions, shift_configurations, tenant_roles, tenants CASCADE");
+		});
+
+		// Seed default tenant
+		tenantSeeder.run(null);
+
+		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
+
+		// Set up Tenant Leave Settings (Ensure policiesConfigured is true and approval is not required)
+		com.sonixhr.entity.leave.TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenant.getId());
+		settings.setPoliciesConfigured(true);
+		settings.setLeaveApprovalRequired(false);
+		tenantLeaveSettingsRepository.save(settings);
+
+		com.sonixhr.entity.employee.Employee employee = employeeRepository.findByEmailWithRolesAndPermissions("admin@acme.com")
+				.orElseThrow(() -> new AssertionError("Super Admin employee not found"));
+
+		// Simulate authenticated context for employee
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "password", employee.getAuthorities()
+				)
+		);
+		com.sonixhr.security.TenantContext.setCurrentTenant(tenant.getId());
+
+		// 1. Apply for a half-day leave spanning single day (should succeed)
+		java.time.LocalDate leaveDate = java.time.LocalDate.now().plusDays(1);
+		while (leaveDate.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || leaveDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+			leaveDate = leaveDate.plusDays(1);
+		}
+
+		com.sonixhr.dto.leave.LeaveRequestDTO halfDayRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.CASUAL)
+				.startDate(leaveDate)
+				.endDate(leaveDate)
+				.isHalfDay(true)
+				.reason("Doctor appointment half day")
+				.build();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.leave.LeaveResponseDTO> response =
+				employeeLeaveController.requestLeave(halfDayRequest, employee);
+		assertNotNull(response.getBody());
+		assertEquals(com.sonixhr.enums.leave.LeaveStatus.APPROVED, response.getBody().getStatus()); // Auto-approved because requester is manager/admin
+		assertEquals(0.5, response.getBody().getTotalDays());
+		assertTrue(response.getBody().getIsHalfDay());
+
+		// Assert attendance status is HALF_DAY in database
+		String attendanceStatus = jdbcTemplate.queryForObject(
+				"SELECT status FROM attendance_records WHERE employee_id = ? AND attendance_date = ?",
+				String.class, employee.getId(), java.sql.Date.valueOf(leaveDate)
+		);
+		assertEquals("HALF_DAY", attendanceStatus);
+
+		// 2. Apply for a half-day leave spanning multiple days (should fail)
+		com.sonixhr.dto.leave.LeaveRequestDTO invalidHalfDayRequest = com.sonixhr.dto.leave.LeaveRequestDTO.builder()
+				.leaveType(com.sonixhr.enums.leave.LeaveType.CASUAL)
+				.startDate(leaveDate)
+				.endDate(leaveDate.plusDays(1))
+				.isHalfDay(true)
+				.reason("Invalid multiple days")
+				.build();
+
+		try {
+			employeeLeaveController.requestLeave(invalidHalfDayRequest, employee);
+			org.junit.jupiter.api.Assertions.fail("Should have failed for multiple days half-day request");
+		} catch (com.sonixhr.exceptions.BusinessException ex) {
+			assertTrue(ex.getMessage().contains("Half-day leaves can only be requested for a single day"));
+		}
 
 		// Clean context
 		com.sonixhr.security.TenantContext.clear();

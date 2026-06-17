@@ -38,6 +38,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/platform/auth")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlatformAuthController {
 
     private final PlatformAuthService platformAuthService;

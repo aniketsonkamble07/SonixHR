@@ -301,4 +301,72 @@ public class LeaveConfigurationService {
         settingsRepository.save(settings);
         return policies;
     }
+
+    public LeaveSettingsDTO getTenantSettingsDTO(Long tenantId) {
+        return convertToSettingsDTO(getTenantSettings(tenantId));
+    }
+
+    @Transactional
+    public LeaveSettingsDTO updateTenantSettingsDTO(Long tenantId, LeaveSettingsDTO dto) {
+        return convertToSettingsDTO(updateTenantSettings(tenantId, dto));
+    }
+
+    public LeaveSettingsDTO convertToSettingsDTO(TenantLeaveSettings settings) {
+        if (settings == null) {
+            return null;
+        }
+        WeekendConfig wkConfig = settings.getWeekendConfig() != null ? settings.getWeekendConfig() : WeekendConfig.SATURDAY_SUNDAY;
+        return LeaveSettingsDTO.builder()
+                .tenantId(settings.getTenantId())
+                .leavePolicies(settings.getLeavePolicies())
+                .policiesConfigured(settings.getPoliciesConfigured())
+                .weekendConfig(wkConfig)
+                .customWeekendDays(settings.getCustomWeekendDays())
+                .countWeekendsAsLeave(settings.getCountWeekendsAsLeave())
+                .countHolidaysAsLeave(settings.getCountHolidaysAsLeave())
+                .casualLeavePerYear(settings.getCasualLeavePerYear())
+                .sickLeavePerYear(settings.getSickLeavePerYear())
+                .earnedLeavePerYear(settings.getEarnedLeavePerYear())
+                .emergencyLeavePerYear(settings.getEmergencyLeavePerYear())
+                .maternityLeavePerYear(settings.getMaternityLeavePerYear())
+                .paternityLeavePerYear(settings.getPaternityLeavePerYear())
+                .unpaidLeavePerYear(settings.getUnpaidLeavePerYear())
+                .compensatoryLeavePerYear(settings.getCompensatoryLeavePerYear())
+                .maxConsecutiveLeaveDays(settings.getMaxConsecutiveLeaveDays())
+                .leaveApprovalRequired(settings.getLeaveApprovalRequired())
+                .autoApproveForManager(settings.getAutoApproveForManager())
+                .country(settings.getCountry())
+                .state(settings.getState())
+                .includeNationalHolidays(settings.getIncludeNationalHolidays())
+                .includeStateHolidays(settings.getIncludeStateHolidays())
+                .workingDays(getWorkingDaysArray(wkConfig, settings.getCustomWeekendDays()))
+                .weekendDays(getWeekendDaysArray(wkConfig, settings.getCustomWeekendDays()))
+                .weekendDisplay(wkConfig.getDisplayName())
+                .timezone(java.util.TimeZone.getDefault().getID())
+                .build();
+    }
+
+    private String[] getWeekendDaysArray(WeekendConfig config, String customDays) {
+        if (config == WeekendConfig.SATURDAY_SUNDAY) {
+            return new String[]{"SATURDAY", "SUNDAY"};
+        } else if (config == WeekendConfig.SUNDAY_ONLY) {
+            return new String[]{"SUNDAY"};
+        } else if (config == WeekendConfig.CUSTOM && customDays != null) {
+            return Arrays.stream(customDays.split(","))
+                    .map(String::trim)
+                    .map(String::toUpperCase)
+                    .filter(s -> !s.isEmpty())
+                    .toArray(String[]::new);
+        }
+        return new String[0];
+    }
+
+    private String[] getWorkingDaysArray(WeekendConfig config, String customDays) {
+        List<String> allDays = List.of("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY");
+        String[] weekendDays = getWeekendDaysArray(config, customDays);
+        List<String> weekendList = Arrays.asList(weekendDays);
+        return allDays.stream()
+                .filter(d -> !weekendList.contains(d))
+                .toArray(String[]::new);
+    }
 }

@@ -10,8 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
-
+ 
 @Data
 @Entity
 @Table(name = "departments", uniqueConstraints = {

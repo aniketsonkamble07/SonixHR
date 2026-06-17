@@ -43,7 +43,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
         
@@ -56,7 +55,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
         
@@ -69,7 +67,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(6)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(false)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(true)
                 .build());
 
@@ -82,7 +79,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
 
@@ -95,7 +91,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("FEMALE")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
 
@@ -108,7 +103,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("MALE")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
 
@@ -121,7 +115,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
 
@@ -134,7 +127,6 @@ public class TenantLeaveSettings {
                 .minimumServiceMonths(0)
                 .genderEligibility("ALL")
                 .probationPeriodAllowed(true)
-                .roleEligibility(java.util.Collections.emptyList())
                 .prorated(false)
                 .build());
         

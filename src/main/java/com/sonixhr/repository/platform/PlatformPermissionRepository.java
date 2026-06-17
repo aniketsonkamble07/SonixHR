@@ -1,7 +1,6 @@
 package com.sonixhr.repository.platform;
-
+ 
 import com.sonixhr.entity.platform.PlatformPermission;
-import com.sonixhr.enums.PlatformPermissionEnum;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,9 +32,7 @@ public interface PlatformPermissionRepository extends JpaRepository<PlatformPerm
 
     @Query("SELECT p FROM PlatformPermission p WHERE p.active = true ORDER BY p.category ASC, p.displayOrder ASC")
     List<PlatformPermission> findAllOrdered();
-
-    Page<PlatformPermission> findAll(Pageable pageable);
-
+ 
     List<PlatformPermission> findByActiveTrue();
 
     @Query("SELECT p FROM PlatformPermission p WHERE p.active = true ORDER BY p.displayOrder ASC")

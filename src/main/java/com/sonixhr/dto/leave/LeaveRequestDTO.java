@@ -32,4 +32,6 @@ public class LeaveRequestDTO {
 
     @Size(max = 500, message = "Reason cannot exceed 500 characters")
     private String reason;
+
+    private Boolean isHalfDay;
 }

@@ -150,11 +150,14 @@ public class LeaveService {
             }
 
             if (!existingDates.contains(date)) {
+                com.sonixhr.enums.attendance.AttendanceStatus attendanceStatus =
+                        Boolean.TRUE.equals(leave.getIsHalfDay()) ? com.sonixhr.enums.attendance.AttendanceStatus.HALF_DAY : com.sonixhr.enums.attendance.AttendanceStatus.ON_LEAVE;
+
                 AttendanceRecord attendance = AttendanceRecord.builder()
                         .tenant(leave.getTenant())
                         .employee(leave.getEmployee())
                         .attendanceDate(date)
-                        .status(AttendanceStatus.ON_LEAVE)
+                        .status(attendanceStatus)
                         .reason("Leave: " + leave.getLeaveType().getDisplayName() +
                                 (leave.getReason() != null ? " - " + leave.getReason() : ""))
                         .markedBy(leave.getApprovedBy())
@@ -342,16 +345,6 @@ public class LeaveService {
                 }
             }
 
-            // 5. Role Eligibility Check
-            java.util.List<String> eligibleRoles = policy.getRoleEligibility();
-            if (eligibleRoles != null && !eligibleRoles.isEmpty()) {
-                boolean hasEligibleRole = employee.getRoles().stream()
-                        .anyMatch(r -> eligibleRoles.contains(r.getName()));
-                if (!hasEligibleRole) {
-                    throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
-                            request.getLeaveType().getDisplayName(), eligibleRoles));
-                }
-            }
         } else {
             throw new BusinessException(request.getLeaveType().getDisplayName() + " is not configured for this tenant");
         }
@@ -380,8 +373,18 @@ public class LeaveService {
         double totalDays = calculateTotalLeaveDays(employee,
                 request.getStartDate(), request.getEndDate(), request.getLeaveType(), settings);
 
-        if (totalDays <= 0) {
-            throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
+        if (Boolean.TRUE.equals(request.getIsHalfDay())) {
+            if (!request.getStartDate().isEqual(request.getEndDate())) {
+                throw new BusinessException("Half-day leaves can only be requested for a single day");
+            }
+            if (totalDays <= 0) {
+                throw new BusinessException("No working days selected for leave. Selected date falls on weekend/holiday.");
+            }
+            totalDays = 0.5;
+        } else {
+            if (totalDays <= 0) {
+                throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
+            }
         }
 
         // Check maximum consecutive leave days
@@ -416,6 +419,7 @@ public class LeaveService {
                 .totalDays(totalDays)
                 .reason(request.getReason())
                 .status(initialStatus)
+                .isHalfDay(Boolean.TRUE.equals(request.getIsHalfDay()))
                 .build();
 
         if (autoApprove) {
@@ -796,16 +800,6 @@ public class LeaveService {
                 }
             }
 
-            // 5. Role Eligibility Check
-            java.util.List<String> eligibleRoles = policy.getRoleEligibility();
-            if (eligibleRoles != null && !eligibleRoles.isEmpty()) {
-                boolean hasEligibleRole = leave.getEmployee().getRoles().stream()
-                        .anyMatch(r -> eligibleRoles.contains(r.getName()));
-                if (!hasEligibleRole) {
-                    throw new BusinessException(String.format("Employee does not have the required role to apply for %s. Required roles: %s", 
-                            request.getLeaveType().getDisplayName(), eligibleRoles));
-                }
-            }
         } else {
             throw new BusinessException(request.getLeaveType().getDisplayName() + " is not configured for this tenant");
         }
@@ -832,8 +826,18 @@ public class LeaveService {
         double totalDays = calculateTotalLeaveDays(leave.getEmployee(),
                 request.getStartDate(), request.getEndDate(), request.getLeaveType(), settings);
 
-        if (totalDays <= 0) {
-            throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
+        if (Boolean.TRUE.equals(request.getIsHalfDay())) {
+            if (!request.getStartDate().isEqual(request.getEndDate())) {
+                throw new BusinessException("Half-day leaves can only be requested for a single day");
+            }
+            if (totalDays <= 0) {
+                throw new BusinessException("No working days selected for leave. Selected date falls on weekend/holiday.");
+            }
+            totalDays = 0.5;
+        } else {
+            if (totalDays <= 0) {
+                throw new BusinessException("No working days selected for leave. Selected dates fall on weekends/holidays.");
+            }
         }
 
         // Check maximum consecutive leave days
@@ -865,6 +869,7 @@ public class LeaveService {
         leave.setTotalDays(totalDays);
         leave.setReason(request.getReason());
         leave.setStatus(initialStatus);
+        leave.setIsHalfDay(Boolean.TRUE.equals(request.getIsHalfDay()));
 
         if (autoApprove) {
             leave.setApprovedBy(currentUser.getId());
@@ -931,6 +936,7 @@ public class LeaveService {
                 .approvedByName(leave.getApprovedByName())
                 .approvedAt(leave.getApprovedAt())
                 .createdAt(leave.getCreatedAt())
+                .isHalfDay(leave.getIsHalfDay())
                 .build();
     }
 }

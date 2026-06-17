@@ -44,6 +44,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class TenantRegistrationService {
 
     private final TenantRepository tenantRepository;
@@ -51,7 +52,6 @@ public class TenantRegistrationService {
     private final TenantRoleRepository roleRepository;
     private final TenantPermissionRepository permissionRepository;
     private final ActivationTokenService activationTokenService;
-    private final WelcomeTenantEmailService welcomeTenantEmailService;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;

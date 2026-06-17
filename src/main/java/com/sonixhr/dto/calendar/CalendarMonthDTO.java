@@ -14,6 +14,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CalendarMonthDTO {
+    private Long employeeId;
+    private String employeeName;
+    private String employeeCode;
     private int year;
     private int month;
     private String monthName;

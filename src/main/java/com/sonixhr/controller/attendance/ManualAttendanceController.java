@@ -7,24 +7,23 @@ import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.attendance.ManualAttendanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
+ 
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
+ 
 @Slf4j
 @RestController
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
+@SuppressWarnings({"unchecked", "null"})
 public class ManualAttendanceController {
 
     private final ManualAttendanceService attendanceService;

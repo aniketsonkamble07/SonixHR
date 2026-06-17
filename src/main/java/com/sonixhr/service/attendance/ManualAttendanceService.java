@@ -4,6 +4,7 @@ import com.sonixhr.dto.attendance.ManualTeamMemberAttendanceDTO;
 import com.sonixhr.entity.attendance.AttendanceRecord;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.attendance.AttendanceStatus;
+import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.attendance.ManualAttendanceRepository;
@@ -81,6 +82,19 @@ public class ManualAttendanceService {
         if (employee.getLastWorkingDate() != null && attendanceDate.isAfter(employee.getLastWorkingDate())) {
             throw new BusinessException(
                     String.format("Cannot mark attendance after last working date: %s", employee.getLastWorkingDate())
+            );
+        }
+
+        // RULE 5: Cannot mark attendance for resigned (if last working date has passed), terminated, suspended, or invited employees
+        boolean isResignedAndLeft = employee.getStatus() == EmployeeStatus.RESIGNED &&
+                (employee.getLastWorkingDate() == null || attendanceDate.isAfter(employee.getLastWorkingDate()));
+
+        if (isResignedAndLeft ||
+                employee.getStatus() == EmployeeStatus.TERMINATED ||
+                employee.getStatus() == EmployeeStatus.SUSPENDED ||
+                employee.getStatus() == EmployeeStatus.INVITED) {
+            throw new BusinessException(
+                    String.format("Cannot mark attendance for an employee with status: %s", employee.getStatus().getDisplayName())
             );
         }
     }
@@ -187,6 +201,12 @@ public class ManualAttendanceService {
         // CRITICAL: Validate date against hire date and future dates
         validateAttendanceDate(date, targetEmployee);
         validateOvertime(overtimeHours);
+
+        if (targetEmployee.getStatus() == EmployeeStatus.ON_LEAVE && status != AttendanceStatus.ON_LEAVE) {
+            throw new BusinessException(
+                    String.format("Cannot mark employee as %s because their employee status is ON LEAVE", status.getDisplayName())
+            );
+        }
 
         Long tenantId = targetEmployee.getTenant().getId();
 
@@ -322,6 +342,10 @@ public class ManualAttendanceService {
 
         validateAttendanceDate(date, targetEmployee);
         validateOvertime(overtimeHours);
+
+        if (targetEmployee.getStatus() == EmployeeStatus.ON_LEAVE) {
+            throw new BusinessException("Cannot add overtime for an employee who is currently ON LEAVE");
+        }
 
         Long tenantId = targetEmployee.getTenant().getId();
 

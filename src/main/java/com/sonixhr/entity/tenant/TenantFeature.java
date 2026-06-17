@@ -8,8 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
-
+ 
 @Entity
 @Table(name = "tenant_features", indexes = {
         @Index(name = "idx_features_tenant", columnList = "tenant_id"),

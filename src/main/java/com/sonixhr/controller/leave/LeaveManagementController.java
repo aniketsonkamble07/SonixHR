@@ -4,7 +4,6 @@ import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.leave.LeaveResponseDTO;
 import com.sonixhr.dto.leave.LeaveSettingsDTO;
 import com.sonixhr.entity.employee.Employee;
-import com.sonixhr.entity.leave.TenantLeaveSettings;
 import com.sonixhr.enums.leave.LeaveStatus;
 import com.sonixhr.enums.leave.WeekendConfig;
 import com.sonixhr.service.employee.EmployeeService;
@@ -37,22 +36,22 @@ public class LeaveManagementController {
 
     @GetMapping("/leaves/settings")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_VIEW')")
-    public ResponseEntity<TenantLeaveSettings> getTenantLeaveSettings(
+    public ResponseEntity<LeaveSettingsDTO> getTenantLeaveSettings(
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get leave settings for tenant: {}", tenantId);
-        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenantId);
+        LeaveSettingsDTO settings = leaveConfigService.getTenantSettingsDTO(tenantId);
         return ResponseEntity.ok(settings);
     }
 
     @PutMapping("/leaves/settings")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<TenantLeaveSettings> updateTenantLeaveSettings(
+    public ResponseEntity<LeaveSettingsDTO> updateTenantLeaveSettings(
             @Valid @RequestBody LeaveSettingsDTO dto,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update leave settings for tenant: {}", tenantId);
-        TenantLeaveSettings settings = leaveConfigService.updateTenantSettings(tenantId, dto);
+        LeaveSettingsDTO settings = leaveConfigService.updateTenantSettingsDTO(tenantId, dto);
         return ResponseEntity.ok(settings);
     }
 
@@ -131,101 +130,101 @@ public class LeaveManagementController {
 
     @PutMapping("/leaves/policies/{leaveType}")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateLeavePolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateLeavePolicy(
             @PathVariable String leaveType,
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update leave policy for {} under tenant: {}", leaveType, tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, leaveType, policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get(leaveType.toUpperCase()));
     }
 
     @PutMapping("/leaves/policies/casual")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateCasualPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateCasualPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update CASUAL leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "CASUAL", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("CASUAL"));
     }
 
     @PutMapping("/leaves/policies/sick")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateSickPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateSickPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update SICK leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "SICK", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("SICK"));
     }
 
     @PutMapping("/leaves/policies/earned")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateEarnedPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateEarnedPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update EARNED leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "EARNED", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("EARNED"));
     }
 
     @PutMapping("/leaves/policies/emergency")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateEmergencyPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateEmergencyPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update EMERGENCY leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "EMERGENCY", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("EMERGENCY"));
     }
 
     @PutMapping("/leaves/policies/maternity")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateMaternityPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateMaternityPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update MATERNITY leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "MATERNITY", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("MATERNITY"));
     }
 
     @PutMapping("/leaves/policies/paternity")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updatePaternityPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updatePaternityPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update PATERNITY leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "PATERNITY", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("PATERNITY"));
     }
 
     @PutMapping("/leaves/policies/unpaid")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateUnpaidPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateUnpaidPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update UNPAID leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "UNPAID", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("UNPAID"));
     }
 
     @PutMapping("/leaves/policies/compensatory")
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SETTINGS_EDIT')")
-    public ResponseEntity<java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO>> updateCompensatoryPolicy(
+    public ResponseEntity<com.sonixhr.dto.leave.LeavePolicyDTO> updateCompensatoryPolicy(
             @RequestBody com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate,
             @AuthenticationPrincipal Employee currentEmployee) {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to update COMPENSATORY leave policy under tenant: {}", tenantId);
         java.util.Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updatedPolicies = leaveConfigService.updateLeavePolicy(tenantId, "COMPENSATORY", policyUpdate);
-        return ResponseEntity.ok(updatedPolicies);
+        return ResponseEntity.ok(updatedPolicies.get("COMPENSATORY"));
     }
 }

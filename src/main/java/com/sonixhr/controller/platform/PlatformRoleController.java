@@ -19,16 +19,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-
+ 
 @Slf4j
 @RestController
 @RequestMapping("/api/platform/roles")
 @RequiredArgsConstructor
 public class PlatformRoleController {
-
+ 
     private final PlatformRoleService roleService;
-    private final PlatformUserService userService;  // ✅ Added for user responses
 
     // ✅ REMOVED - Platform users don't have tenantId
     // private Long getCurrentTenantId(PlatformUser currentUser) { ... }

@@ -2,6 +2,7 @@ package com.sonixhr.service.attendance;
 
 import com.sonixhr.dto.attendance.ShiftConfigurationDTO;
 import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
+import com.sonixhr.dto.attendance.ShiftConfigurationSummaryDTO;
 import com.sonixhr.entity.attendance.ShiftConfiguration;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
@@ -416,5 +417,17 @@ public class ShiftConfigurationService {
                 .createdAt(shift.getCreatedAt())
                 .updatedAt(shift.getUpdatedAt())
                 .build();
+    }
+
+    public List<ShiftConfigurationSummaryDTO> getAllShiftConfigurationsSummary(Long tenantId) {
+        return getAllShiftConfigurations(tenantId).stream()
+                .map(ShiftConfigurationSummaryDTO::fromFullDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ShiftConfigurationSummaryDTO> getAllActiveShiftsSummary() {
+        return getAllActiveShifts().stream()
+                .map(ShiftConfigurationSummaryDTO::fromFullDTO)
+                .collect(Collectors.toList());
     }
 }

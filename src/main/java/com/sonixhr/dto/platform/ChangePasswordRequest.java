@@ -14,5 +14,6 @@ public class ChangePasswordRequest {
     @NotBlank
     private String newPassword;
 
+    @Builder.Default
     private boolean mustChangePassword = true;
 }

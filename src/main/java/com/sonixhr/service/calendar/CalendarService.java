@@ -142,6 +142,9 @@ public class CalendarService {
         Map<String, Object> summary = calculateSummary(days);
 
         return CalendarMonthDTO.builder()
+                .employeeId(employee.getId())
+                .employeeName(employee.getFullName())
+                .employeeCode(employee.getEmployeeCode())
                 .year(year)
                 .month(month)
                 .monthName(yearMonth.getMonth().toString())

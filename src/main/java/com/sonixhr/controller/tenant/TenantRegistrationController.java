@@ -5,7 +5,6 @@ import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.repository.employee.EmployeeRepository;
-import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.tenant.TenantRegistrationService;
 import jakarta.validation.Valid;
@@ -14,18 +13,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+ 
 import java.util.Map;
-
+ 
 @Slf4j
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 public class TenantRegistrationController {
-
+ 
     private final TenantRegistrationService registrationService;
     private final ActivationTokenService activationTokenService;
-    private final TenantRepository tenantRepository;
     private final EmployeeRepository employeeRepository;
 
 

@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class CacheMonitoringService {
 
     private final CacheManager cacheManager;
@@ -22,6 +23,7 @@ public class CacheMonitoringService {
     private final Map<String, CacheStats> cacheStats = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelay = 60000) // Every minute
+    @SuppressWarnings("null")
     public void logCacheStats() {
         if (cacheManager instanceof CaffeineCacheManager caffeineCacheManager) {
             caffeineCacheManager.getCacheNames().forEach(cacheName -> {

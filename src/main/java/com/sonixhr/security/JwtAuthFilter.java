@@ -12,21 +12,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
-
+ 
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
+ 
 @Slf4j
 @Component
+@SuppressWarnings("null")
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
@@ -106,9 +105,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
+    protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         long startTime = System.nanoTime();
@@ -177,7 +176,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
 
             UserDetails userDetails = null;
-            boolean tenantContextSet = false;
             String cacheKey = userType + ":" + username;
 
             try {
@@ -206,7 +204,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Long tenantId = Long.parseLong(tenantIdStr);
                     TenantContext.setCurrentTenant(tenantId);
                     tenantRLSService.setCurrentTenantInDB(tenantId);
-                    tenantContextSet = true;
 
                     if (userDetails == null) {
                         userDetails = employeeDetailsService.loadUserByUsername(username);
@@ -405,12 +402,5 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 "userDetailsCacheSize", userDetailsCache.size(),
                 "authCacheSize", authCache.size(),
                 "publicPathCacheSize", publicPathCache.size());
-    }
-
-    /**
-     * Original method kept for compatibility
-     */
-    private boolean isPublicPath(String path) {
-        return isPublicPathOptimized(path);
     }
 }

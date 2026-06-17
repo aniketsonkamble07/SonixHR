@@ -1,9 +1,7 @@
 package com.sonixhr.controller.employee;
-
+ 
 import com.sonixhr.dto.ActivationRequest;
 import com.sonixhr.entity.employee.Employee;
-import com.sonixhr.enums.employee.EmployeeStatus;
-import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.service.ActivationTokenService;
 import jakarta.validation.Valid;
@@ -11,19 +9,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
+ 
 import java.util.HashMap;
 import java.util.Map;
-
+ 
 @Slf4j
 @RestController
 @RequestMapping("/api/employee/auth")
 @RequiredArgsConstructor
 public class EmployeeActivationController {
-
+ 
     private final ActivationTokenService activationTokenService;
-    private final EmployeeRepository employeeRepository;
     private final JwtService jwtService;
 
     @PostMapping("/activate")

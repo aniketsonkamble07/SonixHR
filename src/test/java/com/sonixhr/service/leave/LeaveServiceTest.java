@@ -750,7 +750,6 @@ class LeaveServiceTest {
                         .minimumServiceMonths(minimumServiceMonths)
                         .genderEligibility((String) map.get("genderEligibility"))
                         .probationPeriodAllowed((Boolean) map.get("probationPeriodAllowed"))
-                        .roleEligibility((List<String>) map.get("roleEligibility"))
                         .prorated((Boolean) map.get("prorated"))
                         .build();
                 typedPolicies.put(entry.getKey(), dto);

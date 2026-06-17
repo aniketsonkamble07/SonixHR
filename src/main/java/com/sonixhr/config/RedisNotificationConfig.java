@@ -10,6 +10,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 @Configuration
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class RedisNotificationConfig {
 
     private final RedisNotificationSubscriber subscriber;
