@@ -58,6 +58,9 @@ class SonixhrApplicationTests {
 	private com.sonixhr.controller.attendance.ManualAttendanceController manualAttendanceController;
 
 	@Autowired
+	private com.sonixhr.controller.task.EmployeeTaskController employeeTaskController;
+
+	@Autowired
 	private com.sonixhr.repository.department.DepartmentRepository departmentRepository;
 
 	@Autowired
@@ -1234,6 +1237,100 @@ class SonixhrApplicationTests {
 		} catch (com.sonixhr.exceptions.BusinessException ex) {
 			assertTrue(ex.getMessage().contains("Half-day leaves can only be requested for a single day"));
 		}
+
+		// Clean context
+		com.sonixhr.security.TenantContext.clear();
+		org.springframework.security.core.context.SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	@org.springframework.transaction.annotation.Transactional
+	void testEmployeeTaskFlow() throws Exception {
+		// Clean database
+		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+			jdbcTemplate.execute("TRUNCATE TABLE employees, tenant_subscriptions, shift_configurations, tenant_roles, tenants CASCADE");
+		});
+
+		// Seed default tenant
+		tenantSeeder.run(null);
+
+		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
+		com.sonixhr.security.TenantContext.setCurrentTenant(tenant.getId());
+
+		// Get Super Admin / Manager employee (seeded as admin@acme.com)
+		com.sonixhr.entity.employee.Employee manager = employeeRepository.findByEmailWithRolesAndPermissions("admin@acme.com")
+				.orElseThrow(() -> new AssertionError("Super Admin employee not found"));
+
+		// Simulate authenticated context for manager
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						manager, "password", manager.getAuthorities()
+				)
+		);
+
+		// Create a separate mock employee to assign task to
+		com.sonixhr.entity.employee.Employee employee = com.sonixhr.entity.employee.Employee.builder()
+				.tenant(tenant)
+				.employeeCode("EMP002")
+				.firstName("John")
+				.lastName("Doe")
+				.email("john.doe@acme.com")
+				.passwordHash("DummyHash123")
+				.hireDate(java.time.LocalDate.now())
+				.status(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE)
+				.isActive(true)
+				.roles(new java.util.HashSet<>(manager.getRoles())) // Give them the roles for testing authority
+				.manager(manager)
+				.build();
+		employee = employeeRepository.save(employee);
+
+		// 1. Authenticate as Manager and create/assign task
+		com.sonixhr.dto.task.TaskCreateRequestDTO request = com.sonixhr.dto.task.TaskCreateRequestDTO.builder()
+				.title("Review HR Guidelines")
+				.description("Please review the standard HR guidelines document.")
+				.assignedToId(employee.getId())
+				.dueDate(java.time.LocalDate.now().plusDays(2))
+				.build();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> createResponse =
+				employeeTaskController.createTask(request, manager);
+		
+		assertNotNull(createResponse.getBody());
+		assertEquals(org.springframework.http.HttpStatus.CREATED, createResponse.getStatusCode());
+		assertEquals("Review HR Guidelines", createResponse.getBody().getTitle());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.PENDING, createResponse.getBody().getStatus());
+
+		// 2. Authenticate as Employee to view and acknowledge the task
+		final com.sonixhr.entity.employee.Employee finalEmployee = employee;
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						finalEmployee, "password", finalEmployee.getAuthorities()
+				)
+		);
+
+		org.springframework.http.ResponseEntity<org.springframework.data.domain.Page<com.sonixhr.dto.task.TaskResponseDTO>> myTasksResponse =
+				employeeTaskController.getMyTasks(finalEmployee, org.springframework.data.domain.PageRequest.of(0, 10));
+		assertNotNull(myTasksResponse.getBody());
+		assertEquals(1, myTasksResponse.getBody().getTotalElements());
+
+		Long taskId = createResponse.getBody().getId();
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> ackResponse =
+				employeeTaskController.acknowledgeTask(taskId, finalEmployee);
+		assertNotNull(ackResponse.getBody());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.ACKNOWLEDGED, ackResponse.getBody().getStatus());
+		assertNotNull(ackResponse.getBody().getAcknowledgedAt());
+
+		// 3. Update task status to IN_PROGRESS and then COMPLETED
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> inProgressResponse =
+				employeeTaskController.updateTaskStatus(taskId, com.sonixhr.enums.task.TaskStatus.IN_PROGRESS, finalEmployee);
+		assertNotNull(inProgressResponse.getBody());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.IN_PROGRESS, inProgressResponse.getBody().getStatus());
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> completedResponse =
+				employeeTaskController.updateTaskStatus(taskId, com.sonixhr.enums.task.TaskStatus.COMPLETED, finalEmployee);
+		assertNotNull(completedResponse.getBody());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.COMPLETED, completedResponse.getBody().getStatus());
+		assertNotNull(completedResponse.getBody().getCompletedAt());
 
 		// Clean context
 		com.sonixhr.security.TenantContext.clear();

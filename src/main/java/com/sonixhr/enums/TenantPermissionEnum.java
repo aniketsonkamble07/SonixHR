@@ -108,7 +108,18 @@ public enum TenantPermissionEnum {
     // AUDIT & SECURITY
     // =====================================================
     AUDIT_ROLE_ASSIGNMENTS("View role assignment audit logs", "Audit", 1),
-    AUDIT_PERMISSION_CHANGES("View permission change audit logs", "Audit", 2);
+    AUDIT_PERMISSION_CHANGES("View permission change audit logs", "Audit", 2),
+
+    // =====================================================
+    // TASK MANAGEMENT
+    // =====================================================
+    TASK_CREATE("Create and assign tasks", "Task Management", 1),
+    TASK_VIEW_ALL("View all tasks in tenant", "Task Management", 2),
+    TASK_VIEW_TEAM("View team tasks", "Task Management", 3),
+    TASK_VIEW_OWN("View own assigned tasks", "Task Management", 4),
+    TASK_EDIT("Edit task details", "Task Management", 5),
+    TASK_ACKNOWLEDGE("Acknowledge assigned tasks", "Task Management", 6),
+    TASK_UPDATE_STATUS("Update own task status", "Task Management", 7);
 
     private final String description;
     private final String category;
