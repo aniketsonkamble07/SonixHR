@@ -21,7 +21,6 @@ import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import com.sonixhr.service.ActivationTokenService;
-import com.sonixhr.service.EmailService;
 import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import com.sonixhr.service.attendance.ShiftConfigurationService;
 import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
@@ -52,7 +51,6 @@ public class TenantRegistrationService {
     private final TenantRoleRepository roleRepository;
     private final TenantPermissionRepository permissionRepository;
     private final ActivationTokenService activationTokenService;
-    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;
     private final EmployeeCodeGenerator employeeCodeGenerator;

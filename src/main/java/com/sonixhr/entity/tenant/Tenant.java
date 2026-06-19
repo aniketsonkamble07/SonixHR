@@ -46,7 +46,7 @@ public class Tenant {
 
     @Column(name = "is_active")
     @Builder.Default
-    private boolean isActive = true;  // ✅ Changed to primitive boolean
+    private boolean isActive = true;
 
     @Column(name = "admin_email", nullable = false, length = 255)
     private String adminEmail;
@@ -60,7 +60,7 @@ public class Tenant {
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", length = 20)
     @Builder.Default
-    private PlanType planType = PlanType.TRIAL;  // ✅ Changed to enum
+    private PlanType planType = PlanType.TRIAL;
 
     @Column(name = "max_employees")
     @Builder.Default
@@ -91,10 +91,10 @@ public class Tenant {
     private LocalDateTime deletedAt;
 
     @Column(name = "created_by")
-    private Long createdBy;  // ✅ Changed from UUID to Long (matches Employee/User ID)
+    private Long createdBy;
 
     @Column(name = "updated_by")
-    private Long updatedBy;  // ✅ Changed from UUID to Long
+    private Long updatedBy;
 
     @Version
     @Builder.Default
@@ -150,12 +150,12 @@ public class Tenant {
         return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.trialEndsAt);
     }
 
-    // ✅ Convenience method for template compatibility
+    //  Convenience method for template compatibility
     public Boolean getIsActive() {
         return isActive;
     }
 
-    // ✅ JPA Lifecycle Validation
+    // JPA Lifecycle Validation
     @PrePersist
     @PreUpdate
     private void validate() {

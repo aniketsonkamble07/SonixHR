@@ -20,6 +20,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,13 +87,17 @@ public class PlatformUserService {
             throw new DuplicateResourceException("Email already exists: " + request.getEmail());
         }
 
-        Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(request.getRoleIds()));
+        Set<Long> roleIds = request.getRoleIds();
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new BusinessException("At least one valid role must be assigned");
+        }
+        Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(roleIds));
         if (roles.isEmpty()) {
             throw new BusinessException("At least one valid role must be assigned");
         }
-        if (roles.size() != request.getRoleIds().size()) {
+        if (roles.size() != roleIds.size()) {
             Set<Long> found = roles.stream().map(PlatformRole::getId).collect(Collectors.toSet());
-            Set<Long> missing = request.getRoleIds().stream()
+            Set<Long> missing = roleIds.stream()
                     .filter(id -> !found.contains(id)).collect(Collectors.toSet());
             throw new BusinessException("Invalid role IDs: " + missing);
         }
@@ -107,16 +112,19 @@ public class PlatformUserService {
                 .roles(roles)
                 .build();
 
-        PlatformUser saved = platformUserRepository.save(user);
+        if (user != null) {
+            PlatformUser saved = platformUserRepository.save(user);
 
-        String token = activationTokenService.generateTokenForPlatformUser(saved.getId());
-        String activationLink = baseUrl + "/api/platform/auth/activate?token=" + token;
+            String token = activationTokenService.generateTokenForPlatformUser(saved.getId());
+            String activationLink = baseUrl + "/api/platform/auth/activate?token=" + token;
 
-        // FIX 3: call through a separate bean so @Async proxy is honoured
-        notificationService.sendActivationEmail(saved.getEmail(), saved.getFullName(), activationLink);
+            // FIX 3: call through a separate bean so @Async proxy is honoured
+            notificationService.sendActivationEmail(saved.getEmail(), saved.getFullName(), activationLink);
 
-        log.info("Platform user created (pending activation): {}", request.getEmail());
-        return toResponse(saved, activationLink, LocalDateTime.now().plusHours(24));
+            log.info("Platform user created (pending activation): {}", request.getEmail());
+            return toResponse(saved, activationLink, LocalDateTime.now().plusHours(24));
+        }
+        throw new BusinessException("Failed to construct platform user");
     }
 
     @Transactional
@@ -175,7 +183,7 @@ public class PlatformUserService {
     // =====================================================
 
     @Cacheable(value = "platformUsers", key = "'user:' + #userId", unless = "#result == null")
-    public PlatformUserResponse getUserById(Long userId) {
+    public PlatformUserResponse getUserById(@NonNull Long userId) {
         log.debug("Loading platform user from DB: {}", userId);
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
@@ -224,7 +232,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsers",     key = "'user:'  + #userId"),
             @CacheEvict(value = "platformUsersPage", allEntries = true)
     })
-    public PlatformUserResponse updateUser(Long userId, PlatformUserUpdateRequest request) {
+    public PlatformUserResponse updateUser(@NonNull Long userId, PlatformUserUpdateRequest request) {
         log.info("Updating platform user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
@@ -273,7 +281,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsersPage",  allEntries = true),
             @CacheEvict(value = "platformStatistics", allEntries = true)
     })
-    public PlatformUserResponse updateUserStatus(Long userId, UserStatus status) {
+    public PlatformUserResponse updateUserStatus(@NonNull Long userId, UserStatus status) {
         log.info("Updating status for user {} to {}", userId, status);
 
         PlatformUser user = platformUserRepository.findById(userId)
@@ -299,12 +307,13 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsers",     key = "'user:' + #userId"),
             @CacheEvict(value = "platformUsersPage", allEntries = true)
     })
-    public PlatformUserResponse updateUserRoles(Long userId, Set<Long> roleIds) {
+    public PlatformUserResponse updateUserRoles(@NonNull Long userId, Set<Long> roleIds) {
         log.info("Updating roles for user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
+        if (roleIds == null || roleIds.isEmpty()) throw new BusinessException("At least one valid role must be assigned");
         Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(roleIds));
         if (roles.isEmpty()) throw new BusinessException("At least one valid role must be assigned");
         if (roles.size() != roleIds.size()) {
@@ -333,7 +342,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsersPage",  allEntries = true),
             @CacheEvict(value = "platformStatistics", allEntries = true)
     })
-    public void activateUserByAdmin(Long userId) {
+    public void activateUserByAdmin(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
         if ("admin@sonixhr.com".equals(user.getEmail()))
             throw new BusinessException("Super Admin is already active");
@@ -356,7 +365,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsersPage",  allEntries = true),
             @CacheEvict(value = "platformStatistics", allEntries = true)
     })
-    public void suspendUser(Long userId) {
+    public void suspendUser(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
         if ("admin@sonixhr.com".equals(user.getEmail()))
             throw new BusinessException("Cannot suspend the default Super Admin");
@@ -379,7 +388,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsersPage",  allEntries = true),
             @CacheEvict(value = "platformStatistics", allEntries = true)
     })
-    public void deleteUser(Long userId) {
+    public void deleteUser(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
         if ("admin@sonixhr.com".equals(user.getEmail()))
             throw new BusinessException("Cannot delete the default Super Admin");
@@ -399,7 +408,7 @@ public class PlatformUserService {
             @CacheEvict(value = "platformUsers",     key = "'user:' + #userId"),
             @CacheEvict(value = "platformUsersPage", allEntries = true)
     })
-    public void resetPasswordByAdmin(Long userId, String newPassword) {
+    public void resetPasswordByAdmin(@NonNull Long userId, String newPassword) {
         PlatformUser user = requireUser(userId);
         validatePasswordStrength(newPassword);
 
@@ -434,7 +443,7 @@ public class PlatformUserService {
     // PRIVATE HELPERS
     // =====================================================
 
-    private PlatformUser requireUser(Long userId) {
+    private PlatformUser requireUser(@NonNull Long userId) {
         return platformUserRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found: " + userId));
     }

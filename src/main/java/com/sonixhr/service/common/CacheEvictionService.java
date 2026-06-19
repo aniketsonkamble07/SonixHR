@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class CacheEvictionService {
 
     private final CacheManager cacheManager;
@@ -17,7 +18,6 @@ public class CacheEvictionService {
      * Evict all caches for a specific tenant
      */
     public void evictTenantCaches(Long tenantId) {
-        String tenantPrefix = "*tenant_" + tenantId + "*";
 
         cacheManager.getCacheNames().forEach(cacheName -> {
             Cache cache = cacheManager.getCache(cacheName);

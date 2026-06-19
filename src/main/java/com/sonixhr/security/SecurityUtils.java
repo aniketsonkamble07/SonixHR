@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
+@SuppressWarnings("unchecked")
 public class SecurityUtils {
 
     @Autowired(required = false)
@@ -260,7 +261,6 @@ public class SecurityUtils {
     /**
      * Get current user's roles - Optimized with multiple cache layers
      */
-    @SuppressWarnings("unchecked")
     public List<String> getCurrentUserRoles() {
         // Check request cache
         Map<String, Object> reqCache = requestCache.get();

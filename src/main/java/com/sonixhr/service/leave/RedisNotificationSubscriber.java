@@ -16,7 +16,7 @@ public class RedisNotificationSubscriber implements MessageListener {
     private final NotificationEmitterService emitterService;
 
     @Override
-    public void onMessage(Message message, byte[] pattern) {
+    public void onMessage(@org.springframework.lang.NonNull Message message, @org.springframework.lang.Nullable byte[] pattern) {
         try {
             String channel = new String(message.getChannel(), StandardCharsets.UTF_8);
             String body = new String(message.getBody(), StandardCharsets.UTF_8);

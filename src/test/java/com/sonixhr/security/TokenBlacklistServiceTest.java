@@ -14,11 +14,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class TokenBlacklistServiceTest {
 
     @InjectMocks

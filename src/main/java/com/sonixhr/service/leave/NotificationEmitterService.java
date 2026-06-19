@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.lang.NonNull;
 
 @Slf4j
 @Service
@@ -19,7 +20,7 @@ public class NotificationEmitterService {
     /**
      * Register a new SSE connection for an employee.
      */
-    public SseEmitter createEmitter(Long employeeId) {
+    public SseEmitter createEmitter(@NonNull Long employeeId) {
         // Timeout of 30 minutes (1800000 ms)
         SseEmitter emitter = new SseEmitter(1800000L);
 
@@ -46,7 +47,7 @@ public class NotificationEmitterService {
     /**
      * Remove an emitter when it is completed/timed out.
      */
-    private void removeEmitter(Long employeeId, SseEmitter emitter) {
+    private void removeEmitter(@NonNull Long employeeId, SseEmitter emitter) {
         List<SseEmitter> emitters = employeeEmitters.get(employeeId);
         if (emitters != null) {
             synchronized (emitters) {
@@ -62,7 +63,7 @@ public class NotificationEmitterService {
     /**
      * Send a notification to all active SSE emitters of a specific employee.
      */
-    public void sendNotification(Long employeeId, String messageJson) {
+    public void sendNotification(@NonNull Long employeeId, @NonNull String messageJson) {
         List<SseEmitter> emitters = employeeEmitters.get(employeeId);
         if (emitters == null || emitters.isEmpty()) {
             log.debug("No active SSE emitters for employee: {}", employeeId);

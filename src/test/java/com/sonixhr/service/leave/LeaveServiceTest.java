@@ -30,13 +30,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class LeaveServiceTest {
 
     @InjectMocks
@@ -717,7 +717,6 @@ class LeaveServiceTest {
         assertTrue(ex.getMessage().contains("You are not authorized to approve this leave request"));
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, LeavePolicyDTO> convertPolicies(Map<String, Object> rawPolicies) {
         Map<String, LeavePolicyDTO> typedPolicies = new HashMap<>();
         for (Map.Entry<String, Object> entry : rawPolicies.entrySet()) {

@@ -8,9 +8,9 @@ import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.leave.LeaveRequest;
 import com.sonixhr.entity.leave.PublicHoliday;
 import com.sonixhr.entity.leave.TenantLeaveSettings;
-import com.sonixhr.enums.attendance.AttendanceStatus;
 import com.sonixhr.enums.leave.LeaveStatus;
 import com.sonixhr.enums.leave.LeaveType;
+import org.springframework.lang.NonNull;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.LeavePoliciesNotConfiguredException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class LeaveService {
 
@@ -122,7 +123,11 @@ public class LeaveService {
 
     private void createAttendanceForLeaveDays(LeaveRequest leave) {
         LocalDate date = leave.getStartDate();
-        TenantLeaveSettings settings = settingsRepository.findById(leave.getTenant().getId()).orElse(null);
+        Long tenantId = leave.getTenant().getId();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant ID cannot be null");
+        }
+        TenantLeaveSettings settings = settingsRepository.findById(tenantId).orElse(null);
 
         Set<LocalDate> holidayDates = getHolidayDatesInRange(leave.getTenant().getId(), leave.getStartDate(), leave.getEndDate(), settings);
 
@@ -165,8 +170,10 @@ public class LeaveService {
                         .markedByRole("MANAGER")
                         .markedAt(LocalDateTime.now())
                         .build();
-                attendanceRepository.save(attendance);
-                log.info("Created attendance record for leave on: {}", date);
+                if (attendance != null) {
+                    attendanceRepository.save(attendance);
+                    log.info("Created attendance record for leave on: {}", date);
+                }
             }
             date = date.plusDays(1);
         }
@@ -179,7 +186,7 @@ public class LeaveService {
     /**
      * Get leave balance considering tenant settings
      */
-    public Map<String, Object> getLeaveBalanceWithTenantSettings(Long employeeId, Long tenantId) {
+    public Map<String, Object> getLeaveBalanceWithTenantSettings(@NonNull Long employeeId, @NonNull Long tenantId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
@@ -287,13 +294,17 @@ public class LeaveService {
      * Request leave with tenant setting validation
      */
     @Transactional
-    public LeaveResponseDTO requestLeaveWithTenantSettings(Long employeeId, LeaveRequestDTO request, Employee currentUser) {
+    public LeaveResponseDTO requestLeaveWithTenantSettings(@NonNull Long employeeId, LeaveRequestDTO request, Employee currentUser) {
         log.info("Employee {} requesting leave from {} to {}", employeeId, request.getStartDate(), request.getEndDate());
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
-        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(employee.getTenant().getId());
+        Long tenantId = employee.getTenant().getId();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant ID cannot be null");
+        }
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenantId);
 
         // First-time configuration check
         if (settings.getPoliciesConfigured() == null || !settings.getPoliciesConfigured()) {
@@ -429,14 +440,17 @@ public class LeaveService {
             log.info("Leave request auto-approved for employee: {}", employeeId);
         }
 
-        LeaveRequest saved = leaveRepository.save(leave);
+        if (leave != null) {
+            LeaveRequest saved = leaveRepository.save(leave);
 
-        // If auto-approved, create attendance records
-        if (autoApprove) {
-            createAttendanceForLeaveDays(saved);
+            // If auto-approved, create attendance records
+            if (autoApprove) {
+                createAttendanceForLeaveDays(saved);
+            }
+
+            return convertToResponse(saved);
         }
-
-        return convertToResponse(saved);
+        throw new BusinessException("Failed to save leave request");
     }
 
     /**
@@ -481,7 +495,7 @@ public class LeaveService {
     /**
      * Get available days for leave type based on tenant settings
      */
-    private double getAvailableDaysForLeaveType(Employee employee, LeaveType leaveType, int year, TenantLeaveSettings settings) {
+    private double getAvailableDaysForLeaveType(Employee employee, LeaveType leaveType, int year, @NonNull TenantLeaveSettings settings) {
         double baseDays = 0;
         boolean carryForward = false;
         double maxCarryForwardDays = 0;
@@ -567,7 +581,7 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
-    public LeaveResponseDTO approveLeave(Long leaveId, Long approverId, String approverName) {
+    public LeaveResponseDTO approveLeave(@NonNull Long leaveId, @NonNull Long approverId, String approverName) {
         log.info("Approving leave request: {} by {}", leaveId, approverName);
 
         LeaveRequest leave = leaveRepository.findById(leaveId)
@@ -619,7 +633,7 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
-    public LeaveResponseDTO rejectLeave(Long leaveId, String rejectionReason, Long rejectorId, String rejectorName) {
+    public LeaveResponseDTO rejectLeave(@NonNull Long leaveId, String rejectionReason, @NonNull Long rejectorId, String rejectorName) {
         log.info("Rejecting leave request: {} by {}", leaveId, rejectorName);
 
         LeaveRequest leave = leaveRepository.findById(leaveId)
@@ -696,7 +710,7 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
-    public LeaveResponseDTO cancelLeave(Long leaveId, Long employeeId, String cancellationReason) {
+    public LeaveResponseDTO cancelLeave(@NonNull Long leaveId, @NonNull Long employeeId, String cancellationReason) {
         log.info("Cancelling leave request: {} by employee: {}", leaveId, employeeId);
 
         LeaveRequest leave = leaveRepository.findById(leaveId)
@@ -739,7 +753,7 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
-    public LeaveResponseDTO updateLeaveRequest(Long leaveId, Long employeeId, LeaveRequestDTO request, Employee currentUser) {
+    public LeaveResponseDTO updateLeaveRequest(@NonNull Long leaveId, @NonNull Long employeeId, LeaveRequestDTO request, Employee currentUser) {
         log.info("Updating leave request: {} by employee: {}", leaveId, employeeId);
 
         LeaveRequest leave = leaveRepository.findById(leaveId)
@@ -753,7 +767,11 @@ public class LeaveService {
             throw new BusinessException("Only pending leave requests can be updated");
         }
 
-        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(leave.getTenant().getId());
+        Long tenantId = leave.getTenant().getId();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant ID cannot be null");
+        }
+        TenantLeaveSettings settings = leaveConfigService.getTenantSettings(tenantId);
 
         // Policy validation
         Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = settings.getLeavePolicies();
@@ -892,7 +910,7 @@ public class LeaveService {
     // GET LEAVES FOR EMPLOYEE/TEAM
     // =====================================================
 
-    public List<LeaveResponseDTO> getMyLeaves(Long employeeId) {
+    public List<LeaveResponseDTO> getMyLeaves(@NonNull Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 

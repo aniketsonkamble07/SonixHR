@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/employees")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class LeaveManagementController {
 
     private final LeaveService leaveService;

@@ -35,7 +35,6 @@ public class TenantDynamicRoleService {
     private long cacheTtlMinutes;
 
     private static final String REDIS_KEY_TENANT_USER_AUTHORITIES = "tenant:user:authorities:";
-    private static final String REDIS_KEY_TENANT_ROLE_PERMISSIONS = "tenant:role:permissions:";
 
     /**
      * Load employee authorities dynamically from database (tenant-specific)

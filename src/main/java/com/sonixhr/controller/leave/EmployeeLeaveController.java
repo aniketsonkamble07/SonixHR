@@ -19,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/employee/leaves")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class EmployeeLeaveController {
 
     private final LeaveService leaveService;

@@ -1,6 +1,5 @@
 package com.sonixhr.service.tenant;
 
-import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.entity.employee.Employee;
@@ -28,7 +27,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class TenantRegistrationServiceTest {
 
     @InjectMocks

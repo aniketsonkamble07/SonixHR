@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "null"})
 public class PlatformTokenBlacklistService {
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -193,7 +193,6 @@ public class PlatformTokenBlacklistService {
      * Alternative: Blacklist token in Redis with pipelining (better performance for bulk operations)
      * Use this if you're blacklisting many tokens at once
      */
-    @SuppressWarnings("unused")
     private boolean blacklistTokenInRedisWithPipeline(String jti, String username, String userType, long ttl) {
         try {
             String key = REDIS_KEY_BLACKLIST + jti;
@@ -206,8 +205,8 @@ public class PlatformTokenBlacklistService {
                 hash.put("userType".getBytes(), userType != null ? userType.getBytes() : new byte[0]);
                 hash.put("blacklistedAt".getBytes(), String.valueOf(System.currentTimeMillis()).getBytes());
 
-                connection.hMSet(key.getBytes(), hash);
-                connection.expire(key.getBytes(), ttl / 1000);
+                connection.hashCommands().hMSet(key.getBytes(), hash);
+                connection.keyCommands().expire(key.getBytes(), ttl / 1000);
                 return null;
             });
 

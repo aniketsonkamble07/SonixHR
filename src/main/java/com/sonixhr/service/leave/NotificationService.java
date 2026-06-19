@@ -11,12 +11,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.lang.NonNull;
 
 import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class NotificationService {
 
@@ -28,7 +30,7 @@ public class NotificationService {
      * Create and save a notification for an employee.
      */
     @Transactional
-    public Notification sendNotification(Employee recipient, String title, String message, String type) {
+    public Notification sendNotification(@NonNull Employee recipient, @NonNull String title, @NonNull String message, @NonNull String type) {
         log.info("Creating notification for employee: {} - Title: {}", recipient.getId(), title);
 
         Notification notification = Notification.builder()
@@ -64,7 +66,7 @@ public class NotificationService {
     /**
      * Retrieve all notifications for the employee.
      */
-    public List<Notification> getMyNotifications(Long employeeId, Long tenantId) {
+    public List<Notification> getMyNotifications(@NonNull Long employeeId, @NonNull Long tenantId) {
         log.info("Fetching notifications for employee: {} in tenant: {}", employeeId, tenantId);
         return notificationRepository.findByEmployeeIdAndTenantIdOrderByCreatedAtDesc(employeeId, tenantId);
     }
@@ -73,7 +75,7 @@ public class NotificationService {
      * Mark a specific notification as read.
      */
     @Transactional
-    public void markAsRead(Long notificationId, Long employeeId, Long tenantId) {
+    public void markAsRead(@NonNull Long notificationId, @NonNull Long employeeId, @NonNull Long tenantId) {
         log.info("Marking notification {} as read for employee {}", notificationId, employeeId);
 
         Notification notification = notificationRepository.findById(notificationId)

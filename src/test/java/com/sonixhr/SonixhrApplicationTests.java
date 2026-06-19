@@ -808,7 +808,7 @@ class SonixhrApplicationTests {
 
 		// 1. Request a leave (e.g. CASUAL leave for next week)
 		java.time.LocalDate startDate = java.time.LocalDate.now().plusDays(1);
-		while (startDate.getDayOfWeek() == java.time.DayOfWeek.SATURDAY || startDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+		while (startDate.getDayOfWeek() != java.time.DayOfWeek.THURSDAY) {
 			startDate = startDate.plusDays(1);
 		}
 		java.time.LocalDate endDate = startDate.plusDays(1);

@@ -31,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/employees")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Tag(name = "Employee Management", description = "APIs for managing employees")
 public class EmployeeController {
 

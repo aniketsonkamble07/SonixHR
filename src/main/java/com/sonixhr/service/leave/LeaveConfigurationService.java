@@ -12,6 +12,7 @@ import com.sonixhr.repository.leave.PublicHolidayRepository;
 import com.sonixhr.repository.leave.TenantLeaveSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,13 +34,16 @@ public class LeaveConfigurationService {
      * Get tenant leave settings, creates defaults if not present.
      */
     @Transactional
-    public TenantLeaveSettings getTenantSettings(Long tenantId) {
+    public TenantLeaveSettings getTenantSettings(@NonNull Long tenantId) {
         TenantLeaveSettings settings = settingsRepository.findById(tenantId).orElse(null);
         if (settings == null) {
-            settings = TenantLeaveSettings.builder()
+            TenantLeaveSettings newSettings = TenantLeaveSettings.builder()
                     .tenantId(tenantId)
                     .build();
-            return settingsRepository.save(settings);
+            if (newSettings != null) {
+                return settingsRepository.save(newSettings);
+            }
+            throw new BusinessException("Failed to construct default leave settings");
         }
         if (settings.getLeavePolicies() == null || settings.getLeavePolicies().isEmpty()) {
             settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
@@ -52,7 +56,7 @@ public class LeaveConfigurationService {
      * Update tenant leave settings.
      */
     @Transactional
-    public TenantLeaveSettings updateTenantSettings(Long tenantId, LeaveSettingsDTO dto) {
+    public TenantLeaveSettings updateTenantSettings(@NonNull Long tenantId, LeaveSettingsDTO dto) {
         TenantLeaveSettings settings = getTenantSettings(tenantId);
         
         if (dto.getLeavePolicies() != null) {
@@ -125,7 +129,7 @@ public class LeaveConfigurationService {
      * Update employee-specific weekend and off-day settings.
      */
     @Transactional
-    public Employee updateEmployeeSettings(Long tenantId, Long employeeId, WeekendConfig weekendConfig, String customWeekendDays) {
+    public Employee updateEmployeeSettings(@NonNull Long tenantId, @NonNull Long employeeId, WeekendConfig weekendConfig, String customWeekendDays) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
@@ -154,8 +158,11 @@ public class LeaveConfigurationService {
         // 2. Fall back to tenant-level settings if employee settings are null
         if (config == null) {
             TenantLeaveSettings tenantSettings = settings;
-            if (tenantSettings == null && employee != null) {
-                tenantSettings = settingsRepository.findById(employee.getTenant().getId()).orElse(null);
+            if (tenantSettings == null && employee != null && employee.getTenant() != null) {
+                Long tId = employee.getTenant().getId();
+                if (tId != null) {
+                    tenantSettings = settingsRepository.findById(tId).orElse(null);
+                }
             }
             if (tenantSettings != null) {
                 config = tenantSettings.getWeekendConfig();
@@ -202,7 +209,7 @@ public class LeaveConfigurationService {
     /**
      * Check if a date is a public holiday for the tenant.
      */
-    public boolean isHolidayForTenant(LocalDate date, Long tenantId, TenantLeaveSettings settings) {
+    public boolean isHolidayForTenant(LocalDate date, @NonNull Long tenantId, TenantLeaveSettings settings) {
         if (settings == null) {
             settings = settingsRepository.findById(tenantId).orElse(null);
             if (settings == null) {
@@ -263,7 +270,7 @@ public class LeaveConfigurationService {
     /**
      * Get all leave policies map for a tenant.
      */
-    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> getLeavePolicies(Long tenantId) {
+    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> getLeavePolicies(@NonNull Long tenantId) {
         TenantLeaveSettings settings = getTenantSettings(tenantId);
         return settings.getLeavePolicies();
     }
@@ -272,7 +279,7 @@ public class LeaveConfigurationService {
      * Update/insert a policy configuration for a specific leave type.
      */
     @Transactional
-    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updateLeavePolicy(Long tenantId, String leaveTypeStr, com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate) {
+    public Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> updateLeavePolicy(@NonNull Long tenantId, String leaveTypeStr, com.sonixhr.dto.leave.LeavePolicyDTO policyUpdate) {
         TenantLeaveSettings settings = getTenantSettings(tenantId);
         Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> policies = settings.getLeavePolicies();
         if (policies == null) {
@@ -302,12 +309,12 @@ public class LeaveConfigurationService {
         return policies;
     }
 
-    public LeaveSettingsDTO getTenantSettingsDTO(Long tenantId) {
+    public LeaveSettingsDTO getTenantSettingsDTO(@NonNull Long tenantId) {
         return convertToSettingsDTO(getTenantSettings(tenantId));
     }
 
     @Transactional
-    public LeaveSettingsDTO updateTenantSettingsDTO(Long tenantId, LeaveSettingsDTO dto) {
+    public LeaveSettingsDTO updateTenantSettingsDTO(@NonNull Long tenantId, LeaveSettingsDTO dto) {
         return convertToSettingsDTO(updateTenantSettings(tenantId, dto));
     }
 

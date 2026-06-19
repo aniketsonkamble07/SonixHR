@@ -12,12 +12,12 @@ import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class WelcomeTenantEmailService {
 
     private final JavaMailSender mailSender;
@@ -51,11 +51,7 @@ public class WelcomeTenantEmailService {
                 tenant.getAdminEmail(), tenant.getCompanyName());
 
         try {
-            String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=";
             String tenantUrl = baseUrl;
-            String trialEndDate = tenant.getTrialEndsAt() != null ?
-                    tenant.getTrialEndsAt().format(DATE_FORMATTER) :
-                    LocalDate.now().plusDays(14).format(DATE_FORMATTER);
 
             String subject = "Welcome to SonixHR - Activate Your Account";
 

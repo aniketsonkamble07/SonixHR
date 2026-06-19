@@ -87,6 +87,10 @@ public class TenantPermissionController {
     public ResponseEntity<PermissionDTO> getPermissionById(@PathVariable Long id) {
         log.debug("REST request to get permission by id: {}", id);
 
+        if (id == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
         PermissionDTO permission = permissionService.getPermissionById(id);
 
         if (permission == null) {

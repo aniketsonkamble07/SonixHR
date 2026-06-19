@@ -8,7 +8,7 @@ import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +37,9 @@ public class TenantPermissionService {
                             .category(enumPermission.getCategory())
                             .displayOrder(enumPermission.getOrder())
                             .build();
+                    if (permission == null) {
+                        throw new IllegalStateException("Failed to build tenant permission");
+                    }
                     permissionRepository.save(permission);
                     log.info("Added permission: {}", enumPermission.name());
                 }
@@ -132,7 +135,7 @@ public class TenantPermissionService {
     /**
      * Get permissions for a specific role with selected status
      */
-    public List<PermissionGroupDTO> getPermissionsWithRoleSelection(Long roleId, Set<Long> selectedPermissionIds) {
+    public List<PermissionGroupDTO> getPermissionsWithRoleSelection(@NonNull Long roleId, Set<Long> selectedPermissionIds) {
         log.debug("Getting permissions with role selection for roleId: {}", roleId);
 
         List<PermissionGroupDTO> groups = getGroupedPermissions();
@@ -217,7 +220,7 @@ public class TenantPermissionService {
                 .collect(Collectors.toList());
     }
 
-    public PermissionDTO getPermissionById(Long id) {
+    public PermissionDTO getPermissionById(@NonNull Long id) {
         log.debug("Getting permission by id: {}", id);
 
         Optional<TenantPermission> permissionOpt = permissionRepository.findById(id);
@@ -251,7 +254,7 @@ public class TenantPermissionService {
                 .collect(Collectors.toList());
     }
 
-    public Page<PermissionDTO> getAllPermissions(Pageable pageable) {
+    public Page<PermissionDTO> getAllPermissions(@NonNull Pageable pageable) {
         log.debug("Getting all permissions with pagination: {}", pageable);
 
         Page<TenantPermission> permissionPage = permissionRepository.findAll(pageable);

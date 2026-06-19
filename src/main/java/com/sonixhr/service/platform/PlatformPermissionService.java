@@ -12,6 +12,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.lang.NonNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -109,13 +110,13 @@ public class PlatformPermissionService {
         return permissions != null ? permissions : new ArrayList<>();
     }
 
-    public List<PlatformPermission> getPermissionsByTenant(Long tenantId) {
+    public List<PlatformPermission> getPermissionsByTenant(@NonNull Long tenantId) {
         log.debug("Getting permissions for tenant: {} (system-wide)", tenantId);
         return getAllPermissions();
     }
 
     @Cacheable(value = "platformPermissions", key = "#id", unless = "#result == null")
-    public PlatformPermission getPermissionById(Long id) {
+    public @NonNull PlatformPermission getPermissionById(@NonNull Long id) {
         log.debug("Getting permission by id: {}", id);
 
         if (cacheEnabled) {
@@ -130,6 +131,10 @@ public class PlatformPermissionService {
 
         if (cacheEnabled) {
             permissionCache.put(id, permission);
+        }
+
+        if (permission == null) {
+            throw new ResourceNotFoundException("Permission not found with id: " + id);
         }
 
         return permission;
@@ -224,6 +229,10 @@ public class PlatformPermissionService {
                 .active(true)
                 .build();
 
+        if (permission == null) {
+            throw new IllegalStateException("Failed to build platform permission");
+        }
+
         PlatformPermission saved = permissionRepository.save(permission);
 
         if (cacheEnabled) {
@@ -235,12 +244,8 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public PlatformPermission updatePermissionDescription(Long id, String description) {
+    public PlatformPermission updatePermissionDescription(@NonNull Long id, String description) {
         log.info("Updating permission description for id: {}", id);
-
-        if (id == null) {
-            throw new IllegalArgumentException("Permission ID cannot be null");
-        }
 
         PlatformPermission permission = getPermissionById(id);
         permission.setDescription(description);
@@ -256,7 +261,7 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public PlatformPermission updatePermissionCategory(Long id, String category) {
+    public PlatformPermission updatePermissionCategory(@NonNull Long id, String category) {
         log.info("Updating permission category for id: {}", id);
 
         PlatformPermission permission = getPermissionById(id);
@@ -273,7 +278,7 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public PlatformPermission updatePermissionDisplayOrder(Long id, Integer displayOrder) {
+    public PlatformPermission updatePermissionDisplayOrder(@NonNull Long id, Integer displayOrder) {
         log.info("Updating permission display order for id: {}", id);
 
         PlatformPermission permission = getPermissionById(id);
@@ -290,12 +295,8 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public void deletePermission(Long id) {
+    public void deletePermission(@NonNull Long id) {
         log.info("Deleting permission with id: {}", id);
-
-        if (id == null) {
-            throw new IllegalArgumentException("Permission ID cannot be null");
-        }
 
         PlatformPermission permission = getPermissionById(id);
 
@@ -315,7 +316,7 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public void hardDeletePermission(Long id) {
+    public void hardDeletePermission(@NonNull Long id) {
         log.warn("Hard deleting permission with id: {}", id);
 
         PlatformPermission permission = getPermissionById(id);
@@ -335,7 +336,7 @@ public class PlatformPermissionService {
 
     @Transactional
     @CacheEvict(value = "platformPermissions", allEntries = true)
-    public PlatformPermission activatePermission(Long id) {
+    public PlatformPermission activatePermission(@NonNull Long id) {
         log.info("Activating permission with id: {}", id);
 
         PlatformPermission permission = getPermissionById(id);

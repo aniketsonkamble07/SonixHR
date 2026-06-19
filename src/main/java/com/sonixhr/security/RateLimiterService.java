@@ -34,6 +34,7 @@ import java.time.Duration;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class RateLimiterService {
 
     private final StringRedisTemplate redisTemplate;

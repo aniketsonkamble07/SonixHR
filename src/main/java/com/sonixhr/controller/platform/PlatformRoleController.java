@@ -7,7 +7,6 @@ import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.platform.PlatformRoleService;
-import com.sonixhr.service.platform.PlatformUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

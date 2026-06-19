@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class TenantRLSService {
 
     private final JdbcTemplate jdbcTemplate;
@@ -40,7 +41,6 @@ public class TenantRLSService {
 
     // Redis cache keys
     private static final String REDIS_KEY_TENANT_CONFIG = "tenant:config:";
-    private static final String REDIS_KEY_TENANT_POLICIES = "tenant:policies:";
     private static final String REDIS_KEY_TENANT_METRICS = "tenant:metrics:";
 
     // Batch update buffer for metrics
@@ -139,7 +139,7 @@ public class TenantRLSService {
                     localTenantCache.put(tenantId, config);
 
                     // Cache in Redis L2 cache
-                    redisTemplate.opsForHash().putAll(cacheKey, Map.of(
+                    redisTemplate.opsForHash().putAll(cacheKey, Map.<String, Object>of(
                             "tenantName", config.getTenantName(),
                             "schemaName", config.getSchemaName(),
                             "isActive", config.isActive(),
@@ -557,12 +557,6 @@ public class TenantRLSService {
             """, policyName, tableName, tenantColumn, tenantColumn);
 
         try {
-            // Check if RLS is already enabled to avoid unnecessary calls
-            String checkRls = String.format("""
-                SELECT relreplident FROM pg_class 
-                WHERE oid = '%s'::regclass
-            """, tableName);
-
             jdbcTemplate.execute(enableRLS);
             jdbcTemplate.execute(dropPolicy);
             jdbcTemplate.execute(createPolicy);

@@ -40,7 +40,7 @@ public class EmployeeDetailsService implements UserDetailsService {
     @Value("${app.employee.cache.ttl-minutes:10}")
     private long cacheTtlMinutes;
 
-    // ✅ Use Caffeine cache with TTL and max size (instead of ConcurrentHashMap)
+    //  Use Caffeine cache with TTL and max size (instead of ConcurrentHashMap)
     private final Cache<String, Employee> employeeCache = Caffeine.newBuilder()
             .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)  // Auto-expiry
             .maximumSize(10_000)  // Prevent memory issues
@@ -58,11 +58,11 @@ public class EmployeeDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         long startTime = System.nanoTime();
 
-        // ✅ Check cache first with active validation
+        //  Check cache first with active validation
         if (cacheEnabled) {
             Employee cachedEmployee = employeeCache.getIfPresent(email);
             if (cachedEmployee != null) {
-                // ✅ Verify cached employee is still active
+                //  Verify cached employee is still active
                 if (!cachedEmployee.isActive()) {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
                     employeeCache.invalidate(email);
@@ -81,13 +81,13 @@ public class EmployeeDetailsService implements UserDetailsService {
                     return new UsernameNotFoundException("Employee not found: " + email);
                 });
 
-        // ✅ Check if employee is active before caching
+        //  Check if employee is active before caching
         if (!employee.isActive()) {
             log.warn("Employee account is inactive for email: {}", email);
             throw new UsernameNotFoundException("Employee account is inactive");
         }
 
-        // ✅ Cache only if active
+        //  Cache only if active
         if (cacheEnabled) {
             employeeCache.put(email, employee);
         }
@@ -211,7 +211,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         Employee cachedEmployee = employeeCache.getIfPresent(email);
 
         if (cachedEmployee != null && tokenRolesVersion != null) {
-            // ✅ Also check if cached employee is still active
+            //  Also check if cached employee is still active
             if (!cachedEmployee.isActive()) {
                 log.warn("Cached employee is inactive during version check, removing: {}", email);
                 employeeCache.invalidate(email);
@@ -246,7 +246,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         // Check cache first
         for (String email : emails) {
             Employee cached = employeeCache.getIfPresent(email);
-            if (cached != null && cached.isActive()) {  // ✅ Only return active
+            if (cached != null && cached.isActive()) {
                 result.put(email, cached);
             } else if (cached != null && !cached.isActive()) {
                 employeeCache.invalidate(email);  // Remove inactive from cache
@@ -260,7 +260,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         if (!uncachedEmails.isEmpty()) {
             java.util.List<Employee> employees = employeeRepository.findAllByEmailsWithRoles(uncachedEmails);
             for (Employee employee : employees) {
-                if (employee.isActive()) {  // ✅ Only cache active employees
+                if (employee.isActive()) {
                     result.put(employee.getEmail(), employee);
                     if (cacheEnabled) {
                         employeeCache.put(employee.getEmail(), employee);
@@ -289,7 +289,7 @@ public class EmployeeDetailsService implements UserDetailsService {
                 java.util.List<Employee> activeEmployees = employeeRepository.findTop100ByIsActiveTrue();
                 int loadedCount = 0;
                 for (Employee employee : activeEmployees) {
-                    if (employee.isActive()) {  // ✅ Only preload active employees
+                    if (employee.isActive()) {
                         // Trigger authority loading to cache
                         employee.getAuthorities();
                         employeeCache.put(employee.getEmail(), employee);

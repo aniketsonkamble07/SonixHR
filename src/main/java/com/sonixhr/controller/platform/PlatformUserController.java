@@ -28,6 +28,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/platform/users")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlatformUserController {
 
     private final PlatformUserService platformUserService;

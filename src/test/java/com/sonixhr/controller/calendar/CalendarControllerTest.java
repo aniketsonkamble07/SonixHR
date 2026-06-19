@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CalendarController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@SuppressWarnings("null")
 class CalendarControllerTest {
 
     @Autowired
