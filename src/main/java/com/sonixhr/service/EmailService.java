@@ -78,6 +78,51 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendSubscriptionReminderEmail(String to, String companyName, String planName, int daysRemaining) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send subscription reminder email to: {}", to);
+            return;
+        }
+
+        log.info("Sending subscription reminder email to: {} for company: {}", to, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Subscription Expiration Reminder - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #EF4444;">Subscription Expiration Reminder</h2>
+                        <p>This is a friendly reminder that your subscription for <strong>%s</strong> is set to expire in <strong>%d days</strong>.</p>
+                        <p>Details:</p>
+                        <ul>
+                            <li><strong>Company:</strong> %s</li>
+                            <li><strong>Current Plan:</strong> %s</li>
+                        </ul>
+                        <p>To avoid any disruption to your service, please renew or upgrade your plan from the Billing Dashboard.</p>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, companyName, daysRemaining, companyName, planName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Subscription reminder email sent successfully to: {}", to);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send subscription reminder email to: {}", to, e);
+        }
+    }
+
     // =====================================================
     // PLATFORM USER EMAILS
     // =====================================================
@@ -299,6 +344,77 @@ public class EmailService {
             log.info("Account activated notification sent to: {}", to);
         } catch (MessagingException e) {
             log.error("Failed to send account activated notification to: {}", to, e);
+        }
+    }
+
+    @Async
+    public void sendAccountSuspendedNotification(String to, String name) {
+        if (!emailEnabled) return;
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Your Account Has Been Suspended - SonixHR");
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #EF4444;">Account Suspended</h2>
+                        <p>Dear %s,</p>
+                        <p>Your SonixHR platform user account has been <strong>suspended</strong> by the system administrator.</p>
+                        <p>If you believe this is an error, please contact support.</p>
+                        <hr/>
+                        <p>Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, name);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Account suspended notification sent to: {}", to);
+        } catch (MessagingException e) {
+            log.error("Failed to send account suspended notification to: {}", to, e);
+        }
+    }
+
+    @Async
+    public void sendPasswordResetNotification(String to, String name) {
+        if (!emailEnabled) return;
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Your Password Has Been Reset - SonixHR");
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #4F46E5;">Password Reset Successful</h2>
+                        <p>Dear %s,</p>
+                        <p>Your SonixHR platform user account password has been successfully <strong>reset</strong> by the administrator.</p>
+                        <p>You can now log in using your new credentials.</p>
+                        <p>If you did not authorize this change, please contact support immediately.</p>
+                        <hr/>
+                        <p>Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, name);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Password reset notification sent to: {}", to);
+        } catch (MessagingException e) {
+            log.error("Failed to send password reset notification to: {}", to, e);
         }
     }
 

@@ -123,6 +123,11 @@ public class Tenant {
         this.suspensionReason = null;
     }
 
+    public void deactivate() {
+        this.status = UserStatus.INACTIVE;
+        this.isActive = false;
+    }
+
     public boolean isSuspended() {
         return this.status == UserStatus.SUSPENDED;
     }

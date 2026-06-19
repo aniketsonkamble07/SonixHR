@@ -88,7 +88,14 @@ public class SecurityConfig {
                                 "/api/reset-password/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/api-docs/**")
+                                "/api-docs/**",
+                                "/",
+                                "/index.html",
+                                "/platform/**",
+                                "/*.html",
+                                "/*.css",
+                                "/*.js",
+                                "/favicon.ico")
                         .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -134,7 +141,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
-                "http://localhost:8081"));
+                "http://localhost:8081",
+                "https://sonixhr.onrender.com"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization", "Content-Type", "X-Tenant-ID", "X-Request-ID", "Accept", "Origin"));

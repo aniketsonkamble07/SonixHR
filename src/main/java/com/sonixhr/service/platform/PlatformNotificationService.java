@@ -60,7 +60,7 @@ public class PlatformNotificationService {
     @Async
     public void sendAccountSuspendedNotification(String email, String fullName) {
         try {
-          //  emailService.sendAccountSuspendedNotification(email, fullName);
+            emailService.sendAccountSuspendedNotification(email, fullName);
             log.info("Account suspended notification sent to: {}", email);
         } catch (Exception e) {
             log.error("Failed to send account suspended notification to: {}", email, e);
@@ -70,7 +70,7 @@ public class PlatformNotificationService {
     @Async
     public void sendPasswordResetNotification(String email, String fullName) {
         try {
-           // emailService.sendPasswordResetNotification(email, fullName);
+            emailService.sendPasswordResetNotification(email, fullName);
             log.info("Password reset notification sent to: {}", email);
         } catch (Exception e) {
             log.error("Failed to send password reset notification to: {}", email, e);

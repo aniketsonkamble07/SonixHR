@@ -62,9 +62,12 @@ public class EmployeeDetailsService implements UserDetailsService {
         if (cacheEnabled) {
             Employee cachedEmployee = employeeCache.getIfPresent(email);
             if (cachedEmployee != null) {
-                //  Verify cached employee is still active
+                //  Verify cached employee and tenant are still active
                 if (!cachedEmployee.isActive()) {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
+                    employeeCache.invalidate(email);
+                } else if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
+                    log.warn("Cached employee tenant is inactive or suspended, removing from cache: {}", email);
                     employeeCache.invalidate(email);
                 } else {
                     log.debug("Cache hit for employee: {}", email);
@@ -85,6 +88,12 @@ public class EmployeeDetailsService implements UserDetailsService {
         if (!employee.isActive()) {
             log.warn("Employee account is inactive for email: {}", email);
             throw new UsernameNotFoundException("Employee account is inactive");
+        }
+
+        // Check if employee's tenant is active/suspended
+        if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
+            log.warn("Employee tenant is inactive or suspended for email: {}", email);
+            throw new UsernameNotFoundException("Tenant account is suspended or inactive");
         }
 
         //  Cache only if active
@@ -192,6 +201,11 @@ public class EmployeeDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("Employee account is inactive");
         }
 
+        if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
+            log.warn("Employee tenant is inactive or suspended for email: {}", email);
+            throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+        }
+
         // Clear cached authorities to force reload
         employee.clearAuthoritiesCache();
 
@@ -211,9 +225,15 @@ public class EmployeeDetailsService implements UserDetailsService {
         Employee cachedEmployee = employeeCache.getIfPresent(email);
 
         if (cachedEmployee != null && tokenRolesVersion != null) {
-            //  Also check if cached employee is still active
+            //  Also check if cached employee and tenant are still active
             if (!cachedEmployee.isActive()) {
                 log.warn("Cached employee is inactive during version check, removing: {}", email);
+                employeeCache.invalidate(email);
+                return loadUserByUsername(email);
+            }
+
+            if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
+                log.warn("Cached employee tenant is inactive or suspended during version check, removing: {}", email);
                 employeeCache.invalidate(email);
                 return loadUserByUsername(email);
             }

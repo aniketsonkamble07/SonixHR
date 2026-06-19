@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SonixHR Platform Super Admin Panel</title>
+  
+  <!-- Fonts -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- ==========================================
+       LOGIN VIEW
+       ========================================== -->
+  <div id="login-view" class="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <h1>Sonix<span>HR</span></h1>
+        <p class="card-subtitle">Platform Administration</p>
+      </div>
+      <div class="login-subtitle">
+        Sign in to manage organizations, subscription plans, and platform systems.
+      </div>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Super Admin Email</label>
+          <div class="input-container">
+            <input type="email" id="login-email" class="form-input" placeholder="admin@sonixhr.com" value="admin@sonixhr.com" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <div class="input-container">
+            <input type="password" id="login-password" class="form-input" placeholder="••••••••" value="Admin@123" required>
+          </div>
+        </div>
+        
+        <button type="submit" id="login-submit-btn" class="btn-primary">
+          <span>Sign In</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+      
+      <div class="login-footer">
+        SonixHR SaaS Platform Admin Control Portal
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MAIN PORTAL VIEW
+       ========================================== -->
+  <div id="app-view" style="display: none;">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h2>Sonix<span>HR</span> Admin</h2>
+      </div>
+      
+      <ul class="sidebar-menu">
+        <li class="sidebar-item active" data-tab="tab-overview">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Overview & Metrics</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-tenants">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-building"></i>
+            <span>Organizations</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-subscriptions">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-credit-card"></i>
+            <span>Subscriptions</span>
+          </a>
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn-logout">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+      <!-- Header -->
+      <header class="main-header">
+        <div class="header-title">
+          <h2 id="current-tab-title">Platform Dashboard</h2>
+        </div>
+        
+        <div class="header-actions">
+          <div class="system-health">
+            <span>DB Status: <span class="health-dot" id="db-health-dot"></span></span>
+            <span style="margin-left: 10px;">Redis Status: <span class="health-dot" id="redis-health-dot"></span></span>
+          </div>
+          
+          <div class="user-profile">
+            <div class="user-avatar" id="header-user-avatar">A</div>
+            <div class="user-info">
+              <span class="user-name" id="header-user-name">Super Admin</span>
+              <span class="user-email" id="header-user-email">admin@sonixhr.com</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Body -->
+      <main class="content-body">
+        
+        <!-- ==========================================
+             TAB 1: OVERVIEW & METRICS
+             ========================================== -->
+        <section id="tab-overview" class="view-panel active">
+          <!-- Statistics Cards Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card indigo">
+              <div class="metric-info">
+                <h3>Total Organizations</h3>
+                <div class="metric-value" id="stat-total-tenants">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-building"></i>
+              </div>
+            </div>
+            
+            <div class="metric-card success">
+              <div class="metric-info">
+                <h3>Active Organizations</h3>
+                <div class="metric-value" id="stat-active-tenants">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-building-circle-check"></i>
+              </div>
+            </div>
+            
+            <div class="metric-card info">
+              <div class="metric-info">
+                <h3>Trial Organizations</h3>
+                <div class="metric-value" id="stat-trial-tenants">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-hourglass-half"></i>
+              </div>
+            </div>
+            
+            <div class="metric-card danger">
+              <div class="metric-info">
+                <h3>Expired Subscriptions</h3>
+                <div class="metric-value" id="stat-expired-subs">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-calendar-times"></i>
+              </div>
+            </div>
+            
+            <div class="metric-card purple">
+              <div class="metric-info">
+                <h3>Total Employees</h3>
+                <div class="metric-value" id="stat-total-employees">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-users"></i>
+              </div>
+            </div>
+
+            <div class="metric-card success">
+              <div class="metric-info">
+                <h3>Total Active Users</h3>
+                <div class="metric-value" id="stat-total-active-users">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-user-check"></i>
+              </div>
+            </div>
+
+            <div class="metric-card indigo">
+              <div class="metric-info">
+                <h3>Monthly MRR</h3>
+                <div class="metric-value" id="stat-mrr">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-indian-rupee-sign"></i>
+              </div>
+            </div>
+
+            <div class="metric-card warning">
+              <div class="metric-info">
+                <h3>Open Support Tickets</h3>
+                <div class="metric-value" id="stat-tickets">-</div>
+              </div>
+              <div class="metric-icon">
+                <i class="fa-solid fa-ticket"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboard Charts & Lists Row -->
+          <div class="dashboard-row">
+            <!-- Left Column: Recent Registrations -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-clock"></i> Recent Organizations</h3>
+                  <p class="card-subtitle">Latest tenants created in the last 30 days</p>
+                </div>
+              </div>
+              
+              <div class="table-container">
+                <table class="responsive-table">
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Code</th>
+                      <th>Admin Contact</th>
+                      <th>Plan Type</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-tenants-tbody">
+                    <tr>
+                      <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading recent organizations...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right Column: Upsell Opportunities -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-arrow-trend-up"></i> Expansion Alerts</h3>
+                  <p class="card-subtitle">Tenants approaching employee limit thresholds</p>
+                </div>
+              </div>
+              
+              <div class="list-panel" id="upsell-list">
+                <div style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading alerts...</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Secondary dashboard widgets -->
+          <div class="dashboard-row" style="grid-template-columns: 1fr 1fr;">
+            <!-- Registration Trends Chart -->
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-area"></i> Organization Registration Trends</h3>
+              <div class="chart-wrapper">
+                <canvas id="registrationTrendChart"></canvas>
+              </div>
+            </div>
+            
+            <!-- Top Resource Consumers -->
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-server"></i> Storage & Resource Consumers</h3>
+              <div class="table-container">
+                <table class="responsive-table">
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Employees</th>
+                      <th>Storage Use</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resource-consumers-tbody">
+                    <tr>
+                      <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading resource consumers...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 2: ORGANIZATION / TENANT MANAGEMENT
+             ========================================== -->
+        <section id="tab-tenants" class="view-panel">
+          <!-- Filters & Actions Bar -->
+          <div class="filter-bar">
+            <div class="filter-inputs">
+              <div class="search-input-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="tenant-search" class="search-input" placeholder="Search by company or code...">
+              </div>
+              
+              <select id="tenant-status-filter" class="select-input">
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="SUSPENDED">Suspended</option>
+                <option value="DELETED">Deleted</option>
+              </select>
+            </div>
+            
+            <button class="btn btn-primary" onclick="openModal('register-tenant-modal')">
+              <i class="fa-solid fa-plus"></i>
+              <span>Create Organization</span>
+            </button>
+          </div>
+
+          <!-- Organizations List Table -->
+          <div class="table-container">
+            <table class="responsive-table">
+              <thead>
+                <tr>
+                  <th>Company Name</th>
+                  <th>Tenant Code</th>
+                  <th>Admin Contact</th>
+                  <th>Plan Type</th>
+                  <th>Plan Status</th>
+                  <th>Limit</th>
+                  <th>Status</th>
+                  <th style="width: 280px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tenants-list-tbody">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading organization registry...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination details -->
+          <div class="pagination">
+            <div class="pagination-info">
+              Showing <span id="pagination-start">0</span> to <span id="pagination-end">0</span> of <span id="pagination-total">0</span> entries
+            </div>
+            <div class="pagination-controls">
+              <button class="btn btn-secondary btn-icon" id="pagination-prev" disabled><i class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-icon" id="pagination-next" disabled><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 3: SUBSCRIPTION DASHBOARD
+             ========================================== -->
+        <section id="tab-subscriptions" class="view-panel">
+          <!-- Small Plan Cards Grid -->
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <div class="metric-card info">
+              <div class="metric-info">
+                <h3>Free Trial Accounts</h3>
+                <div class="metric-value" id="sub-trial-count">0</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-hourglass-start"></i></div>
+            </div>
+            
+            <div class="metric-card indigo">
+              <div class="metric-info">
+                <h3>Basic Plan Accounts</h3>
+                <div class="metric-value" id="sub-basic-count">0</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-cubes"></i></div>
+            </div>
+            
+            <div class="metric-card purple">
+              <div class="metric-info">
+                <h3>Premium Plan Accounts</h3>
+                <div class="metric-value" id="sub-premium-count">0</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-crown"></i></div>
+            </div>
+            
+            <div class="metric-card success">
+              <div class="metric-info">
+                <h3>Enterprise Plan Accounts</h3>
+                <div class="metric-value" id="sub-enterprise-count">0</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-row">
+            <!-- Monthly Revenue Line Chart -->
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-indian-rupee-sign"></i> Monthly Revenue Trend (INR)</h3>
+              <div class="chart-wrapper">
+                <canvas id="monthlyRevenueChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Plan Growth Bar Chart -->
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-column"></i> Subscription Growth</h3>
+              <div class="chart-wrapper">
+                <canvas id="subscriptionGrowthChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Plan distribution chart -->
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-pie"></i> Plan Distribution</h3>
+              <div class="chart-wrapper">
+                <canvas id="planDistributionChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subscription Sandbox Simulator Panel -->
+          <div class="card sandbox-card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title text-warning" style="color: var(--color-secondary) !important;">
+                  <i class="fa-solid fa-vial"></i> Subscription Management Simulator (Tenant Sandbox)
+                </h3>
+                <p class="card-subtitle">Test subscription states, plan upgrade/downgrade flows, billing histories, and active/cancelled status toggles.</p>
+              </div>
+            </div>
+            
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
+              <div class="form-group">
+                <label class="form-label">Target Organization</label>
+                <select id="sandbox-tenant-select" class="select-input" style="width: 100%;">
+                  <option value="">Choose organization...</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Simulate Action</label>
+                <select id="sandbox-action-select" class="select-input" style="width: 100%;">
+                  <option value="UPGRADE">Upgrade Subscription</option>
+                  <option value="DOWNGRADE">Downgrade Subscription</option>
+                  <option value="RENEW">Renew Plan Subscription</option>
+                  <option value="CANCEL">Cancel Active Plan</option>
+                </select>
+              </div>
+              
+              <div class="form-group" id="sandbox-plan-wrapper">
+                <label class="form-label">New Plan Tier</label>
+                <select id="sandbox-plan-select" class="select-input" style="width: 100%;">
+                  <option value="basic">Basic Plan</option>
+                  <option value="moderate">Moderate Plan</option>
+                  <option value="premium">Premium Plan</option>
+                  <option value="enterprise">Enterprise Plan</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="display: flex; align-items: flex-end;">
+                <button class="btn btn-primary" id="sandbox-execute-btn" style="width: 100%; height: 40px;">
+                  <i class="fa-solid fa-play"></i>
+                  <span>Execute Simulation</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODALS
+       ========================================== -->
+
+  <!-- Modal 1: Register Tenant Organization -->
+  <div id="register-tenant-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create New Organization</h3>
+        <button class="modal-close" onclick="closeModal('register-tenant-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="register-tenant-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="reg-company-name">Company Name</label>
+              <input type="text" id="reg-company-name" class="form-input" placeholder="Acme Logistics Ltd" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-plan-type">Initial Subscription Plan</label>
+              <select id="reg-plan-type" class="select-input" style="width: 100%; height: 42px;">
+                <option value="trial">Free Trial (14 days, 10 employees)</option>
+                <option value="basic">Basic ($49/mo, 100 employees)</option>
+                <option value="moderate">Moderate ($99/mo, 500 employees)</option>
+                <option value="premium">Premium ($299/mo, 2000 employees)</option>
+                <option value="enterprise">Enterprise ($999/mo, 10000 employees)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-name">Super Admin Name</label>
+              <input type="text" id="reg-admin-name" class="form-input" placeholder="John Doe" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-email">Super Admin Email</label>
+              <input type="email" id="reg-admin-email" class="form-input" placeholder="admin@acme.com" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="reg-admin-phone">Admin Mobile / Phone</label>
+            <input type="text" id="reg-admin-phone" class="form-input" placeholder="9876543210" required>
+          </div>
+          
+          <div class="modal-footer" style="padding-bottom: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('register-tenant-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create Organization</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Suspend Organization -->
+  <div id="suspend-tenant-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>Suspend Organization</h3>
+        <button class="modal-close" onclick="closeModal('suspend-tenant-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="suspend-tenant-form">
+          <input type="hidden" id="suspend-tenant-id">
+          
+          <div style="margin-bottom: 20px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 15px; border-radius: 10px; font-size: 0.85rem; color: var(--text-muted);">
+            <i class="fa-solid fa-triangle-exclamation text-danger" style="margin-right: 6px;"></i>
+            <strong>Warning:</strong> Suspending this organization will immediately block all its employees and active admins from logging in, and turn its active subscription status off.
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="suspend-reason">Reason for Suspension</label>
+            <textarea id="suspend-reason" class="form-input" style="height: 100px; resize: none;" placeholder="e.g. Non-payment of subscription fees or policy violation..." required></textarea>
+          </div>
+          
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('suspend-tenant-modal')">Cancel</button>
+            <button type="submit" class="btn btn-danger">Confirm Suspension</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Override Organization Plan Limits -->
+  <div id="override-tenant-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>Override Subscription Limits</h3>
+        <button class="modal-close" onclick="closeModal('override-tenant-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="override-tenant-form">
+          <input type="hidden" id="override-tenant-id">
+          
+          <div class="form-group">
+            <label class="form-label" for="override-plan-type">Override Plan Tier</label>
+            <select id="override-plan-type" class="select-input" style="width: 100%; height: 42px;">
+              <option value="TRIAL">Trial</option>
+              <option value="BASIC">Basic</option>
+              <option value="MODERATE">Moderate</option>
+              <option value="PREMIUM">Premium</option>
+              <option value="ENTERPRISE">Enterprise</option>
+            </select>
+          </div>
+          
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="override-max-employees">Employee Seat Limit</label>
+            <input type="number" id="override-max-employees" class="form-input" min="10" placeholder="e.g. 500" required>
+          </div>
+
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="override-max-storage">Storage Quota (MB)</label>
+            <input type="number" id="override-max-storage" class="form-input" min="128" placeholder="e.g. 10240" required>
+          </div>
+          
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('override-tenant-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Override</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Edit Tenant Organization -->
+  <div id="edit-tenant-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>Edit Organization Details</h3>
+        <button class="modal-close" onclick="closeModal('edit-tenant-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-tenant-form">
+          <input type="hidden" id="edit-tenant-id">
+          
+          <div class="form-group">
+            <label class="form-label" for="edit-company-name">Company Name</label>
+            <input type="text" id="edit-company-name" class="form-input" required>
+          </div>
+          
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="edit-admin-phone">Admin Mobile / Phone</label>
+            <input type="text" id="edit-admin-phone" class="form-input" required>
+          </div>
+          
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('edit-tenant-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: View Organization Details -->
+  <div id="view-tenant-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3>Organization Information Details</h3>
+        <button class="modal-close" onclick="closeModal('view-tenant-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="view-tenant-details-body">
+        <!-- Dynamically injected details -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('view-tenant-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Popups Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ==========================================
+       JAVASCRIPT LOGIC
+       ========================================== -->
+  <script>
+    // State Constants
+    const API_BASE = 'https://sonixhr.onrender.com/api';
+    let CURRENT_PAGE = 0;
+    const PAGE_SIZE = 10;
+    let TOTAL_PAGES = 0;
+    
+    // Globals for Charts
+    let regChartInstance = null;
+    let revChartInstance = null;
+    let growthChartInstance = null;
+    let distChartInstance = null;
+
+    // Dom elements
+    const loginView = document.getElementById('login-view');
+    const appView = document.getElementById('app-view');
+    const loginForm = document.getElementById('login-form');
+    const tabItems = document.querySelectorAll('.sidebar-item');
+    const viewPanels = document.querySelectorAll('.view-panel');
+    const tabTitle = document.getElementById('current-tab-title');
+    const logoutBtn = document.getElementById('logout-btn');
+    
+    // Toast Alert Helper
+    function showToast(title, message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      let icon = 'fa-info-circle';
+      if (type === 'success') icon = 'fa-check-circle';
+      if (type === 'error') icon = 'fa-exclamation-circle';
+      if (type === 'warning') icon = 'fa-triangle-exclamation';
+      
+      toast.innerHTML = `
+        <i class="fa-solid ${icon} toast-icon"></i>
+        <div class="toast-content">
+          <div class="toast-title">${title}</div>
+          <div class="toast-msg">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Auto dismiss after 5 seconds
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.style.animation = 'fadeOut 0.3s forwards';
+          toast.addEventListener('animationend', () => toast.remove());
+        }
+      }, 5000);
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+    
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // Fetch Client headers
+    function getHeaders() {
+      const token = localStorage.getItem('platform_token');
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    }
+
+    // Handle authentication API responses
+    function checkResponseStatus(res) {
+      if (res.status === 401) {
+        showToast('Session Expired', 'Please login again to continue.', 'warning');
+        handleLogout();
+        throw new Error('Unauthorized session');
+      }
+      if (res.status === 429) {
+        showToast('Too Many Requests', 'Rate limit exceeded. Please wait a minute and retry.', 'error');
+        throw new Error('Rate limit exceeded');
+      }
+      return res;
+    }
+
+    // Verify token at boot
+    async function initApp() {
+      const token = localStorage.getItem('platform_token');
+      if (!token) {
+        showLoginView();
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/platform/auth/verify-token?token=${token}`);
+        const data = await res.json();
+        if (res.ok && data.valid && data.userType === 'PLATFORM') {
+          showAppView();
+          
+          // Populate profile
+          document.getElementById('header-user-email').textContent = data.email || 'admin@sonixhr.com';
+          const name = localStorage.getItem('platform_user_name') || 'Super Admin';
+          document.getElementById('header-user-name').textContent = name;
+          document.getElementById('header-user-avatar').textContent = name.charAt(0).toUpperCase();
+          
+          // Load default tab
+          loadTab('tab-overview');
+        } else {
+          handleLogout();
+        }
+      } catch (e) {
+        console.error('Validation failure', e);
+        handleLogout();
+      }
+    }
+
+    function showLoginView() {
+      loginView.style.display = 'flex';
+      appView.style.display = 'none';
+    }
+
+    function showAppView() {
+      loginView.style.display = 'none';
+      appView.style.display = 'flex';
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('platform_token');
+      localStorage.removeItem('platform_user_name');
+      localStorage.removeItem('platform_user_email');
+      showLoginView();
+    }
+
+    // Platform login
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-submit-btn');
+      
+      btn.disabled = true;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<span class="loading-spinner"></span>`;
+      
+      try {
+        const res = await fetch(`${API_BASE}/platform/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        
+        if (res.status === 429) {
+          showToast('Blocked', 'Too many attempts. Try again later.', 'error');
+          return;
+        }
+        
+        const data = await res.json();
+        if (res.ok && data.accessToken) {
+          localStorage.setItem('platform_token', data.accessToken);
+          localStorage.setItem('platform_user_name', data.fullName || 'Super Admin');
+          localStorage.setItem('platform_user_email', data.email || email);
+          
+          showToast('Welcome Back', `Successfully logged in as ${data.fullName || 'Administrator'}.`, 'success');
+          showAppView();
+          initApp();
+        } else {
+          showToast('Access Denied', data.message || 'Incorrect credentials, please check.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        showToast('Connection Error', 'Failed to connect to the platform API.', 'error');
+      }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch(`${API_BASE}/platform/auth/logout`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+      } catch(e) {}
+      handleLogout();
+      showToast('Goodbye', 'You have been successfully logged out.', 'success');
+    });
+
+    // Tab Switching
+    tabItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
+        tabItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        
+        loadTab(tabId);
+      });
+    });
+
+    function loadTab(tabId) {
+      viewPanels.forEach(p => p.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      
+      if (tabId === 'tab-overview') {
+        tabTitle.textContent = 'Platform Overview & Health';
+        fetchDashboardMetrics();
+        fetchSystemHealth();
+      } else if (tabId === 'tab-tenants') {
+        tabTitle.textContent = 'Organization Management';
+        CURRENT_PAGE = 0;
+        fetchTenantsList();
+      } else if (tabId === 'tab-subscriptions') {
+        tabTitle.textContent = 'Subscription Dashboard & Billing Analytics';
+        fetchSubscriptionMetrics();
+      }
+    }
+
+    // ==========================================
+    // OVERVIEW VIEW PORTAL LOGIC
+    // ==========================================
+    
+    async function fetchSystemHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          updateHealthDot('db-health-dot', data.databaseStatus);
+          updateHealthDot('redis-health-dot', data.redisStatus);
+        }
+      } catch (e) {
+        updateHealthDot('db-health-dot', 'DOWN');
+        updateHealthDot('redis-health-dot', 'DOWN');
+      }
+    }
+    
+    function updateHealthDot(elementId, status) {
+      const dot = document.getElementById(elementId);
+      dot.className = 'health-dot';
+      if (status === 'UP') {
+        dot.classList.add('up');
+      } else {
+        dot.classList.add('down');
+      }
+    }
+
+    async function fetchDashboardMetrics() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/dashboard`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Set stats
+          document.getElementById('stat-total-tenants').textContent = data.tenantSummary.totalTenants;
+          document.getElementById('stat-active-tenants').textContent = data.tenantSummary.activeTenants;
+          document.getElementById('stat-trial-tenants').textContent = data.tenantSummary.trialTenants;
+          document.getElementById('stat-expired-subs').textContent = data.subscriptionSummary.expiredSubscriptions;
+          
+          document.getElementById('stat-total-employees').textContent = data.systemSummary.totalEmployees;
+          document.getElementById('stat-total-active-users').textContent = data.systemSummary.totalActiveUsers;
+          document.getElementById('stat-tickets').textContent = data.systemSummary.supportTicketsOpen;
+          
+          // Formats INR (Indian Rupee) MRR
+          const mrrFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+          document.getElementById('stat-mrr').textContent = mrrFormatter.format(data.subscriptionSummary.totalMrr || 0);
+
+          // Populate Recent Tenants
+          const tbody = document.getElementById('recent-tenants-tbody');
+          tbody.innerHTML = '';
+          if (data.recentTenants && data.recentTenants.length > 0) {
+            data.recentTenants.forEach(t => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><strong>${t.companyName}</strong></td>
+                <td><code>${t.tenantCode}</code></td>
+                <td>${t.adminName}<br><span style="font-size:0.75rem; color:var(--text-muted);">${t.adminEmail}</span></td>
+                <td><span class="badge ${t.planType.toLowerCase()}">${t.planType}</span></td>
+                <td><span class="badge ${t.status.toLowerCase()}">${t.status}</span></td>
+                <td>${new Date(t.createdAt).toLocaleDateString()}</td>
+              `;
+              tbody.appendChild(row);
+            });
+          } else {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No recent organizations registered.</td></tr>`;
+          }
+
+          // Populate Alerts
+          const upsellDiv = document.getElementById('upsell-list');
+          upsellDiv.innerHTML = '';
+          if (data.upsellOpportunities && data.upsellOpportunities.length > 0) {
+            data.upsellOpportunities.forEach(u => {
+              const item = document.createElement('div');
+              item.className = 'list-item';
+              item.innerHTML = `
+                <div>
+                  <span class="list-item-name">${u.companyName}</span>
+                  <span class="list-item-sub">Approaching Seat Limit (${u.currentEmployees}/${u.maxEmployees} employees)</span>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: ${Math.min(u.utilizationPercentage, 100)}%;"></div>
+                  </div>
+                </div>
+                <div>
+                  <span class="badge warning">${Math.round(u.utilizationPercentage)}%</span>
+                </div>
+              `;
+              upsellDiv.appendChild(item);
+            });
+          } else {
+            upsellDiv.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px 0;">No active alerts. All tenants under limits.</div>`;
+          }
+
+          // Populate Top Resource Consumers
+          const consumersTbody = document.getElementById('resource-consumers-tbody');
+          consumersTbody.innerHTML = '';
+          if (data.topResourceConsumers && data.topResourceConsumers.length > 0) {
+            data.topResourceConsumers.forEach(rc => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><strong>${rc.companyName}</strong></td>
+                <td>${rc.currentEmployees} seats</td>
+                <td><code>${rc.currentStorageMb} MB</code></td>
+              `;
+              consumersTbody.appendChild(row);
+            });
+          } else {
+            consumersTbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No resource usage data.</td></tr>`;
+          }
+
+          // Render Registration Trend Chart
+          renderTrendChart(data.registrationTrend);
+
+        }
+      } catch (e) {
+        console.error('Error fetching stats', e);
+      }
+    }
+
+    function renderTrendChart(trendPoints) {
+      const ctx = document.getElementById('registrationTrendChart').getContext('2d');
+      
+      const labels = trendPoints.map(p => p.period);
+      const counts = trendPoints.map(p => p.count);
+
+      if (regChartInstance) {
+        regChartInstance.destroy();
+      }
+
+      regChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'New Organizations Created',
+            data: counts,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.08)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#9ca3af', stepSize: 1 }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#9ca3af' }
+            }
+          }
+        }
+      });
+    }
+
+    // ==========================================
+    // ORGANIZATION / TENANT VIEWS LOGIC
+    // ==========================================
+    
+    async function fetchTenantsList() {
+      const search = document.getElementById('tenant-search').value;
+      const status = document.getElementById('tenant-status-filter').value;
+      
+      let url = `${API_BASE}/platform/tenants?page=${CURRENT_PAGE}&size=${PAGE_SIZE}`;
+      if (search) url += `&companyName=${encodeURIComponent(search)}`;
+      if (status) url += `&status=${status}`;
+
+      const tbody = document.getElementById('tenants-list-tbody');
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;"><span class="loading-spinner"></span></td></tr>`;
+      
+      try {
+        const res = await fetch(url, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.content;
+          
+          tbody.innerHTML = '';
+          if (list && list.length > 0) {
+            list.forEach(t => {
+              const limitStr = t.maxEmployees ? `${t.maxEmployees} seats` : 'No Seat Limit';
+              
+              // Action Buttons mapping based on current status
+              let actionsHtml = `
+                <button class="btn btn-secondary btn-icon" onclick="viewTenantDetails(${t.id})" title="Details"><i class="fa-solid fa-eye text-info"></i></button>
+                <button class="btn btn-secondary btn-icon" onclick="openEditTenantModal(${t.id}, '${t.companyName}', '${t.adminPhone}')" title="Edit Metadata"><i class="fa-solid fa-pen text-warning"></i></button>
+                <button class="btn btn-secondary btn-icon" onclick="openOverrideModal(${t.id}, '${t.planType}', ${t.maxEmployees})" title="Override Limits"><i class="fa-solid fa-cog text-primary"></i></button>
+              `;
+              
+              if (t.status === 'SUSPENDED') {
+                actionsHtml += `<button class="btn btn-success" style="padding: 6px 12px; font-size:0.75rem;" onclick="activateTenant(${t.id})"><i class="fa-solid fa-play"></i> Reactivate</button>`;
+              } else if (t.status === 'ACTIVE') {
+                actionsHtml += `<button class="btn btn-warning" style="padding: 6px 12px; font-size:0.75rem;" onclick="openSuspendModal(${t.id})"><i class="fa-solid fa-pause"></i> Suspend</button>`;
+                actionsHtml += `<button class="btn btn-secondary" style="padding: 6px 12px; font-size:0.75rem;" onclick="deactivateTenant(${t.id})"><i class="fa-solid fa-toggle-off"></i> Disable</button>`;
+              } else if (t.status === 'INACTIVE') {
+                actionsHtml += `<button class="btn btn-success" style="padding: 6px 12px; font-size:0.75rem;" onclick="activateTenant(${t.id})"><i class="fa-solid fa-toggle-on"></i> Enable</button>`;
+              }
+              
+              if (t.status !== 'DELETED') {
+                actionsHtml += `<button class="btn btn-secondary btn-icon" onclick="deleteTenant(${t.id})" title="Delete"><i class="fa-solid fa-trash text-danger"></i></button>`;
+              }
+              
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><strong>${t.companyName}</strong></td>
+                <td><code>${t.tenantCode}</code></td>
+                <td>${t.adminName}<br><span style="font-size:0.75rem; color:var(--text-muted);">${t.adminEmail}</span></td>
+                <td><span class="badge ${t.planType.toLowerCase()}">${t.planType}</span></td>
+                <td><span class="badge ${t.planStatus ? t.planStatus.toLowerCase() : 'trial'}">${t.planStatus || 'TRIAL'}</span></td>
+                <td>${limitStr}</td>
+                <td><span class="badge ${t.status.toLowerCase()}">${t.status}</span></td>
+                <td style="text-align: right;"><div class="action-buttons" style="justify-content: flex-end;">${actionsHtml}</div></td>
+              `;
+              tbody.appendChild(row);
+            });
+            
+            // Setup pagination UI
+            TOTAL_PAGES = data.totalPages;
+            document.getElementById('pagination-start').textContent = (CURRENT_PAGE * PAGE_SIZE) + 1;
+            document.getElementById('pagination-end').textContent = Math.min((CURRENT_PAGE + 1) * PAGE_SIZE, data.totalElements);
+            document.getElementById('pagination-total').textContent = data.totalElements;
+            
+            document.getElementById('pagination-prev').disabled = CURRENT_PAGE === 0;
+            document.getElementById('pagination-next').disabled = CURRENT_PAGE >= TOTAL_PAGES - 1;
+          } else {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;">No organizations match the search criteria.</td></tr>`;
+            document.getElementById('pagination-start').textContent = 0;
+            document.getElementById('pagination-end').textContent = 0;
+            document.getElementById('pagination-total').textContent = 0;
+            document.getElementById('pagination-prev').disabled = true;
+            document.getElementById('pagination-next').disabled = true;
+          }
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-danger); padding: 30px 0;"><i class="fa-solid fa-circle-exclamation"></i> Error loading organization list.</td></tr>`;
+      }
+    }
+
+    // Pagination Listeners
+    document.getElementById('pagination-prev').addEventListener('click', () => {
+      if (CURRENT_PAGE > 0) {
+        CURRENT_PAGE--;
+        fetchTenantsList();
+      }
+    });
+    
+    document.getElementById('pagination-next').addEventListener('click', () => {
+      if (CURRENT_PAGE < TOTAL_PAGES - 1) {
+        CURRENT_PAGE++;
+        fetchTenantsList();
+      }
+    });
+
+    // Search and filters triggers
+    document.getElementById('tenant-search').addEventListener('input', debounce(() => {
+      CURRENT_PAGE = 0;
+      fetchTenantsList();
+    }, 400));
+
+    document.getElementById('tenant-status-filter').addEventListener('change', () => {
+      CURRENT_PAGE = 0;
+      fetchTenantsList();
+    });
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // Create Tenant
+    document.getElementById('register-tenant-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        companyName: document.getElementById('reg-company-name').value,
+        adminEmail: document.getElementById('reg-admin-email').value,
+        adminName: document.getElementById('reg-admin-name').value,
+        adminPhone: document.getElementById('reg-admin-phone').value,
+        planType: document.getElementById('reg-plan-type').value
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        const data = await res.json();
+        
+        if (res.ok) {
+          showToast('Created', 'Organization successfully registered and active.', 'success');
+          closeModal('register-tenant-modal');
+          document.getElementById('register-tenant-form').reset();
+          fetchTenantsList();
+        } else {
+          showToast('Failed', data.message || 'Failed to create tenant.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API error registering organization.', 'error');
+      }
+    });
+
+    // View Details
+    async function viewTenantDetails(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const t = await res.json();
+          const detailsDiv = document.getElementById('view-tenant-details-body');
+          
+          detailsDiv.innerHTML = `
+            <table class="responsive-table" style="box-shadow:none; border:none; width:100%;">
+              <tr>
+                <td style="font-weight:bold; width:35%;">Organization ID</td>
+                <td><code>${t.id}</code></td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Company Name</td>
+                <td>${t.companyName}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Tenant Code / Subdomain</td>
+                <td><code>${t.tenantCode}</code></td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Super Admin Name</td>
+                <td>${t.adminName}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Super Admin Email</td>
+                <td>${t.adminEmail}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Admin Mobile</td>
+                <td>${t.adminPhone}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Subscription Plan</td>
+                <td><span class="badge ${t.planType.toLowerCase()}">${t.planType}</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Subscription Status</td>
+                <td><span class="badge ${t.planStatus ? t.planStatus.toLowerCase() : 'trial'}">${t.planStatus || 'TRIAL'}</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Seat Limit</td>
+                <td>${t.maxEmployees} employees</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Organization Status</td>
+                <td><span class="badge ${t.status.toLowerCase()}">${t.status}</span></td>
+              </tr>
+              ${t.status === 'SUSPENDED' ? `
+              <tr style="background:rgba(239,68,68,0.02)">
+                <td style="font-weight:bold; color:var(--color-danger)">Suspension Reason</td>
+                <td style="color:var(--color-danger)">${t.suspensionReason || 'None provided'}</td>
+              </tr>` : ''}
+              <tr>
+                <td style="font-weight:bold;">Created At</td>
+                <td>${new Date(t.createdAt).toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="font-weight:bold;">Last Updated</td>
+                <td>${new Date(t.updatedAt).toLocaleString()}</td>
+              </tr>
+            </table>
+          `;
+          openModal('view-tenant-modal');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to retrieve organization details.', 'error');
+      }
+    }
+
+    // Edit Metadata
+    function openEditTenantModal(id, companyName, adminPhone) {
+      document.getElementById('edit-tenant-id').value = id;
+      document.getElementById('edit-company-name').value = companyName;
+      document.getElementById('edit-admin-phone').value = adminPhone || '';
+      openModal('edit-tenant-modal');
+    }
+
+    document.getElementById('edit-tenant-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit-tenant-id').value;
+      const payload = {
+        companyName: document.getElementById('edit-company-name').value,
+        adminPhone: document.getElementById('edit-admin-phone').value
+      };
+      
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Updated', 'Organization metadata changes saved.', 'success');
+          closeModal('edit-tenant-modal');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', 'Failed to save edits.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API edit error.', 'error');
+      }
+    });
+
+    // Suspend Organization
+    function openSuspendModal(id) {
+      document.getElementById('suspend-tenant-id').value = id;
+      document.getElementById('suspend-reason').value = '';
+      openModal('suspend-tenant-modal');
+    }
+
+    document.getElementById('suspend-tenant-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('suspend-tenant-id').value;
+      const reason = document.getElementById('suspend-reason').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}/suspend?reason=${encodeURIComponent(reason)}`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Suspended', 'Organization successfully suspended.', 'warning');
+          closeModal('suspend-tenant-modal');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', 'Could not suspend organization.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API suspension error.', 'error');
+      }
+    });
+
+    // Reactivate Tenant
+    async function activateTenant(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}/activate`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Activated', 'Organization successfully reactivated.', 'success');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', 'Failed to reactivate organization.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API activation error.', 'error');
+      }
+    }
+
+    // Disable (Deactivate) Tenant
+    async function deactivateTenant(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}/deactivate`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Disabled', 'Organization successfully disabled/deactivated.', 'warning');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', 'Failed to deactivate organization.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API deactivation error.', 'error');
+      }
+    }
+
+    // Override Plan Limits
+    function openOverrideModal(id, planType, maxEmployees) {
+      document.getElementById('override-tenant-id').value = id;
+      document.getElementById('override-plan-type').value = planType;
+      document.getElementById('override-max-employees').value = maxEmployees;
+      
+      // Guess storage limit based on plan type default
+      let defStorage = 1024;
+      if (planType === 'MODERATE') defStorage = 5120;
+      if (planType === 'PREMIUM') defStorage = 20480;
+      if (planType === 'ENTERPRISE') defStorage = 102400;
+      document.getElementById('override-max-storage').value = defStorage;
+
+      openModal('override-tenant-modal');
+    }
+
+    document.getElementById('override-tenant-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('override-tenant-id').value;
+      const payload = {
+        planType: document.getElementById('override-plan-type').value,
+        maxEmployees: parseInt(document.getElementById('override-max-employees').value),
+        maxStorageMb: parseInt(document.getElementById('override-max-storage').value)
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants/${id}/plan-override`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Limits Overridden', 'Plan seats and custom storage limits updated.', 'success');
+          closeModal('override-tenant-modal');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', 'Override call failed.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API override error.', 'error');
+      }
+    });
+
+    // Delete Tenant
+    async function deleteTenant(id) {
+      if (confirm('Are you absolutely sure you want to delete this organization? This performs a soft-delete, disabling its subscription and marking it as Deleted.')) {
+        try {
+          const res = await fetch(`${API_BASE}/platform/tenants/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+          });
+          checkResponseStatus(res);
+          if (res.status === 204 || res.ok) {
+            showToast('Deleted', 'Organization deleted successfully.', 'success');
+            fetchTenantsList();
+          } else {
+            showToast('Failed', 'Failed to delete organization.', 'error');
+          }
+        } catch (err) {
+          showToast('Error', 'API delete error.', 'error');
+        }
+      }
+    }
+
+    // ==========================================
+    // SUBSCRIPTION VIEW & SIMULATOR LOGIC
+    // ==========================================
+    
+    async function fetchSubscriptionMetrics() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/subscriptions/dashboard`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          
+          document.getElementById('sub-trial-count').textContent = data.freeTrialCount;
+          document.getElementById('sub-basic-count').textContent = data.basicPlanCount;
+          document.getElementById('sub-premium-count').textContent = data.premiumPlanCount;
+          document.getElementById('sub-enterprise-count').textContent = data.enterprisePlanCount;
+
+          renderSubscriptionCharts(data);
+          
+          // Populate targets dropdown for simulator
+          populateSandboxTargets();
+        }
+      } catch (err) {
+        console.error('Error loading subscriptions', err);
+      }
+    }
+
+    function renderSubscriptionCharts(data) {
+      // Monthly Revenue Chart
+      const revCtx = document.getElementById('monthlyRevenueChart').getContext('2d');
+      const revLabels = data.monthlyRevenue.map(p => p.label);
+      const revValues = data.monthlyRevenue.map(p => p.value);
+      
+      if (revChartInstance) revChartInstance.destroy();
+      revChartInstance = new Chart(revCtx, {
+        type: 'line',
+        data: {
+          labels: revLabels,
+          datasets: [{
+            label: 'Monthly Revenue (INR)',
+            data: revValues,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+          }
+        }
+      });
+
+      // Subscription Growth Chart
+      const growthCtx = document.getElementById('subscriptionGrowthChart').getContext('2d');
+      const growthLabels = data.subscriptionGrowth.map(p => p.label);
+      const growthValues = data.subscriptionGrowth.map(p => p.value);
+      
+      if (growthChartInstance) growthChartInstance.destroy();
+      growthChartInstance = new Chart(growthCtx, {
+        type: 'bar',
+        data: {
+          labels: growthLabels,
+          datasets: [{
+            label: 'Total Subscriptions',
+            data: growthValues,
+            backgroundColor: 'rgba(168, 85, 247, 0.65)',
+            borderColor: '#a855f7',
+            borderWidth: 1,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+          }
+        }
+      });
+
+      // Plan Distribution Chart (Donut)
+      const distCtx = document.getElementById('planDistributionChart').getContext('2d');
+      const distLabels = data.planDistribution.map(p => p.label);
+      const distValues = data.planDistribution.map(p => p.value);
+      
+      if (distChartInstance) distChartInstance.destroy();
+      distChartInstance = new Chart(distCtx, {
+        type: 'doughnut',
+        data: {
+          labels: distLabels,
+          datasets: [{
+            data: distValues,
+            backgroundColor: ['#0ea5e9', '#6366f1', '#a855f7', '#10b981'],
+            borderWidth: 2,
+            borderColor: '#0c101f'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } }
+            }
+          }
+        }
+      });
+    }
+
+    async function populateSandboxTargets() {
+      const select = document.getElementById('sandbox-tenant-select');
+      
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants?size=50`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          select.innerHTML = '<option value="">Choose organization...</option>';
+          data.content.forEach(t => {
+            if (t.status !== 'DELETED') {
+              const opt = document.createElement('option');
+              opt.value = t.id;
+              opt.textContent = `${t.companyName} (${t.tenantCode})`;
+              opt.setAttribute('data-code', t.tenantCode);
+              select.appendChild(opt);
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error fetching targets', e);
+      }
+    }
+
+    // Toggle sandbox fields based on selected action
+    document.getElementById('sandbox-action-select').addEventListener('change', (e) => {
+      const val = e.target.value;
+      const planWrapper = document.getElementById('sandbox-plan-wrapper');
+      if (val === 'UPGRADE' || val === 'DOWNGRADE') {
+        planWrapper.style.display = 'block';
+      } else {
+        planWrapper.style.display = 'none';
+      }
+    });
+
+    // Execute Subscription Simulator Actions (delegates to tenant's own controller)
+    document.getElementById('sandbox-execute-btn').addEventListener('click', async () => {
+      const tenantSelect = document.getElementById('sandbox-tenant-select');
+      const tenantId = tenantSelect.value;
+      const action = document.getElementById('sandbox-action-select').value;
+      
+      if (!tenantId) {
+        showToast('Required', 'Please choose a target organization first.', 'warning');
+        return;
+      }
+      
+      const btn = document.getElementById('sandbox-execute-btn');
+      btn.disabled = true;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<span class="loading-spinner"></span>`;
+      
+      // Simulated header mapping
+      const tenantHeaders = getHeaders();
+      tenantHeaders['X-Tenant-ID'] = tenantId; // Inject simulation context headers
+      
+      let url = `${API_BASE}/tenant/subscriptions`;
+      let method = 'POST';
+      let payload = null;
+
+      if (action === 'RENEW') {
+        url += '/renew';
+      } else if (action === 'CANCEL') {
+        url += '/cancel';
+      } else if (action === 'UPGRADE') {
+        url += '/upgrade';
+        const plan = document.getElementById('sandbox-plan-select').value;
+        url += `?planType=${plan}&billingCycle=monthly`;
+      } else if (action === 'DOWNGRADE') {
+        url += '/downgrade';
+        const plan = document.getElementById('sandbox-plan-select').value;
+        url += `?planType=${plan}&billingCycle=monthly`;
+      }
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: tenantHeaders
+        });
+        checkResponseStatus(res);
+        const data = await res.json();
+        
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+
+        if (res.ok) {
+          showToast('Simulation Successful', `Action '${action}' executed. Status is now ${data.planStatus}.`, 'success');
+          fetchSubscriptionMetrics();
+        } else {
+          showToast('Simulation Denied', data.message || 'Action rejected by tenant service validation policies.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        showToast('Error', 'Simulator connection failure.', 'error');
+      }
+    });
+
+    // Boot App
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
