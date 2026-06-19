@@ -10,6 +10,8 @@ import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.task.EmployeeTaskRepository;
 import com.sonixhr.security.TenantContext;
+import com.sonixhr.service.EmailService;
+import com.sonixhr.service.leave.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,11 +25,14 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class EmployeeTaskService {
 
     private final EmployeeTaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Transactional
     public TaskResponseDTO createTask(@NonNull TaskCreateRequestDTO dto, @NonNull Long assignerId) {
@@ -87,6 +92,26 @@ public class EmployeeTaskService {
 
         EmployeeTask saved = taskRepository.save(task);
         log.info("Task created successfully with ID: {}", saved.getId());
+
+        // Send Email Notification to assignee
+        if (assignee.getEmail() != null) {
+            emailService.sendTaskNotification(
+                    assignee.getEmail(),
+                    assignee.getFullName(),
+                    saved.getTitle(),
+                    "ASSIGNED",
+                    assigner.getFullName()
+            );
+        }
+
+        // Send In-App Notification to assignee
+        notificationService.sendNotification(
+                assignee,
+                "Task Assigned",
+                String.format("You have been assigned a new task: '%s' by %s.", saved.getTitle(), assigner.getFullName()),
+                "TASK"
+        );
+
         return convertToResponse(saved);
     }
 
@@ -141,22 +166,137 @@ public class EmployeeTaskService {
                 task.getAssignedTo().getManager().getId().equals(employeeId);
 
         if (newStatus == TaskStatus.CANCELLED) {
+            if (task.getStatus() == TaskStatus.COMPLETED || task.getStatus() == TaskStatus.CANCELLED || task.getStatus() == TaskStatus.DECLINED) {
+                throw new BusinessException("Cannot cancel a task that is completed, declined, or already cancelled");
+            }
             // Only assigner, direct manager, or super admin can cancel a task
             if (!isAssigner && !isDirectManager && !isSuperAdmin) {
                 throw new BusinessException("You are not authorized to cancel this task");
             }
-        } else {
-            // Assignee (or direct manager/super admin) can update to IN_PROGRESS or COMPLETED
+        } else if (newStatus == TaskStatus.IN_PROGRESS) {
+            if (task.getStatus() != TaskStatus.ACCEPTED) {
+                throw new BusinessException("Task must be accepted before starting work");
+            }
             if (!isAssignee && !isDirectManager && !isSuperAdmin) {
                 throw new BusinessException("You are not authorized to update this task status");
             }
-            if (newStatus == TaskStatus.COMPLETED) {
-                task.setCompletedAt(LocalDateTime.now());
+        } else if (newStatus == TaskStatus.COMPLETED) {
+            if (task.getStatus() != TaskStatus.ACCEPTED && task.getStatus() != TaskStatus.IN_PROGRESS) {
+                throw new BusinessException("Task must be accepted or in progress before completing");
             }
+            if (!isAssignee && !isDirectManager && !isSuperAdmin) {
+                throw new BusinessException("You are not authorized to update this task status");
+            }
+            task.setCompletedAt(LocalDateTime.now());
+        } else {
+            throw new BusinessException("Invalid status transition via this endpoint. Use accept/decline/acknowledge endpoints instead.");
         }
 
         task.setStatus(newStatus);
         EmployeeTask saved = taskRepository.save(task);
+        return convertToResponse(saved);
+    }    @Transactional
+    public TaskResponseDTO acceptTask(@NonNull Long taskId, @NonNull Long employeeId) {
+        log.info("Accepting task: {} by employee: {}", taskId, employeeId);
+
+        EmployeeTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+
+        // Verify tenant isolation
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (!task.getTenant().getId().equals(tenantId)) {
+            throw new ResourceNotFoundException("Task not found");
+        }
+
+        if (!task.getAssignedTo().getId().equals(employeeId)) {
+            throw new BusinessException("You can only accept tasks assigned to you");
+        }
+
+        if (task.getStatus() != TaskStatus.PENDING && task.getStatus() != TaskStatus.ACKNOWLEDGED) {
+            throw new BusinessException("Only pending or acknowledged tasks can be accepted");
+        }
+
+        task.setStatus(TaskStatus.ACCEPTED);
+        EmployeeTask saved = taskRepository.save(task);
+
+        // Send notifications to assigner
+        Employee assigner = task.getAssignedBy();
+        Employee assignee = task.getAssignedTo();
+
+        // Email Notification
+        if (assigner.getEmail() != null) {
+            emailService.sendTaskNotification(
+                    assigner.getEmail(),
+                    assigner.getFullName(),
+                    task.getTitle(),
+                    "ACCEPTED",
+                    assignee.getFullName()
+            );
+        }
+
+        // In-App Notification
+        notificationService.sendNotification(
+                assigner,
+                "Task Accepted",
+                String.format("Task '%s' was accepted by %s.", task.getTitle(), assignee.getFullName()),
+                "TASK"
+        );
+
+        return convertToResponse(saved);
+    }
+
+    @Transactional
+    public TaskResponseDTO declineTask(@NonNull Long taskId, @NonNull String declineReason, @NonNull Long employeeId) {
+        log.info("Declining task: {} by employee: {} with reason: {}", taskId, employeeId, declineReason);
+
+        if (declineReason == null || declineReason.trim().isEmpty()) {
+            throw new BusinessException("Decline reason is required");
+        }
+
+        EmployeeTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found"));
+
+        // Verify tenant isolation
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (!task.getTenant().getId().equals(tenantId)) {
+            throw new ResourceNotFoundException("Task not found");
+        }
+
+        if (!task.getAssignedTo().getId().equals(employeeId)) {
+            throw new BusinessException("You can only decline tasks assigned to you");
+        }
+
+        if (task.getStatus() != TaskStatus.PENDING && task.getStatus() != TaskStatus.ACKNOWLEDGED) {
+            throw new BusinessException("Only pending or acknowledged tasks can be declined");
+        }
+
+        task.setStatus(TaskStatus.DECLINED);
+        task.setDeclineReason(declineReason);
+        EmployeeTask saved = taskRepository.save(task);
+
+        // Send notifications to assigner
+        Employee assigner = task.getAssignedBy();
+        Employee assignee = task.getAssignedTo();
+
+        // Email Notification
+        if (assigner.getEmail() != null) {
+            emailService.sendTaskNotification(
+                    assigner.getEmail(),
+                    assigner.getFullName(),
+                    task.getTitle(),
+                    "DECLINED",
+                    assignee.getFullName()
+            );
+        }
+
+        // In-App Notification
+        notificationService.sendNotification(
+                assigner,
+                "Task Declined",
+                String.format("Task '%s' was declined by %s. Reason: %s", task.getTitle(), assignee.getFullName(), declineReason),
+                "TASK"
+        );
+
         return convertToResponse(saved);
     }
 
@@ -188,6 +328,7 @@ public class EmployeeTaskService {
                 .status(task.getStatus())
                 .acknowledgedAt(task.getAcknowledgedAt())
                 .completedAt(task.getCompletedAt())
+                .declineReason(task.getDeclineReason())
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())
                 .build();

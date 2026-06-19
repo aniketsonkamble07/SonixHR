@@ -63,6 +63,9 @@ public class EmployeeTask {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "decline_reason", length = 500)
+    private String declineReason;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

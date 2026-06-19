@@ -115,4 +115,48 @@ public class EmployeeTaskController {
         TaskResponseDTO response = taskService.updateTaskStatus(id, status, employeeId);
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/{id}/accept")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS') or hasAnyAuthority('EMPLOYEE')")
+    public ResponseEntity<TaskResponseDTO> acceptTask(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        if (id == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (currentEmployee == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Long employeeId = currentEmployee.getId();
+        if (employeeId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        log.info("REST request to accept task: {} by {}", id, currentEmployee.getFullName());
+        TaskResponseDTO response = taskService.acceptTask(id, employeeId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/decline")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS') or hasAnyAuthority('EMPLOYEE')")
+    public ResponseEntity<TaskResponseDTO> declineTask(
+            @PathVariable Long id,
+            @RequestParam String declineReason,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        if (id == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (declineReason == null || declineReason.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (currentEmployee == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Long employeeId = currentEmployee.getId();
+        if (employeeId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        log.info("REST request to decline task: {} with reason: {} by {}", id, declineReason, currentEmployee.getFullName());
+        TaskResponseDTO response = taskService.declineTask(id, declineReason, employeeId);
+        return ResponseEntity.ok(response);
+    }
 }

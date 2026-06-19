@@ -70,6 +70,9 @@ class SonixhrApplicationTests {
 	private com.sonixhr.service.leave.LeaveConfigurationService leaveConfigService;
 
 	@Autowired
+	private com.sonixhr.repository.leave.NotificationRepository notificationRepository;
+
+	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
 	@Autowired
@@ -1284,21 +1287,27 @@ class SonixhrApplicationTests {
 				.build();
 		employee = employeeRepository.save(employee);
 
-		// 1. Authenticate as Manager and create/assign task
-		com.sonixhr.dto.task.TaskCreateRequestDTO request = com.sonixhr.dto.task.TaskCreateRequestDTO.builder()
+		// 1. Authenticate as Manager and create/assign task 1
+		com.sonixhr.dto.task.TaskCreateRequestDTO request1 = com.sonixhr.dto.task.TaskCreateRequestDTO.builder()
 				.title("Review HR Guidelines")
 				.description("Please review the standard HR guidelines document.")
 				.assignedToId(employee.getId())
 				.dueDate(java.time.LocalDate.now().plusDays(2))
 				.build();
 
-		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> createResponse =
-				employeeTaskController.createTask(request, manager);
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> createResponse1 =
+				employeeTaskController.createTask(request1, manager);
 		
-		assertNotNull(createResponse.getBody());
-		assertEquals(org.springframework.http.HttpStatus.CREATED, createResponse.getStatusCode());
-		assertEquals("Review HR Guidelines", createResponse.getBody().getTitle());
-		assertEquals(com.sonixhr.enums.task.TaskStatus.PENDING, createResponse.getBody().getStatus());
+		assertNotNull(createResponse1.getBody());
+		assertEquals(org.springframework.http.HttpStatus.CREATED, createResponse1.getStatusCode());
+		assertEquals("Review HR Guidelines", createResponse1.getBody().getTitle());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.PENDING, createResponse1.getBody().getStatus());
+
+		// Assert that the assignee (John) received a notification for task assignment
+		java.util.List<com.sonixhr.entity.leave.Notification> johnNotifications = 
+				notificationRepository.findByEmployeeIdAndTenantIdOrderByCreatedAtDesc(employee.getId(), tenant.getId());
+		assertTrue(johnNotifications.size() > 0, "John should have received a notification");
+		assertTrue(johnNotifications.get(0).getTitle().contains("Task Assigned"), "Notification title should contain Task Assigned");
 
 		// 2. Authenticate as Employee to view and acknowledge the task
 		final com.sonixhr.entity.employee.Employee finalEmployee = employee;
@@ -1313,21 +1322,71 @@ class SonixhrApplicationTests {
 		assertNotNull(myTasksResponse.getBody());
 		assertEquals(1, myTasksResponse.getBody().getTotalElements());
 
-		Long taskId = createResponse.getBody().getId();
+		Long task1Id = createResponse1.getBody().getId();
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> ackResponse =
-				employeeTaskController.acknowledgeTask(taskId, finalEmployee);
+				employeeTaskController.acknowledgeTask(task1Id, finalEmployee);
 		assertNotNull(ackResponse.getBody());
 		assertEquals(com.sonixhr.enums.task.TaskStatus.ACKNOWLEDGED, ackResponse.getBody().getStatus());
 		assertNotNull(ackResponse.getBody().getAcknowledgedAt());
 
-		// 3. Update task status to IN_PROGRESS and then COMPLETED
+		// 3. Employee declines Task 1 with a reason
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> declineResponse =
+				employeeTaskController.declineTask(task1Id, "Too busy with production release", finalEmployee);
+		assertNotNull(declineResponse.getBody());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.DECLINED, declineResponse.getBody().getStatus());
+		assertEquals("Too busy with production release", declineResponse.getBody().getDeclineReason());
+
+		// Assert that the manager received a notification for declined task
+		java.util.List<com.sonixhr.entity.leave.Notification> managerNotificationsDecline = 
+				notificationRepository.findByEmployeeIdAndTenantIdOrderByCreatedAtDesc(manager.getId(), tenant.getId());
+		assertTrue(managerNotificationsDecline.size() > 0, "Manager should have received a notification");
+		assertTrue(managerNotificationsDecline.get(0).getTitle().contains("Task Declined"), "Notification title should contain Task Declined");
+
+		// 4. Authenticate as Manager again and create/assign task 2
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						manager, "password", manager.getAuthorities()
+				)
+		);
+
+		com.sonixhr.dto.task.TaskCreateRequestDTO request2 = com.sonixhr.dto.task.TaskCreateRequestDTO.builder()
+				.title("Fix Login Bug")
+				.description("Investigate and fix the login issue reported in production.")
+				.assignedToId(finalEmployee.getId())
+				.dueDate(java.time.LocalDate.now().plusDays(1))
+				.build();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> createResponse2 =
+				employeeTaskController.createTask(request2, manager);
+		assertNotNull(createResponse2.getBody());
+		Long task2Id = createResponse2.getBody().getId();
+
+		// 5. Authenticate as Employee to accept the task
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						finalEmployee, "password", finalEmployee.getAuthorities()
+				)
+		);
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> acceptResponse =
+				employeeTaskController.acceptTask(task2Id, finalEmployee);
+		assertNotNull(acceptResponse.getBody());
+		assertEquals(com.sonixhr.enums.task.TaskStatus.ACCEPTED, acceptResponse.getBody().getStatus());
+
+		// Assert that the manager received a notification for accepted task
+		java.util.List<com.sonixhr.entity.leave.Notification> managerNotificationsAccept = 
+				notificationRepository.findByEmployeeIdAndTenantIdOrderByCreatedAtDesc(manager.getId(), tenant.getId());
+		assertTrue(managerNotificationsAccept.size() > 0, "Manager should have received a notification");
+		assertTrue(managerNotificationsAccept.get(0).getTitle().contains("Task Accepted"), "Notification title should contain Task Accepted");
+
+		// 6. Update task status to IN_PROGRESS and then COMPLETED
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> inProgressResponse =
-				employeeTaskController.updateTaskStatus(taskId, com.sonixhr.enums.task.TaskStatus.IN_PROGRESS, finalEmployee);
+				employeeTaskController.updateTaskStatus(task2Id, com.sonixhr.enums.task.TaskStatus.IN_PROGRESS, finalEmployee);
 		assertNotNull(inProgressResponse.getBody());
 		assertEquals(com.sonixhr.enums.task.TaskStatus.IN_PROGRESS, inProgressResponse.getBody().getStatus());
 
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.task.TaskResponseDTO> completedResponse =
-				employeeTaskController.updateTaskStatus(taskId, com.sonixhr.enums.task.TaskStatus.COMPLETED, finalEmployee);
+				employeeTaskController.updateTaskStatus(task2Id, com.sonixhr.enums.task.TaskStatus.COMPLETED, finalEmployee);
 		assertNotNull(completedResponse.getBody());
 		assertEquals(com.sonixhr.enums.task.TaskStatus.COMPLETED, completedResponse.getBody().getStatus());
 		assertNotNull(completedResponse.getBody().getCompletedAt());
