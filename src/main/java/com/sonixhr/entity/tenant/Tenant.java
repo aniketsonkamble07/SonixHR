@@ -1,6 +1,6 @@
 package com.sonixhr.entity.tenant;
 
-import com.sonixhr.enums.PlanType;
+
 import com.sonixhr.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -57,10 +57,9 @@ public class Tenant {
     @Column(name = "admin_phone", length = 20)
     private String adminPhone;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", length = 20)
     @Builder.Default
-    private PlanType planType = PlanType.TRIAL;
+    private String planType = "trial";
 
     @Column(name = "max_employees")
     @Builder.Default
@@ -137,19 +136,19 @@ public class Tenant {
     }
 
     public boolean isTrialActive() {
-        return this.planType == PlanType.TRIAL &&
+        return "trial".equalsIgnoreCase(this.planType) &&
                 this.trialEndsAt != null &&
                 this.trialEndsAt.isAfter(LocalDateTime.now());
     }
 
     public boolean isTrialExpired() {
-        return this.planType == PlanType.TRIAL &&
+        return "trial".equalsIgnoreCase(this.planType) &&
                 this.trialEndsAt != null &&
                 this.trialEndsAt.isBefore(LocalDateTime.now());
     }
 
     public int getDaysLeftInTrial() {
-        if (this.trialEndsAt == null || this.planType != PlanType.TRIAL) {
+        if (this.trialEndsAt == null || !"trial".equalsIgnoreCase(this.planType)) {
             return 0;
         }
         return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.trialEndsAt);

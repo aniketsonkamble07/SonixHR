@@ -1,6 +1,5 @@
 package com.sonixhr.dto.platform;
 
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,7 +20,7 @@ public class PlatformTenantResponseDTO {
     private String adminName;
     private String adminEmail;
     private String adminPhone;
-    private PlanType planType;
+    private String planType;
     private UserStatus status;
     private boolean isActive;
     private Integer maxEmployees;

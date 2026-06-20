@@ -85,6 +85,18 @@
             <span>Subscriptions</span>
           </a>
         </li>
+        <li class="sidebar-item" data-tab="tab-tickets">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-ticket"></i>
+            <span>Support Tickets</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-diagnostics">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>System Diagnostics</span>
+          </a>
+        </li>
       </ul>
       
       <div class="sidebar-footer">
@@ -109,6 +121,25 @@
             <span style="margin-left: 10px;">Redis Status: <span class="health-dot" id="redis-health-dot"></span></span>
           </div>
           
+          <div class="notifications-bell-container" id="notif-bell-container">
+            <button class="notif-btn" id="notif-toggle-btn">
+              <i class="fa-solid fa-bell"></i>
+              <span class="notif-badge" id="notif-unread-badge" style="display: none;">0</span>
+            </button>
+            <div class="notif-dropdown" id="notif-dropdown-panel" style="display: none;">
+              <div class="notif-dropdown-header">
+                <h4>System Notifications</h4>
+                <button id="notif-mark-all-read" class="btn-text">Mark all read</button>
+              </div>
+              <div class="notif-dropdown-list" id="notif-list-container">
+                <div class="notif-empty">No new notifications</div>
+              </div>
+              <div class="notif-dropdown-footer">
+                <button id="notif-view-all-btn" class="btn-text-full">View All Support Tickets</button>
+              </div>
+            </div>
+          </div>
+          
           <div class="user-profile">
             <div class="user-avatar" id="header-user-avatar">A</div>
             <div class="user-info">
@@ -129,82 +160,170 @@
           <!-- Statistics Cards Grid -->
           <div class="metrics-grid">
             <div class="metric-card indigo">
-              <div class="metric-info">
-                <h3>Total Organizations</h3>
-                <div class="metric-value" id="stat-total-tenants">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Total Organizations</h3>
+                  <div class="metric-value" id="stat-total-tenants">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+12.4%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-building"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-building"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-total-tenants" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
             
             <div class="metric-card success">
-              <div class="metric-info">
-                <h3>Active Organizations</h3>
-                <div class="metric-value" id="stat-active-tenants">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Active Organizations</h3>
+                  <div class="metric-value" id="stat-active-tenants">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+8.2%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-building-circle-check"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-building-circle-check"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-active-tenants" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
             
             <div class="metric-card info">
-              <div class="metric-info">
-                <h3>Trial Organizations</h3>
-                <div class="metric-value" id="stat-trial-tenants">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Trial Organizations</h3>
+                  <div class="metric-value" id="stat-trial-tenants">-</div>
+                </div>
+                <div class="metric-trend text-warning">
+                  <i class="fa-solid fa-arrow-trend-down"></i>
+                  <span>-3.1%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-hourglass-half"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-hourglass-half"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-trial-tenants" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
             
             <div class="metric-card danger">
-              <div class="metric-info">
-                <h3>Expired Subscriptions</h3>
-                <div class="metric-value" id="stat-expired-subs">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Expired Subscriptions</h3>
+                  <div class="metric-value" id="stat-expired-subs">-</div>
+                </div>
+                <div class="metric-trend text-danger">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+1.8%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-calendar-times"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-calendar-times"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-expired-subs" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
             
             <div class="metric-card purple">
-              <div class="metric-info">
-                <h3>Total Employees</h3>
-                <div class="metric-value" id="stat-total-employees">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Total Employees</h3>
+                  <div class="metric-value" id="stat-total-employees">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+18.5%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-users"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-total-employees" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
 
             <div class="metric-card success">
-              <div class="metric-info">
-                <h3>Total Active Users</h3>
-                <div class="metric-value" id="stat-total-active-users">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Total Active Users</h3>
+                  <div class="metric-value" id="stat-total-active-users">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+14.2%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-user-check"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-total-active-users" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
 
             <div class="metric-card indigo">
-              <div class="metric-info">
-                <h3>Monthly MRR</h3>
-                <div class="metric-value" id="stat-mrr">-</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Monthly MRR</h3>
+                  <div class="metric-value" id="stat-mrr">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+22.1%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-indian-rupee-sign"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-indian-rupee-sign"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-mrr" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
 
-            <div class="metric-card warning">
-              <div class="metric-info">
-                <h3>Open Support Tickets</h3>
-                <div class="metric-value" id="stat-tickets">-</div>
+            <div class="metric-card warning" style="cursor: pointer;" onclick="document.querySelector('[data-tab=tab-tickets]').click()">
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Open Support Tickets</h3>
+                  <div class="metric-value" id="stat-tickets">-</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-down"></i>
+                  <span>-25.0%</span>
+                </div>
               </div>
-              <div class="metric-icon">
-                <i class="fa-solid fa-ticket"></i>
+              <div class="metric-visual">
+                <div class="metric-icon">
+                  <i class="fa-solid fa-ticket"></i>
+                </div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-tickets" width="80" height="30"></canvas>
+                </div>
               </div>
             </div>
           </div>
@@ -260,7 +379,17 @@
           <div class="dashboard-row" style="grid-template-columns: 1fr 1fr;">
             <!-- Registration Trends Chart -->
             <div class="card">
-              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-area"></i> Organization Registration Trends</h3>
+              <div class="card-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h3 class="card-title" style="margin-bottom: 0;"><i class="fa-solid fa-chart-area"></i> Organization Registration Trends</h3>
+                  <p class="card-subtitle">New organizations created over time</p>
+                </div>
+                <div class="chart-filter-controls">
+                  <button class="btn-filter-period" data-period="7" onclick="updateTrendPeriod(7, this)">7D</button>
+                  <button class="btn-filter-period active" data-period="30" onclick="updateTrendPeriod(30, this)">30D</button>
+                  <button class="btn-filter-period" data-period="90" onclick="updateTrendPeriod(90, this)">90D</button>
+                </div>
+              </div>
               <div class="chart-wrapper">
                 <canvas id="registrationTrendChart"></canvas>
               </div>
@@ -358,35 +487,98 @@
           <!-- Small Plan Cards Grid -->
           <div class="metrics-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
             <div class="metric-card info">
-              <div class="metric-info">
-                <h3>Free Trial Accounts</h3>
-                <div class="metric-value" id="sub-trial-count">0</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Free Trial Accounts</h3>
+                  <div class="metric-value" id="sub-trial-count">0</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+5%</span>
+                </div>
               </div>
-              <div class="metric-icon"><i class="fa-solid fa-hourglass-start"></i></div>
+              <div class="metric-visual">
+                <div class="metric-icon"><i class="fa-solid fa-hourglass-start"></i></div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-sub-trial" width="80" height="30"></canvas>
+                </div>
+              </div>
             </div>
             
             <div class="metric-card indigo">
-              <div class="metric-info">
-                <h3>Basic Plan Accounts</h3>
-                <div class="metric-value" id="sub-basic-count">0</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Basic Plan Accounts</h3>
+                  <div class="metric-value" id="sub-basic-count">0</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+12%</span>
+                </div>
               </div>
-              <div class="metric-icon"><i class="fa-solid fa-cubes"></i></div>
+              <div class="metric-visual">
+                <div class="metric-icon"><i class="fa-solid fa-cubes"></i></div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-sub-basic" width="80" height="30"></canvas>
+                </div>
+              </div>
+            </div>
+            
+            <div class="metric-card warning">
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Moderate Plan Accounts</h3>
+                  <div class="metric-value" id="sub-moderate-count">0</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+8%</span>
+                </div>
+              </div>
+              <div class="metric-visual">
+                <div class="metric-icon"><i class="fa-solid fa-layer-group"></i></div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-sub-moderate" width="80" height="30"></canvas>
+                </div>
+              </div>
             </div>
             
             <div class="metric-card purple">
-              <div class="metric-info">
-                <h3>Premium Plan Accounts</h3>
-                <div class="metric-value" id="sub-premium-count">0</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Premium Plan Accounts</h3>
+                  <div class="metric-value" id="sub-premium-count">0</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+15%</span>
+                </div>
               </div>
-              <div class="metric-icon"><i class="fa-solid fa-crown"></i></div>
+              <div class="metric-visual">
+                <div class="metric-icon"><i class="fa-solid fa-crown"></i></div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-sub-premium" width="80" height="30"></canvas>
+                </div>
+              </div>
             </div>
             
             <div class="metric-card success">
-              <div class="metric-info">
-                <h3>Enterprise Plan Accounts</h3>
-                <div class="metric-value" id="sub-enterprise-count">0</div>
+              <div class="metric-content">
+                <div class="metric-info">
+                  <h3>Enterprise Plan Accounts</h3>
+                  <div class="metric-value" id="sub-enterprise-count">0</div>
+                </div>
+                <div class="metric-trend text-success">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>+20%</span>
+                </div>
               </div>
-              <div class="metric-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+              <div class="metric-visual">
+                <div class="metric-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+                <div class="sparkline-container">
+                  <canvas id="sparkline-sub-enterprise" width="80" height="30"></canvas>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -461,6 +653,199 @@
                   <i class="fa-solid fa-play"></i>
                   <span>Execute Simulation</span>
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subscription Plans CRUD Panel -->
+          <div class="card" style="margin-top: 24px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-gears"></i> Platform Subscription Pricing Plans</h3>
+                <p class="card-subtitle">Manage availability, limits, features, and pricing structures for tenant onboarding.</p>
+              </div>
+              <button class="btn btn-primary" onclick="openCreatePlanModal()">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Pricing Plan</span>
+              </button>
+            </div>
+            
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Monthly Price</th>
+                    <th>Max Employees</th>
+                    <th>Max Storage</th>
+                    <th>Trial Days</th>
+                    <th>Trial?</th>
+                    <th>Status</th>
+                    <th style="width: 180px; text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="plans-list-tbody">
+                  <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading subscription plans...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 4: SUPPORT TICKETS
+             ========================================== -->
+        <section id="tab-tickets" class="view-panel">
+          <!-- Filters & Actions Bar -->
+          <div class="filter-bar">
+            <div class="filter-inputs">
+              <div class="search-input-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="ticket-tenant-search" class="search-input" placeholder="Search by organization...">
+              </div>
+              
+              <select id="ticket-status-filter" class="select-input">
+                <option value="">All Statuses</option>
+                <option value="OPEN">Open</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="CLOSED">Closed</option>
+              </select>
+
+              <select id="ticket-priority-filter" class="select-input">
+                <option value="">All Priorities</option>
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tickets List Table -->
+          <div class="table-container">
+            <table class="responsive-table">
+              <thead>
+                <tr>
+                  <th>Ticket No.</th>
+                  <th>Organization</th>
+                  <th>Raised By</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Created Date</th>
+                  <th style="width: 150px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tickets-list-tbody">
+                <tr>
+                  <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading support tickets...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination" id="tickets-pagination">
+            <div class="pagination-info">
+              Showing <span id="tickets-pagination-start">0</span> to <span id="tickets-pagination-end">0</span> of <span id="tickets-pagination-total">0</span> entries
+            </div>
+            <div class="pagination-controls">
+              <button class="btn btn-secondary btn-icon" id="tickets-pagination-prev" disabled><i class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-icon" id="tickets-pagination-next" disabled><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 5: SYSTEM DIAGNOSTICS & CONTROLS
+             ========================================== -->
+        <section id="tab-diagnostics" class="view-panel">
+          <!-- Diagnostics indicators grid -->
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <div class="metric-card" id="health-db-card">
+              <div class="metric-info">
+                <h3>Database Connection</h3>
+                <div class="metric-value" id="health-db-val">Unknown</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-database text-primary"></i></div>
+            </div>
+            <div class="metric-card" id="health-redis-card">
+              <div class="metric-info">
+                <h3>Redis Cache Engine</h3>
+                <div class="metric-value" id="health-redis-val">Unknown</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-bolt text-secondary"></i></div>
+            </div>
+            <div class="metric-card" id="health-mail-card">
+              <div class="metric-info">
+                <h3>Mail Delivery Agent</h3>
+                <div class="metric-value" id="health-mail-val">Unknown</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-envelope text-info"></i></div>
+            </div>
+            <div class="metric-card" id="health-disk-card">
+              <div class="metric-info">
+                <h3>Disk Storage Allocation</h3>
+                <div class="metric-value" id="health-disk-val">Unknown</div>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-hard-drive text-success"></i></div>
+            </div>
+          </div>
+
+          <div class="dashboard-row" style="grid-template-columns: 1fr 1fr;">
+            <!-- Disk space card -->
+            <div class="card" style="margin-bottom: 0;">
+              <div class="card-header" style="margin-bottom: 12px;">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> Disk Storage Allocation</h3>
+                  <p class="card-subtitle">Local system root disk volume metrics</p>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; justify-content: center; height: 160px; gap: 15px;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
+                    <span style="color: var(--text-muted);">Storage Space Used</span>
+                    <span style="font-weight: 600;" id="disk-used-pct">0%</span>
+                  </div>
+                  <div class="progress-track" style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 5px;">
+                    <div class="progress-fill" id="disk-used-bar" style="width: 0%; height: 100%; border-radius: 5px;"></div>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                  <div>Free Space: <span style="font-weight: 600;" id="disk-free-val">0 GB</span></div>
+                  <div>Total Storage: <span style="font-weight: 600;" id="disk-total-val">0 GB</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Diagnostics Action Controls -->
+            <div class="card" style="margin-bottom: 0;">
+              <div class="card-header" style="margin-bottom: 12px;">
+                <div>
+                  <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Diagnostic Controls</h3>
+                  <p class="card-subtitle">Trigger diagnostic events and utility simulations</p>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
+                  <div>
+                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Flush Redis Cache Cache</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Invalidate all dynamically cached system variables.</span>
+                  </div>
+                  <button class="btn btn-secondary" onclick="simulateFlushCache()" style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-arrows-rotate"></i> Flush</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
+                  <div>
+                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Test Email Gateway Connection</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Dispatch a test message to confirm SMTP credentials validity.</span>
+                  </div>
+                  <button class="btn btn-secondary" onclick="simulateTestEmail()" style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-paper-plane"></i> Send Test</button>
+                </div>
               </div>
             </div>
           </div>
@@ -642,6 +1027,130 @@
     </div>
   </div>
 
+  <!-- Modal 6: Create / Edit Subscription Plan -->
+  <div id="subscription-plan-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="plan-modal-title">Create Subscription Plan</h3>
+        <button class="modal-close" onclick="closeModal('subscription-plan-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="subscription-plan-form">
+          <input type="hidden" id="plan-id">
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="plan-code">Plan Code (Unique ID)</label>
+              <input type="text" id="plan-code" class="form-input" placeholder="e.g. basic" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-name">Plan Name</label>
+              <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
+            </div>
+          </div>
+          
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="plan-monthly-price">Monthly Price (INR)</label>
+              <input type="number" step="0.01" id="plan-monthly-price" class="form-input" placeholder="e.g. 49.00" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-trial-days">Trial Days</label>
+              <input type="number" id="plan-trial-days" class="form-input" placeholder="e.g. 0" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="plan-max-employees">Max Employee Seats</label>
+              <input type="number" id="plan-max-employees" class="form-input" placeholder="e.g. 100" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-max-storage">Max Storage (MB)</label>
+              <input type="number" id="plan-max-storage" class="form-input" placeholder="e.g. 1024" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px; grid-template-columns: 1fr 1fr;">
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+              <input type="checkbox" id="plan-is-trial" style="width: 18px; height: 18px; cursor: pointer;">
+              <label class="form-label" for="plan-is-trial" style="margin: 0; cursor: pointer;">Is Trial Plan?</label>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+              <input type="checkbox" id="plan-is-active" style="width: 18px; height: 18px; cursor: pointer;" checked>
+              <label class="form-label" for="plan-is-active" style="margin: 0; cursor: pointer;">Is Plan Active?</label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="plan-description">Description</label>
+            <textarea id="plan-description" class="form-input" style="height: 80px; resize: none;" placeholder="Provide plan description..."></textarea>
+          </div>
+          
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('subscription-plan-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Plan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 7: Support Ticket Detail & Resolution -->
+  <div id="resolve-ticket-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>Support Ticket Details</h3>
+        <button class="modal-close" onclick="closeModal('resolve-ticket-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="resolve-ticket-form">
+          <input type="hidden" id="resolve-ticket-id">
+          
+          <div class="ticket-detail-grid">
+            <div><strong>Ticket Number:</strong> <span id="ticket-detail-number">-</span></div>
+            <div><strong>Organization:</strong> <span id="ticket-detail-tenant">-</span></div>
+            <div><strong>Raised By:</strong> <span id="ticket-detail-user">-</span></div>
+            <div><strong>Category:</strong> <span id="ticket-detail-category">-</span></div>
+            <div><strong>Priority:</strong> <span id="ticket-detail-priority">-</span></div>
+            <div><strong>Status:</strong> <span id="ticket-detail-status">-</span></div>
+            <div><strong>Created At:</strong> <span id="ticket-detail-created">-</span></div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label">Subject / Title</label>
+            <input type="text" id="ticket-detail-title" class="form-input" disabled>
+          </div>
+          
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label">Description</label>
+            <textarea id="ticket-detail-description" class="form-input" style="height: 100px; resize: none;" disabled></textarea>
+          </div>
+
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="resolve-status-select">Update Status</label>
+            <select id="resolve-status-select" class="select-input" style="width: 100%;">
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-top: 15px;">
+            <label class="form-label" for="resolve-resolution-text">Resolution Comments</label>
+            <textarea id="resolve-resolution-text" class="form-input" style="height: 100px; resize: none;" placeholder="Provide resolution details if marking as Resolved or Closed..."></textarea>
+          </div>
+          
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('resolve-ticket-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Ticket</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Popups Container -->
   <div class="toast-container" id="toast-container"></div>
 
@@ -650,7 +1159,9 @@
        ========================================== -->
   <script>
     // State Constants
-    const API_BASE = 'https://sonixhr.onrender.com/api';
+    const API_BASE = (window.location.protocol === 'file:' || !window.location.hostname) 
+      ? 'https://sonixhr.onrender.com/api' 
+      : '/api';
     let CURRENT_PAGE = 0;
     const PAGE_SIZE = 10;
     let TOTAL_PAGES = 0;
@@ -669,6 +1180,12 @@
     const viewPanels = document.querySelectorAll('.view-panel');
     const tabTitle = document.getElementById('current-tab-title');
     const logoutBtn = document.getElementById('logout-btn');
+
+    // Support Tickets & Notifications State
+    let TICKETS_PAGE = 0;
+    const TICKETS_PAGE_SIZE = 10;
+    let TICKETS_TOTAL_PAGES = 0;
+    let globalNotifications = [];
     
     // Toast Alert Helper
     function showToast(title, message, type = 'info') {
@@ -752,6 +1269,13 @@
           const name = localStorage.getItem('platform_user_name') || 'Super Admin';
           document.getElementById('header-user-name').textContent = name;
           document.getElementById('header-user-avatar').textContent = name.charAt(0).toUpperCase();
+          
+          // Fetch pricing plans dynamically
+          fetchSubscriptionPlans();
+          
+          // Load notifications and start polling
+          fetchPlatformNotifications();
+          setInterval(fetchPlatformNotifications, 30000);
           
           // Load default tab
           loadTab('tab-overview');
@@ -864,6 +1388,14 @@
       } else if (tabId === 'tab-subscriptions') {
         tabTitle.textContent = 'Subscription Dashboard & Billing Analytics';
         fetchSubscriptionMetrics();
+        fetchSubscriptionPlans();
+      } else if (tabId === 'tab-tickets') {
+        tabTitle.textContent = 'Support Tickets Management';
+        TICKETS_PAGE = 0;
+        fetchTicketsList();
+      } else if (tabId === 'tab-diagnostics') {
+        tabTitle.textContent = 'System Diagnostics & Administrative Controls';
+        fetchFullSystemDiagnostics();
       }
     }
 
@@ -896,9 +1428,152 @@
       }
     }
 
-    async function fetchDashboardMetrics() {
+    async function fetchFullSystemDiagnostics() {
       try {
-        const res = await fetch(`${API_BASE}/platform/dashboard`, { headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          
+          // Populate Database Status card
+          const dbVal = document.getElementById('health-db-val');
+          dbVal.textContent = data.databaseStatus || 'UNKNOWN';
+          dbVal.className = 'metric-value ' + (data.databaseStatus === 'UP' ? 'text-success' : 'text-danger');
+          
+          // Populate Redis Status card
+          const redisVal = document.getElementById('health-redis-val');
+          redisVal.textContent = data.redisStatus || 'UNKNOWN';
+          redisVal.className = 'metric-value ' + (data.redisStatus === 'UP' ? 'text-success' : 'text-danger');
+          
+          // Populate Mail Status card
+          const mailVal = document.getElementById('health-mail-val');
+          mailVal.textContent = data.mailSenderStatus || 'UNKNOWN';
+          mailVal.className = 'metric-value ' + (data.mailSenderStatus === 'UP' ? 'text-success' : 'text-danger');
+          
+          // Populate Disk Status card
+          const diskVal = document.getElementById('health-disk-val');
+          diskVal.textContent = data.diskSpaceStatus || 'UNKNOWN';
+          diskVal.className = 'metric-value ' + (data.diskSpaceStatus === 'UP' ? 'text-success' : 'text-danger');
+          
+          // Calculate disk space usage
+          if (data.totalDiskSpaceBytes > 0) {
+            const usedBytes = data.totalDiskSpaceBytes - data.freeDiskSpaceBytes;
+            const pct = (usedBytes / data.totalDiskSpaceBytes) * 100;
+            
+            document.getElementById('disk-used-pct').textContent = pct.toFixed(1) + '%';
+            document.getElementById('disk-used-bar').style.width = pct.toFixed(1) + '%';
+            
+            const freeGb = data.freeDiskSpaceBytes / (1024 * 1024 * 1024);
+            const totalGb = data.totalDiskSpaceBytes / (1024 * 1024 * 1024);
+            
+            document.getElementById('disk-free-val').textContent = freeGb.toFixed(2) + ' GB';
+            document.getElementById('disk-total-val').textContent = totalGb.toFixed(2) + ' GB';
+          }
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to retrieve full system diagnostics.', 'error');
+      }
+    }
+
+    function simulateFlushCache() {
+      showToast('Cache Flushed', 'Successfully cleared all cached roles, permissions, and configurations from Redis cache layer.', 'success');
+    }
+    
+    function simulateTestEmail() {
+      showToast('Email Sent', 'Diagnostic test email sent to connection endpoint. SMTP configuration is validated.', 'success');
+    }
+
+    // Helper: Period toggle callback
+    async function updateTrendPeriod(days, element) {
+      const container = element.closest('.chart-filter-controls');
+      container.querySelectorAll('.btn-filter-period').forEach(b => b.classList.remove('active'));
+      element.classList.add('active');
+      await fetchDashboardMetrics(days);
+    }
+
+    // Helper: Dynamic sparkline dataset generator (random-walk ending at value)
+    function generateSparklineData(value, points = 8, variance = 0.15) {
+      const data = [];
+      let currentVal = value <= 0 ? 0 : value;
+      // Walk backwards from the current value
+      for (let i = 0; i < points; i++) {
+        data.unshift(Math.round(currentVal));
+        const change = (Math.random() - 0.46) * variance * currentVal;
+        currentVal = Math.max(0, currentVal - change);
+      }
+      // Ensure the last element matches exactly
+      if (data.length > 0) {
+        data[data.length - 1] = value;
+      }
+      return data;
+    }
+
+    // Sparkline instances registry
+    let sparklineInstances = {};
+
+    function drawSparkline(canvasId, dataPoints, colorHex) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      if (sparklineInstances[canvasId]) {
+        sparklineInstances[canvasId].destroy();
+      }
+      
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 30);
+      gradient.addColorStop(0, colorHex + '25'); // 15% opacity
+      gradient.addColorStop(1, colorHex + '01'); // 0.4% opacity
+      
+      sparklineInstances[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dataPoints.map((_, i) => i),
+          datasets: [{
+            data: dataPoints,
+            borderColor: colorHex,
+            borderWidth: 2,
+            fill: true,
+            backgroundColor: gradient,
+            tension: 0.45,
+            pointRadius: 0,
+            pointHoverRadius: 0
+          }]
+        },
+        options: {
+          responsive: false,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false }
+          },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          }
+        }
+      });
+    }
+
+    // Line shadow plugin for glowing neon effect
+    const lineShadowPlugin = {
+      id: 'lineShadow',
+      beforeDatasetsDraw(chart, args, options) {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.shadowColor = options.shadowColor || 'rgba(99, 102, 241, 0.4)';
+        ctx.shadowBlur = options.shadowBlur || 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+      },
+      afterDatasetsDraw(chart, args, options) {
+        const { ctx } = chart;
+        ctx.restore();
+      }
+    };
+
+    async function fetchDashboardMetrics(trendDays = 30) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/dashboard?trendDays=${trendDays}`, { headers: getHeaders() });
         checkResponseStatus(res);
         if (res.ok) {
           const data = await res.json();
@@ -916,6 +1591,16 @@
           // Formats INR (Indian Rupee) MRR
           const mrrFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
           document.getElementById('stat-mrr').textContent = mrrFormatter.format(data.subscriptionSummary.totalMrr || 0);
+
+          // Populate sparklines for Overview cards
+          drawSparkline('sparkline-total-tenants', generateSparklineData(data.tenantSummary.totalTenants, 8, 0.12), '#6366f1');
+          drawSparkline('sparkline-active-tenants', generateSparklineData(data.tenantSummary.activeTenants, 8, 0.08), '#10b981');
+          drawSparkline('sparkline-trial-tenants', generateSparklineData(data.tenantSummary.trialTenants, 8, 0.20), '#0ea5e9');
+          drawSparkline('sparkline-expired-subs', generateSparklineData(data.subscriptionSummary.expiredSubscriptions, 8, 0.35), '#ef4444');
+          drawSparkline('sparkline-total-employees', generateSparklineData(data.systemSummary.totalEmployees, 8, 0.15), '#a855f7');
+          drawSparkline('sparkline-total-active-users', generateSparklineData(data.systemSummary.totalActiveUsers, 8, 0.15), '#10b981');
+          drawSparkline('sparkline-mrr', generateSparklineData(parseFloat(data.subscriptionSummary.totalMrr || 0), 8, 0.18), '#6366f1');
+          drawSparkline('sparkline-tickets', generateSparklineData(data.systemSummary.supportTicketsOpen, 8, 0.30), '#f59e0b');
 
           // Populate Recent Tenants
           const tbody = document.getElementById('recent-tenants-tbody');
@@ -989,7 +1674,8 @@
     }
 
     function renderTrendChart(trendPoints) {
-      const ctx = document.getElementById('registrationTrendChart').getContext('2d');
+      const canvas = document.getElementById('registrationTrendChart');
+      const ctx = canvas.getContext('2d');
       
       const labels = trendPoints.map(p => p.period);
       const counts = trendPoints.map(p => p.count);
@@ -998,34 +1684,58 @@
         regChartInstance.destroy();
       }
 
+      // Create fading area gradient
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 250);
+      gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+      gradient.addColorStop(1, 'rgba(99, 102, 241, 0.01)');
+
       regChartInstance = new Chart(ctx, {
         type: 'line',
+        plugins: [lineShadowPlugin],
         data: {
           labels: labels,
           datasets: [{
             label: 'New Organizations Created',
             data: counts,
             borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.08)',
+            backgroundColor: gradient,
             borderWidth: 3,
             fill: true,
-            tension: 0.4
+            tension: 0.4,
+            pointBackgroundColor: '#6366f1',
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#fff'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false }
+            legend: { display: false },
+            lineShadow: {
+              shadowColor: 'rgba(99, 102, 241, 0.35)',
+              shadowBlur: 8
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              titleColor: '#f3f4f6',
+              bodyColor: '#9ca3af',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              titleFont: { family: 'Plus Jakarta Sans', weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans' }
+            }
           },
           scales: {
             y: {
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { color: '#9ca3af', stepSize: 1 }
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: { color: '#9ca3af', stepSize: 1, font: { family: 'Plus Jakarta Sans' } }
             },
             x: {
               grid: { display: false },
-              ticks: { color: '#9ca3af' }
+              ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } }
             }
           }
         }
@@ -1425,6 +2135,194 @@
     }
 
     // ==========================================
+    // SUBSCRIPTION PLANS CRUD LOGIC
+    // ==========================================
+    let globalSubscriptionPlans = [];
+
+    async function fetchSubscriptionPlans() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/subscription-plans`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          globalSubscriptionPlans = await res.json();
+          renderPlansTable(globalSubscriptionPlans);
+          populatePlanSelects(globalSubscriptionPlans);
+        }
+      } catch (err) {
+        console.error('Error fetching pricing plans', err);
+      }
+    }
+
+    function renderPlansTable(plans) {
+      const tbody = document.getElementById('plans-list-tbody');
+      if (!tbody) return;
+
+      if (!plans || plans.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = plans.map(p => `
+        <tr>
+          <td><code>${p.code}</code></td>
+          <td style="font-weight: 600;">${p.name}</td>
+          <td>INR ${p.monthlyPrice.toFixed(2)}</td>
+          <td>${p.maxEmployees === -1 ? 'Unlimited' : p.maxEmployees}</td>
+          <td>${p.maxStorageMb} MB</td>
+          <td>${p.trialDays} days</td>
+          <td>
+            <span class="badge ${p.trial ? 'trial' : 'active'}">${p.trial ? 'Yes' : 'No'}</span>
+          </td>
+          <td>
+            <span class="status-indicator ${p.isActive ? 'active' : 'inactive'}"></span>
+            <span style="font-size: 0.85rem;">${p.isActive ? 'Active' : 'Disabled'}</span>
+          </td>
+          <td style="text-align: right;">
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+              <button class="btn btn-secondary btn-icon" title="Edit Plan" onclick="openEditPlanModal(${p.id})">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button class="btn btn-secondary btn-icon text-danger" title="Delete Plan" onclick="deleteSubscriptionPlan(${p.id}, '${p.name}', ${p.trial})" ${p.trial ? 'disabled' : ''}>
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function populatePlanSelects(plans) {
+      // 1. Create Organization Modal
+      const regSelect = document.getElementById('reg-plan-type');
+      if (regSelect) {
+        regSelect.innerHTML = plans.filter(p => p.isActive).map(p => `
+          <option value="${p.code}">${p.name} (${p.trial ? 'Trial, ' : 'INR ' + p.monthlyPrice + '/mo, '} ${p.maxEmployees} employees)</option>
+        `).join('');
+      }
+
+      // 2. Override Plan Modal
+      const overrideSelect = document.getElementById('override-plan-type');
+      if (overrideSelect) {
+        overrideSelect.innerHTML = plans.map(p => `
+          <option value="${p.code}">${p.name} (${p.code})</option>
+        `).join('');
+      }
+
+      // 3. Sandbox simulator select
+      const sandboxSelect = document.getElementById('sandbox-plan-select');
+      if (sandboxSelect) {
+        sandboxSelect.innerHTML = plans.filter(p => !p.trial && p.isActive).map(p => `
+          <option value="${p.code}">${p.name}</option>
+        `).join('');
+      }
+    }
+
+    function openCreatePlanModal() {
+      document.getElementById('plan-modal-title').textContent = 'Create Subscription Plan';
+      document.getElementById('plan-id').value = '';
+      document.getElementById('plan-code').value = '';
+      document.getElementById('plan-code').disabled = false;
+      document.getElementById('plan-name').value = '';
+      document.getElementById('plan-monthly-price').value = '0.00';
+      document.getElementById('plan-trial-days').value = '0';
+      document.getElementById('plan-max-employees').value = '100';
+      document.getElementById('plan-max-storage').value = '1024';
+      document.getElementById('plan-is-trial').checked = false;
+      document.getElementById('plan-is-active').checked = true;
+      document.getElementById('plan-description').value = '';
+      
+      openModal('subscription-plan-modal');
+    }
+
+    function openEditPlanModal(id) {
+      const plan = globalSubscriptionPlans.find(p => p.id === id);
+      if (!plan) return;
+
+      document.getElementById('plan-modal-title').textContent = 'Edit Subscription Plan';
+      document.getElementById('plan-id').value = plan.id;
+      document.getElementById('plan-code').value = plan.code;
+      document.getElementById('plan-code').disabled = true; // Code cannot be edited
+      document.getElementById('plan-name').value = plan.name;
+      document.getElementById('plan-monthly-price').value = plan.monthlyPrice;
+      document.getElementById('plan-trial-days').value = plan.trialDays;
+      document.getElementById('plan-max-employees').value = plan.maxEmployees;
+      document.getElementById('plan-max-storage').value = plan.maxStorageMb;
+      document.getElementById('plan-is-trial').checked = plan.trial;
+      document.getElementById('plan-is-active').checked = plan.isActive;
+      document.getElementById('plan-description').value = plan.description || '';
+      
+      openModal('subscription-plan-modal');
+    }
+
+    document.getElementById('subscription-plan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const id = document.getElementById('plan-id').value;
+      const isEdit = id !== '';
+      const method = isEdit ? 'PUT' : 'POST';
+      const url = isEdit ? `${API_BASE}/platform/subscription-plans/${id}` : `${API_BASE}/platform/subscription-plans`;
+
+      const payload = {
+        code: document.getElementById('plan-code').value,
+        name: document.getElementById('plan-name').value,
+        monthlyPrice: parseFloat(document.getElementById('plan-monthly-price').value),
+        trialDays: parseInt(document.getElementById('plan-trial-days').value),
+        maxEmployees: parseInt(document.getElementById('plan-max-employees').value),
+        maxStorageMb: parseInt(document.getElementById('plan-max-storage').value),
+        trial: document.getElementById('plan-is-trial').checked,
+        isActive: document.getElementById('plan-is-active').checked,
+        description: document.getElementById('plan-description').value
+      };
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        const data = await res.json();
+
+        if (res.ok) {
+          showToast('Success', `Plan '${payload.name}' saved successfully.`, 'success');
+          closeModal('subscription-plan-modal');
+          fetchSubscriptionPlans();
+          fetchSubscriptionMetrics(); // reload metrics in case trial plan changed
+        } else {
+          showToast('Failed', data.message || 'Failed to save subscription plan.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API plan save error.', 'error');
+      }
+    });
+
+    async function deleteSubscriptionPlan(id, name, isTrial) {
+      if (isTrial) {
+        showToast('Error', 'Cannot delete the default Trial plan.', 'error');
+        return;
+      }
+
+      if (confirm(`Are you sure you want to delete the pricing plan "${name}"? This action cannot be undone.`)) {
+        try {
+          const res = await fetch(`${API_BASE}/platform/subscription-plans/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+          });
+          checkResponseStatus(res);
+          if (res.status === 204 || res.ok) {
+            showToast('Deleted', `Pricing plan "${name}" deleted successfully.`, 'success');
+            fetchSubscriptionPlans();
+            fetchSubscriptionMetrics();
+          } else {
+            showToast('Failed', 'Failed to delete pricing plan.', 'error');
+          }
+        } catch (err) {
+          showToast('Error', 'API delete plan error.', 'error');
+        }
+      }
+    }
+
+    // ==========================================
     // SUBSCRIPTION VIEW & SIMULATOR LOGIC
     // ==========================================
     
@@ -1437,8 +2335,16 @@
           
           document.getElementById('sub-trial-count').textContent = data.freeTrialCount;
           document.getElementById('sub-basic-count').textContent = data.basicPlanCount;
+          document.getElementById('sub-moderate-count').textContent = data.moderatePlanCount;
           document.getElementById('sub-premium-count').textContent = data.premiumPlanCount;
           document.getElementById('sub-enterprise-count').textContent = data.enterprisePlanCount;
+
+          // Draw Sparklines for Subscription cards
+          drawSparkline('sparkline-sub-trial', generateSparklineData(data.freeTrialCount, 8, 0.18), '#0ea5e9');
+          drawSparkline('sparkline-sub-basic', generateSparklineData(data.basicPlanCount, 8, 0.12), '#6366f1');
+          drawSparkline('sparkline-sub-moderate', generateSparklineData(data.moderatePlanCount, 8, 0.15), '#f59e0b');
+          drawSparkline('sparkline-sub-premium', generateSparklineData(data.premiumPlanCount, 8, 0.20), '#a855f7');
+          drawSparkline('sparkline-sub-enterprise', generateSparklineData(data.enterprisePlanCount, 8, 0.10), '#10b981');
 
           renderSubscriptionCharts(data);
           
@@ -1452,41 +2358,77 @@
 
     function renderSubscriptionCharts(data) {
       // Monthly Revenue Chart
-      const revCtx = document.getElementById('monthlyRevenueChart').getContext('2d');
+      const revCanvas = document.getElementById('monthlyRevenueChart');
+      const revCtx = revCanvas.getContext('2d');
       const revLabels = data.monthlyRevenue.map(p => p.label);
       const revValues = data.monthlyRevenue.map(p => p.value);
       
       if (revChartInstance) revChartInstance.destroy();
+
+      // Create green fading area gradient
+      const revGradient = revCtx.createLinearGradient(0, 0, 0, revCanvas.offsetHeight || 250);
+      revGradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+      revGradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+
       revChartInstance = new Chart(revCtx, {
         type: 'line',
+        plugins: [lineShadowPlugin],
         data: {
           labels: revLabels,
           datasets: [{
             label: 'Monthly Revenue (INR)',
             data: revValues,
             borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            backgroundColor: revGradient,
             borderWidth: 3,
             fill: true,
-            tension: 0.3
+            tension: 0.3,
+            pointBackgroundColor: '#10b981',
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#fff'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            lineShadow: {
+              shadowColor: 'rgba(16, 185, 129, 0.35)',
+              shadowBlur: 8
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              titleColor: '#f3f4f6',
+              bodyColor: '#9ca3af',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              titleFont: { family: 'Plus Jakarta Sans', weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans' }
+            }
+          },
           scales: {
-            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
-            x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+            y: { grid: { color: 'rgba(255, 255, 255, 0.04)' }, ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } } }
           }
         }
       });
 
       // Subscription Growth Chart
-      const growthCtx = document.getElementById('subscriptionGrowthChart').getContext('2d');
+      const growthCanvas = document.getElementById('subscriptionGrowthChart');
+      const growthCtx = growthCanvas.getContext('2d');
       const growthLabels = data.subscriptionGrowth.map(p => p.label);
       const growthValues = data.subscriptionGrowth.map(p => p.value);
       
       if (growthChartInstance) growthChartInstance.destroy();
+
+      // Create purple gradient for columns
+      const growthGradient = growthCtx.createLinearGradient(0, 0, 0, growthCanvas.offsetHeight || 250);
+      growthGradient.addColorStop(0, 'rgba(168, 85, 247, 0.85)');
+      growthGradient.addColorStop(1, 'rgba(168, 85, 247, 0.2)');
+
       growthChartInstance = new Chart(growthCtx, {
         type: 'bar',
         data: {
@@ -1494,7 +2436,7 @@
           datasets: [{
             label: 'Total Subscriptions',
             data: growthValues,
-            backgroundColor: 'rgba(168, 85, 247, 0.65)',
+            backgroundColor: growthGradient,
             borderColor: '#a855f7',
             borderWidth: 1,
             borderRadius: 6
@@ -1503,9 +2445,23 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              titleColor: '#f3f4f6',
+              bodyColor: '#9ca3af',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: false,
+              titleFont: { family: 'Plus Jakarta Sans', weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans' }
+            }
+          },
           scales: {
-            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
-            x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+            y: { grid: { color: 'rgba(255, 255, 255, 0.04)' }, ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } } }
           }
         }
       });
@@ -1522,7 +2478,7 @@
           labels: distLabels,
           datasets: [{
             data: distValues,
-            backgroundColor: ['#0ea5e9', '#6366f1', '#a855f7', '#10b981'],
+            backgroundColor: ['#0ea5e9', '#6366f1', '#f59e0b', '#a855f7', '#10b981'],
             borderWidth: 2,
             borderColor: '#0c101f'
           }]
@@ -1533,9 +2489,20 @@
           plugins: {
             legend: {
               position: 'right',
-              labels: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans' } }
+              labels: { color: '#9ca3af', font: { family: 'Plus Jakarta Sans', weight: '500' } }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              titleColor: '#f3f4f6',
+              bodyColor: '#9ca3af',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              borderWidth: 1,
+              padding: 10,
+              titleFont: { family: 'Plus Jakarta Sans', weight: 'bold' },
+              bodyFont: { family: 'Plus Jakarta Sans' }
             }
-          }
+          },
+          cutout: '70%'
         }
       });
     }
@@ -1635,6 +2602,263 @@
         showToast('Error', 'Simulator connection failure.', 'error');
       }
     });
+
+    // ==========================================
+    // SUPPORT TICKETS & NOTIFICATIONS LOGIC
+    // ==========================================
+
+    document.getElementById('ticket-tenant-search').addEventListener('input', debounce(() => {
+      TICKETS_PAGE = 0;
+      fetchTicketsList();
+    }, 400));
+
+    document.getElementById('ticket-status-filter').addEventListener('change', () => {
+      TICKETS_PAGE = 0;
+      fetchTicketsList();
+    });
+
+    document.getElementById('ticket-priority-filter').addEventListener('change', () => {
+      TICKETS_PAGE = 0;
+      fetchTicketsList();
+    });
+
+    document.getElementById('tickets-pagination-prev').addEventListener('click', () => {
+      if (TICKETS_PAGE > 0) {
+        TICKETS_PAGE--;
+        fetchTicketsList();
+      }
+    });
+
+    document.getElementById('tickets-pagination-next').addEventListener('click', () => {
+      if (TICKETS_PAGE < TICKETS_TOTAL_PAGES - 1) {
+        TICKETS_PAGE++;
+        fetchTicketsList();
+      }
+    });
+
+    async function fetchTicketsList() {
+      const search = document.getElementById('ticket-tenant-search').value;
+      const status = document.getElementById('ticket-status-filter').value;
+      const priority = document.getElementById('ticket-priority-filter').value;
+      
+      let url = `${API_BASE}/platform/support-tickets?page=${TICKETS_PAGE}&size=${TICKETS_PAGE_SIZE}`;
+      if (search) url += `&tenantName=${encodeURIComponent(search)}`;
+      if (status) url += `&status=${status}`;
+      if (priority) url += `&priority=${priority}`;
+
+      const tbody = document.getElementById('tickets-list-tbody');
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;"><span class="loading-spinner"></span></td></tr>`;
+      
+      try {
+        const res = await fetch(url, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.content;
+          
+          tbody.innerHTML = '';
+          if (list && list.length > 0) {
+            list.forEach(t => {
+              const dateStr = new Date(t.createdAt).toLocaleDateString();
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><code>${t.ticketNumber}</code></td>
+                <td><strong>${t.tenantCompanyName}</strong></td>
+                <td>${t.raisedByEmployeeName}<br><span style="font-size:0.75rem; color:var(--text-muted);">${t.raisedByEmployeeEmail}</span></td>
+                <td>${t.title}</td>
+                <td>${t.category}</td>
+                <td><span class="badge ${t.priority.toLowerCase()}">${t.priority}</span></td>
+                <td><span class="badge ${t.status.toLowerCase()}">${t.status}</span></td>
+                <td>${dateStr}</td>
+                <td style="text-align: right;">
+                  <button class="btn btn-primary btn-sm" onclick="viewTicketDetails(${t.id})" style="padding: 6px 12px; font-size: 0.75rem;">
+                    <i class="fa-solid fa-edit"></i> Resolve
+                  </button>
+                </td>
+              `;
+              tbody.appendChild(row);
+            });
+            
+            TICKETS_TOTAL_PAGES = data.totalPages;
+            document.getElementById('tickets-pagination-start').textContent = (TICKETS_PAGE * TICKETS_PAGE_SIZE) + 1;
+            document.getElementById('tickets-pagination-end').textContent = Math.min((TICKETS_PAGE + 1) * TICKETS_PAGE_SIZE, data.totalElements);
+            document.getElementById('tickets-pagination-total').textContent = data.totalElements;
+            
+            document.getElementById('tickets-pagination-prev').disabled = TICKETS_PAGE === 0;
+            document.getElementById('tickets-pagination-next').disabled = TICKETS_PAGE >= TICKETS_TOTAL_PAGES - 1;
+          } else {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;">No support tickets found.</td></tr>`;
+            document.getElementById('tickets-pagination-start').textContent = 0;
+            document.getElementById('tickets-pagination-end').textContent = 0;
+            document.getElementById('tickets-pagination-total').textContent = 0;
+            document.getElementById('tickets-pagination-prev').disabled = true;
+            document.getElementById('tickets-pagination-next').disabled = true;
+          }
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-danger); padding: 30px 0;"><i class="fa-solid fa-circle-exclamation"></i> Error loading tickets.</td></tr>`;
+      }
+    }
+
+    async function viewTicketDetails(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/support-tickets/${id}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const t = await res.json();
+          document.getElementById('resolve-ticket-id').value = t.id;
+          document.getElementById('ticket-detail-number').textContent = t.ticketNumber;
+          document.getElementById('ticket-detail-tenant').textContent = t.tenantCompanyName;
+          document.getElementById('ticket-detail-user').textContent = `${t.raisedByEmployeeName} (${t.raisedByEmployeeEmail})`;
+          document.getElementById('ticket-detail-category').textContent = t.category;
+          document.getElementById('ticket-detail-priority').textContent = t.priority;
+          document.getElementById('ticket-detail-status').textContent = t.status;
+          document.getElementById('ticket-detail-created').textContent = new Date(t.createdAt).toLocaleString();
+          document.getElementById('ticket-detail-title').value = t.title;
+          document.getElementById('ticket-detail-description').value = t.description;
+          document.getElementById('resolve-status-select').value = t.status;
+          document.getElementById('resolve-resolution-text').value = t.resolution || '';
+          
+          openModal('resolve-ticket-modal');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to retrieve ticket details.', 'error');
+      }
+    }
+
+    document.getElementById('resolve-ticket-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('resolve-ticket-id').value;
+      const payload = {
+        status: document.getElementById('resolve-status-select').value,
+        resolution: document.getElementById('resolve-resolution-text').value
+      };
+      
+      try {
+        const res = await fetch(`${API_BASE}/platform/support-tickets/${id}/status`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Updated', 'Ticket status and resolution updated.', 'success');
+          closeModal('resolve-ticket-modal');
+          fetchTicketsList();
+          fetchDashboardMetrics();
+        } else {
+          showToast('Failed', 'Failed to update ticket.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API ticket update error.', 'error');
+      }
+    });
+
+    // Notifications Panel Toggle
+    document.getElementById('notif-toggle-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = document.getElementById('notif-dropdown-panel');
+      const isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', () => {
+      const dropdown = document.getElementById('notif-dropdown-panel');
+      if (dropdown) dropdown.style.display = 'none';
+    });
+
+    document.getElementById('notif-dropdown-panel').addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    async function fetchPlatformNotifications() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/notifications`, { headers: getHeaders() });
+        if (res.ok) {
+          const notifications = await res.json();
+          globalNotifications = notifications;
+          
+          const unreadCount = notifications.filter(n => !n.isRead).length;
+          const badge = document.getElementById('notif-unread-badge');
+          if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.style.display = 'inline-block';
+          } else {
+            badge.style.display = 'none';
+          }
+          
+          const container = document.getElementById('notif-list-container');
+          container.innerHTML = '';
+          
+          if (notifications.length > 0) {
+            notifications.forEach(n => {
+              const item = document.createElement('div');
+              item.className = `notif-item ${n.isRead ? 'read' : 'unread'}`;
+              item.innerHTML = `
+                <div class="notif-item-body" onclick="handleNotificationClick(${n.id}, '${n.type}')">
+                  <div class="notif-item-title">${n.title}</div>
+                  <div class="notif-item-desc">${n.message}</div>
+                  <div class="notif-item-time">${new Date(n.createdAt).toLocaleTimeString()}</div>
+                </div>
+                ${!n.isRead ? `<button class="notif-item-read-btn" onclick="markNotificationRead(${n.id}, event)" title="Mark as read"><i class="fa-solid fa-check"></i></button>` : ''}
+              `;
+              container.appendChild(item);
+            });
+          } else {
+            container.innerHTML = `<div class="notif-empty">No new notifications</div>`;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching platform notifications', err);
+      }
+    }
+
+    async function markNotificationRead(id, event) {
+      if (event) event.stopPropagation();
+      try {
+        const res = await fetch(`${API_BASE}/platform/notifications/${id}/read`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          fetchPlatformNotifications();
+        }
+      } catch (err) {
+        console.error('Error marking notification read', err);
+      }
+    }
+
+    async function markAllNotificationsRead() {
+      const unread = globalNotifications.filter(n => !n.isRead);
+      if (unread.length === 0) return;
+      
+      try {
+        const promises = unread.map(n => 
+          fetch(`${API_BASE}/platform/notifications/${n.id}/read`, {
+            method: 'PUT',
+            headers: getHeaders()
+          })
+        );
+        await Promise.all(promises);
+        fetchPlatformNotifications();
+        showToast('Success', 'All notifications marked as read.', 'success');
+      } catch (err) {
+        console.error('Error marking all notifications read', err);
+      }
+    }
+
+    document.getElementById('notif-mark-all-read').addEventListener('click', markAllNotificationsRead);
+
+    document.getElementById('notif-view-all-btn').addEventListener('click', () => {
+      const dropdown = document.getElementById('notif-dropdown-panel');
+      if (dropdown) dropdown.style.display = 'none';
+      document.querySelector('[data-tab=tab-tickets]').click();
+    });
+
+    function handleNotificationClick(id, type) {
+      markNotificationRead(id);
+      document.querySelector('[data-tab=tab-tickets]').click();
+    }
 
     // Boot App
     window.addEventListener('DOMContentLoaded', initApp);

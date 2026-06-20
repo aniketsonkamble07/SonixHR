@@ -3,9 +3,10 @@ package com.sonixhr.service.tenant;
 import com.sonixhr.dto.tenant.TenantSubscriptionResponseDTO;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.employee.EmployeeRepository;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class TenantSubscriptionService {
 
@@ -32,6 +34,7 @@ public class TenantSubscriptionService {
     private final TenantRepository tenantRepository;
     private final EmployeeRepository employeeRepository;
     private final TenantRLSService tenantRLSService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     public TenantSubscriptionResponseDTO currentSubscription(Long tenantId) {
         log.info("Fetching current active subscription for tenant ID: {}", tenantId);
@@ -65,14 +68,15 @@ public class TenantSubscriptionService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        PlanType newPlanType = PlanType.fromCode(planTypeCode);
+        SubscriptionPlan newPlan = subscriptionPlanRepository.findByCodeIgnoreCase(planTypeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planTypeCode));
         BillingCycle billingCycle = BillingCycle.valueOf(billingCycleStr.toUpperCase());
 
         // Validate limits if downgrading
         long employeeCount = employeeRepository.countByTenantId(tenantId);
-        if (newPlanType.getMaxEmployees() > 0 && employeeCount > newPlanType.getMaxEmployees()) {
+        if (newPlan.getMaxEmployees() > 0 && employeeCount > newPlan.getMaxEmployees()) {
             throw new BusinessException("Cannot change plan: current employee count (" + employeeCount 
-                    + ") exceeds the new plan limit (" + newPlanType.getMaxEmployees() + ")");
+                    + ") exceeds the new plan limit (" + newPlan.getMaxEmployees() + ")");
         }
 
         // Deactivate existing active subscription
@@ -82,26 +86,26 @@ public class TenantSubscriptionService {
         });
 
         // Update tenant settings
-        tenant.setPlanType(newPlanType);
-        tenant.setMaxEmployees(newPlanType.getMaxEmployees());
-        tenant.setPlanStatus("active");
+        tenant.setPlanType(newPlan.getCode());
+        tenant.setMaxEmployees(newPlan.getMaxEmployees());
+        tenant.setPlanStatus(newPlan.isTrial() ? "trial" : "active");
         tenantRepository.save(tenant);
 
-        // Determine price
-        double price = billingCycle == BillingCycle.YEARLY ? newPlanType.getYearlyPrice() : newPlanType.getMonthlyPrice();
+        // Determine price: 10% discount for yearly billing cycle
+        double price = billingCycle == BillingCycle.YEARLY ? newPlan.getMonthlyPrice() * 12 * 0.9 : newPlan.getMonthlyPrice();
 
         // Create a new subscription record
         TenantSubscription newSub = TenantSubscription.builder()
                 .tenant(tenant)
-                .planType(newPlanType)
-                .planName(newPlanType.getDisplayName())
-                .planStatus(PlanStatus.ACTIVE)
-                .maxEmployees(newPlanType.getMaxEmployees())
-                .maxStorageMb(newPlanType.getMaxStorageMb())
+                .planType(newPlan.getCode())
+                .planName(newPlan.getName())
+                .planStatus(newPlan.isTrial() ? PlanStatus.TRIAL : PlanStatus.ACTIVE)
+                .maxEmployees(newPlan.getMaxEmployees())
+                .maxStorageMb(newPlan.getMaxStorageMb())
                 .startedAt(LocalDateTime.now())
                 .endsAt(billingCycle == BillingCycle.YEARLY ? LocalDateTime.now().plusYears(1) : LocalDateTime.now().plusMonths(1))
                 .amount(BigDecimal.valueOf(price))
-                .currency("USD")
+                .currency("INR")
                 .billingCycle(billingCycle)
                 .isActive(true)
                 .build();

@@ -1,6 +1,5 @@
 package com.sonixhr.dto.platform;
 
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -73,7 +72,7 @@ public class PlatformDashboardDTO {
         private String companyName;
         private String adminName;
         private String adminEmail;
-        private PlanType planType;
+        private String planType;
         private UserStatus status;
         private LocalDateTime createdAt;
     }

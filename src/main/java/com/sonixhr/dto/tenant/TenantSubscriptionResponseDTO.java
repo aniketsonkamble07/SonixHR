@@ -2,7 +2,6 @@ package com.sonixhr.dto.tenant;
 
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
-import com.sonixhr.enums.PlanType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +16,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class TenantSubscriptionResponseDTO {
     private Long id;
-    private PlanType planType;
+    private String planType;
     private String planName;
     private PlanStatus planStatus;
     private int maxEmployees;

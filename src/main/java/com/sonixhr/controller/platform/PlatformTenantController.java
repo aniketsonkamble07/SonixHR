@@ -88,9 +88,6 @@ public class PlatformTenantController {
     public ResponseEntity<PlatformTenantResponseDTO> createTenant(
             @RequestBody @Valid TenantRegistrationRequest request) {
         log.info("REST request to create organization: {}", request.getCompanyName());
-        if (request == null) {
-            return ResponseEntity.badRequest().build();
-        }
         PlatformTenantResponseDTO tenant = tenantService.createTenant(request);
         return ResponseEntity.ok(tenant);
     }

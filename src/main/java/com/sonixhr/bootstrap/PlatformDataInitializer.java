@@ -17,6 +17,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -33,6 +35,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
     private final PlatformUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
     private static final String SUPER_ADMIN_PASSWORD = "Admin@123";
@@ -54,6 +57,16 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.warn("Could not alter employees.blood_group column (table might not exist or column already altered): {}", e.getMessage());
         }
 
+        // Drop obsolete enum check constraints on tenants and tenant_subscriptions
+        try {
+            log.info("Dropping obsolete check constraints for plan_type if they exist...");
+            jdbcTemplate.execute("ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_plan_type_check");
+            jdbcTemplate.execute("ALTER TABLE tenant_subscriptions DROP CONSTRAINT IF EXISTS tenant_subscriptions_plan_type_check");
+            log.info("Successfully dropped obsolete plan_type check constraints.");
+        } catch (Exception e) {
+            log.warn("Could not drop plan_type check constraints: {}", e.getMessage());
+        }
+
         // Step 1: Create all permissions
         createAllPermissions();
 
@@ -66,9 +79,85 @@ public class PlatformDataInitializer implements ApplicationRunner {
         // Step 4: Create other default roles (optional)
         createOtherDefaultRoles();
 
+        // Step 5: Seed default subscription plans
+        seedDefaultSubscriptionPlans();
+        
         log.info("=========================================");
         log.info("Platform Data Initializer Completed");
         log.info("=========================================");
+    }
+
+    private void seedDefaultSubscriptionPlans() {
+        if (subscriptionPlanRepository.count() == 0) {
+            log.info("Seeding default subscription plans...");
+
+            // 1. TRIAL
+            subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                    .code("trial")
+                    .name("Trial Plan")
+                    .monthlyPrice(0.00)
+                    .maxEmployees(10)
+                    .maxStorageMb(512)
+                    .trialDays(14)
+                    .isTrial(true)
+                    .isActive(true)
+                    .description("Free trial access for 14 days, up to 10 employees")
+                    .build());
+
+            // 2. BASIC
+            subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                    .code("basic")
+                    .name("Basic Plan")
+                    .monthlyPrice(49.00)
+                    .maxEmployees(100)
+                    .maxStorageMb(1024)
+                    .trialDays(0)
+                    .isTrial(false)
+                    .isActive(true)
+                    .description("Core HR features, up to 100 employees")
+                    .build());
+
+            // 3. MODERATE
+            subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                    .code("moderate")
+                    .name("Moderate Plan")
+                    .monthlyPrice(99.00)
+                    .maxEmployees(500)
+                    .maxStorageMb(5120)
+                    .trialDays(0)
+                    .isTrial(false)
+                    .isActive(true)
+                    .description("Advanced HR features, up to 500 employees")
+                    .build());
+
+            // 4. PREMIUM
+            subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                    .code("premium")
+                    .name("Premium Plan")
+                    .monthlyPrice(299.00)
+                    .maxEmployees(2000)
+                    .maxStorageMb(20480)
+                    .trialDays(0)
+                    .isTrial(false)
+                    .isActive(true)
+                    .description("All HR features, up to 2,000 employees")
+                    .build());
+
+            // 5. ENTERPRISE
+            subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                    .code("enterprise")
+                    .name("Enterprise Plan")
+                    .monthlyPrice(999.00)
+                    .maxEmployees(10000)
+                    .maxStorageMb(102400)
+                    .trialDays(0)
+                    .isTrial(false)
+                    .isActive(true)
+                    .description("Custom pricing, unlimited employees, dedicated support")
+                    .build());
+
+            log.info("✅ Successfully seeded default subscription plans");
+        }
     }
 
     // ✅ KEEP ONLY ONE of these methods

@@ -4,10 +4,10 @@ import com.sonixhr.dto.platform.PlatformDashboardDTO;
 import com.sonixhr.dto.platform.SystemHealthDTO;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
+import com.sonixhr.repository.platform.SupportTicketRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +32,7 @@ public class PlatformDashboardService {
     private final TenantSubscriptionRepository subscriptionRepository;
     private final EmployeeRepository employeeRepository;
     private final PlatformUserRepository platformUserRepository;
+    private final SupportTicketRepository supportTicketRepository;
     private final JavaMailSender mailSender;
     private final DataSource dataSource;
     private final org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
@@ -49,11 +50,11 @@ public class PlatformDashboardService {
         long activeTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.ACTIVE).count();
         long suspendedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.SUSPENDED).count();
         long deletedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.DELETED).count();
-        long trialTenants = allTenants.stream().filter(t -> t.getPlanType() == PlanType.TRIAL).count();
+        long trialTenants = allTenants.stream().filter(t -> "trial".equalsIgnoreCase(t.getPlanType())).count();
 
         Map<String, Long> planDistribution = allTenants.stream()
-                .filter(t -> t.getStatus() != UserStatus.DELETED)
-                .collect(Collectors.groupingBy(t -> t.getPlanType().name(), Collectors.counting()));
+                .filter(t -> t.getStatus() != UserStatus.DELETED && t.getPlanType() != null)
+                .collect(Collectors.groupingBy(t -> t.getPlanType().toLowerCase(), Collectors.counting()));
 
         PlatformDashboardDTO.TenantSummary tenantSummary = PlatformDashboardDTO.TenantSummary.builder()
                 .totalTenants(totalTenants)
@@ -105,7 +106,7 @@ public class PlatformDashboardService {
         long activeEmployees = employeeRepository.countByIsActiveTrue();
         long activePlatformUsers = platformUserRepository.countByStatus(UserStatus.ACTIVE);
         long totalActiveUsers = activeEmployees + activePlatformUsers;
-        long supportTicketsOpen = 12L; // Mocked support tickets count
+        long supportTicketsOpen = supportTicketRepository.countByStatus("OPEN") + supportTicketRepository.countByStatus("IN_PROGRESS");
 
         PlatformDashboardDTO.SystemSummary systemSummary = PlatformDashboardDTO.SystemSummary.builder()
                 .totalEmployees(totalEmployees)

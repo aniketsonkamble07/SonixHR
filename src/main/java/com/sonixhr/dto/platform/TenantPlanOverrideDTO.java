@@ -1,6 +1,5 @@
 package com.sonixhr.dto.platform;
 
-import com.sonixhr.enums.PlanType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -15,7 +14,7 @@ import lombok.NoArgsConstructor;
 public class TenantPlanOverrideDTO {
 
     @NotNull(message = "Plan type is required")
-    private PlanType planType;
+    private String planType;
 
     @NotNull(message = "Max employees limit is required")
     @Positive(message = "Max employees must be a positive number")

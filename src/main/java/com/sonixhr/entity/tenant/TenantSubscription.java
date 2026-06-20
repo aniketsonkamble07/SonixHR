@@ -3,7 +3,7 @@ package com.sonixhr.entity.tenant;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
-import com.sonixhr.enums.PlanType;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -48,9 +48,8 @@ public class TenantSubscription {
     // =====================================================
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", nullable = false, length = 20)
-    private PlanType planType;
+    private String planType;
 
     @Column(name = "plan_name", length = 100)
     private String planName;
@@ -188,7 +187,7 @@ public class TenantSubscription {
         this.isActive = false;
     }
 
-    public void upgradePlan(PlanType newPlanType) {
+    public void upgradePlan(String newPlanType) {
         this.planType = newPlanType;
     }
 }

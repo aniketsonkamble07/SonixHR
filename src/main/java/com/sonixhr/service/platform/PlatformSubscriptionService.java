@@ -2,7 +2,6 @@ package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.SubscriptionDashboardDTO;
 import com.sonixhr.entity.tenant.TenantSubscription;
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,19 +25,23 @@ public class PlatformSubscriptionService {
         List<TenantSubscription> allSubs = subscriptionRepository.findAll();
 
         long freeTrialCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && sub.getPlanType() == PlanType.TRIAL && !sub.isTrialExpired())
+                .filter(sub -> sub.getIsActive() && "trial".equalsIgnoreCase(sub.getPlanType()) && !sub.isTrialExpired())
                 .count();
 
         long basicPlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && sub.getPlanType() == PlanType.BASIC && !sub.isExpired())
+                .filter(sub -> sub.getIsActive() && "basic".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
+                .count();
+
+        long moderatePlanCount = allSubs.stream()
+                .filter(sub -> sub.getIsActive() && "moderate".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
                 .count();
 
         long premiumPlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && sub.getPlanType() == PlanType.PREMIUM && !sub.isExpired())
+                .filter(sub -> sub.getIsActive() && "premium".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
                 .count();
 
         long enterprisePlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && sub.getPlanType() == PlanType.ENTERPRISE && !sub.isExpired())
+                .filter(sub -> sub.getIsActive() && "enterprise".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
                 .count();
 
         // 1. Monthly Revenue (MRR over the last 6 months)
@@ -48,11 +51,30 @@ public class PlatformSubscriptionService {
         // 3. Plan Distribution
         List<SubscriptionDashboardDTO.ChartPoint> planDistribution = new java.util.ArrayList<>();
 
-        // Populate Plan Distribution Chart data
-        planDistribution.add(new SubscriptionDashboardDTO.ChartPoint("Free Trial", (double) freeTrialCount));
-        planDistribution.add(new SubscriptionDashboardDTO.ChartPoint("Basic Plan", (double) basicPlanCount));
-        planDistribution.add(new SubscriptionDashboardDTO.ChartPoint("Premium Plan", (double) premiumPlanCount));
-        planDistribution.add(new SubscriptionDashboardDTO.ChartPoint("Enterprise Plan", (double) enterprisePlanCount));
+        // Populate Plan Distribution Chart data dynamically based on actual plan names/types
+        java.util.Map<String, Long> distributionMap = new java.util.LinkedHashMap<>();
+        distributionMap.put("Free Trial", 0L);
+        distributionMap.put("Basic Plan", 0L);
+        distributionMap.put("Moderate Plan", 0L);
+        distributionMap.put("Premium Plan", 0L);
+        distributionMap.put("Enterprise Plan", 0L);
+
+        allSubs.stream()
+                .filter(sub -> sub.getIsActive() && (!"trial".equalsIgnoreCase(sub.getPlanType()) ? !sub.isExpired() : !sub.isTrialExpired()))
+                .forEach(sub -> {
+                    String name = sub.getPlanName() != null ? sub.getPlanName() : sub.getPlanType();
+                    if ("trial".equalsIgnoreCase(name) || "trial".equalsIgnoreCase(sub.getPlanType())) name = "Free Trial";
+                    else if ("basic".equalsIgnoreCase(name) || "basic".equalsIgnoreCase(sub.getPlanType())) name = "Basic Plan";
+                    else if ("moderate".equalsIgnoreCase(name) || "moderate".equalsIgnoreCase(sub.getPlanType())) name = "Moderate Plan";
+                    else if ("premium".equalsIgnoreCase(name) || "premium".equalsIgnoreCase(sub.getPlanType())) name = "Premium Plan";
+                    else if ("enterprise".equalsIgnoreCase(name) || "enterprise".equalsIgnoreCase(sub.getPlanType())) name = "Enterprise Plan";
+                    
+                    distributionMap.put(name, distributionMap.getOrDefault(name, 0L) + 1);
+                });
+
+        distributionMap.forEach((name, count) -> {
+            planDistribution.add(new SubscriptionDashboardDTO.ChartPoint(name, (double) count));
+        });
 
         // Generate last 6 months list
         java.time.YearMonth currentMonth = java.time.YearMonth.now();
@@ -64,7 +86,7 @@ public class PlatformSubscriptionService {
 
             // Calculate MRR for targetMonth
             BigDecimal mrrSum = allSubs.stream()
-                    .filter(sub -> sub.getIsActive() && sub.getPlanType() != PlanType.TRIAL && sub.getAmount() != null)
+                    .filter(sub -> sub.getIsActive() && !"trial".equalsIgnoreCase(sub.getPlanType()) && sub.getAmount() != null)
                     .filter(sub -> {
                         LocalDateTime start = sub.getStartedAt() != null ? sub.getStartedAt() : sub.getCreatedAt();
                         LocalDateTime end = sub.getEndsAt();
@@ -113,6 +135,7 @@ public class PlatformSubscriptionService {
         return SubscriptionDashboardDTO.builder()
                 .freeTrialCount(freeTrialCount)
                 .basicPlanCount(basicPlanCount)
+                .moderatePlanCount(moderatePlanCount)
                 .premiumPlanCount(premiumPlanCount)
                 .enterprisePlanCount(enterprisePlanCount)
                 .monthlyRevenue(monthlyRevenue)

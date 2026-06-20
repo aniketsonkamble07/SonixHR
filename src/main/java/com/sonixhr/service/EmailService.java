@@ -540,4 +540,68 @@ public class EmailService {
             log.error("Failed to send task notification email to: {}", to, e);
         }
     }
+
+    @Async
+    public void sendSupportTicketAlert(String to, String adminName, String ticketNumber, String companyName, String ticketTitle, String ticketStatus, String action) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send support ticket alert to: {}", to);
+            return;
+        }
+
+        log.info("Sending support ticket alert email to: {}", to);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject(String.format("Support Ticket Alert [%s] - %s", ticketNumber, action));
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #4F46E5;">Support Ticket Alert</h2>
+                        <p>Hello <strong>%s</strong>,</p>
+                        <p>A support ticket has been <strong>%s</strong>.</p>
+                        <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
+                            <tr style="background-color: #f8f9fa;">
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Ticket Number</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Organization</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
+                            </tr>
+                            <tr style="background-color: #f8f9fa;">
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Title</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Status</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">%s</td>
+                            </tr>
+                        </table>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">This is an automated notification. Please do not reply directly.</p>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, 
+                adminName, 
+                action.toLowerCase(), 
+                ticketNumber, 
+                companyName, 
+                ticketTitle, 
+                ticketStatus);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Support ticket alert email sent successfully to: {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send support ticket alert email to: {}", to, e);
+        }
+    }
 }

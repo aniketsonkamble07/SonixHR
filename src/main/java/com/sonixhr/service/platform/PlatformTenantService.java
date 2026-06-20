@@ -7,6 +7,8 @@ import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.dto.tenant.TenantUpdateRequest;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
@@ -32,6 +34,7 @@ public class PlatformTenantService {
     private final EmployeeDetailsService employeeDetailsService;
     private final TenantRegistrationService tenantRegistrationService;
     private final TenantRLSService tenantRLSService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     public Page<PlatformTenantResponseDTO> getAllTenants(String companyName, String status, Boolean isActive, Pageable pageable) {
         log.info("Fetching all tenants with filter - name: {}, status: {}, isActive: {}", companyName, status, isActive);
@@ -96,21 +99,46 @@ public class PlatformTenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        tenant.setPlanType(dto.getPlanType());
+        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(dto.getPlanType())
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found with code: " + dto.getPlanType()));
+
+        tenant.setPlanType(plan.getCode());
         tenant.setMaxEmployees(dto.getMaxEmployees());
+        tenant.setPlanStatus(plan.isTrial() ? "trial" : "active");
+        if (plan.isTrial()) {
+            if (tenant.getTrialEndsAt() == null) {
+                tenant.setTrialEndsAt(java.time.LocalDateTime.now().plusDays(plan.getTrialDays() > 0 ? plan.getTrialDays() : 14));
+            }
+        } else {
+            tenant.setTrialEndsAt(null);
+        }
         Tenant savedTenant = tenantRepository.save(tenant);
 
         // Update current active subscription settings
         TenantSubscription sub = subscriptionRepository.findByTenantIdAndIsActiveTrue(id)
                 .orElseGet(() -> TenantSubscription.builder()
                         .tenant(savedTenant)
-                        .planName(dto.getPlanType().name())
+                        .planName(plan.getName())
+                        .currency("INR")
+                        .billingCycle(com.sonixhr.enums.BillingCycle.MONTHLY)
                         .build());
         
-        sub.setPlanType(dto.getPlanType());
+        sub.setPlanType(plan.getCode());
+        sub.setPlanName(plan.getName());
         sub.setMaxEmployees(dto.getMaxEmployees());
         sub.setIsActive(true);
         sub.setMaxStorageMb(dto.getMaxStorageMb());
+        sub.setPlanStatus(plan.isTrial() ? com.sonixhr.enums.PlanStatus.TRIAL : com.sonixhr.enums.PlanStatus.ACTIVE);
+        
+        if (sub.getStartedAt() == null) {
+            sub.setStartedAt(java.time.LocalDateTime.now());
+        }
+        if (sub.getEndsAt() == null) {
+            sub.setEndsAt(plan.isTrial() ? java.time.LocalDateTime.now().plusDays(plan.getTrialDays() > 0 ? plan.getTrialDays() : 14) : java.time.LocalDateTime.now().plusMonths(1));
+        }
+        if (sub.getAmount() == null) {
+            sub.setAmount(java.math.BigDecimal.valueOf(plan.getMonthlyPrice()));
+        }
         subscriptionRepository.save(sub);
 
         // Invalidate employee caches

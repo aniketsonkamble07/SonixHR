@@ -86,6 +86,15 @@ class SonixhrApplicationTests {
 	private com.sonixhr.controller.platform.PlatformSubscriptionController platformSubscriptionController;
 
 	@Autowired
+	private com.sonixhr.controller.tenant.TenantSupportTicketController tenantSupportTicketController;
+
+	@Autowired
+	private com.sonixhr.controller.platform.PlatformSupportTicketController platformSupportTicketController;
+
+	@Autowired
+	private com.sonixhr.controller.platform.PlatformNotificationController platformNotificationController;
+
+	@Autowired
 	private com.sonixhr.repository.platform.PlatformUserRepository platformUserRepository;
 
 	@Autowired
@@ -1461,7 +1470,7 @@ class SonixhrApplicationTests {
 		assertEquals(1, dashboardRes.getBody().getTenantSummary().getTotalTenants());
 		assertEquals(0, dashboardRes.getBody().getSubscriptionSummary().getExpiredSubscriptions());
 		assertEquals(2, dashboardRes.getBody().getSystemSummary().getTotalActiveUsers());
-		assertEquals(12, dashboardRes.getBody().getSystemSummary().getSupportTicketsOpen());
+		assertEquals(0, dashboardRes.getBody().getSystemSummary().getSupportTicketsOpen());
 
 		// 2. Fetch system health check
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.platform.SystemHealthDTO> healthRes =
@@ -1502,7 +1511,7 @@ class SonixhrApplicationTests {
 
 		// 6. Plan override direct update
 		com.sonixhr.dto.platform.TenantPlanOverrideDTO planOverride = com.sonixhr.dto.platform.TenantPlanOverrideDTO.builder()
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.maxEmployees(500)
 				.maxStorageMb(10240)
 				.build();
@@ -1510,7 +1519,7 @@ class SonixhrApplicationTests {
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.platform.PlatformTenantResponseDTO> overrideRes =
 				platformTenantController.overrideTenantPlan(tenant.getId(), planOverride);
 		assertNotNull(overrideRes.getBody());
-		assertEquals(com.sonixhr.enums.PlanType.PREMIUM, overrideRes.getBody().getPlanType());
+		assertEquals("premium", overrideRes.getBody().getPlanType());
 		assertEquals(Integer.valueOf(500), overrideRes.getBody().getMaxEmployees());
 
 		// 7. Reactivate tenant
@@ -1606,7 +1615,7 @@ class SonixhrApplicationTests {
 		assertEquals(org.springframework.http.HttpStatus.OK, dashboardRes.getStatusCode());
 		assertEquals(6, dashboardRes.getBody().getMonthlyRevenue().size());
 		assertEquals(6, dashboardRes.getBody().getSubscriptionGrowth().size());
-		assertEquals(4, dashboardRes.getBody().getPlanDistribution().size());
+		assertEquals(5, dashboardRes.getBody().getPlanDistribution().size());
 
 		// Now authenticate as Tenant Super Admin to test tenant subscription management
 		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
@@ -1630,7 +1639,7 @@ class SonixhrApplicationTests {
 		org.springframework.http.ResponseEntity<com.sonixhr.dto.tenant.TenantSubscriptionResponseDTO> upgradeRes =
 				tenantSubscriptionController.upgradeSubscription(tenantAdmin, "premium", "monthly");
 		assertNotNull(upgradeRes.getBody());
-		assertEquals(com.sonixhr.enums.PlanType.PREMIUM, upgradeRes.getBody().getPlanType());
+		assertEquals("premium", upgradeRes.getBody().getPlanType());
 		assertEquals(com.sonixhr.enums.PlanStatus.ACTIVE, upgradeRes.getBody().getPlanStatus());
 
 		// 3. Renew subscription
@@ -1674,7 +1683,7 @@ class SonixhrApplicationTests {
 		// 1. Trial expiring in 3 days (triggers reminder)
 		com.sonixhr.entity.tenant.TenantSubscription trialExpiring3 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.BASIC)
+				.planType("basic")
 				.planName("Basic Trial 3")
 				.planStatus(com.sonixhr.enums.PlanStatus.TRIAL)
 				.trialStartedAt(java.time.LocalDateTime.now().minusDays(11))
@@ -1685,7 +1694,7 @@ class SonixhrApplicationTests {
 		// 2. Trial expiring in 1 day (triggers reminder)
 		com.sonixhr.entity.tenant.TenantSubscription trialExpiring1 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.BASIC)
+				.planType("basic")
 				.planName("Basic Trial 1")
 				.planStatus(com.sonixhr.enums.PlanStatus.TRIAL)
 				.trialStartedAt(java.time.LocalDateTime.now().minusDays(13))
@@ -1696,7 +1705,7 @@ class SonixhrApplicationTests {
 		// 3. Trial expiring in 5 days (should NOT trigger reminder)
 		com.sonixhr.entity.tenant.TenantSubscription trialExpiring5 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.BASIC)
+				.planType("basic")
 				.planName("Basic Trial 5")
 				.planStatus(com.sonixhr.enums.PlanStatus.TRIAL)
 				.trialStartedAt(java.time.LocalDateTime.now().minusDays(9))
@@ -1707,7 +1716,7 @@ class SonixhrApplicationTests {
 		// 4. Paid expiring in 7 days (triggers reminder)
 		com.sonixhr.entity.tenant.TenantSubscription paidExpiring7 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.planName("Premium 7")
 				.planStatus(com.sonixhr.enums.PlanStatus.ACTIVE)
 				.startedAt(java.time.LocalDateTime.now().minusDays(23))
@@ -1718,7 +1727,7 @@ class SonixhrApplicationTests {
 		// 5. Paid expiring in 3 days (triggers reminder)
 		com.sonixhr.entity.tenant.TenantSubscription paidExpiring3 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.planName("Premium 3")
 				.planStatus(com.sonixhr.enums.PlanStatus.ACTIVE)
 				.startedAt(java.time.LocalDateTime.now().minusDays(27))
@@ -1729,7 +1738,7 @@ class SonixhrApplicationTests {
 		// 6. Paid expiring in 1 day (triggers reminder)
 		com.sonixhr.entity.tenant.TenantSubscription paidExpiring1 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.planName("Premium 1")
 				.planStatus(com.sonixhr.enums.PlanStatus.ACTIVE)
 				.startedAt(java.time.LocalDateTime.now().minusDays(29))
@@ -1740,7 +1749,7 @@ class SonixhrApplicationTests {
 		// 7. Paid expiring in 4 days (should NOT trigger reminder)
 		com.sonixhr.entity.tenant.TenantSubscription paidExpiring4 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.planName("Premium 4")
 				.planStatus(com.sonixhr.enums.PlanStatus.ACTIVE)
 				.startedAt(java.time.LocalDateTime.now().minusDays(26))
@@ -1751,7 +1760,7 @@ class SonixhrApplicationTests {
 		// 8. Inactive paid subscription (should NOT trigger reminder)
 		com.sonixhr.entity.tenant.TenantSubscription paidInactiveExpiring7 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.PREMIUM)
+				.planType("premium")
 				.planName("Premium Inactive 7")
 				.planStatus(com.sonixhr.enums.PlanStatus.ACTIVE)
 				.startedAt(java.time.LocalDateTime.now().minusDays(23))
@@ -1762,7 +1771,7 @@ class SonixhrApplicationTests {
 		// 9. Cancelled trial subscription (should NOT trigger reminder)
 		com.sonixhr.entity.tenant.TenantSubscription trialCancelledExpiring3 = com.sonixhr.entity.tenant.TenantSubscription.builder()
 				.tenant(tenant)
-				.planType(com.sonixhr.enums.PlanType.BASIC)
+				.planType("basic")
 				.planName("Basic Cancelled 3")
 				.planStatus(com.sonixhr.enums.PlanStatus.CANCELLED)
 				.trialStartedAt(java.time.LocalDateTime.now().minusDays(11))
@@ -1807,6 +1816,109 @@ class SonixhrApplicationTests {
 				.sendSubscriptionReminderEmail(tenant.getAdminEmail(), tenant.getCompanyName(), "Premium 3", 3);
 		org.mockito.Mockito.verify(emailService, org.mockito.Mockito.timeout(5000).times(1))
 				.sendSubscriptionReminderEmail(tenant.getAdminEmail(), tenant.getCompanyName(), "Premium 1", 1);
+	}
+
+	@Test
+	@org.springframework.transaction.annotation.Transactional
+	void testSupportTicketsAndNotifications() throws Exception {
+		// Clean database
+		new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+			jdbcTemplate.execute("TRUNCATE TABLE employees, tenant_subscriptions, shift_configurations, tenant_roles, tenants, support_tickets, platform_notifications CASCADE");
+		});
+
+		// Initialize platform data (seeding Super Admin user admin@sonixhr.com)
+		platformDataInitializer.run(null);
+
+		// Seed tenant
+		tenantSeeder.run(null);
+
+		// Fetch seeded tenant and employee (tenant side)
+		com.sonixhr.entity.tenant.Tenant tenant = tenantRepository.findAll().get(0);
+		com.sonixhr.entity.employee.Employee employee = employeeRepository.findByEmailWithRolesAndPermissions("admin@acme.com")
+				.orElseThrow(() -> new AssertionError("Tenant Employee not found"));
+
+		// Fetch platform user (platform side)
+		com.sonixhr.entity.platform.PlatformUser platformUser = platformUserRepository.findByEmail("admin@sonixhr.com")
+				.orElseThrow(() -> new AssertionError("Platform Admin not found"));
+
+		// 1. Authenticate as Tenant Employee to raise a ticket
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						employee, "Admin@123", employee.getAuthorities()
+				)
+		);
+		com.sonixhr.security.TenantContext.setCurrentTenant(tenant.getId());
+
+		com.sonixhr.dto.platform.SupportTicketCreateRequest createReq = com.sonixhr.dto.platform.SupportTicketCreateRequest.builder()
+				.title("Network connection issues")
+				.description("The portal times out when loading the employee dashboard on high load.")
+				.category("Technical")
+				.priority("HIGH")
+				.build();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.platform.SupportTicketResponse> createRes =
+				tenantSupportTicketController.createTicket(createReq, employee);
+
+		assertNotNull(createRes.getBody());
+		assertNotNull(createRes.getBody().getId());
+		assertNotNull(createRes.getBody().getTicketNumber());
+		assertTrue(createRes.getBody().getTicketNumber().startsWith("TKT-"));
+		assertEquals("OPEN", createRes.getBody().getStatus());
+		assertEquals("Technical", createRes.getBody().getCategory());
+
+		Long ticketId = createRes.getBody().getId();
+
+		// 2. Authenticate as Platform User to view and resolve the ticket
+		org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+				new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+						platformUser, "Admin@123", platformUser.getAuthorities()
+				)
+		);
+		com.sonixhr.security.TenantContext.clear(); // platform users do not have a tenant context
+
+		// Verify notifications are generated for platform user
+		org.springframework.http.ResponseEntity<java.util.List<com.sonixhr.dto.platform.PlatformNotificationResponse>> notifRes =
+				platformNotificationController.getMyNotifications(platformUser);
+		assertNotNull(notifRes.getBody());
+		assertFalse(notifRes.getBody().isEmpty());
+		
+		// Let's assert notifications count is at least 1
+		assertTrue(notifRes.getBody().size() >= 1);
+
+		// Read the notification
+		Long notifId = notifRes.getBody().get(0).getId();
+		org.springframework.http.ResponseEntity<Void> readRes = platformNotificationController.markAsRead(notifId, platformUser);
+		assertEquals(org.springframework.http.HttpStatus.OK, readRes.getStatusCode());
+
+		// List all tickets
+		org.springframework.http.ResponseEntity<org.springframework.data.domain.Page<com.sonixhr.dto.platform.SupportTicketResponse>> listRes =
+				platformSupportTicketController.getAllTickets(null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+		assertNotNull(listRes.getBody());
+		assertEquals(1, listRes.getBody().getTotalElements());
+
+		// Get ticket details
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.platform.SupportTicketResponse> detailsRes =
+				platformSupportTicketController.getTicketById(ticketId);
+		assertNotNull(detailsRes.getBody());
+		assertEquals("Network connection issues", detailsRes.getBody().getTitle());
+
+		// Update ticket status to RESOLVED
+		com.sonixhr.dto.platform.SupportTicketStatusUpdateRequest updateReq = com.sonixhr.dto.platform.SupportTicketStatusUpdateRequest.builder()
+				.status("RESOLVED")
+				.resolution("Optimized the database indexing for employee dashboards to handle high volume traffic.")
+				.build();
+
+		org.springframework.http.ResponseEntity<com.sonixhr.dto.platform.SupportTicketResponse> updateRes =
+				platformSupportTicketController.updateTicketStatus(ticketId, updateReq, platformUser);
+
+		assertNotNull(updateRes.getBody());
+		assertEquals("RESOLVED", updateRes.getBody().getStatus());
+		assertEquals("Optimized the database indexing for employee dashboards to handle high volume traffic.", updateRes.getBody().getResolution());
+		assertEquals(platformUser.getId(), updateRes.getBody().getResolvedByPlatformUserId());
+
+		// Clean contexts
+		com.sonixhr.security.TenantContext.clear();
+		org.springframework.security.core.context.SecurityContextHolder.clearContext();
 	}
 }
 

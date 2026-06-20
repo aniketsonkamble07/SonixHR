@@ -2,15 +2,15 @@ package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
-// Force re-indexing of imports
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.entity.tenant.TenantSubscription;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
-import com.sonixhr.enums.PlanType;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
@@ -56,6 +56,7 @@ public class TenantRegistrationService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeCodeGenerator employeeCodeGenerator;
     private final ShiftConfigurationService shiftConfigurationService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -73,14 +74,19 @@ public class TenantRegistrationService {
         // 1. Validate uniqueness
         validateUniqueness(request);
 
-        // 2. Get plan details
-        PlanType planType = PlanType.fromCode(request.getPlanType());
+        // 2. Get plan details from DB
+        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(request.getPlanType())
+                .orElseGet(() -> {
+                    log.warn("Requested plan '{}' not found, falling back to active trial plan", request.getPlanType());
+                    return subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue()
+                            .orElseThrow(() -> new BusinessException("No active subscription plan found in the system."));
+                });
 
         // 3. Generate unique identifiers
         String tenantCode = generateUniqueTenantCode(request.getCompanyName());
 
         // 4. Create Tenant
-        Tenant tenant = createTenant(request, tenantCode, planType);
+        Tenant tenant = createTenant(request, tenantCode, plan);
         log.info("Tenant created with ID: {}", tenant.getId());
 
         // 5. Create Super Admin role for this tenant (with all global permissions)
@@ -92,7 +98,7 @@ public class TenantRegistrationService {
         log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
 
         // 7. Create subscription record
-        createSubscription(tenant, planType);
+        createSubscription(tenant, plan);
         log.info("Subscription created for tenant");
 
         // 8. Generate activation token for employee
@@ -191,21 +197,26 @@ public class TenantRegistrationService {
     }
 
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
-                                PlanType planType) {
+                                SubscriptionPlan plan) {
         UserStatus tenantStatus = bypassActivation ? UserStatus.ACTIVE : UserStatus.PENDING_VERIFICATION;
         boolean tenantActive = bypassActivation;
+        
+        String initialPlanStatus = plan.isTrial() ? "trial" : "active";
+        int trialDays = plan.getTrialDays() > 0 ? plan.getTrialDays() : defaultTrialDays;
+        LocalDateTime trialEndsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : null;
+        
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
-                .planType(planType)
-                .maxEmployees(planType.getMaxEmployees())
+                .planType(plan.getCode())
+                .maxEmployees(plan.getMaxEmployees())
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
                 .status(tenantStatus)
                 .isActive(tenantActive)
-                .planStatus("trial")
-                .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
+                .planStatus(initialPlanStatus)
+                .trialEndsAt(trialEndsAt)
                 .build();
         return tenantRepository.save(tenant);
     }
@@ -299,19 +310,26 @@ public class TenantRegistrationService {
     // SUBSCRIPTION MANAGEMENT
     // =====================================================
 
-    private void createSubscription(Tenant tenant, PlanType planType) {
+    private void createSubscription(Tenant tenant, SubscriptionPlan plan) {
+        PlanStatus initialPlanStatus = plan.isTrial() ? PlanStatus.TRIAL : PlanStatus.ACTIVE;
+        LocalDateTime trialStartedAt = plan.isTrial() ? LocalDateTime.now() : null;
+        int trialDays = plan.getTrialDays() > 0 ? plan.getTrialDays() : defaultTrialDays;
+        LocalDateTime trialEndsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : null;
+        LocalDateTime startedAt = LocalDateTime.now();
+        LocalDateTime endsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : LocalDateTime.now().plusMonths(1);
+
         TenantSubscription subscription = TenantSubscription.builder()
                 .tenant(tenant)
-                .planType(planType)
-                .planName(planType.getDisplayName())
-                .planStatus(PlanStatus.TRIAL)
-                .maxEmployees(planType.getMaxEmployees())
-                .maxStorageMb(planType.getMaxStorageMb())
-                .trialStartedAt(LocalDateTime.now())
-                .trialEndsAt(LocalDateTime.now().plusDays(defaultTrialDays))
-                .startedAt(LocalDateTime.now())
-                .endsAt(LocalDateTime.now().plusDays(defaultTrialDays))
-                .amount(BigDecimal.valueOf(planType.getMonthlyPrice()))
+                .planType(plan.getCode())
+                .planName(plan.getName())
+                .planStatus(initialPlanStatus)
+                .maxEmployees(plan.getMaxEmployees())
+                .maxStorageMb(plan.getMaxStorageMb())
+                .trialStartedAt(trialStartedAt)
+                .trialEndsAt(trialEndsAt)
+                .startedAt(startedAt)
+                .endsAt(endsAt)
+                .amount(BigDecimal.valueOf(plan.getMonthlyPrice()))
                 .currency("INR")
                 .billingCycle(BillingCycle.MONTHLY)
                 .isActive(true)
@@ -334,7 +352,7 @@ public class TenantRegistrationService {
                 .tenantId(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())
-                .planType(tenant.getPlanType() != null ? tenant.getPlanType().getCode() : null)
+                .planType(tenant.getPlanType())
                 .planStatus(tenant.getPlanStatus())
                 .trialEndsAt(tenant.getTrialEndsAt())
                 .status(tenant.getStatus() != null ? tenant.getStatus().name() : null)

@@ -14,6 +14,7 @@ import java.util.List;
 public class SubscriptionDashboardDTO {
     private long freeTrialCount;
     private long basicPlanCount;
+    private long moderatePlanCount;
     private long premiumPlanCount;
     private long enterprisePlanCount;
     

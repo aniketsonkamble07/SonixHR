@@ -6,7 +6,8 @@ import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
-import com.sonixhr.enums.PlanType;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantPermissionRepository;
@@ -28,6 +29,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,6 +65,8 @@ class TenantRegistrationServiceTest {
     private EmployeeCodeGenerator employeeCodeGenerator;
     @Mock
     private ShiftConfigurationService shiftConfigurationService;
+    @Mock
+    private SubscriptionPlanRepository subscriptionPlanRepository;
 
     @BeforeEach
     void setUp() {
@@ -82,6 +86,18 @@ class TenantRegistrationServiceTest {
                 .planType("basic")
                 .build();
 
+        SubscriptionPlan mockPlan = SubscriptionPlan.builder()
+                .code("basic")
+                .name("Basic Plan")
+                .monthlyPrice(49.00)
+                .maxEmployees(100)
+                .maxStorageMb(1024)
+                .trialDays(0)
+                .isTrial(false)
+                .isActive(true)
+                .build();
+
+        when(subscriptionPlanRepository.findByCodeIgnoreCase("basic")).thenReturn(Optional.of(mockPlan));
         when(tenantRepository.existsByCompanyName(any())).thenReturn(false);
         when(employeeRepository.existsByEmail(any())).thenReturn(false);
         when(tenantRepository.existsByTenantCode(any())).thenReturn(false);
@@ -90,7 +106,7 @@ class TenantRegistrationServiceTest {
         mockTenant.setId(10L);
         mockTenant.setCompanyName("Test Company");
         mockTenant.setTenantCode("TEST-COMPANY");
-        mockTenant.setPlanType(PlanType.BASIC);
+        mockTenant.setPlanType("basic");
         mockTenant.setStatus(UserStatus.PENDING_VERIFICATION);
         when(tenantRepository.save(any(Tenant.class))).thenReturn(mockTenant);
 

@@ -32,5 +32,5 @@ public class TenantRegistrationRequest {
     private String adminPhone;
 
     @Builder.Default
-    private String planType = "professional";
+    private String planType = "trial";
 }
