@@ -1,6 +1,5 @@
 package com.sonixhr.entity.tenant;
 
-
 import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.UserStatus;
@@ -17,15 +16,13 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@Table(name = "tenants",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_tenant_code", columnNames = "tenant_code")
-        },
-        indexes = {
-                @Index(name = "idx_tenant_code", columnList = "tenant_code"),
-                @Index(name = "idx_tenant_status", columnList = "status"),
-                @Index(name = "idx_tenant_is_active", columnList = "is_active")
-        })
+@Table(name = "tenants", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_tenant_code", columnNames = "tenant_code")
+}, indexes = {
+        @Index(name = "idx_tenant_code", columnList = "tenant_code"),
+        @Index(name = "idx_tenant_status", columnList = "status"),
+        @Index(name = "idx_tenant_is_active", columnList = "is_active")
+})
 @Data
 @Builder
 @NoArgsConstructor
@@ -66,8 +63,8 @@ public class Tenant {
     @Column(name = "city", length = 100)
     private String city;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "state", length = 50)
+    @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState state;
 
     @Column(name = "country", length = 50)
@@ -167,7 +164,7 @@ public class Tenant {
         return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.endsAt);
     }
 
-    //  Convenience method for template compatibility
+    // Convenience method for template compatibility
     public Boolean getIsActive() {
         return isActive;
     }
@@ -191,8 +188,10 @@ public class Tenant {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Tenant tenant = (Tenant) o;
         return id != null && Objects.equals(id, tenant.id);
     }

@@ -19,8 +19,8 @@ public class StateProfessionalTaxConfig {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "state_code", nullable = false, length = 50)
+    @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState stateCode;
 
     @Column(name = "salary_range_min", nullable = false, precision = 12, scale = 2)

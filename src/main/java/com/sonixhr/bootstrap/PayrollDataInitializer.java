@@ -117,7 +117,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
 
             // Karnataka (KA)
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KA)
+                    .stateCode(IndianState.KARNATAKA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(24999.99))
                     .amount(BigDecimal.ZERO)
@@ -125,7 +125,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
                     .build());
 
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KA)
+                    .stateCode(IndianState.KARNATAKA)
                     .salaryRangeMin(BigDecimal.valueOf(24999.99))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -138,7 +138,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
             // > 7500 to 10000 -> 175
             // > 10000 -> 200 (except February, where it is 300)
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(7500.00))
                     .amount(BigDecimal.ZERO)
@@ -146,7 +146,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
                     .build());
 
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(7500.00))
                     .salaryRangeMax(BigDecimal.valueOf(10000.00))
                     .amount(BigDecimal.valueOf(175.00))
@@ -155,7 +155,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
 
             // February specific: ₹300
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(null)
                     .applicableMonth(2) // February
@@ -165,7 +165,7 @@ public class PayrollDataInitializer implements ApplicationRunner {
 
             // Default other months: ₹200
             stateProfessionalTaxConfigRepository.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(null)
                     .applicableMonth(null) // Applies to non-February months

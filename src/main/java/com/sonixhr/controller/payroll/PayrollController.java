@@ -29,7 +29,7 @@ public class PayrollController {
     @PostMapping("/calculate")
     public PayrollCalculationResponse calculate(@RequestBody PayrollCalculationRequest req) {
         BigDecimal ctc = req.getCtc() != null ? req.getCtc() : BigDecimal.ZERO;
-        IndianState state = req.getState() != null ? req.getState() : IndianState.MH;
+        IndianState state = req.getState() != null ? req.getState() : IndianState.MAHARASHTRA;
         int month = req.getMonth();
         int year = req.getYear() > 0 ? req.getYear() : 2025;
         BigDecimal lopDays = req.getLopDays() != null ? req.getLopDays() : BigDecimal.ZERO;
@@ -186,11 +186,11 @@ public class PayrollController {
 
     private BigDecimal calculatePT(IndianState state, BigDecimal gross, int month, List<StateProfessionalTaxConfig> slabs) {
         if (slabs == null || slabs.isEmpty()) {
-            if (state == IndianState.MH) {
+            if (state == IndianState.MAHARASHTRA) {
                 if (gross.compareTo(BigDecimal.valueOf(7500)) <= 0) return BigDecimal.ZERO;
                 if (gross.compareTo(BigDecimal.valueOf(10000)) <= 0) return BigDecimal.valueOf(175.00);
                 return BigDecimal.valueOf(month == 2 ? 300.00 : 200.00);
-            } else if (state == IndianState.KA) {
+            } else if (state == IndianState.KARNATAKA) {
                 if (gross.compareTo(BigDecimal.valueOf(25000)) >= 0) return BigDecimal.valueOf(200.00);
                 return BigDecimal.ZERO;
             }

@@ -32,10 +32,10 @@ import java.util.stream.Collectors;
 
 @Data
 @Entity
-@ToString(exclude = {"documents", "certifications", "bankDetails"})
+@ToString(exclude = { "documents", "certifications", "bankDetails" })
 @Table(name = "employees", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_employee_code_tenant", columnNames = {"tenant_id", "employee_code"}),
-        @UniqueConstraint(name = "uk_employee_email_tenant", columnNames = {"tenant_id", "email"})
+        @UniqueConstraint(name = "uk_employee_code_tenant", columnNames = { "tenant_id", "employee_code" }),
+        @UniqueConstraint(name = "uk_employee_email_tenant", columnNames = { "tenant_id", "email" })
 }, indexes = {
         @Index(name = "idx_employees_tenant", columnList = "tenant_id"),
         @Index(name = "idx_employees_email", columnList = "email"),
@@ -85,12 +85,8 @@ public class Employee implements UserDetails {
     // ROLES & PERMISSIONS
     // =====================================================
     @Builder.Default
-    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "employee_roles",
-            joinColumns = @JoinColumn(name = "employee_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
+    @ManyToMany(fetch = FetchType.EAGER, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinTable(name = "employee_roles", joinColumns = @JoinColumn(name = "employee_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<TenantRole> roles = new HashSet<>();
 
     // =====================================================
@@ -211,8 +207,8 @@ public class Employee implements UserDetails {
     @Column(length = 100)
     private String city;
 
-    @Enumerated(EnumType.STRING)
     @Column(length = 50)
+    @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState state;
 
     @Column(length = 50)
@@ -265,7 +261,6 @@ public class Employee implements UserDetails {
     @Column(name = "certifications", columnDefinition = "jsonb")
     @Builder.Default
     private Map<String, Object> certifications = new HashMap<>();
-
 
     @Enumerated(EnumType.STRING)
     @Column(name = "weekend_config")
@@ -360,12 +355,14 @@ public class Employee implements UserDetails {
     }
 
     public int getTenureInMonths() {
-        if (hireDate == null) return 0;
+        if (hireDate == null)
+            return 0;
         return (int) ChronoUnit.MONTHS.between(hireDate, LocalDate.now());
     }
 
     public int getAge() {
-        if (dateOfBirth == null) return 0;
+        if (dateOfBirth == null)
+            return 0;
         return Period.between(dateOfBirth, LocalDate.now()).getYears();
     }
 
@@ -526,7 +523,6 @@ public class Employee implements UserDetails {
     public Map<String, Object> getCertifications() {
         return certifications != null ? certifications : new HashMap<>();
     }
-
 
     public Map<String, Object> getBankDetails() {
         return bankDetails != null ? bankDetails : new HashMap<>();

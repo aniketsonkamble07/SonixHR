@@ -77,6 +77,38 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.warn("Could not drop plan_type check constraints: {}", e.getMessage());
         }
 
+        // Drop obsolete state enum check constraints dynamically if they exist
+        try {
+            log.info("Dropping obsolete state CHECK constraints dynamically...");
+            jdbcTemplate.execute(
+                "DO $$\n" +
+                "DECLARE\n" +
+                "    r RECORD;\n" +
+                "BEGIN\n" +
+                "    FOR r IN (\n" +
+                "        SELECT tc.table_name, tc.constraint_name\n" +
+                "        FROM information_schema.table_constraints tc\n" +
+                "        JOIN information_schema.constraint_column_usage ccu \n" +
+                "            ON tc.constraint_name = ccu.constraint_name \n" +
+                "            AND tc.table_schema = ccu.table_schema\n" +
+                "        WHERE tc.constraint_type = 'CHECK'\n" +
+                "          AND tc.table_schema = 'public'\n" +
+                "          AND (\n" +
+                "            (tc.table_name = 'employees' AND ccu.column_name = 'state') OR\n" +
+                "            (tc.table_name = 'tenants' AND ccu.column_name = 'state') OR\n" +
+                "            (tc.table_name = 'tenant_leave_settings' AND ccu.column_name = 'state') OR\n" +
+                "            (tc.table_name = 'platform_state_pt_configs' AND ccu.column_name = 'state_code')\n" +
+                "          )\n" +
+                "    ) LOOP\n" +
+                "        EXECUTE 'ALTER TABLE ' || quote_ident(r.table_name) || ' DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);\n" +
+                "    END LOOP;\n" +
+                "END $$;"
+            );
+            log.info("Successfully dropped obsolete state CHECK constraints.");
+        } catch (Exception e) {
+            log.warn("Could not drop state CHECK constraints: {}", e.getMessage());
+        }
+
         // Step 1: Create all permissions
         createAllPermissions();
 
@@ -388,12 +420,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
         }
 
         LocalDate epoch = LocalDate.of(2020, 1, 1);
-        if (!statePtConfigRepo.existsByStateCode(IndianState.KA)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.KARNATAKA)) {
             log.info("Seeding default state Professional Tax configs for KA...");
             
             // Seed PT slabs for Karnataka (KA)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KA)
+                    .stateCode(IndianState.KARNATAKA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(24999.99))
                     .amount(BigDecimal.ZERO)
@@ -401,7 +433,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KA)
+                    .stateCode(IndianState.KARNATAKA)
                     .salaryRangeMin(BigDecimal.valueOf(24999.99))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -410,12 +442,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for KA seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.MH)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.MAHARASHTRA)) {
             log.info("Seeding default state Professional Tax configs for MH...");
             
             // Seed PT slabs for Maharashtra (MH)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(7500.00))
                     .amount(BigDecimal.ZERO)
@@ -423,7 +455,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(7500.00))
                     .salaryRangeMax(BigDecimal.valueOf(10000.00))
                     .amount(BigDecimal.valueOf(175.00))
@@ -432,7 +464,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
             // February override rule: 300.00
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(null)
                     .applicableMonth(2)
@@ -441,7 +473,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MH)
+                    .stateCode(IndianState.MAHARASHTRA)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(null)
                     .applicableMonth(null)
@@ -451,12 +483,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for MH seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.GJ)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.GUJARAT)) {
             log.info("Seeding default state Professional Tax configs for GJ...");
             
             // Seed PT slabs for Gujarat (GJ)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.GJ)
+                    .stateCode(IndianState.GUJARAT)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(12000.00))
                     .amount(BigDecimal.ZERO)
@@ -464,7 +496,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.GJ)
+                    .stateCode(IndianState.GUJARAT)
                     .salaryRangeMin(BigDecimal.valueOf(12000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -473,12 +505,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for GJ seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.TS)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.TELANGANA)) {
             log.info("Seeding default state Professional Tax configs for TS...");
             
             // Seed PT slabs for Telangana (TS)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TS)
+                    .stateCode(IndianState.TELANGANA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(15000.00))
                     .amount(BigDecimal.ZERO)
@@ -486,7 +518,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TS)
+                    .stateCode(IndianState.TELANGANA)
                     .salaryRangeMin(BigDecimal.valueOf(15000.00))
                     .salaryRangeMax(BigDecimal.valueOf(20000.00))
                     .amount(BigDecimal.valueOf(150.00))
@@ -494,7 +526,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TS)
+                    .stateCode(IndianState.TELANGANA)
                     .salaryRangeMin(BigDecimal.valueOf(20000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -503,12 +535,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for TS seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.AP)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.ANDHRA_PRADESH)) {
             log.info("Seeding default state Professional Tax configs for AP...");
             
             // Seed PT slabs for Andhra Pradesh (AP)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.AP)
+                    .stateCode(IndianState.ANDHRA_PRADESH)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(15000.00))
                     .amount(BigDecimal.ZERO)
@@ -516,7 +548,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.AP)
+                    .stateCode(IndianState.ANDHRA_PRADESH)
                     .salaryRangeMin(BigDecimal.valueOf(15000.00))
                     .salaryRangeMax(BigDecimal.valueOf(20000.00))
                     .amount(BigDecimal.valueOf(150.00))
@@ -524,7 +556,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.AP)
+                    .stateCode(IndianState.ANDHRA_PRADESH)
                     .salaryRangeMin(BigDecimal.valueOf(20000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -533,12 +565,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for AP seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.WB)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.WEST_BENGAL)) {
             log.info("Seeding default state Professional Tax configs for WB...");
             
             // Seed PT slabs for West Bengal (WB)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.WB)
+                    .stateCode(IndianState.WEST_BENGAL)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(10000.00))
                     .amount(BigDecimal.ZERO)
@@ -546,7 +578,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.WB)
+                    .stateCode(IndianState.WEST_BENGAL)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(BigDecimal.valueOf(15000.00))
                     .amount(BigDecimal.valueOf(110.00))
@@ -554,7 +586,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.WB)
+                    .stateCode(IndianState.WEST_BENGAL)
                     .salaryRangeMin(BigDecimal.valueOf(15000.00))
                     .salaryRangeMax(BigDecimal.valueOf(25000.00))
                     .amount(BigDecimal.valueOf(130.00))
@@ -562,7 +594,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.WB)
+                    .stateCode(IndianState.WEST_BENGAL)
                     .salaryRangeMin(BigDecimal.valueOf(25000.00))
                     .salaryRangeMax(BigDecimal.valueOf(40000.00))
                     .amount(BigDecimal.valueOf(150.00))
@@ -570,7 +602,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.WB)
+                    .stateCode(IndianState.WEST_BENGAL)
                     .salaryRangeMin(BigDecimal.valueOf(40000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -579,12 +611,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for WB seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.MP)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.MADHYA_PRADESH)) {
             log.info("Seeding default state Professional Tax configs for MP...");
             
             // Seed PT slabs for Madhya Pradesh (MP)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MP)
+                    .stateCode(IndianState.MADHYA_PRADESH)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(18750.00))
                     .amount(BigDecimal.ZERO)
@@ -592,7 +624,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MP)
+                    .stateCode(IndianState.MADHYA_PRADESH)
                     .salaryRangeMin(BigDecimal.valueOf(18750.00))
                     .salaryRangeMax(BigDecimal.valueOf(25000.00))
                     .amount(BigDecimal.valueOf(125.00))
@@ -600,7 +632,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.MP)
+                    .stateCode(IndianState.MADHYA_PRADESH)
                     .salaryRangeMin(BigDecimal.valueOf(25000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(208.00))
@@ -609,12 +641,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for MP seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.TN)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.TAMIL_NADU)) {
             log.info("Seeding default state Professional Tax configs for TN...");
             
             // Seed PT slabs for Tamil Nadu (TN)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(3500.00))
                     .amount(BigDecimal.ZERO)
@@ -622,7 +654,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.valueOf(3500.00))
                     .salaryRangeMax(BigDecimal.valueOf(5000.00))
                     .amount(BigDecimal.valueOf(25.00))
@@ -630,7 +662,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.valueOf(5000.00))
                     .salaryRangeMax(BigDecimal.valueOf(7500.00))
                     .amount(BigDecimal.valueOf(60.00))
@@ -638,7 +670,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.valueOf(7500.00))
                     .salaryRangeMax(BigDecimal.valueOf(10000.00))
                     .amount(BigDecimal.valueOf(135.00))
@@ -646,7 +678,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(BigDecimal.valueOf(12500.00))
                     .amount(BigDecimal.valueOf(170.00))
@@ -654,7 +686,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.TN)
+                    .stateCode(IndianState.TAMIL_NADU)
                     .salaryRangeMin(BigDecimal.valueOf(12500.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -663,12 +695,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for TN seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.KL)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.KERALA)) {
             log.info("Seeding default state Professional Tax configs for KL...");
             
             // Seed PT slabs for Kerala (KL)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(2000.00))
                     .amount(BigDecimal.ZERO)
@@ -676,7 +708,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(2000.00))
                     .salaryRangeMax(BigDecimal.valueOf(3000.00))
                     .amount(BigDecimal.valueOf(20.00))
@@ -684,7 +716,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(3000.00))
                     .salaryRangeMax(BigDecimal.valueOf(5000.00))
                     .amount(BigDecimal.valueOf(30.00))
@@ -692,7 +724,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(5000.00))
                     .salaryRangeMax(BigDecimal.valueOf(7500.00))
                     .amount(BigDecimal.valueOf(50.00))
@@ -700,7 +732,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(7500.00))
                     .salaryRangeMax(BigDecimal.valueOf(10000.00))
                     .amount(BigDecimal.valueOf(75.00))
@@ -708,7 +740,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(10000.00))
                     .salaryRangeMax(BigDecimal.valueOf(12500.00))
                     .amount(BigDecimal.valueOf(100.00))
@@ -716,7 +748,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(12500.00))
                     .salaryRangeMax(BigDecimal.valueOf(16666.67))
                     .amount(BigDecimal.valueOf(125.00))
@@ -724,7 +756,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(16666.67))
                     .salaryRangeMax(BigDecimal.valueOf(20833.33))
                     .amount(BigDecimal.valueOf(166.67))
@@ -732,7 +764,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.KL)
+                    .stateCode(IndianState.KERALA)
                     .salaryRangeMin(BigDecimal.valueOf(20833.33))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(208.33))
@@ -741,12 +773,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for KL seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.OD)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.ODISHA)) {
             log.info("Seeding default state Professional Tax configs for OD...");
             
             // Seed PT slabs for Odisha (OD)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.OD)
+                    .stateCode(IndianState.ODISHA)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(13000.00))
                     .amount(BigDecimal.ZERO)
@@ -754,7 +786,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.OD)
+                    .stateCode(IndianState.ODISHA)
                     .salaryRangeMin(BigDecimal.valueOf(13000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))
@@ -763,12 +795,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("✅ State Professional Tax configurations for OD seeded successfully.");
         }
 
-        if (!statePtConfigRepo.existsByStateCode(IndianState.CG)) {
+        if (!statePtConfigRepo.existsByStateCode(IndianState.CHHATTISGARH)) {
             log.info("Seeding default state Professional Tax configs for CG...");
             
             // Seed PT slabs for Chhattisgarh (CG)
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.CG)
+                    .stateCode(IndianState.CHHATTISGARH)
                     .salaryRangeMin(BigDecimal.ZERO)
                     .salaryRangeMax(BigDecimal.valueOf(20000.00))
                     .amount(BigDecimal.ZERO)
@@ -776,7 +808,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .build());
 
             statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
-                    .stateCode(IndianState.CG)
+                    .stateCode(IndianState.CHHATTISGARH)
                     .salaryRangeMin(BigDecimal.valueOf(20000.00))
                     .salaryRangeMax(null)
                     .amount(BigDecimal.valueOf(200.00))

@@ -52,7 +52,7 @@ public class DepartmentControllerIntegrationTest {
                 .adminPhone("+12345678901")
                 .officeAddress("123 Test Street")
                 .city("Bangalore")
-                .state(IndianState.KA)
+                .state(IndianState.KARNATAKA)
                 .country("India")
                 .planCode("trial")
                 .billingCycle("MONTHLY")

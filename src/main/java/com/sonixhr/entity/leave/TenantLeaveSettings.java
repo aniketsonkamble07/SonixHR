@@ -24,203 +24,203 @@ import java.util.Map;
 @AllArgsConstructor
 public class TenantLeaveSettings {
 
-    @Id
-    private Long tenantId;
+        @Id
+        private Long tenantId;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "leave_policies", columnDefinition = "jsonb")
-    @Builder.Default
-    private Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = createDefaultPolicies();
+        @JdbcTypeCode(SqlTypes.JSON)
+        @Column(name = "leave_policies", columnDefinition = "jsonb")
+        @Builder.Default
+        private Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> leavePolicies = createDefaultPolicies();
 
-    public static Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> createDefaultPolicies() {
-        Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> policies = new HashMap<>();
-        
-        // CASUAL
-        policies.put("CASUAL", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(12)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
-        
-        // SICK
-        policies.put("SICK", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(12)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
-        
-        // EARNED
-        policies.put("EARNED", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(15)
-                .carryForward(true)
-                .maxCarryForwardDays(30)
-                .minimumServiceMonths(6)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(false)
-                .prorated(true)
-                .build());
+        public static Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> createDefaultPolicies() {
+                Map<String, com.sonixhr.dto.leave.LeavePolicyDTO> policies = new HashMap<>();
 
-        // EMERGENCY
-        policies.put("EMERGENCY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(3)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
+                // CASUAL
+                policies.put("CASUAL", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(12)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-        // MATERNITY
-        policies.put("MATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(84)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("FEMALE")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
+                // SICK
+                policies.put("SICK", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(12)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-        // PATERNITY
-        policies.put("PATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(5)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("MALE")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
+                // EARNED
+                policies.put("EARNED", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(15)
+                                .carryForward(true)
+                                .maxCarryForwardDays(30)
+                                .minimumServiceMonths(6)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(false)
+                                .prorated(true)
+                                .build());
 
-        // UNPAID
-        policies.put("UNPAID", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(0)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
+                // EMERGENCY
+                policies.put("EMERGENCY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(3)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-        // COMPENSATORY
-        policies.put("COMPENSATORY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
-                .allowed(true)
-                .daysPerYear(0)
-                .carryForward(false)
-                .maxCarryForwardDays(0)
-                .minimumServiceMonths(0)
-                .genderEligibility("ALL")
-                .probationPeriodAllowed(true)
-                .prorated(false)
-                .build());
-        
-        return policies;
-    }
+                // MATERNITY
+                policies.put("MATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(84)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("FEMALE")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "weekend_config")
-    @Builder.Default
-    private WeekendConfig weekendConfig = WeekendConfig.SATURDAY_SUNDAY;
+                // PATERNITY
+                policies.put("PATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(5)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("MALE")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-    @Column(name = "custom_weekend_days")
-    @Builder.Default
-    private String customWeekendDays = null;
+                // UNPAID
+                policies.put("UNPAID", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(0)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-    @Column(name = "count_weekends_as_leave")
-    @Builder.Default
-    private Boolean countWeekendsAsLeave = false;
+                // COMPENSATORY
+                policies.put("COMPENSATORY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
+                                .allowed(true)
+                                .daysPerYear(0)
+                                .carryForward(false)
+                                .maxCarryForwardDays(0)
+                                .minimumServiceMonths(0)
+                                .genderEligibility("ALL")
+                                .probationPeriodAllowed(true)
+                                .prorated(false)
+                                .build());
 
-    @Column(name = "count_holidays_as_leave")
-    @Builder.Default
-    private Boolean countHolidaysAsLeave = false;
+                return policies;
+        }
 
-    @Column(name = "policies_configured")
-    @Builder.Default
-    private Boolean policiesConfigured = false;
+        @Enumerated(EnumType.STRING)
+        @Column(name = "weekend_config")
+        @Builder.Default
+        private WeekendConfig weekendConfig = WeekendConfig.SATURDAY_SUNDAY;
 
-    @Column(name = "casual_leave_per_year")
-    @Builder.Default
-    private Integer casualLeavePerYear = 12;
+        @Column(name = "custom_weekend_days")
+        @Builder.Default
+        private String customWeekendDays = null;
 
-    @Column(name = "sick_leave_per_year")
-    @Builder.Default
-    private Integer sickLeavePerYear = 12;
+        @Column(name = "count_weekends_as_leave")
+        @Builder.Default
+        private Boolean countWeekendsAsLeave = false;
 
-    @Column(name = "earned_leave_per_year")
-    @Builder.Default
-    private Integer earnedLeavePerYear = 15;
+        @Column(name = "count_holidays_as_leave")
+        @Builder.Default
+        private Boolean countHolidaysAsLeave = false;
 
-    @Column(name = "emergency_leave_per_year")
-    @Builder.Default
-    private Integer emergencyLeavePerYear = 3;
+        @Column(name = "policies_configured")
+        @Builder.Default
+        private Boolean policiesConfigured = false;
 
-    @Column(name = "maternity_leave_per_year")
-    @Builder.Default
-    private Integer maternityLeavePerYear = 84;
+        @Column(name = "casual_leave_per_year")
+        @Builder.Default
+        private Integer casualLeavePerYear = 12;
 
-    @Column(name = "paternity_leave_per_year")
-    @Builder.Default
-    private Integer paternityLeavePerYear = 5;
+        @Column(name = "sick_leave_per_year")
+        @Builder.Default
+        private Integer sickLeavePerYear = 12;
 
-    @Column(name = "unpaid_leave_per_year")
-    @Builder.Default
-    private Integer unpaidLeavePerYear = 0;
+        @Column(name = "earned_leave_per_year")
+        @Builder.Default
+        private Integer earnedLeavePerYear = 15;
 
-    @Column(name = "compensatory_leave_per_year")
-    @Builder.Default
-    private Integer compensatoryLeavePerYear = 0;
+        @Column(name = "emergency_leave_per_year")
+        @Builder.Default
+        private Integer emergencyLeavePerYear = 3;
 
-    @Column(name = "max_consecutive_leave_days")
-    @Builder.Default
-    private Integer maxConsecutiveLeaveDays = 30;
+        @Column(name = "maternity_leave_per_year")
+        @Builder.Default
+        private Integer maternityLeavePerYear = 84;
 
-    @Column(name = "leave_approval_required")
-    @Builder.Default
-    private Boolean leaveApprovalRequired = true;
+        @Column(name = "paternity_leave_per_year")
+        @Builder.Default
+        private Integer paternityLeavePerYear = 5;
 
-    @Column(name = "auto_approve_for_manager")
-    @Builder.Default
-    private Boolean autoApproveForManager = true;
+        @Column(name = "unpaid_leave_per_year")
+        @Builder.Default
+        private Integer unpaidLeavePerYear = 0;
 
-    @Column(length = 50)
-    @Builder.Default
-    private String country = null;
+        @Column(name = "compensatory_leave_per_year")
+        @Builder.Default
+        private Integer compensatoryLeavePerYear = 0;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 50)
-    @Builder.Default
-    private IndianState state = null;
+        @Column(name = "max_consecutive_leave_days")
+        @Builder.Default
+        private Integer maxConsecutiveLeaveDays = 30;
 
-    @Column(name = "include_national_holidays")
-    @Builder.Default
-    private Boolean includeNationalHolidays = true;
+        @Column(name = "leave_approval_required")
+        @Builder.Default
+        private Boolean leaveApprovalRequired = true;
 
-    @Column(name = "include_state_holidays")
-    @Builder.Default
-    private Boolean includeStateHolidays = true;
+        @Column(name = "auto_approve_for_manager")
+        @Builder.Default
+        private Boolean autoApproveForManager = true;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+        @Column(length = 50)
+        @Builder.Default
+        private String country = null;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+        @Column(length = 50)
+        @Builder.Default
+        @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
+        private IndianState state = null;
+
+        @Column(name = "include_national_holidays")
+        @Builder.Default
+        private Boolean includeNationalHolidays = true;
+
+        @Column(name = "include_state_holidays")
+        @Builder.Default
+        private Boolean includeStateHolidays = true;
+
+        @CreationTimestamp
+        @Column(name = "created_at", updatable = false)
+        private LocalDateTime createdAt;
+
+        @UpdateTimestamp
+        @Column(name = "updated_at")
+        private LocalDateTime updatedAt;
 }
