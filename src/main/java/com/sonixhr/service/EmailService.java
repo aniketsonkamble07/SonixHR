@@ -123,6 +123,51 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendSubscriptionExpiredEmail(String to, String companyName, String planName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send subscription expired email to: {}", to);
+            return;
+        }
+
+        log.info("Sending subscription expired email to: {} for company: {}", to, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Your Subscription Has Expired - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #EF4444;">Subscription Expired</h2>
+                        <p>This is to inform you that your subscription for <strong>%s</strong> has expired.</p>
+                        <p>Details:</p>
+                        <ul>
+                            <li><strong>Company:</strong> %s</li>
+                            <li><strong>Expired Plan:</strong> %s</li>
+                        </ul>
+                        <p>Your tenant account has been temporarily suspended. To reactivate your services, please log in and renew or upgrade your plan from the Billing Dashboard.</p>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, companyName, companyName, planName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Subscription expired email sent successfully to: {}", to);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send subscription expired email to: {}", to, e);
+        }
+    }
+
     // =====================================================
     // PLATFORM USER EMAILS
     // =====================================================

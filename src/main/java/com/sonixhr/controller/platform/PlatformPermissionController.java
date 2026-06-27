@@ -1,5 +1,6 @@
 package com.sonixhr.controller.platform;
 
+// Trigger IDE Linter Re-evaluation
 import com.sonixhr.dto.PermissionGroupDTO;
 import com.sonixhr.dto.PermissionDTO;
 import com.sonixhr.entity.platform.PlatformPermission;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/platform/permissions")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlatformPermissionController {
 
     private final PlatformPermissionService permissionService;

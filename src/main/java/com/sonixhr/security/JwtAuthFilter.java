@@ -277,6 +277,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      * Optimized public path checking with caching
      */
     private boolean isPublicPathOptimized(String path) {
+        // Exclude authenticated tenant auth endpoints
+        if ("/api/tenant/auth/me".equals(path) || 
+            "/api/tenant/auth/logout".equals(path) || 
+            "/api/tenant/auth/test-auth".equals(path)) {
+            return false;
+        }
+
         // Check exact match first (fastest)
         if (EXACT_PUBLIC_PATHS.contains(path)) {
             return true;

@@ -5,6 +5,7 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.enums.PlatformPermissionEnum;
 import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.IndianState;
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -19,9 +20,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
+import com.sonixhr.entity.payroll.StatutoryRateConfig;
+import com.sonixhr.entity.payroll.StateProfessionalTaxConfig;
+import com.sonixhr.repository.payroll.StatutoryRateConfigRepository;
+import com.sonixhr.repository.payroll.StateProfessionalTaxConfigRepository;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Slf4j
 @Component
@@ -36,10 +43,13 @@ public class PlatformDataInitializer implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final StatutoryRateConfigRepository statutoryRateConfigRepo;
+    private final StateProfessionalTaxConfigRepository statePtConfigRepo;
 
     private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
     private static final String SUPER_ADMIN_PASSWORD = "Admin@123";
     private static final String SUPER_ADMIN_NAME = "Super Administrator";
+
 
     @Override
     @Transactional
@@ -81,6 +91,9 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
         // Step 5: Seed default subscription plans
         seedDefaultSubscriptionPlans();
+
+        // Step 6: Seed Statutory Rates and PT Configs
+        seedStatutoryRatesAndPtConfigs();
         
         log.info("=========================================");
         log.info("Platform Data Initializer Completed");
@@ -100,6 +113,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .maxStorageMb(512)
                     .trialDays(14)
                     .isTrial(true)
+                    .validityMonths(1)
                     .isActive(true)
                     .description("Free trial access for 14 days, up to 10 employees")
                     .build());
@@ -113,6 +127,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .maxStorageMb(1024)
                     .trialDays(0)
                     .isTrial(false)
+                    .validityMonths(1)
                     .isActive(true)
                     .description("Core HR features, up to 100 employees")
                     .build());
@@ -126,6 +141,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .maxStorageMb(5120)
                     .trialDays(0)
                     .isTrial(false)
+                    .validityMonths(1)
                     .isActive(true)
                     .description("Advanced HR features, up to 500 employees")
                     .build());
@@ -139,6 +155,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .maxStorageMb(20480)
                     .trialDays(0)
                     .isTrial(false)
+                    .validityMonths(1)
                     .isActive(true)
                     .description("All HR features, up to 2,000 employees")
                     .build());
@@ -152,6 +169,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                     .maxStorageMb(102400)
                     .trialDays(0)
                     .isTrial(false)
+                    .validityMonths(12)
                     .isActive(true)
                     .description("Custom pricing, unlimited employees, dedicated support")
                     .build());
@@ -310,5 +328,461 @@ public class PlatformDataInitializer implements ApplicationRunner {
         if (roleName.contains("Support")) return "SUPPORT";
         if (roleName.contains("Billing")) return "BILLING";
         return "CUSTOM";
+    }
+
+    private void seedStatutoryRatesAndPtConfigs() {
+        if (statutoryRateConfigRepo.count() == 0) {
+            log.info("Seeding statutory rate configurations...");
+            LocalDate epoch = LocalDate.of(2020, 1, 1);
+            
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("EPF_EE")
+                    .rate(BigDecimal.valueOf(0.1200))
+                    .wageBase("WAGES_BASE")
+                    .ceilingAmount(BigDecimal.valueOf(15000.00))
+                    .capAmount(BigDecimal.valueOf(1800.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("EPF_ER")
+                    .rate(BigDecimal.valueOf(0.1200))
+                    .wageBase("WAGES_BASE")
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("EPS_ER")
+                    .rate(BigDecimal.valueOf(0.0833))
+                    .wageBase("WAGES_BASE")
+                    .ceilingAmount(BigDecimal.valueOf(15000.00))
+                    .capAmount(BigDecimal.valueOf(1250.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("EDLI")
+                    .rate(BigDecimal.valueOf(0.0050))
+                    .wageBase("WAGES_BASE")
+                    .ceilingAmount(BigDecimal.valueOf(15000.00))
+                    .capAmount(BigDecimal.valueOf(75.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("ESI_EE")
+                    .rate(BigDecimal.valueOf(0.0075))
+                    .wageBase("WAGES_BASE")
+                    .ceilingAmount(BigDecimal.valueOf(21000.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
+                    .componentCode("ESI_ER")
+                    .rate(BigDecimal.valueOf(0.0325))
+                    .wageBase("WAGES_BASE")
+                    .ceilingAmount(BigDecimal.valueOf(21000.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ Statutory rate configurations seeded successfully.");
+        }
+
+        LocalDate epoch = LocalDate.of(2020, 1, 1);
+        if (!statePtConfigRepo.existsByStateCode(IndianState.KA)) {
+            log.info("Seeding default state Professional Tax configs for KA...");
+            
+            // Seed PT slabs for Karnataka (KA)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KA)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(24999.99))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KA)
+                    .salaryRangeMin(BigDecimal.valueOf(24999.99))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for KA seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.MH)) {
+            log.info("Seeding default state Professional Tax configs for MH...");
+            
+            // Seed PT slabs for Maharashtra (MH)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MH)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(7500.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MH)
+                    .salaryRangeMin(BigDecimal.valueOf(7500.00))
+                    .salaryRangeMax(BigDecimal.valueOf(10000.00))
+                    .amount(BigDecimal.valueOf(175.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            // February override rule: 300.00
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MH)
+                    .salaryRangeMin(BigDecimal.valueOf(10000.00))
+                    .salaryRangeMax(null)
+                    .applicableMonth(2)
+                    .amount(BigDecimal.valueOf(300.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MH)
+                    .salaryRangeMin(BigDecimal.valueOf(10000.00))
+                    .salaryRangeMax(null)
+                    .applicableMonth(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for MH seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.GJ)) {
+            log.info("Seeding default state Professional Tax configs for GJ...");
+            
+            // Seed PT slabs for Gujarat (GJ)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.GJ)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(12000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.GJ)
+                    .salaryRangeMin(BigDecimal.valueOf(12000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for GJ seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.TS)) {
+            log.info("Seeding default state Professional Tax configs for TS...");
+            
+            // Seed PT slabs for Telangana (TS)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TS)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(15000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TS)
+                    .salaryRangeMin(BigDecimal.valueOf(15000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(20000.00))
+                    .amount(BigDecimal.valueOf(150.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TS)
+                    .salaryRangeMin(BigDecimal.valueOf(20000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for TS seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.AP)) {
+            log.info("Seeding default state Professional Tax configs for AP...");
+            
+            // Seed PT slabs for Andhra Pradesh (AP)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.AP)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(15000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.AP)
+                    .salaryRangeMin(BigDecimal.valueOf(15000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(20000.00))
+                    .amount(BigDecimal.valueOf(150.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.AP)
+                    .salaryRangeMin(BigDecimal.valueOf(20000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for AP seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.WB)) {
+            log.info("Seeding default state Professional Tax configs for WB...");
+            
+            // Seed PT slabs for West Bengal (WB)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.WB)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(10000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.WB)
+                    .salaryRangeMin(BigDecimal.valueOf(10000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(15000.00))
+                    .amount(BigDecimal.valueOf(110.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.WB)
+                    .salaryRangeMin(BigDecimal.valueOf(15000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(25000.00))
+                    .amount(BigDecimal.valueOf(130.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.WB)
+                    .salaryRangeMin(BigDecimal.valueOf(25000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(40000.00))
+                    .amount(BigDecimal.valueOf(150.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.WB)
+                    .salaryRangeMin(BigDecimal.valueOf(40000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for WB seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.MP)) {
+            log.info("Seeding default state Professional Tax configs for MP...");
+            
+            // Seed PT slabs for Madhya Pradesh (MP)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MP)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(18750.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MP)
+                    .salaryRangeMin(BigDecimal.valueOf(18750.00))
+                    .salaryRangeMax(BigDecimal.valueOf(25000.00))
+                    .amount(BigDecimal.valueOf(125.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.MP)
+                    .salaryRangeMin(BigDecimal.valueOf(25000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(208.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for MP seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.TN)) {
+            log.info("Seeding default state Professional Tax configs for TN...");
+            
+            // Seed PT slabs for Tamil Nadu (TN)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(3500.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.valueOf(3500.00))
+                    .salaryRangeMax(BigDecimal.valueOf(5000.00))
+                    .amount(BigDecimal.valueOf(25.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.valueOf(5000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(7500.00))
+                    .amount(BigDecimal.valueOf(60.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.valueOf(7500.00))
+                    .salaryRangeMax(BigDecimal.valueOf(10000.00))
+                    .amount(BigDecimal.valueOf(135.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.valueOf(10000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(12500.00))
+                    .amount(BigDecimal.valueOf(170.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.TN)
+                    .salaryRangeMin(BigDecimal.valueOf(12500.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for TN seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.KL)) {
+            log.info("Seeding default state Professional Tax configs for KL...");
+            
+            // Seed PT slabs for Kerala (KL)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(2000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(2000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(3000.00))
+                    .amount(BigDecimal.valueOf(20.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(3000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(5000.00))
+                    .amount(BigDecimal.valueOf(30.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(5000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(7500.00))
+                    .amount(BigDecimal.valueOf(50.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(7500.00))
+                    .salaryRangeMax(BigDecimal.valueOf(10000.00))
+                    .amount(BigDecimal.valueOf(75.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(10000.00))
+                    .salaryRangeMax(BigDecimal.valueOf(12500.00))
+                    .amount(BigDecimal.valueOf(100.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(12500.00))
+                    .salaryRangeMax(BigDecimal.valueOf(16666.67))
+                    .amount(BigDecimal.valueOf(125.00))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(16666.67))
+                    .salaryRangeMax(BigDecimal.valueOf(20833.33))
+                    .amount(BigDecimal.valueOf(166.67))
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.KL)
+                    .salaryRangeMin(BigDecimal.valueOf(20833.33))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(208.33))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for KL seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.OD)) {
+            log.info("Seeding default state Professional Tax configs for OD...");
+            
+            // Seed PT slabs for Odisha (OD)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.OD)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(13000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.OD)
+                    .salaryRangeMin(BigDecimal.valueOf(13000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for OD seeded successfully.");
+        }
+
+        if (!statePtConfigRepo.existsByStateCode(IndianState.CG)) {
+            log.info("Seeding default state Professional Tax configs for CG...");
+            
+            // Seed PT slabs for Chhattisgarh (CG)
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.CG)
+                    .salaryRangeMin(BigDecimal.ZERO)
+                    .salaryRangeMax(BigDecimal.valueOf(20000.00))
+                    .amount(BigDecimal.ZERO)
+                    .effectiveFrom(epoch)
+                    .build());
+
+            statePtConfigRepo.save(StateProfessionalTaxConfig.builder()
+                    .stateCode(IndianState.CG)
+                    .salaryRangeMin(BigDecimal.valueOf(20000.00))
+                    .salaryRangeMax(null)
+                    .amount(BigDecimal.valueOf(200.00))
+                    .effectiveFrom(epoch)
+                    .build());
+            log.info("✅ State Professional Tax configurations for CG seeded successfully.");
+        }
     }
 }

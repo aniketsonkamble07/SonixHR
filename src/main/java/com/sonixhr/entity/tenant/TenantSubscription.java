@@ -1,6 +1,7 @@
 package com.sonixhr.entity.tenant;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 
@@ -18,10 +19,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "tenant_subscriptions", indexes = {
         @Index(name = "idx_subscriptions_tenant", columnList = "tenant_id"),
-        @Index(name = "idx_subscriptions_plan", columnList = "plan_type"),
+        @Index(name = "idx_subscriptions_plan", columnList = "subscription_plan_id"),
         @Index(name = "idx_subscriptions_status", columnList = "plan_status"),
-        @Index(name = "idx_subscriptions_active", columnList = "is_active"),
-        @Index(name = "idx_subscriptions_trial_ends", columnList = "trial_ends_at")
+        @Index(name = "idx_subscriptions_active", columnList = "is_active")
 })
 @Getter
 @Setter
@@ -48,8 +48,13 @@ public class TenantSubscription {
     // =====================================================
 
     @NotNull
-    @Column(name = "plan_type", nullable = false, length = 20)
-    private String planType;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_plan_id", nullable = true)
+    private SubscriptionPlan subscriptionPlan;
+
+    public String getPlanType() {
+        return this.subscriptionPlan != null ? this.subscriptionPlan.getCode() : null;
+    }
 
     @Column(name = "plan_name", length = 100)
     private String planName;
@@ -57,7 +62,7 @@ public class TenantSubscription {
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_status", nullable = false, length = 20)
     @Builder.Default
-    private PlanStatus planStatus = PlanStatus.TRIAL;
+    private PlanStatus planStatus = PlanStatus.ACTIVE;
 
     // =====================================================
     // LIMITS
@@ -72,17 +77,6 @@ public class TenantSubscription {
     @Column(name = "max_storage_mb")
     @Builder.Default
     private Integer maxStorageMb = 1024;
-
-    // =====================================================
-    // TRIAL PERIOD
-    // =====================================================
-
-    @Column(name = "trial_started_at")
-    @Builder.Default
-    private LocalDateTime trialStartedAt = LocalDateTime.now();
-
-    @Column(name = "trial_ends_at")
-    private LocalDateTime trialEndsAt;
 
     // =====================================================
     // SUBSCRIPTION DATES
@@ -152,12 +146,7 @@ public class TenantSubscription {
     // =====================================================
 
     public boolean isTrial() {
-        return PlanStatus.TRIAL.equals(this.planStatus);
-    }
-
-    public boolean isTrialExpired() {
-        return trialEndsAt != null &&
-                trialEndsAt.isBefore(LocalDateTime.now());
+        return this.subscriptionPlan != null && this.subscriptionPlan.isTrial();
     }
 
     public boolean isExpired() {
@@ -183,11 +172,10 @@ public class TenantSubscription {
     }
 
     public void expire() {
-        this.planStatus = PlanStatus.TRIAL;
         this.isActive = false;
     }
 
-    public void upgradePlan(String newPlanType) {
-        this.planType = newPlanType;
+    public void upgradePlan(SubscriptionPlan newPlan) {
+        this.subscriptionPlan = newPlan;
     }
 }

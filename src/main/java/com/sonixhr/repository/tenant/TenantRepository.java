@@ -1,6 +1,8 @@
 package com.sonixhr.repository.tenant;
  
 import com.sonixhr.entity.tenant.Tenant;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.enums.PlanStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -70,21 +72,18 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     long countByStatus(String status);
     long countByIsActiveTrue();
 
-    // ===== Expiring Trials =====
-    List<Tenant> findByPlanStatusAndTrialEndsAtBefore(String planStatus, LocalDateTime dateTime);
-
     // ===== Additional Useful Methods =====
 
     /**
      * Find tenants that are currently in trial period
      */
-    @Query("SELECT t FROM Tenant t WHERE t.planStatus = 'trial' AND t.trialEndsAt > CURRENT_TIMESTAMP")
+    @Query("SELECT t FROM Tenant t WHERE t.subscriptionPlan.isTrial = true AND t.endsAt > CURRENT_TIMESTAMP")
     List<Tenant> findActiveTrials();
 
     /**
      * Find tenants with expired trials
      */
-    @Query("SELECT t FROM Tenant t WHERE t.planStatus = 'trial' AND t.trialEndsAt < CURRENT_TIMESTAMP")
+    @Query("SELECT t FROM Tenant t WHERE t.subscriptionPlan.isTrial = true AND t.endsAt < CURRENT_TIMESTAMP")
     List<Tenant> findExpiredTrials();
 
     /**
@@ -92,17 +91,17 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
      */
     @Modifying
     @Transactional
-    @Query("UPDATE Tenant t SET t.planType = :planType, t.planStatus = :planStatus, " +
+    @Query("UPDATE Tenant t SET t.subscriptionPlan = :subscriptionPlan, t.planStatus = :planStatus, " +
             "t.maxEmployees = :maxEmployees WHERE t.id = :tenantId")
     int updatePlan(@Param("tenantId") Long tenantId,
-                   @Param("planType") String planType,
-                   @Param("planStatus") String planStatus,
+                   @Param("subscriptionPlan") SubscriptionPlan subscriptionPlan,
+                   @Param("planStatus") PlanStatus planStatus,
                    @Param("maxEmployees") Integer maxEmployees);
 
     /**
      * Count tenants by plan type
      */
-    @Query("SELECT t.planType, COUNT(t) FROM Tenant t GROUP BY t.planType")
+    @Query("SELECT t.subscriptionPlan.code, COUNT(t) FROM Tenant t GROUP BY t.subscriptionPlan.code")
     List<Object[]> countByPlanType();
 
     /**

@@ -97,6 +97,13 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     @QueryHints(@QueryHint(name = CACHEABLE, value = "true"))
     List<TenantRole> findAllByTenantIdWithPermissions(@Param("tenantId") Long tenantId);
 
+    /**
+     * Find all active roles for a tenant with permissions eagerly loaded
+     */
+    @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId = :tenantId AND r.active = true")
+    @QueryHints(@QueryHint(name = CACHEABLE, value = "true"))
+    List<TenantRole> findAllByTenantIdAndActiveTrueWithPermissions(@Param("tenantId") Long tenantId);
+
     // =====================================================
     // DEFAULT ROLES
     // =====================================================

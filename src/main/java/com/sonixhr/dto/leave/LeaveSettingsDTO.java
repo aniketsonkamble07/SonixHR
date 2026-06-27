@@ -1,5 +1,6 @@
 package com.sonixhr.dto.leave;
 
+import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.leave.WeekendConfig;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,7 +43,7 @@ public class LeaveSettingsDTO {
 
     // Holiday settings
     private String country;
-    private String state;
+    private IndianState state;
     private Boolean includeNationalHolidays;
     private Boolean includeStateHolidays;
 

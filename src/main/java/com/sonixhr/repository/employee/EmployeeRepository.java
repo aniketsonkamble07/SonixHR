@@ -421,4 +421,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      */
     @Query("SELECT e FROM Employee e WHERE e.isActive = true ORDER BY e.lastLoginAt DESC")
     List<Employee> findTop100ByIsActiveTrue(Pageable pageable);
+
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
+    List<Employee> findActiveByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT e FROM Employee e WHERE e.email = :email AND e.tenant.id = :tenantId")
+    Optional<Employee> findByEmailAndTenantId(@Param("email") String email, @Param("tenantId") Long tenantId);
+
+    @Query("SELECT e FROM Employee e WHERE e.employeeCode = :employeeCode AND e.tenant.id = :tenantId")
+    Optional<Employee> findByEmployeeCodeAndTenantId(@Param("employeeCode") String employeeCode,
+                                                     @Param("tenantId") Long tenantId);
+
+
+
 }

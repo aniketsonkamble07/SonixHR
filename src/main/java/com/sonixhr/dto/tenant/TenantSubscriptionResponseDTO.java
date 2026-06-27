@@ -21,8 +21,6 @@ public class TenantSubscriptionResponseDTO {
     private PlanStatus planStatus;
     private int maxEmployees;
     private int maxStorageMb;
-    private LocalDateTime trialStartedAt;
-    private LocalDateTime trialEndsAt;
     private LocalDateTime startedAt;
     private LocalDateTime endsAt;
     private BigDecimal amount;

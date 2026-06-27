@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@SuppressWarnings("null")
 public class Employee implements UserDetails {
 
     // =====================================================
@@ -199,7 +200,7 @@ public class Employee implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default
-    private EmployeeStatus status = EmployeeStatus.PROBATION;
+    private EmployeeStatus status = EmployeeStatus.INACTIVE;
 
     // =====================================================
     // ADDRESS INFORMATION
@@ -210,8 +211,9 @@ public class Employee implements UserDetails {
     @Column(length = 100)
     private String city;
 
-    @Column(length = 100)
-    private String state;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private IndianState state;
 
     @Column(length = 50)
     private String country;

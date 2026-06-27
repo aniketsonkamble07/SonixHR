@@ -90,6 +90,7 @@ public class PlatformSubscriptionPlanController {
         plan.setMaxStorageMb(dto.getMaxStorageMb());
         plan.setTrialDays(dto.getTrialDays());
         plan.setTrial(dto.isTrial());
+        plan.setValidityMonths(dto.getValidityMonths());
         plan.setActive(dto.isActive());
         plan.setDescription(dto.getDescription());
 
@@ -123,6 +124,7 @@ public class PlatformSubscriptionPlanController {
                 .maxStorageMb(plan.getMaxStorageMb())
                 .trialDays(plan.getTrialDays())
                 .isTrial(plan.isTrial())
+                .validityMonths(plan.getValidityMonths())
                 .isActive(plan.isActive())
                 .description(plan.getDescription())
                 .build();
@@ -138,6 +140,7 @@ public class PlatformSubscriptionPlanController {
                 .maxStorageMb(dto.getMaxStorageMb())
                 .trialDays(dto.getTrialDays())
                 .isTrial(dto.isTrial())
+                .validityMonths(dto.getValidityMonths())
                 .isActive(dto.isActive())
                 .description(dto.getDescription())
                 .build();

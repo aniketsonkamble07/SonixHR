@@ -27,7 +27,7 @@ public class EmployeeProfileUpdateRequest {
     // Address Information
     private String address;
     private String city;
-    private String state;
+    private IndianState state;
     private String country;
     private String postalCode;
     private String permanentAddress;

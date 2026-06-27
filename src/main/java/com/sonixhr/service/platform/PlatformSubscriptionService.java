@@ -16,6 +16,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@SuppressWarnings("null")
 public class PlatformSubscriptionService {
 
     private final TenantSubscriptionRepository subscriptionRepository;
@@ -25,7 +26,7 @@ public class PlatformSubscriptionService {
         List<TenantSubscription> allSubs = subscriptionRepository.findAll();
 
         long freeTrialCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "trial".equalsIgnoreCase(sub.getPlanType()) && !sub.isTrialExpired())
+                .filter(sub -> sub.getIsActive() && "trial".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
                 .count();
 
         long basicPlanCount = allSubs.stream()
@@ -60,7 +61,7 @@ public class PlatformSubscriptionService {
         distributionMap.put("Enterprise Plan", 0L);
 
         allSubs.stream()
-                .filter(sub -> sub.getIsActive() && (!"trial".equalsIgnoreCase(sub.getPlanType()) ? !sub.isExpired() : !sub.isTrialExpired()))
+                .filter(sub -> sub.getIsActive() && !sub.isExpired())
                 .forEach(sub -> {
                     String name = sub.getPlanName() != null ? sub.getPlanName() : sub.getPlanType();
                     if ("trial".equalsIgnoreCase(name) || "trial".equalsIgnoreCase(sub.getPlanType())) name = "Free Trial";

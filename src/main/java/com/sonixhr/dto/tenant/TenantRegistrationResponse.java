@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.sonixhr.enums.IndianState;
 import java.time.LocalDateTime;
  
 @Data
@@ -25,7 +26,7 @@ public class TenantRegistrationResponse {
     // Plan info
     private String planType;
     private String planStatus;
-    private LocalDateTime trialEndsAt;
+    private LocalDateTime endsAt;
 
     // Status
     private String status;
@@ -35,6 +36,12 @@ public class TenantRegistrationResponse {
     private String adminEmail;
     private String adminName;
     private String adminPhone;
+
+    // Address info
+    private String officeAddress;
+    private String city;
+    private IndianState state;
+    private String country;
 
     // Activation info
     private String activationToken;  // For development/testing
@@ -56,15 +63,15 @@ public class TenantRegistrationResponse {
 
     // Helper method for success response
     public static TenantRegistrationResponse success(String message, Long tenantId,
-                                                     String planType, LocalDateTime trialEndsAt,
+                                                     String planType, LocalDateTime endsAt,
                                                      String activationToken) {
         return TenantRegistrationResponse.builder()
                 .success(true)
                 .message(message)
                 .tenantId(tenantId)
                 .planType(planType)
-                .planStatus("trial")
-                .trialEndsAt(trialEndsAt)
+                .planStatus("ACTIVE")
+                .endsAt(endsAt)
                 .status("ACTIVE")
                 .isActive(true)
                 .activationToken(activationToken)
@@ -75,7 +82,7 @@ public class TenantRegistrationResponse {
     // NEW: Success response with Super Admin employee details
     public static TenantRegistrationResponse successWithEmployee(String message, Long tenantId,
                                                                  String planType,
-                                                                 LocalDateTime trialEndsAt, String activationToken,
+                                                                 LocalDateTime endsAt, String activationToken,
                                                                  Long employeeId, String employeeCode,
                                                                  String fullName, String email) {
         return TenantRegistrationResponse.builder()
@@ -83,8 +90,8 @@ public class TenantRegistrationResponse {
                 .message(message)
                 .tenantId(tenantId)
                 .planType(planType)
-                .planStatus("trial")
-                .trialEndsAt(trialEndsAt)
+                .planStatus("ACTIVE")
+                .endsAt(endsAt)
                 .status("ACTIVE")
                 .isActive(true)
                 .activationToken(activationToken)

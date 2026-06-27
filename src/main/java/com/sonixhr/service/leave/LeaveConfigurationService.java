@@ -24,6 +24,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@SuppressWarnings("null")
 public class LeaveConfigurationService {
 
     private final TenantLeaveSettingsRepository settingsRepository;
@@ -230,7 +231,7 @@ public class LeaveConfigurationService {
             boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && settings.getIncludeNationalHolidays();
             boolean isState = settings.getIncludeStateHolidays() && 
                               settings.getState() != null && 
-                              settings.getState().equalsIgnoreCase(h.getRegion());
+                              settings.getState().name().equalsIgnoreCase(h.getRegion());
             if (isNational || isState) {
                 return true;
             }

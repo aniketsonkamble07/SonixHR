@@ -33,6 +33,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+@SuppressWarnings("null")
 public class SecurityConfig {
 
     private final UserDetailsService employeeDetailsService;
@@ -83,6 +84,7 @@ public class SecurityConfig {
                                 "/api/tenant/register",
                                 "/api/employee/auth/activate",
                                 "/api/tenant/auth/login",
+                                "/api/tenant/auth/verify-token",
                                 "/api/forgot-password/**",
                                 "/api/employee/auth/activate",
                                 "/api/reset-password/**",
@@ -90,8 +92,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
                                 "/",
-                                "/index.html",
+
                                 "/platform/**",
+                                "/tenant/**",
                                 "/*.html",
                                 "/*.css",
                                 "/*.js",

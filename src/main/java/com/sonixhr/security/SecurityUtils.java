@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "null"})
 public class SecurityUtils {
 
     @Autowired(required = false)

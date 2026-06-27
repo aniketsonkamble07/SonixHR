@@ -1,5 +1,6 @@
 package com.sonixhr.entity.leave;
 
+import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -202,9 +203,10 @@ public class TenantLeaveSettings {
     @Builder.Default
     private String country = null;
 
+    @Enumerated(EnumType.STRING)
     @Column(length = 50)
     @Builder.Default
-    private String state = null;
+    private IndianState state = null;
 
     @Column(name = "include_national_holidays")
     @Builder.Default

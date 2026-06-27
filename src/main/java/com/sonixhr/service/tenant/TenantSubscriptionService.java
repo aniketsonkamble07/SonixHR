@@ -49,8 +49,10 @@ public class TenantSubscriptionService {
         TenantSubscription currentSub = subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant"));
 
-        // Extend endsAt date by 1 month
-        LocalDateTime newEndsAt = currentSub.getEndsAt() != null ? currentSub.getEndsAt().plusMonths(1) : LocalDateTime.now().plusMonths(1);
+        // Extend endsAt date by plan validity months
+        int validityMonths = currentSub.getSubscriptionPlan() != null && currentSub.getSubscriptionPlan().getValidityMonths() > 0 
+                ? currentSub.getSubscriptionPlan().getValidityMonths() : 1;
+        LocalDateTime newEndsAt = currentSub.getEndsAt() != null ? currentSub.getEndsAt().plusMonths(validityMonths) : LocalDateTime.now().plusMonths(validityMonths);
         currentSub.setEndsAt(newEndsAt);
         currentSub.setPlanStatus(PlanStatus.ACTIVE);
         currentSub.setIsActive(true);
@@ -86,10 +88,14 @@ public class TenantSubscriptionService {
         });
 
         // Update tenant settings
-        tenant.setPlanType(newPlan.getCode());
+        tenant.setSubscriptionPlan(newPlan);
         tenant.setMaxEmployees(newPlan.getMaxEmployees());
-        tenant.setPlanStatus(newPlan.isTrial() ? "trial" : "active");
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
         tenantRepository.save(tenant);
+
+        int validityMonths = newPlan.getValidityMonths() > 0 ? newPlan.getValidityMonths() : 1;
+        long monthsToAdd = billingCycle == BillingCycle.YEARLY ? validityMonths * 12L : validityMonths;
+        LocalDateTime endsAt = LocalDateTime.now().plusMonths(monthsToAdd);
 
         // Determine price: 10% discount for yearly billing cycle
         double price = billingCycle == BillingCycle.YEARLY ? newPlan.getMonthlyPrice() * 12 * 0.9 : newPlan.getMonthlyPrice();
@@ -97,14 +103,14 @@ public class TenantSubscriptionService {
         // Create a new subscription record
         TenantSubscription newSub = TenantSubscription.builder()
                 .tenant(tenant)
-                .planType(newPlan.getCode())
+                .subscriptionPlan(newPlan)
                 .planName(newPlan.getName())
-                .planStatus(newPlan.isTrial() ? PlanStatus.TRIAL : PlanStatus.ACTIVE)
+                .planStatus(PlanStatus.ACTIVE)
                 .maxEmployees(newPlan.getMaxEmployees())
                 .maxStorageMb(newPlan.getMaxStorageMb())
                 .startedAt(LocalDateTime.now())
-                .endsAt(billingCycle == BillingCycle.YEARLY ? LocalDateTime.now().plusYears(1) : LocalDateTime.now().plusMonths(1))
-                .amount(BigDecimal.valueOf(price))
+                .endsAt(endsAt)
+                .amount(BigDecimal.valueOf(price * validityMonths))
                 .currency("INR")
                 .billingCycle(billingCycle)
                 .isActive(true)
@@ -144,8 +150,6 @@ public class TenantSubscriptionService {
                 .planStatus(sub.getPlanStatus())
                 .maxEmployees(sub.getMaxEmployees() != null ? sub.getMaxEmployees() : 0)
                 .maxStorageMb(sub.getMaxStorageMb() != null ? sub.getMaxStorageMb() : 0)
-                .trialStartedAt(sub.getTrialStartedAt())
-                .trialEndsAt(sub.getTrialEndsAt())
                 .startedAt(sub.getStartedAt())
                 .endsAt(sub.getEndsAt())
                 .amount(sub.getAmount())

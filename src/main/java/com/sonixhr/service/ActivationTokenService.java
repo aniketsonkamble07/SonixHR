@@ -189,7 +189,7 @@ public class ActivationTokenService {
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
         if (employee.isActive()) {
-            throw new BusinessException("Employee account is already activated");
+            throw new BusinessException("Invalid or expired activation token");
         }
 
         employee.setPasswordHash(passwordEncoder.encode(password));
@@ -247,7 +247,7 @@ public class ActivationTokenService {
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
         if (user.getStatus() == UserStatus.ACTIVE) {
-            throw new BusinessException("Platform user account is already activated");
+            throw new BusinessException("Invalid or expired activation token");
         }
 
         user.setPassword(passwordEncoder.encode(password));
@@ -425,7 +425,7 @@ public class ActivationTokenService {
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
         if (employee.isActive()) {
-            throw new BusinessException("Account is already activated");
+            throw new BusinessException("Invalid or expired activation token");
         }
 
         // Set password and activate

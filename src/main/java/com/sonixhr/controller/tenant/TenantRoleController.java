@@ -6,6 +6,7 @@ import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
+import com.sonixhr.dto.tenant.TenantRoleDeletePreviewResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.service.employee.EmployeeService;
@@ -53,8 +54,8 @@ public class TenantRoleController {
         log.info("Employee {} creating role: {} for tenant: {}",
                 currentEmployee.getEmail(), request.getName(), tenantId);
 
-        TenantRole role = roleService.createRole(request, tenantId, currentEmployee.getId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.toResponse(role));
+        TenantRoleResponse response = roleService.createRole(request, tenantId, currentEmployee.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -71,8 +72,8 @@ public class TenantRoleController {
         log.info("Employee {} updating permissions for role: {} in tenant: {}",
                 currentEmployee.getEmail(), roleId, tenantId);
 
-        TenantRole updated = roleService.updateRolePermissions(roleId, permissionIds, tenantId);
-        return ResponseEntity.ok(roleService.toResponse(updated));
+        TenantRoleResponse response = roleService.updateRolePermissions(roleId, permissionIds, tenantId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -147,8 +148,8 @@ public class TenantRoleController {
         log.info("Employee {} updating role: {} for tenant: {}",
                 currentEmployee.getEmail(), roleId, tenantId);
 
-        TenantRole updated = roleService.updateRole(roleId, request, tenantId);
-        return ResponseEntity.ok(roleService.toResponse(updated));
+        TenantRoleResponse response = roleService.updateRole(roleId, request, tenantId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -158,14 +159,32 @@ public class TenantRoleController {
     @PreAuthorize("hasAuthority('ROLE_DELETE')")
     public ResponseEntity<Void> deleteRole(
             @PathVariable Long roleId,
+            @RequestParam(required = false) Long reassignToRoleId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = getCurrentTenantId(currentEmployee);
-        log.info("Employee {} deleting role: {} for tenant: {}",
+        log.info("Employee {} deleting role: {} (reassignTo: {}) for tenant: {}",
+                currentEmployee.getEmail(), roleId, reassignToRoleId, tenantId);
+
+        roleService.deleteRole(roleId, tenantId, reassignToRoleId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Get delete preview for a role (Admin only)
+     */
+    @GetMapping("/{roleId}/delete-preview")
+    @PreAuthorize("hasAuthority('ROLE_DELETE')")
+    public ResponseEntity<TenantRoleDeletePreviewResponse> getRoleDeletePreview(
+            @PathVariable Long roleId,
+            @AuthenticationPrincipal Employee currentEmployee) {
+
+        Long tenantId = getCurrentTenantId(currentEmployee);
+        log.info("Employee {} requesting delete preview for role: {} in tenant: {}",
                 currentEmployee.getEmail(), roleId, tenantId);
 
-        roleService.deleteRole(roleId, tenantId);
-        return ResponseEntity.noContent().build();
+        TenantRoleDeletePreviewResponse response = roleService.getRoleDeletePreview(roleId, tenantId);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -239,8 +258,8 @@ public class TenantRoleController {
         log.info("Employee {} setting default role: {} for tenant: {}",
                 currentEmployee.getEmail(), roleId, tenantId);
 
-        TenantRole role = roleService.setDefaultRole(roleId, tenantId);
-        return ResponseEntity.ok(roleService.toResponse(role));
+        TenantRoleResponse response = roleService.setDefaultRole(roleId, tenantId);
+        return ResponseEntity.ok(response);
     }
 
 }

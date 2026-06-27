@@ -2,7 +2,7 @@ package com.sonixhr.controller.platform;
 
 import com.sonixhr.dto.platform.PlatformNotificationResponse;
 import com.sonixhr.entity.platform.PlatformUser;
-import com.sonixhr.service.platform.PlatformNotificationServiceExt;
+import com.sonixhr.service.platform.PlatformNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PlatformNotificationController {
 
-    private final PlatformNotificationServiceExt notificationService;
+    private final PlatformNotificationService notificationService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")

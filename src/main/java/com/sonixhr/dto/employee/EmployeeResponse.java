@@ -4,17 +4,20 @@ import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.enums.leave.WeekendConfig;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class EmployeeResponse {
 
     // =====================================================
@@ -23,7 +26,7 @@ public class EmployeeResponse {
     private Long id;
     private Long tenantId;
     private String employeeCode;
-    private UUID userId;
+    private Long userId;
     private boolean isActive;
     // =====================================================
     // PERSONAL INFORMATION
@@ -63,7 +66,7 @@ public class EmployeeResponse {
     // =====================================================
     private String address;
     private String city;
-    private String state;
+    private IndianState state;
     private String country;
     private String postalCode;
     private String permanentAddress;
@@ -115,6 +118,8 @@ public class EmployeeResponse {
     // =====================================================
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ManagerInfo {
         private Long id;
         private String fullName;
@@ -125,6 +130,8 @@ public class EmployeeResponse {
     }
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class DepartmentInfo {
         private Long id;
         private String name;
@@ -132,6 +139,8 @@ public class EmployeeResponse {
     }
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ShiftInfo {
         private Long id;
         private String shiftName;

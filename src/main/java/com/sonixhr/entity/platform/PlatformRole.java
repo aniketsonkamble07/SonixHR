@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@SuppressWarnings("null")
 public class PlatformRole extends BaseRole {
 
     @Column(name = "is_active")

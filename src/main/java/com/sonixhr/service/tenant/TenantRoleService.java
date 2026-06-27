@@ -4,15 +4,19 @@ import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
+import com.sonixhr.dto.tenant.TenantRoleDeletePreviewResponse;
+import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
+import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.security.TenantDynamicRoleService;
+import com.sonixhr.service.employee.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +42,7 @@ public class TenantRoleService {
     private final TenantPermissionRepository permissionRepository;
     private final EmployeeRepository employeeRepository;
     private final TenantDynamicRoleService dynamicRoleService;
+    private final EmployeeService employeeService;
 
     @Value("${app.tenant.role.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -57,12 +62,12 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public TenantRole createRole(TenantRoleCreateRequest request, Long tenantId, Long createdBy) {
+    public TenantRoleResponse createRole(TenantRoleCreateRequest request, Long tenantId, Long createdBy) {
         long startTime = System.nanoTime();
         log.info("Creating tenant role: {} for tenant: {}", request.getName(), tenantId);
 
         if (roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
-            throw new BusinessException("Role already exists: " + request.getName() + " for this tenant");
+            throw new ValidationException("name", "Role name already exists for this tenant");
         }
 
         Set<TenantPermission> permissions = fetchPermissions(request.getPermissionIds());
@@ -98,7 +103,7 @@ public class TenantRoleService {
         long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
         log.info("Tenant role created: {} for tenant {} in {}ms", savedRole.getName(), tenantId, duration);
 
-        return savedRole;
+        return toResponse(savedRole);
     }
 
     private Set<TenantPermission> fetchPermissions(Set<Long> permissionIds) {
@@ -166,14 +171,14 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public TenantRole updateRole(Long roleId, TenantRoleCreateRequest request, Long tenantId) {
+    public TenantRoleResponse updateRole(Long roleId, TenantRoleCreateRequest request, Long tenantId) {
         log.info("Updating tenant role: {} for tenant: {}", roleId, tenantId);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
 
         if (!role.getName().equals(request.getName()) &&
                 roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
-            throw new BusinessException("Role name already exists: " + request.getName());
+            throw new ValidationException("name", "Role name already exists for this tenant");
         }
 
         boolean changed = false;
@@ -221,10 +226,10 @@ public class TenantRoleService {
             invalidateUsersWithRole(roleId, tenantId);
 
             log.info("Tenant role updated: {}", roleId);
-            return updatedRole;
+            return toResponse(updatedRole);
         }
 
-        return role;
+        return toResponse(role);
     }
 
     private boolean handleDefaultRoleFlag(TenantRole role, Boolean isDefault, Long tenantId, Long roleId) {
@@ -252,7 +257,7 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public TenantRole updateRolePermissions(Long roleId, Set<Long> permissionIds, Long tenantId) {
+    public TenantRoleResponse updateRolePermissions(Long roleId, Set<Long> permissionIds, Long tenantId) {
         log.info("Updating permissions for role: {} in tenant: {}", roleId, tenantId);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
@@ -284,7 +289,7 @@ public class TenantRoleService {
         log.info("Permissions updated for role: {} (added: {}, removed: {})",
                 roleId, toAdd.size(), toRemove.size());
 
-        return updatedRole;
+        return toResponse(updatedRole);
     }
 
     @Transactional
@@ -356,7 +361,7 @@ public class TenantRoleService {
             }
         }
 
-        TenantRole role = roleRepository.findByIdAndTenantId(roleId, tenantId)
+        TenantRole role = roleRepository.findByIdAndTenantIdWithPermissions(roleId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Role not found with id: " + roleId + " for tenant: " + tenantId));
 
@@ -372,6 +377,9 @@ public class TenantRoleService {
     public TenantRoleResponse getRoleResponseByIdAndTenant(Long roleId, Long tenantId) {
         log.debug("Fetching tenant role DTO: {} for tenant: {}", roleId, tenantId);
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
+        if (!role.isActive()) {
+            throw new ResourceNotFoundException("Role not found with id: " + roleId + " for tenant: " + tenantId);
+        }
         long count = employeeRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
         return toResponse(role, (int) count);
     }
@@ -399,7 +407,7 @@ public class TenantRoleService {
             }
         }
 
-        List<TenantRole> roles = roleRepository.findAllByTenantId(tenantId);
+        List<TenantRole> roles = roleRepository.findAllByTenantIdAndActiveTrueWithPermissions(tenantId);
 
         if (cacheEnabled) {
             tenantRolesCache.put(tenantId, roles);
@@ -458,7 +466,7 @@ public class TenantRoleService {
             }
         }
 
-        List<TenantRole> roles = roleRepository.findAllByTenantId(tenantId);
+        List<TenantRole> roles = roleRepository.findAllByTenantIdAndActiveTrueWithPermissions(tenantId);
 
         if (cacheEnabled) {
             tenantRolesCache.put(tenantId, roles);
@@ -567,8 +575,8 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public void deleteRole(Long roleId, Long tenantId) {
-        log.info("Deleting tenant role: {} for tenant: {}", roleId, tenantId);
+    public void deleteRole(Long roleId, Long tenantId, Long reassignToRoleId) {
+        log.info("Deleting tenant role: {} (reassignTo: {}) for tenant: {}", roleId, reassignToRoleId, tenantId);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
 
@@ -578,8 +586,35 @@ public class TenantRoleService {
 
         long userCount = employeeRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
         if (userCount > 0) {
-            throw new BusinessException("Cannot delete role that is assigned to " + userCount +
-                    " user(s). Remove the role from users first.");
+            if (reassignToRoleId != null) {
+                // Bulk reassign users to the new role
+                TenantRole newRole = getRoleByIdAndTenant(reassignToRoleId, tenantId);
+                if (!newRole.isActive()) {
+                    throw new BusinessException("Cannot reassign users to an inactive role: " + newRole.getName());
+                }
+                List<Employee> users = employeeRepository.findByRolesIdAndTenantId(roleId, tenantId);
+                for (Employee user : users) {
+                    user.getRoles().removeIf(r -> r.getId().equals(roleId));
+                    user.getRoles().add(newRole);
+                    user.incrementRolesVersion();
+                    user.clearAuthoritiesCache();
+                    employeeRepository.save(user);
+                    
+                    // Invalidate caches for this user
+                    dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
+                    userRoleAssignmentCache.remove(user.getId());
+                }
+                usersByRoleCache.remove(roleId);
+                usersByRoleCache.remove(reassignToRoleId);
+                if (cacheEnabled) {
+                    roleCache.remove(buildCacheKey(tenantId, reassignToRoleId));
+                }
+                log.info("Bulk reassigned {} users from role {} to role {} in tenant {}", 
+                        userCount, roleId, reassignToRoleId, tenantId);
+            } else {
+                throw new BusinessException("Cannot delete role that is assigned to " + userCount +
+                        " user(s). Remove the role from users or specify a reassignToRoleId parameter.");
+            }
         }
 
         long totalRoles = roleRepository.countByTenantId(tenantId);
@@ -716,6 +751,9 @@ public class TenantRoleService {
         dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
         usersByRoleCache.remove(roleId);
         userRoleAssignmentCache.remove(userId);
+        if (cacheEnabled) {
+            roleCache.remove(buildCacheKey(tenantId, roleId));
+        }
 
         log.info("Role '{}' assigned to user '{}' in tenant {}", role.getName(), user.getEmail(), tenantId);
     }
@@ -762,6 +800,9 @@ public class TenantRoleService {
             dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
             for (Long roleId : assignedRoleIds) {
                 usersByRoleCache.remove(roleId);
+                if (cacheEnabled) {
+                    roleCache.remove(buildCacheKey(tenantId, roleId));
+                }
             }
             userRoleAssignmentCache.remove(userId);
 
@@ -803,6 +844,9 @@ public class TenantRoleService {
         dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
         usersByRoleCache.remove(roleId);
         userRoleAssignmentCache.remove(userId);
+        if (cacheEnabled) {
+            roleCache.remove(buildCacheKey(tenantId, roleId));
+        }
 
         log.info("Role '{}' removed from user {} in tenant {}", role.getName(), userId, tenantId);
     }
@@ -849,14 +893,16 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public TenantRole setDefaultRole(Long roleId, Long tenantId) {
+    public TenantRoleResponse setDefaultRole(Long roleId, Long tenantId) {
         log.info("Setting default role: {} for tenant: {}", roleId, tenantId);
 
-        TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
-
-        List<TenantRole> allRoles = roleRepository.findAllByTenantId(tenantId);
+        TenantRole defaultRole = null;
+        List<TenantRole> allRoles = roleRepository.findAllByTenantIdWithPermissions(tenantId);
         for (TenantRole r : allRoles) {
             boolean isThisRole = r.getId().equals(roleId);
+            if (isThisRole) {
+                defaultRole = r;
+            }
             if (r.isDefault() != isThisRole) {
                 if (isThisRole) {
                     r.setAsDefault();
@@ -864,7 +910,14 @@ public class TenantRoleService {
                     r.removeDefaultFlag();
                 }
                 roleRepository.save(r);
+                if (cacheEnabled) {
+                    roleCache.remove(buildCacheKey(tenantId, r.getId()));
+                }
             }
+        }
+
+        if (defaultRole == null) {
+            throw new ResourceNotFoundException("Role not found with id: " + roleId + " for tenant: " + tenantId);
         }
 
         // Invalidate caches
@@ -872,7 +925,50 @@ public class TenantRoleService {
             tenantRolesCache.remove(tenantId);
         }
 
-        return role;
+        return toResponse(defaultRole);
+    }
+
+    public TenantRoleDeletePreviewResponse getRoleDeletePreview(Long roleId, Long tenantId) {
+        log.info("Generating role delete preview for role: {} in tenant: {}", roleId, tenantId);
+
+        TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
+
+        List<Employee> affectedEmployees = employeeRepository.findByRolesIdAndTenantId(roleId, tenantId);
+
+        // Find alternative active roles that are not this role
+        List<TenantRole> otherRoles = roleRepository.findAllByTenantIdAndActiveTrueWithPermissions(tenantId);
+        List<TenantRoleLookupResponse> reassignmentOptions = otherRoles.stream()
+                .filter(r -> !r.getId().equals(roleId))
+                .map(this::toLookupResponse)
+                .collect(Collectors.toList());
+
+        List<EmployeeSummaryResponse> employeeSummaries = affectedEmployees.stream()
+                .map(employeeService::convertToSummaryResponse)
+                .collect(Collectors.toList());
+
+        boolean deletable = true;
+        String validationMessage = null;
+
+        if (!role.isActive()) {
+            deletable = false;
+            validationMessage = "Role is already inactive.";
+        } else if (role.isDefault()) {
+            deletable = false;
+            validationMessage = "Cannot delete the default role. Set another role as default first.";
+        } else if (reassignmentOptions.isEmpty()) {
+            deletable = false;
+            validationMessage = "Cannot delete the last active role. At least one active role must exist in the tenant.";
+        }
+
+        return TenantRoleDeletePreviewResponse.builder()
+                .roleId(roleId)
+                .roleName(role.getName())
+                .affectedEmployeeCount(affectedEmployees.size())
+                .affectedEmployees(employeeSummaries)
+                .reassignmentOptions(reassignmentOptions)
+                .deletable(deletable)
+                .validationMessage(validationMessage)
+                .build();
     }
 
     // =====================================================

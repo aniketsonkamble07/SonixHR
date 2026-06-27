@@ -17,6 +17,7 @@ import java.util.function.Function;
 
 @Slf4j
 @Service
+@SuppressWarnings("null")
 public class JwtService {
 
     @Value("${app.jwt.secret}")

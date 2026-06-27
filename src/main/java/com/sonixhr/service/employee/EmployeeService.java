@@ -5,6 +5,7 @@ import com.sonixhr.dto.employee.EmployeeCreateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
+import com.sonixhr.enums.IndianState;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
@@ -62,9 +63,9 @@ public class EmployeeService {
     // =====================================================
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", allEntries = true),
-        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
-        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+            @CacheEvict(value = "tenantRoles", allEntries = true),
+            @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+            @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
     public EmployeeResponse createEmployee(@NonNull Long tenantId, EmployeeCreateRequest request) {
         log.info("Creating employee for tenant: {}", tenantId);
@@ -75,20 +76,20 @@ public class EmployeeService {
 
         // Check if employee with this email already exists
         if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
-            throw new BusinessException("Employee with email " + request.getEmail() + " already exists");
+            throw new com.sonixhr.exceptions.ValidationException("email", "Employee with email " + request.getEmail() + " already exists");
         }
 
         // Validate roles BEFORE building employee
         Set<Long> roleIds = request.getRoleIds();
         if (roleIds == null || roleIds.isEmpty()) {
             log.error("No roles provided for employee creation");
-            throw new BusinessException("At least one role is required for employee");
+            throw new com.sonixhr.exceptions.ValidationException("roleIds", "At least one role is required for employee");
         }
 
         // Fetch roles
         List<TenantRole> roles = roleRepository.findAllById(roleIds);
         if (roles.isEmpty()) {
-            throw new BusinessException("No valid roles found for the provided role IDs");
+            throw new com.sonixhr.exceptions.ValidationException("roleIds", "No valid roles found for the provided role IDs");
         }
         log.info("Found {} roles for employee", roles.size());
 
@@ -98,7 +99,7 @@ public class EmployeeService {
         // Build employee with roles
         Employee employee = buildEmployeeFromRequest(tenant, request, employeeCode);
 
-        //  Add roles BEFORE save
+        // Add roles BEFORE save
         employee.getRoles().addAll(roles);
 
         // Set manager if provided
@@ -112,7 +113,7 @@ public class EmployeeService {
             employee.setManager(manager);
         }
 
-        // Set default values
+        // Set default values (active immediately for testing)
         employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
         employee.setStatus(EmployeeStatus.ACTIVE);
         employee.setActive(true);
@@ -125,9 +126,14 @@ public class EmployeeService {
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created successfully with code: {} and {} roles", employeeCode, roles.size());
 
+        // Generate activation token & send activation email (disabled for development testing)
+        // String activationToken = activationTokenService.generateTokenForEmployee(savedEmployee.getId());
+        // String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
+        // emailService.sendActivationEmail(savedEmployee.getEmail(), savedEmployee.getFullName(), activationLink);
+        // log.info("Activation email sent to new employee: {}", savedEmployee.getEmail());
+
         return convertToResponse(savedEmployee);
     }
-
 
     // =====================================================
     // UPDATE EMPLOYEE
@@ -139,10 +145,18 @@ public class EmployeeService {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
 
         // Update personal information
-        if (request.getFirstName() != null) employee.setFirstName(request.getFirstName());
-        if (request.getLastName() != null) employee.setLastName(request.getLastName());
-        if (request.getEmail() != null) employee.setEmail(request.getEmail());
-        if (request.getPhone() != null) employee.setPhone(request.getPhone());
+        if (request.getFirstName() != null)
+            employee.setFirstName(request.getFirstName());
+        if (request.getLastName() != null)
+            employee.setLastName(request.getLastName());
+        if (request.getEmail() != null && !request.getEmail().equals(employee.getEmail())) {
+            if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
+                throw new com.sonixhr.exceptions.ValidationException("email", "Employee with email " + request.getEmail() + " already exists");
+            }
+            employee.setEmail(request.getEmail());
+        }
+        if (request.getPhone() != null)
+            employee.setPhone(request.getPhone());
 
         // Update professional information
         Long departmentId = request.getDepartmentId();
@@ -151,14 +165,49 @@ public class EmployeeService {
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             employee.setDepartment(department);
         }
-        if (request.getPosition() != null) employee.setPosition(request.getPosition());
+        if (request.getPosition() != null)
+            employee.setPosition(request.getPosition());
 
         if (request.getEmploymentType() != null) {
             employee.setEmploymentType(request.getEmploymentType());
         }
-        if (request.getWorkLocation() != null) employee.setWorkLocation(request.getWorkLocation());
-        if (request.getHireDate() != null) employee.setHireDate(request.getHireDate());
-        if (request.getProbationMonths() != null) employee.setProbationMonths(request.getProbationMonths());
+        if (request.getWorkLocation() != null) {
+            employee.setWorkLocation(request.getWorkLocation());
+            String wl = request.getWorkLocation().trim();
+            if (!wl.isEmpty()) {
+                IndianState resolvedState = IndianState.fromCode(wl);
+                if (resolvedState == null) {
+                    String upperLoc = wl.toUpperCase();
+                    for (IndianState s : IndianState.values()) {
+                        if (upperLoc.contains(s.getDisplayName().toUpperCase()) ||
+                                upperLoc.matches(".*\\b" + s.name() + "\\b.*")) {
+                            resolvedState = s;
+                            break;
+                        }
+                    }
+                }
+                if (resolvedState == null) {
+                    resolvedState = IndianState.resolveFromCity(wl);
+                }
+                if (resolvedState != null) {
+                    employee.setState(resolvedState);
+                    employee.setCountry("India");
+                }
+                if (employee.getCity() == null || employee.getCity().isEmpty()) {
+                    employee.setCity(wl);
+                }
+            }
+        }
+        if (request.getCity() != null)
+            employee.setCity(request.getCity());
+        if (request.getState() != null)
+            employee.setState(request.getState());
+        if (request.getCountry() != null)
+            employee.setCountry(request.getCountry());
+        if (request.getHireDate() != null)
+            employee.setHireDate(request.getHireDate());
+        if (request.getProbationMonths() != null)
+            employee.setProbationMonths(request.getProbationMonths());
 
         // Update manager if changed
         Long managerId = request.getManagerId();
@@ -169,8 +218,10 @@ public class EmployeeService {
             employee.setManager(newManager);
         }
 
-        if (request.getWeekendConfig() != null) employee.setWeekendConfig(request.getWeekendConfig());
-        if (request.getCustomWeekendDays() != null) employee.setCustomWeekendDays(request.getCustomWeekendDays());
+        if (request.getWeekendConfig() != null)
+            employee.setWeekendConfig(request.getWeekendConfig());
+        if (request.getCustomWeekendDays() != null)
+            employee.setCustomWeekendDays(request.getCustomWeekendDays());
 
         employee.setUpdatedBy(getCurrentEmployeeId());
         Employee updatedEmployee = employeeRepository.save(employee);
@@ -183,7 +234,8 @@ public class EmployeeService {
     // ASSIGN MANAGER BY EMPLOYEE CODE
     // =====================================================
     @Transactional
-    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, @NonNull Long tenantId, String reason) {
+    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, @NonNull Long tenantId,
+            String reason) {
         log.info("Assigning manager by code - Employee: {} to Manager: {}", employeeCode, managerCode);
 
         Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
@@ -225,7 +277,8 @@ public class EmployeeService {
     // =====================================================
     // GET TEAM MEMBERS (Paginated)
     // =====================================================
-    public Page<EmployeeSummaryResponse> getTeamMembersPaginated(@NonNull Long tenantId, @NonNull Long managerId, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> getTeamMembersPaginated(@NonNull Long tenantId, @NonNull Long managerId,
+            Pageable pageable) {
         log.info("Getting team members for manager: {} with pagination", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId, pageable)
@@ -353,7 +406,8 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES BY STATUS
     // =====================================================
-    public Page<EmployeeSummaryResponse> getEmployeesByStatus(@NonNull Long tenantId, EmployeeStatus status, Pageable pageable) {
+    public Page<EmployeeSummaryResponse> getEmployeesByStatus(@NonNull Long tenantId, EmployeeStatus status,
+            Pageable pageable) {
         return employeeRepository.findByTenant_IdAndStatus(tenantId, status, pageable)
                 .map(this::convertToSummaryResponse);
     }
@@ -394,7 +448,8 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
-    private EmployeeSummaryResponse buildHierarchyResponse(Employee employee, Map<Long, List<Employee>> managerToSubordinates) {
+    private EmployeeSummaryResponse buildHierarchyResponse(Employee employee,
+            Map<Long, List<Employee>> managerToSubordinates) {
         EmployeeSummaryResponse response = convertToSummaryResponse(employee);
         List<Employee> subordinates = managerToSubordinates.getOrDefault(employee.getId(), Collections.emptyList());
         response.setDirectReports(subordinates.stream()
@@ -407,7 +462,8 @@ public class EmployeeService {
     // UPDATE EMPLOYEE STATUS
     // =====================================================
     @Transactional
-    public void updateEmployeeStatus(@NonNull Long id, @NonNull Long tenantId, EmployeeStatus newStatus, String reason) {
+    public void updateEmployeeStatus(@NonNull Long id, @NonNull Long tenantId, EmployeeStatus newStatus,
+            String reason) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         EmployeeStatus oldStatus = employee.getStatus();
 
@@ -461,9 +517,9 @@ public class EmployeeService {
     // =====================================================
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", allEntries = true),
-        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
-        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+            @CacheEvict(value = "tenantRoles", allEntries = true),
+            @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+            @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
     public void deleteEmployee(@NonNull Long id, @NonNull Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
@@ -533,8 +589,36 @@ public class EmployeeService {
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
         }
 
-        EmploymentType employmentType = request.getEmploymentType() != null ?
-                request.getEmploymentType() : EmploymentType.FULL_TIME;
+        EmploymentType employmentType = request.getEmploymentType() != null ? request.getEmploymentType()
+                : EmploymentType.FULL_TIME;
+
+        IndianState resolvedState = request.getState();
+        String country = request.getCountry();
+        String city = request.getCity();
+
+        if (resolvedState == null && request.getWorkLocation() != null && !request.getWorkLocation().trim().isEmpty()) {
+            String wl = request.getWorkLocation().trim();
+            resolvedState = IndianState.fromCode(wl);
+            if (resolvedState == null) {
+                String upperLoc = wl.toUpperCase();
+                for (IndianState s : IndianState.values()) {
+                    if (upperLoc.contains(s.getDisplayName().toUpperCase()) ||
+                            upperLoc.matches(".*\\b" + s.name() + "\\b.*")) {
+                        resolvedState = s;
+                        break;
+                    }
+                }
+            }
+            if (resolvedState == null) {
+                resolvedState = IndianState.resolveFromCity(wl);
+            }
+            if (resolvedState != null && country == null) {
+                country = "India";
+            }
+            if (city == null || city.isEmpty()) {
+                city = wl;
+            }
+        }
 
         return Employee.builder()
                 .tenant(tenant)
@@ -547,9 +631,12 @@ public class EmployeeService {
                 .position(request.getPosition())
                 .employmentType(employmentType)
                 .workLocation(request.getWorkLocation())
+                .city(city)
+                .state(resolvedState)
+                .country(country)
                 .hireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now())
                 .probationMonths(request.getProbationMonths() != null ? request.getProbationMonths() : 3)
-                .status(EmployeeStatus.PROBATION)
+                .status(EmployeeStatus.INACTIVE)
                 .isActive(false)
                 .createdBy(getCurrentEmployeeId())
                 .weekendConfig(request.getWeekendConfig())
@@ -562,6 +649,7 @@ public class EmployeeService {
                 .id(employee.getId())
                 .tenantId(employee.getTenantId())
                 .employeeCode(employee.getEmployeeCode())
+                .userId(employee.getId())
                 .firstName(employee.getFirstName())
                 .lastName(employee.getLastName())
                 .fullName(employee.getFullName())
@@ -574,30 +662,32 @@ public class EmployeeService {
                 .bloodGroup(employee.getBloodGroup())
                 .nationality(employee.getNationality())
                 .personalEmail(employee.getPersonalEmail())
-                .department(employee.getDepartment() != null ?
-                        EmployeeResponse.DepartmentInfo.builder()
-                                .id(employee.getDepartment().getId())
-                                .name(employee.getDepartment().getName())
-                                .code(employee.getDepartment().getCode())
-                                .build() : null)
+                .department(employee.getDepartment() != null ? EmployeeResponse.DepartmentInfo.builder()
+                        .id(employee.getDepartment().getId())
+                        .name(employee.getDepartment().getName())
+                        .code(employee.getDepartment().getCode())
+                        .build() : null)
                 .position(employee.getPosition())
                 .manager(employee.getManager() != null ? EmployeeResponse.ManagerInfo.builder()
                         .id(employee.getManager().getId())
                         .fullName(employee.getManager().getFullName())
                         .email(employee.getManager().getEmail())
                         .position(employee.getManager().getPosition())
-                        .department(employee.getManager().getDepartment() != null ?
-                                employee.getManager().getDepartment().getName() : null)
+                        .department(employee.getManager().getDepartment() != null
+                                ? employee.getManager().getDepartment().getName()
+                                : null)
                         .employeeCode(employee.getManager().getEmployeeCode())
                         .build() : null)
-                .shift(employee.getShift() != null ?
-                        EmployeeResponse.ShiftInfo.builder()
-                                .id(employee.getShift().getId())
-                                .shiftName(employee.getShift().getShiftName())
-                                .shiftCode(employee.getShift().getShiftCode())
-                                .startTime(employee.getShift().getStartTime() != null ? employee.getShift().getStartTime().toString() : null)
-                                .endTime(employee.getShift().getEndTime() != null ? employee.getShift().getEndTime().toString() : null)
-                                .build() : null)
+                .shift(employee.getShift() != null ? EmployeeResponse.ShiftInfo.builder()
+                        .id(employee.getShift().getId())
+                        .shiftName(employee.getShift().getShiftName())
+                        .shiftCode(employee.getShift().getShiftCode())
+                        .startTime(employee.getShift().getStartTime() != null
+                                ? employee.getShift().getStartTime().toString()
+                                : null)
+                        .endTime(employee.getShift().getEndTime() != null ? employee.getShift().getEndTime().toString()
+                                : null)
+                        .build() : null)
                 .employmentType(employee.getEmploymentType())
                 .workLocation(employee.getWorkLocation())
                 .hireDate(employee.getHireDate())
@@ -692,30 +782,30 @@ public class EmployeeService {
         return null;
     }
 
-    private void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {
+    public void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {
         if (manager == null) {
             log.info("Removing manager for employee: {}", employee.getEmployeeCode());
             return;
         }
 
         if (employee.getId().equals(manager.getId())) {
-            throw new BusinessException("Employee cannot be their own manager");
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Employee cannot be their own manager");
         }
 
         if (!manager.getTenantId().equals(tenantId)) {
-            throw new BusinessException("Manager must be from the same tenant");
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be from the same tenant");
         }
 
         if (!manager.isActive()) {
-            throw new BusinessException("Manager must be an active employee");
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be an active employee");
         }
 
         if (manager.isOnProbation()) {
-            throw new BusinessException("Employees on probation cannot be managers");
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Employees on probation cannot be managers");
         }
 
         if (isCircularReference(employee, manager)) {
-            throw new BusinessException("Circular manager reference detected");
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Circular manager reference detected");
         }
     }
 
@@ -755,8 +845,8 @@ public class EmployeeService {
     }
 
     // =====================================================
-// ADD THESE MISSING METHODS
-// =====================================================
+    // ADD THESE MISSING METHODS
+    // =====================================================
 
     /**
      * Forgot password - sends reset link to employee email
@@ -852,7 +942,7 @@ public class EmployeeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         if (employee.isActive()) {
-            throw new BusinessException("Account is already activated");
+            throw new BusinessException("Invalid or expired activation token");
         }
 
         // Activate employee
@@ -870,6 +960,14 @@ public class EmployeeService {
         }
 
         Employee activated = employeeRepository.save(employee);
+
+        // Activate tenant if needed
+        Tenant tenant = activated.getTenant();
+        if (tenant != null && !tenant.getIsActive()) {
+            tenant.activate();
+            tenantRepository.save(tenant);
+            log.info("Tenant activated: {}", tenant.getCompanyName());
+        }
 
         // Invalidate the token
         activationTokenService.invalidateToken(token);
@@ -907,7 +1005,8 @@ public class EmployeeService {
      * Change password for authenticated employee
      */
     @Transactional
-    public void changePassword(@NonNull Long employeeId, String oldPassword, String newPassword, String confirmPassword) {
+    public void changePassword(@NonNull Long employeeId, String oldPassword, String newPassword,
+            String confirmPassword) {
         log.info("Changing password for employee: {}", employeeId);
 
         if (!newPassword.equals(confirmPassword)) {

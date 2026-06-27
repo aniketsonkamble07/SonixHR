@@ -2,6 +2,7 @@ package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.PlatformTenantResponseDTO;
 import com.sonixhr.dto.platform.TenantPlanOverrideDTO;
+import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
 import com.sonixhr.dto.tenant.TenantUpdateRequest;
@@ -102,15 +103,12 @@ public class PlatformTenantService {
         SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(dto.getPlanType())
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found with code: " + dto.getPlanType()));
 
-        tenant.setPlanType(plan.getCode());
+        tenant.setSubscriptionPlan(plan);
         tenant.setMaxEmployees(dto.getMaxEmployees());
-        tenant.setPlanStatus(plan.isTrial() ? "trial" : "active");
-        if (plan.isTrial()) {
-            if (tenant.getTrialEndsAt() == null) {
-                tenant.setTrialEndsAt(java.time.LocalDateTime.now().plusDays(plan.getTrialDays() > 0 ? plan.getTrialDays() : 14));
-            }
-        } else {
-            tenant.setTrialEndsAt(null);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        if (tenant.getEndsAt() == null) {
+            int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+            tenant.setEndsAt(java.time.LocalDateTime.now().plusMonths(validityMonths));
         }
         Tenant savedTenant = tenantRepository.save(tenant);
 
@@ -123,18 +121,18 @@ public class PlatformTenantService {
                         .billingCycle(com.sonixhr.enums.BillingCycle.MONTHLY)
                         .build());
         
-        sub.setPlanType(plan.getCode());
+        sub.setSubscriptionPlan(plan);
         sub.setPlanName(plan.getName());
         sub.setMaxEmployees(dto.getMaxEmployees());
         sub.setIsActive(true);
         sub.setMaxStorageMb(dto.getMaxStorageMb());
-        sub.setPlanStatus(plan.isTrial() ? com.sonixhr.enums.PlanStatus.TRIAL : com.sonixhr.enums.PlanStatus.ACTIVE);
+        sub.setPlanStatus(PlanStatus.ACTIVE);
         
         if (sub.getStartedAt() == null) {
             sub.setStartedAt(java.time.LocalDateTime.now());
         }
         if (sub.getEndsAt() == null) {
-            sub.setEndsAt(plan.isTrial() ? java.time.LocalDateTime.now().plusDays(plan.getTrialDays() > 0 ? plan.getTrialDays() : 14) : java.time.LocalDateTime.now().plusMonths(1));
+            sub.setEndsAt(tenant.getEndsAt());
         }
         if (sub.getAmount() == null) {
             sub.setAmount(java.math.BigDecimal.valueOf(plan.getMonthlyPrice()));
@@ -173,6 +171,18 @@ public class PlatformTenantService {
         }
         if (request.getAdminPhone() != null) {
             tenant.setAdminPhone(request.getAdminPhone());
+        }
+        if (request.getOfficeAddress() != null) {
+            tenant.setOfficeAddress(request.getOfficeAddress());
+        }
+        if (request.getCity() != null) {
+            tenant.setCity(request.getCity());
+        }
+        if (request.getState() != null) {
+            tenant.setState(request.getState());
+        }
+        if (request.getCountry() != null) {
+            tenant.setCountry(request.getCountry());
         }
 
         Tenant savedTenant = tenantRepository.save(tenant);
@@ -234,12 +244,16 @@ public class PlatformTenantService {
                 .adminName(tenant.getAdminName())
                 .adminEmail(tenant.getAdminEmail())
                 .adminPhone(tenant.getAdminPhone())
+                .officeAddress(tenant.getOfficeAddress())
+                .city(tenant.getCity())
+                .state(tenant.getState())
+                .country(tenant.getCountry())
                 .planType(tenant.getPlanType())
                 .status(tenant.getStatus())
                 .isActive(tenant.getIsActive())
                 .maxEmployees(tenant.getMaxEmployees())
-                .planStatus(tenant.getPlanStatus())
-                .trialEndsAt(tenant.getTrialEndsAt())
+                .planStatus(tenant.getPlanStatus() != null ? tenant.getPlanStatus().name() : null)
+                .endsAt(tenant.getEndsAt())
                 .suspendedAt(tenant.getSuspendedAt())
                 .suspensionReason(tenant.getSuspensionReason())
                 .createdAt(tenant.getCreatedAt())

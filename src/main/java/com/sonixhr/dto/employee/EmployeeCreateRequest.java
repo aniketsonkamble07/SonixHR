@@ -1,5 +1,6 @@
 package com.sonixhr.dto.employee;
 
+import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.validation.constraints.Email;
@@ -41,6 +42,10 @@ public class EmployeeCreateRequest {
 
     @NotNull(message = "Hire date is required")
     private LocalDate hireDate;
+
+    private String city;
+    private IndianState state;
+    private String country;
 
     // =====================================================
     // OPTIONAL FIELDS (HR CAN FILL IF AVAILABLE)

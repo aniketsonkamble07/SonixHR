@@ -31,7 +31,7 @@ public class EmployeeActivationController {
 
         // Validate passwords match
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Passwords do not match");
+            throw new com.sonixhr.exceptions.ValidationException("confirmPassword", "Passwords do not match");
         }
 
         // Step 1: Activate employee and get Employee object directly

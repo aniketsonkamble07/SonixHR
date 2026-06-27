@@ -10,6 +10,7 @@ import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
+import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
@@ -47,12 +48,12 @@ public class DepartmentService {
 
         // Validate unique name
         if (departmentRepository.existsByTenant_IdAndName(tenantId, request.getName())) {
-            throw new BusinessException("Department with name '" + request.getName() + "' already exists");
+            throw new ValidationException("name", "Department name already exists for this tenant");
         }
 
         // Validate unique code
         if (departmentRepository.existsByTenant_IdAndCode(tenantId, request.getCode())) {
-            throw new BusinessException("Department with code '" + request.getCode() + "' already exists");
+            throw new ValidationException("code", "Department code already exists for this tenant");
         }
 
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -87,13 +88,13 @@ public class DepartmentService {
         // Check name uniqueness (if changed)
         if (!department.getName().equals(request.getName()) &&
                 departmentRepository.existsByTenant_IdAndName(tenantId, request.getName())) {
-            throw new BusinessException("Department with name '" + request.getName() + "' already exists");
+            throw new ValidationException("name", "Department name already exists for this tenant");
         }
 
         // Check code uniqueness (if changed)
         if (!department.getCode().equals(request.getCode()) &&
                 departmentRepository.existsByTenant_IdAndCode(tenantId, request.getCode())) {
-            throw new BusinessException("Department with code '" + request.getCode() + "' already exists");
+            throw new ValidationException("code", "Department code already exists for this tenant");
         }
 
         department.setName(request.getName());

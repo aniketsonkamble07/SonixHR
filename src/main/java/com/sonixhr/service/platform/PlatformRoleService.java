@@ -4,6 +4,7 @@ import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
+import com.sonixhr.dto.platform.PlatformRoleDeletePreviewResponse;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
@@ -292,6 +293,9 @@ public class PlatformRoleService {
     public PlatformRoleResponse getRoleResponseById(Long roleId) {
         log.debug("Fetching platform role DTO: {}", roleId);
         PlatformRole role = getRoleById(roleId);
+        if (!role.isActive()) {
+            throw new ResourceNotFoundException("Role not found with id: " + roleId);
+        }
         return toResponse(role);
     }
 
@@ -302,7 +306,10 @@ public class PlatformRoleService {
         if (cacheEnabled) {
             List<PlatformRole> cached = allRolesCache.get("all");
             if (cached != null) {
-                return cached.stream().map(this::toResponse).collect(Collectors.toList());
+                return cached.stream()
+                        .filter(PlatformRole::isActive)
+                        .map(this::toResponse)
+                        .collect(Collectors.toList());
             }
         }
 
@@ -315,7 +322,10 @@ public class PlatformRoleService {
             }
         }
 
-        return roles.stream().map(this::toResponse).collect(Collectors.toList());
+        return roles.stream()
+                .filter(PlatformRole::isActive)
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Cacheable(value = "platformRolesLookup", unless = "#result == null || #result.isEmpty()")
@@ -392,7 +402,13 @@ public class PlatformRoleService {
     @Transactional
     @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public void deleteRole(Long roleId) {
-        log.info("Deleting platform role: {}", roleId);
+        deleteRole(roleId, null);
+    }
+
+    @Transactional
+    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
+    public void deleteRole(Long roleId, Long reassignToRoleId) {
+        log.info("Deleting platform role: {} (reassignTo: {})", roleId, reassignToRoleId);
 
         PlatformRole role = getRoleById(roleId);
 
@@ -402,7 +418,31 @@ public class PlatformRoleService {
 
         long userCount = userRepository.countUsersByRoleId(roleId);
         if (userCount > 0) {
-            throw new BusinessException("Cannot delete role that is assigned to " + userCount + " user(s)");
+            if (reassignToRoleId != null) {
+                PlatformRole newRole = getRoleById(reassignToRoleId);
+                if (!newRole.isActive()) {
+                    throw new BusinessException("Cannot reassign users to an inactive role: " + newRole.getName());
+                }
+                List<PlatformUser> users = userRepository.findByRolesId(roleId);
+                for (PlatformUser user : users) {
+                    user.getRoles().removeIf(r -> r.getId().equals(roleId));
+                    user.getRoles().add(newRole);
+                    user.incrementRolesVersion();
+                    userRepository.save(user);
+
+                    platformUserDetailsService.invalidateCache(user.getEmail());
+                }
+                usersByRoleCache.remove(roleId);
+                usersByRoleCache.remove(reassignToRoleId);
+                if (cacheEnabled) {
+                    roleCache.remove(reassignToRoleId);
+                }
+                log.info("Bulk reassigned {} platform users from role {} to role {}", 
+                        userCount, roleId, reassignToRoleId);
+            } else {
+                throw new BusinessException("Cannot delete role that is assigned to " + userCount +
+                        " user(s). Remove the role from users or specify a reassignToRoleId parameter.");
+            }
         }
 
         // Soft delete - deactivate instead of hard delete
@@ -415,6 +455,48 @@ public class PlatformRoleService {
         }
 
         log.info("Platform role deactivated: {}", role.getName());
+    }
+
+    public PlatformRoleDeletePreviewResponse getRoleDeletePreview(Long roleId) {
+        log.info("Generating platform role delete preview for role: {}", roleId);
+
+        PlatformRole role = getRoleById(roleId);
+
+        List<PlatformUser> affectedUsers = userRepository.findByRolesId(roleId);
+        List<PlatformUserResponse> affectedUserResponses = affectedUsers.stream()
+                .map(this::toUserResponse)
+                .collect(Collectors.toList());
+
+        // Find alternative active platform roles that are not this role
+        List<PlatformRole> otherRoles = roleRepository.findByActiveTrue();
+        List<PlatformRoleLookupResponse> reassignmentOptions = otherRoles.stream()
+                .filter(r -> !r.getId().equals(roleId))
+                .map(this::toLookupResponse)
+                .collect(Collectors.toList());
+
+        boolean deletable = true;
+        String validationMessage = null;
+
+        if (!role.isActive()) {
+            deletable = false;
+            validationMessage = "Role is already inactive.";
+        } else if (role.isSystemRole()) {
+            deletable = false;
+            validationMessage = "Cannot delete system role: " + role.getName();
+        } else if (!affectedUsers.isEmpty() && reassignmentOptions.isEmpty()) {
+            deletable = false;
+            validationMessage = "Role has assigned user(s) but no other active roles exist for reassignment.";
+        }
+
+        return PlatformRoleDeletePreviewResponse.builder()
+                .roleId(roleId)
+                .roleName(role.getName())
+                .affectedUserCount(affectedUsers.size())
+                .affectedUsers(affectedUserResponses)
+                .reassignmentOptions(reassignmentOptions)
+                .deletable(deletable)
+                .validationMessage(validationMessage)
+                .build();
     }
 
     /**
@@ -498,6 +580,10 @@ public class PlatformRoleService {
 
         platformUserDetailsService.invalidateCache(user.getEmail());
         usersByRoleCache.remove(roleId);
+        if (cacheEnabled) {
+            roleCache.remove(roleId);
+        }
+        allRolesCache.clear();
 
         log.info("Role '{}' assigned to user '{}'", role.getName(), user.getEmail());
     }
@@ -534,7 +620,11 @@ public class PlatformRoleService {
             platformUserDetailsService.invalidateCache(user.getEmail());
             for (Long roleId : roleIds) {
                 usersByRoleCache.remove(roleId);
+                if (cacheEnabled) {
+                    roleCache.remove(roleId);
+                }
             }
+            allRolesCache.clear();
 
             log.info("{} roles assigned to user {}", rolesToAdd.size(), userId);
         }
@@ -560,6 +650,10 @@ public class PlatformRoleService {
 
         platformUserDetailsService.invalidateCache(user.getEmail());
         usersByRoleCache.remove(roleId);
+        if (cacheEnabled) {
+            roleCache.remove(roleId);
+        }
+        allRolesCache.clear();
 
         log.info("Role removed from user {}", userId);
     }
@@ -651,10 +745,10 @@ public class PlatformRoleService {
                 .fullName(user.getFullName())
                 .designation(user.getDesignation())
                 .status(user.getStatus())
-                .isActive(user.getStatus().isActive())
+                .isActive(user.getStatus() != null && user.getStatus().isActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .roles(user.getRoles().stream()
+                .roles(user.getRoles() == null ? Collections.emptySet() : user.getRoles().stream()
                         .map(role -> PlatformUserResponse.PlatformRoleResponse.builder()
                                 .id(role.getId())
                                 .name(role.getName())

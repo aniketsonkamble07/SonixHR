@@ -70,7 +70,7 @@ public class LeaveService {
             boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && settings.getIncludeNationalHolidays();
             boolean isState = settings.getIncludeStateHolidays() && 
                               settings.getState() != null && 
-                              settings.getState().equalsIgnoreCase(h.getRegion());
+                              settings.getState().name().equalsIgnoreCase(h.getRegion());
             if (isNational || isState) {
                 holidayDates.add(h.getHolidayDate());
             }

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import com.sonixhr.enums.IndianState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,18 @@ public class TenantRegistrationRequest {
     @Pattern(regexp = "^[+]?[0-9]{10,15}$", message = "Invalid phone number format")
     private String adminPhone;
 
-    @Builder.Default
-    private String planType = "trial";
+    @Size(max = 500, message = "Office address must be up to 500 characters")
+    private String officeAddress;
+
+    @Size(max = 100, message = "City name must be up to 100 characters")
+    private String city;
+
+    private IndianState state;
+
+    @Size(max = 50, message = "Country name must be up to 50 characters")
+    private String country;
+
+    private String planCode;
+
+    private String billingCycle;
 }

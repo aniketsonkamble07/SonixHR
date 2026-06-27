@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PlatformDashboardService {
 
     private final TenantRepository tenantRepository;
@@ -70,12 +71,12 @@ public class PlatformDashboardService {
                 .filter(sub -> sub.getIsActive() && !sub.isTrial() && !sub.isExpired())
                 .count();
         long activeTrials = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && sub.isTrial() && !sub.isTrialExpired())
+                .filter(sub -> sub.getIsActive() && sub.isTrial() && !sub.isExpired())
                 .count();
 
         // Expired Subscriptions
         long expiredSubscriptions = allSubscriptions.stream()
-                .filter(sub -> (!sub.isTrial() && sub.isExpired()) || (sub.isTrial() && sub.isTrialExpired()))
+                .filter(TenantSubscription::isExpired)
                 .count();
 
         // Sum MRR (Monthly Recurring Revenue equivalent)

@@ -8,8 +8,8 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.exceptions.BusinessException;
-import com.sonixhr.exceptions.DuplicateResourceException;
 import com.sonixhr.exceptions.NotFoundException;
+import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.service.ActivationTokenService;
@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@SuppressWarnings("null")
 public class PlatformUserService {
 
     private final PlatformUserRepository platformUserRepository;
@@ -84,7 +85,7 @@ public class PlatformUserService {
         log.info("Creating platform user: {}", request.getEmail());
 
         if (platformUserRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateResourceException("Email already exists: " + request.getEmail());
+            throw new ValidationException("email", "Email address already registered");
         }
 
         Set<Long> roleIds = request.getRoleIds();
@@ -254,7 +255,7 @@ public class PlatformUserService {
         }
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             if (platformUserRepository.existsByEmail(request.getEmail())) {
-                throw new DuplicateResourceException("Email already exists: " + request.getEmail());
+                throw new ValidationException("email", "Email address already registered");
             }
 
             // FIX 2: evict the OLD email key from both Caffeine and Redis BEFORE
@@ -473,7 +474,7 @@ public class PlatformUserService {
                 .lastLoginAt(user.getLastLogin())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .roles(user.getRoles().stream()
+                .roles(user.getRoles() == null ? Collections.emptySet() : user.getRoles().stream()
                         .map(role -> PlatformUserResponse.PlatformRoleResponse.builder()
                                 .id(role.getId())
                                 .name(role.getName())

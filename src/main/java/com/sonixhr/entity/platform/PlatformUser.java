@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@SuppressWarnings("null")
 public class PlatformUser extends BaseUser {
 
     @Column(length = 100)

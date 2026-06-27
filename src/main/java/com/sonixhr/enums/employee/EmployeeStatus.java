@@ -2,6 +2,7 @@ package com.sonixhr.enums.employee;
 
 public enum EmployeeStatus {
     ACTIVE("active", "Active", "success"),
+    INACTIVE("inactive", "Inactive", "secondary"),
     PROBATION("probation", "On Probation", "warning"),
     RESIGNED("resigned", "Resigned", "secondary"),
     TERMINATED("terminated", "Terminated", "danger"),
@@ -41,6 +42,10 @@ public enum EmployeeStatus {
 
     public boolean isActive() {
         return this == ACTIVE;
+    }
+
+    public boolean isInactive() {
+        return this == INACTIVE;
     }
 
     public boolean isOnProbation() {

@@ -39,6 +39,9 @@ public class SubscriptionPlanDTO {
 
     private boolean isTrial;
 
+    @Positive(message = "Validity months must be a positive number")
+    private int validityMonths;
+
     private boolean isActive;
 
     @Size(max = 500, message = "Description must not exceed 500 characters")

@@ -43,6 +43,10 @@ public class SubscriptionPlan {
     @Column(name = "is_trial", nullable = false)
     private boolean isTrial;
 
+    @Column(name = "validity_months", nullable = false, columnDefinition = "integer default 1")
+    @Builder.Default
+    private int validityMonths = 1;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean isActive = true;

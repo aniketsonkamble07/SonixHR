@@ -1,7 +1,10 @@
 package com.sonixhr.entity.tenant;
 
 
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.IndianState;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,20 +60,38 @@ public class Tenant {
     @Column(name = "admin_phone", length = 20)
     private String adminPhone;
 
-    @Column(name = "plan_type", length = 20)
-    @Builder.Default
-    private String planType = "trial";
+    @Column(name = "office_address", length = 500)
+    private String officeAddress;
+
+    @Column(name = "city", length = 100)
+    private String city;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "state", length = 50)
+    private IndianState state;
+
+    @Column(name = "country", length = 50)
+    private String country;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_plan_id")
+    private SubscriptionPlan subscriptionPlan;
+
+    public String getPlanType() {
+        return this.subscriptionPlan != null ? this.subscriptionPlan.getCode() : null;
+    }
 
     @Column(name = "max_employees")
     @Builder.Default
     private Integer maxEmployees = 100;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "plan_status", length = 20)
     @Builder.Default
-    private String planStatus = "ACTIVE";
+    private PlanStatus planStatus = PlanStatus.ACTIVE;
 
-    @Column(name = "trial_ends_at")
-    private LocalDateTime trialEndsAt;
+    @Column(name = "ends_at")
+    private LocalDateTime endsAt;
 
     @Column(name = "suspended_at")
     private LocalDateTime suspendedAt;
@@ -135,23 +156,15 @@ public class Tenant {
         return this.status == UserStatus.DELETED;
     }
 
-    public boolean isTrialActive() {
-        return "trial".equalsIgnoreCase(this.planType) &&
-                this.trialEndsAt != null &&
-                this.trialEndsAt.isAfter(LocalDateTime.now());
+    public boolean isExpired() {
+        return this.endsAt != null && this.endsAt.isBefore(LocalDateTime.now());
     }
 
-    public boolean isTrialExpired() {
-        return "trial".equalsIgnoreCase(this.planType) &&
-                this.trialEndsAt != null &&
-                this.trialEndsAt.isBefore(LocalDateTime.now());
-    }
-
-    public int getDaysLeftInTrial() {
-        if (this.trialEndsAt == null || !"trial".equalsIgnoreCase(this.planType)) {
+    public int getDaysLeft() {
+        if (this.endsAt == null) {
             return 0;
         }
-        return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.trialEndsAt);
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.endsAt);
     }
 
     //  Convenience method for template compatibility
@@ -197,7 +210,7 @@ public class Tenant {
                 ", companyName='" + companyName + '\'' +
                 ", status=" + status +
                 ", isActive=" + isActive +
-                ", planType=" + planType +
+                ", planType=" + getPlanType() +
                 ", createdAt=" + createdAt +
                 '}';
     }

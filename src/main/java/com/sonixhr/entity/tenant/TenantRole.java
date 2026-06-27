@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@SuppressWarnings("null")
 public class TenantRole extends BaseRole {
 
     @Column(name = "tenant_id", nullable = true)

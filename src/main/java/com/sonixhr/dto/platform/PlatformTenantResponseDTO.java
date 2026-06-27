@@ -1,6 +1,7 @@
 package com.sonixhr.dto.platform;
 
 import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.IndianState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,12 +21,16 @@ public class PlatformTenantResponseDTO {
     private String adminName;
     private String adminEmail;
     private String adminPhone;
+    private String officeAddress;
+    private String city;
+    private IndianState state;
+    private String country;
     private String planType;
     private UserStatus status;
     private boolean isActive;
     private Integer maxEmployees;
     private String planStatus;
-    private LocalDateTime trialEndsAt;
+    private LocalDateTime endsAt;
     private LocalDateTime suspendedAt;
     private String suspensionReason;
     private LocalDateTime createdAt;

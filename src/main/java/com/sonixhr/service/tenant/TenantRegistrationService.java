@@ -15,7 +15,7 @@ import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.BusinessException;
-import com.sonixhr.exceptions.DuplicateResourceException;
+import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
@@ -64,9 +64,6 @@ public class TenantRegistrationService {
     @Value("${app.trial-days:14}")
     private int defaultTrialDays;
 
-    @Value("${app.bypass-activation:false}")
-    private boolean bypassActivation;
-
     @Transactional
     public TenantRegistrationResponse registerTenant(TenantRegistrationRequest request) {
         log.info("Starting tenant registration for company: {}", request.getCompanyName());
@@ -74,13 +71,20 @@ public class TenantRegistrationService {
         // 1. Validate uniqueness
         validateUniqueness(request);
 
-        // 2. Get plan details from DB
-        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(request.getPlanType())
-                .orElseGet(() -> {
-                    log.warn("Requested plan '{}' not found, falling back to active trial plan", request.getPlanType());
-                    return subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue()
-                            .orElseThrow(() -> new BusinessException("No active subscription plan found in the system."));
-                });
+        // 2. Get active plan details from DB
+        SubscriptionPlan plan;
+        if (request.getPlanCode() != null && !request.getPlanCode().trim().isEmpty()) {
+            plan = subscriptionPlanRepository.findByCodeIgnoreCase(request.getPlanCode().trim())
+                    .orElseThrow(() -> new BusinessException(
+                            "Subscription plan not found with code: " + request.getPlanCode()));
+        } else {
+            plan = subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue()
+                    .orElseThrow(() -> new BusinessException("No active trial subscription plan found in the system."));
+        }
+
+        if (!plan.isActive()) {
+            throw new BusinessException("The selected subscription plan is currently inactive.");
+        }
 
         // 3. Generate unique identifiers
         String tenantCode = generateUniqueTenantCode(request.getCompanyName());
@@ -89,9 +93,11 @@ public class TenantRegistrationService {
         Tenant tenant = createTenant(request, tenantCode, plan);
         log.info("Tenant created with ID: {}", tenant.getId());
 
-        // 5. Create Super Admin role for this tenant (with all global permissions)
-        TenantRole superAdminRole = createSuperAdminRoleForTenant(tenant.getId());
-        log.info("Super Admin role created for tenant with {} permissions", superAdminRole.getPermissions().size());
+        // 5. Create default roles for this tenant (Super Admin, Admin, Employee,
+        // Manager)
+        TenantRole superAdminRole = createDefaultRolesForTenant(tenant.getId());
+        log.info("Default roles created for tenant, Super Admin has {} permissions",
+                superAdminRole.getPermissions().size());
 
         // 6. Create Employee (Super Admin)
         Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, superAdminRole);
@@ -103,13 +109,19 @@ public class TenantRegistrationService {
 
         // 8. Generate activation token for employee
         String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
-        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationToken;
+        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
 
-        // Log the activation link for manual testing
+        // Send activation email to the registered Super Admin employee (disabled for
+        // development)
+        // emailService.sendActivationEmail(superAdminEmployee.getEmail(),
+        // superAdminEmployee.getFullName(), activationLink);
+
+        // Log the credentials for manual testing
         log.info("==========================================");
-        log.info(" ACTIVATION LINK: {}", activationLink);
+        log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
         log.info(" Admin Email: {}", superAdminEmployee.getEmail());
-        log.info("  Temporary Password: Admin@123");
+        log.info(" Password: Admin@123");
+        log.info(" (Optional Activation Link: {})", activationLink);
         log.info("==========================================");
 
         log.info("Tenant registration completed: {}", tenant.getCompanyName());
@@ -171,10 +183,10 @@ public class TenantRegistrationService {
 
     private void validateUniqueness(TenantRegistrationRequest request) {
         if (tenantRepository.existsByCompanyName(request.getCompanyName())) {
-            throw new DuplicateResourceException("Company name already exists: " + request.getCompanyName());
+            throw new ValidationException("companyName", "Company name already registered");
         }
         if (employeeRepository.existsByEmail(request.getAdminEmail())) {
-            throw new DuplicateResourceException("Email already registered: " + request.getAdminEmail());
+            throw new ValidationException("adminEmail", "Email address already registered");
         }
     }
 
@@ -197,26 +209,30 @@ public class TenantRegistrationService {
     }
 
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
-                                SubscriptionPlan plan) {
-        UserStatus tenantStatus = bypassActivation ? UserStatus.ACTIVE : UserStatus.PENDING_VERIFICATION;
-        boolean tenantActive = bypassActivation;
-        
-        String initialPlanStatus = plan.isTrial() ? "trial" : "active";
-        int trialDays = plan.getTrialDays() > 0 ? plan.getTrialDays() : defaultTrialDays;
-        LocalDateTime trialEndsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : null;
-        
+            SubscriptionPlan plan) {
+        UserStatus tenantStatus = UserStatus.ACTIVE;
+        boolean tenantActive = true;
+
+        PlanStatus initialPlanStatus = PlanStatus.ACTIVE;
+        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+        LocalDateTime endsAt = LocalDateTime.now().plusMonths(validityMonths);
+
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
-                .planType(plan.getCode())
+                .subscriptionPlan(plan)
                 .maxEmployees(plan.getMaxEmployees())
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
+                .officeAddress(request.getOfficeAddress())
+                .city(request.getCity())
+                .state(request.getState())
+                .country(request.getCountry())
                 .status(tenantStatus)
                 .isActive(tenantActive)
                 .planStatus(initialPlanStatus)
-                .trialEndsAt(trialEndsAt)
+                .endsAt(endsAt)
                 .build();
         return tenantRepository.save(tenant);
     }
@@ -225,8 +241,8 @@ public class TenantRegistrationService {
     // ROLE MANAGEMENT
     // =====================================================
 
-    private TenantRole createSuperAdminRoleForTenant(Long tenantId) {
-        log.info("Creating Super Admin role for tenant: {}", tenantId);
+    private TenantRole createDefaultRolesForTenant(Long tenantId) {
+        log.info("Creating default roles for tenant: {}", tenantId);
 
         List<TenantPermission> allPermissions = permissionRepository.findAll();
 
@@ -234,28 +250,92 @@ public class TenantRegistrationService {
             throw new BusinessException("No permissions found. Please ensure permissions are initialized.");
         }
 
-        log.info("Found {} global permissions to assign to Super Admin role", allPermissions.size());
+        log.info("Found {} global permissions to assign to default roles", allPermissions.size());
 
-        TenantRole tenantRole = TenantRole.builder()
+        // 1. Super Admin
+        TenantRole superAdminRole = TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Super Admin")
                 .description("Super Administrator with full access to all tenant features")
                 .isDefault(true)
+                .active(true)
+                .priority(100)
+                .category("ADMINISTRATION")
                 .permissions(new HashSet<>(allPermissions))
                 .build();
+        TenantRole savedSuperAdmin = roleRepository.save(superAdminRole);
 
-        TenantRole savedRole = roleRepository.save(tenantRole);
-        log.info(" Created Super Admin role for tenant {} with ID: {} and {} permissions",
-                tenantId, savedRole.getId(), savedRole.getPermissions().size());
+        // 2. Admin
+        Set<String> adminPermissionNames = Set.of(
+                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "EMPLOYEE_VIEW_ALL", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT",
+                "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM", "LEAVE_APPROVE_DEPARTMENT",
+                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN", "ATTENDANCE_VIEW_TEAM",
+                "DEPARTMENT_VIEW", "DEPARTMENT_CREATE", "DEPARTMENT_EDIT", "ROLE_VIEW",
+                "REPORT_VIEW_DEPARTMENT", "REPORT_EXPORT", "SETTINGS_VIEW", "VIEW_BILLING");
+        Set<TenantPermission> adminPermissions = allPermissions.stream()
+                .filter(p -> adminPermissionNames.contains(p.getPermissionName()))
+                .collect(java.util.stream.Collectors.toSet());
+        TenantRole adminRole = TenantRole.builder()
+                .tenantId(tenantId)
+                .name("Admin")
+                .description("Administrator with limited management access")
+                .isDefault(false)
+                .active(true)
+                .priority(80)
+                .category("ADMINISTRATION")
+                .permissions(adminPermissions)
+                .build();
+        roleRepository.save(adminRole);
 
-        return savedRole;
+        // 3. Employee
+        Set<String> employeePermissionNames = Set.of(
+                "EMPLOYEE_VIEW_SELF", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_CANCEL_OWN",
+                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN");
+        Set<TenantPermission> employeePermissions = allPermissions.stream()
+                .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
+                .collect(java.util.stream.Collectors.toSet());
+        TenantRole employeeRole = TenantRole.builder()
+                .tenantId(tenantId)
+                .name("Employee")
+                .description("Basic employee access - default role for new employees")
+                .isDefault(false)
+                .active(true)
+                .priority(40)
+                .category("EMPLOYMENT")
+                .permissions(employeePermissions)
+                .build();
+        roleRepository.save(employeeRole);
+
+        // 4. Manager
+        Set<String> managerPermissionNames = Set.of(
+                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
+                "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN", "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
+                "ATTENDANCE_VIEW_TEAM", "DEPARTMENT_VIEW", "REPORT_VIEW_DEPARTMENT");
+        Set<TenantPermission> managerPermissions = allPermissions.stream()
+                .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
+                .collect(java.util.stream.Collectors.toSet());
+        TenantRole managerRole = TenantRole.builder()
+                .tenantId(tenantId)
+                .name("Manager")
+                .description("Team manager with people management access")
+                .isDefault(false)
+                .active(true)
+                .priority(60)
+                .category("MANAGEMENT")
+                .permissions(managerPermissions)
+                .build();
+        roleRepository.save(managerRole);
+
+        log.info("Created default roles for tenant {}: Super Admin, Admin, Employee, Manager", tenantId);
+        return savedSuperAdmin;
     }
 
     // =====================================================
     // EMPLOYEE CREATION (Super Admin)
     // =====================================================
 
-    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request, TenantRole superAdminRole) {
+    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request,
+            TenantRole superAdminRole) {
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
 
         String firstName = getFirstNameFromFullName(request.getAdminName());
@@ -265,9 +345,9 @@ public class TenantRegistrationService {
             superAdminRole = roleRepository.save(superAdminRole);
         }
 
-        EmployeeStatus employeeStatus = bypassActivation ? EmployeeStatus.ACTIVE : EmployeeStatus.PROBATION;
-        boolean employeeActive = bypassActivation;
-        String passwordHash = bypassActivation ? passwordEncoder.encode("Admin@123") : passwordEncoder.encode(java.util.UUID.randomUUID().toString());
+        EmployeeStatus employeeStatus = EmployeeStatus.ACTIVE;
+        boolean employeeActive = true;
+        String passwordHash = passwordEncoder.encode("Admin@123");
 
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)
@@ -282,7 +362,12 @@ public class TenantRegistrationService {
                 .probationMonths(0)
                 .status(employeeStatus)
                 .isActive(employeeActive)
-                .workLocation("Head Office")
+                .address(tenant.getOfficeAddress())
+                .city(tenant.getCity())
+                .state(tenant.getState())
+                .country(tenant.getCountry())
+                .workLocation(
+                        tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
                 .passwordHash(passwordHash)
                 .createdBy(null)
                 .roles(new HashSet<>(Set.of(superAdminRole)))
@@ -292,13 +377,15 @@ public class TenantRegistrationService {
     }
 
     private String getFirstNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) return "Admin";
+        if (fullName == null || fullName.isEmpty())
+            return "Admin";
         String[] parts = fullName.trim().split(" ");
         return parts[0];
     }
 
     private String getLastNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) return "User";
+        if (fullName == null || fullName.isEmpty())
+            return "User";
         String[] parts = fullName.trim().split(" ");
         if (parts.length > 1) {
             return String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length));
@@ -311,27 +398,23 @@ public class TenantRegistrationService {
     // =====================================================
 
     private void createSubscription(Tenant tenant, SubscriptionPlan plan) {
-        PlanStatus initialPlanStatus = plan.isTrial() ? PlanStatus.TRIAL : PlanStatus.ACTIVE;
-        LocalDateTime trialStartedAt = plan.isTrial() ? LocalDateTime.now() : null;
-        int trialDays = plan.getTrialDays() > 0 ? plan.getTrialDays() : defaultTrialDays;
-        LocalDateTime trialEndsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : null;
+        PlanStatus initialPlanStatus = PlanStatus.ACTIVE;
         LocalDateTime startedAt = LocalDateTime.now();
-        LocalDateTime endsAt = plan.isTrial() ? LocalDateTime.now().plusDays(trialDays) : LocalDateTime.now().plusMonths(1);
+        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+        LocalDateTime endsAt = startedAt.plusMonths(validityMonths);
 
         TenantSubscription subscription = TenantSubscription.builder()
                 .tenant(tenant)
-                .planType(plan.getCode())
+                .subscriptionPlan(plan)
                 .planName(plan.getName())
                 .planStatus(initialPlanStatus)
                 .maxEmployees(plan.getMaxEmployees())
                 .maxStorageMb(plan.getMaxStorageMb())
-                .trialStartedAt(trialStartedAt)
-                .trialEndsAt(trialEndsAt)
                 .startedAt(startedAt)
                 .endsAt(endsAt)
-                .amount(BigDecimal.valueOf(plan.getMonthlyPrice()))
+                .amount(BigDecimal.valueOf(plan.getMonthlyPrice() * validityMonths))
                 .currency("INR")
-                .billingCycle(BillingCycle.MONTHLY)
+                .billingCycle(validityMonths >= 12 ? BillingCycle.YEARLY : BillingCycle.MONTHLY)
                 .isActive(true)
                 .build();
         subscriptionRepository.save(subscription);
@@ -341,10 +424,9 @@ public class TenantRegistrationService {
     // RESPONSE BUILDING
     // =====================================================
 
-    private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken, Employee superAdminEmployee) {
-        String msg = bypassActivation ? 
-                "Registration successful! Account is active and password is set to Admin@123." :
-                "Registration successful! Please check your email to activate your account.";
+    private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken,
+            Employee superAdminEmployee) {
+        String msg = "Registration successful! Please check your email to activate your account.";
 
         return TenantRegistrationResponse.builder()
                 .success(true)
@@ -353,13 +435,17 @@ public class TenantRegistrationService {
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())
                 .planType(tenant.getPlanType())
-                .planStatus(tenant.getPlanStatus())
-                .trialEndsAt(tenant.getTrialEndsAt())
+                .planStatus(tenant.getPlanStatus() != null ? tenant.getPlanStatus().name() : null)
+                .endsAt(tenant.getEndsAt())
                 .status(tenant.getStatus() != null ? tenant.getStatus().name() : null)
                 .isActive(tenant.getIsActive())
                 .adminEmail(tenant.getAdminEmail())
                 .adminName(tenant.getAdminName())
                 .adminPhone(tenant.getAdminPhone())
+                .officeAddress(tenant.getOfficeAddress())
+                .city(tenant.getCity())
+                .state(tenant.getState())
+                .country(tenant.getCountry())
                 .activationToken(activationToken)
                 .activationTokenExpiry(LocalDateTime.now().plusHours(24))
                 .createdAt(tenant.getCreatedAt())

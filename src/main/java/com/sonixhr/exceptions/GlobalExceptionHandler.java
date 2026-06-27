@@ -86,6 +86,25 @@ public class GlobalExceptionHandler {
     }
 
     // =====================================================
+    // HANDLE FIELD-LEVEL VALIDATION ERRORS PROGRAMMATICALLY
+    // =====================================================
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(
+            ValidationException ex) {
+
+        log.warn("Validation failed programmatically: {}", ex.getErrors());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "success", false,
+                        "message", "Please check the highlighted fields",
+                        "errors", ex.getErrors(),
+                        "timestamp", LocalDateTime.now()
+                ));
+    }
+
+    // =====================================================
     // HANDLE DUPLICATE RESOURCE
     // =====================================================
     @ExceptionHandler(DuplicateResourceException.class)
@@ -146,18 +165,45 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
             DataIntegrityViolationException ex) {
 
-        log.error("Database error: {}", ex.getMessage());
+        log.error("Database integrity violation: {}", ex.getMessage());
 
+        String errorMsg = ex.getMessage();
+        Map<String, String> errors = new HashMap<>();
         String message = "Database constraint violation";
 
-        if (ex.getMessage().contains("unique constraint")) {
-            if (ex.getMessage().contains("email")) {
-                message = "This email is already registered";
-            } else if (ex.getMessage().contains("tenant_code")) {
-                message = "This tenant code already exists";
-            } else {
-                message = "A record with this information already exists";
+        if (errorMsg != null) {
+            if (errorMsg.contains("uk_role_tenant_name")) {
+                errors.put("name", "Role name already exists for this tenant");
+                message = "Validation failed: Role name already exists";
+            } else if (errorMsg.contains("uk_department_name_tenant")) {
+                errors.put("name", "Department name already exists for this tenant");
+                message = "Validation failed: Department name already exists";
+            } else if (errorMsg.contains("uk_department_code_tenant")) {
+                errors.put("code", "Department code already exists for this tenant");
+                message = "Validation failed: Department code already exists";
+            } else if (errorMsg.contains("uk_tenant_code")) {
+                errors.put("companyName", "This company name / tenant code already exists");
+                message = "Validation failed: Company name already registered";
+            } else if (errorMsg.contains("email") || errorMsg.contains("uk_employees_email") || errorMsg.contains("uk_employee_email") || errorMsg.contains("uk_platform_user_email")) {
+                errors.put("email", "This email address is already registered");
+                errors.put("adminEmail", "This email address is already registered");
+                message = "Validation failed: Email already registered";
             }
+        }
+
+        if (!errors.isEmpty()) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "success", false,
+                            "message", message,
+                            "errors", errors,
+                            "timestamp", LocalDateTime.now()
+                    ));
+        }
+
+        if (errorMsg != null && errorMsg.contains("unique constraint")) {
+            message = "A record with this information already exists";
         }
 
         return ResponseEntity

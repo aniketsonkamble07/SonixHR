@@ -4,6 +4,7 @@ import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
+import com.sonixhr.dto.platform.PlatformRoleDeletePreviewResponse;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.platform.PlatformRoleService;
@@ -44,7 +45,7 @@ public class PlatformRoleController {
     }
 
     @PutMapping("/{roleId}/permissions")
-    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ROLE')")
     public ResponseEntity<PlatformRoleResponse> assignPermissions(
             @PathVariable Long roleId,
             @RequestBody Set<Long> permissionIds,
@@ -84,7 +85,7 @@ public class PlatformRoleController {
     }
 
     @PutMapping("/{roleId}")
-    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ROLE')")
     public ResponseEntity<PlatformRoleResponse> updateRole(
             @PathVariable Long roleId,
             @Valid @RequestBody PlatformRoleCreateRequest request,
@@ -97,15 +98,28 @@ public class PlatformRoleController {
     }
 
     @DeleteMapping("/{roleId}")
-    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")
+    @PreAuthorize("hasAuthority('DELETE_PLATFORM_ROLE')")
     public ResponseEntity<Void> deleteRole(
+            @PathVariable Long roleId,
+            @RequestParam(required = false) Long reassignToRoleId,
+            @AuthenticationPrincipal PlatformUser currentAdmin) {
+
+        log.info("Platform admin {} deleting role: {} (reassignTo: {})", currentAdmin.getEmail(), roleId, reassignToRoleId);
+
+        roleService.deleteRole(roleId, reassignToRoleId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{roleId}/delete-preview")
+    @PreAuthorize("hasAuthority('DELETE_PLATFORM_ROLE')")
+    public ResponseEntity<PlatformRoleDeletePreviewResponse> getRoleDeletePreview(
             @PathVariable Long roleId,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        log.info("Platform admin {} deleting role: {}", currentAdmin.getEmail(), roleId);
+        log.info("Platform admin {} requesting delete preview for role: {}", currentAdmin.getEmail(), roleId);
 
-        roleService.deleteRole(roleId);
-        return ResponseEntity.noContent().build();
+        PlatformRoleDeletePreviewResponse response = roleService.getRoleDeletePreview(roleId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{roleId}/users")
@@ -119,7 +133,7 @@ public class PlatformRoleController {
     }
 
     @PostMapping("/{roleId}/users/{userId}")
-    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")
+    @PreAuthorize("hasAuthority('ASSIGN_PLATFORM_ROLE')")
     public ResponseEntity<Void> assignRoleToUser(
             @PathVariable Long roleId,
             @PathVariable Long userId,
@@ -132,7 +146,7 @@ public class PlatformRoleController {
     }
 
     @DeleteMapping("/{roleId}/users/{userId}")
-    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")
+    @PreAuthorize("hasAuthority('ASSIGN_PLATFORM_ROLE')")
     public ResponseEntity<Void> removeRoleFromUser(
             @PathVariable Long roleId,
             @PathVariable Long userId,

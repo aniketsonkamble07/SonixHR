@@ -2,10 +2,11 @@ package com.sonixhr.enums;
 
 public enum PlanStatus {
     ACTIVE("active", "Active", "success"),
-    TRIAL("trial", "Trial Period", "warning"),
     SUSPENDED("suspended", "Suspended", "danger"),
     CANCELLED("cancelled", "Cancelled", "secondary"),
-    NOT_ACTIVATED("not_activated", "Not Activated", "secondary");
+    NOT_ACTIVATED("not_activated", "Not Activated", "secondary"),
+    TRIAL("trial", "Trial", "info"),
+    trial("trial", "Trial", "info");
     private final String code;
     private final String displayName;
     private final String badgeColor;
@@ -46,9 +47,6 @@ public enum PlanStatus {
         return this == ACTIVE;
     }
 
-    public boolean isTrial() {
-        return this == TRIAL;
-    }
 
     public boolean isSuspended() {
         return this == SUSPENDED;

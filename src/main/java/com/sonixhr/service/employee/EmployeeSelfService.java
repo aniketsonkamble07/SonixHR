@@ -7,7 +7,6 @@ import com.sonixhr.dto.employee.MyOrgChartResponse;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.platform.PlatformUser;
-import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
@@ -19,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -64,8 +65,21 @@ public class EmployeeSelfService {
             updateProfessionalInfo(employee, request, tenantId);
         } else if (hasProfessionalInfoRequest(request)) {
             log.warn("Employee {} attempted to update professional fields without permission", email);
-            throw new BusinessException(
-                    "You don't have permission to update professional information. Only HR or Super Admin can update department, position, work location, and manager.");
+            Map<String, String> errors = new HashMap<>();
+            String msg = "Only HR or Super Admin can update this professional field";
+            if (request.getDepartmentId() != null) {
+                errors.put("departmentId", msg);
+            }
+            if (request.getPosition() != null) {
+                errors.put("position", msg);
+            }
+            if (request.getWorkLocation() != null) {
+                errors.put("workLocation", msg);
+            }
+            if (request.getManagerId() != null) {
+                errors.put("managerId", msg);
+            }
+            throw new com.sonixhr.exceptions.ValidationException(errors);
         }
 
         Employee updatedEmployee = employeeRepository.save(employee);
@@ -142,6 +156,7 @@ public class EmployeeSelfService {
             Employee manager = employeeRepository.findById(request.getManagerId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Manager not found with id: " + request.getManagerId()));
+            employeeService.validateManagerAssignment(employee, manager, tenantId);
             employee.setManager(manager);
             log.info("Manager updated to: {} (ID: {})", manager.getFullName(), manager.getId());
         }

@@ -3,14 +3,18 @@ package com.sonixhr.dto.platform;
 
 
 import com.sonixhr.enums.UserStatus;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.Set;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PlatformUserResponse {
     private Long id;
     private String email;
@@ -27,6 +31,8 @@ public class PlatformUserResponse {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlatformRoleResponse {
         private Long id;
         private String name;

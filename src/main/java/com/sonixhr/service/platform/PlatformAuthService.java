@@ -42,16 +42,19 @@ public class PlatformAuthService {
     private final PlatformUserRepository platformUserRepository;
     private final JwtService jwtService;
     private final PlatformTokenBlacklistService tokenBlacklistService;
+    private final PlatformUserDetailsService platformUserDetailsService;
 
     public PlatformAuthService(
             @Qualifier("platformAuthenticationManager") AuthenticationManager platformAuthenticationManager,
             PlatformUserRepository platformUserRepository,
             JwtService jwtService,
-            PlatformTokenBlacklistService tokenBlacklistService) {
+            PlatformTokenBlacklistService tokenBlacklistService,
+            PlatformUserDetailsService platformUserDetailsService) {
         this.platformAuthenticationManager = platformAuthenticationManager;
         this.platformUserRepository = platformUserRepository;
         this.jwtService = jwtService;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.platformUserDetailsService = platformUserDetailsService;
     }
 
     /**
@@ -88,9 +91,10 @@ public class PlatformAuthService {
         }
 
         user.setLastLogin(LocalDateTime.now());
-        platformUserRepository.save(user);
+        PlatformUser savedUser = platformUserRepository.save(user);
+        platformUserDetailsService.invalidateCache(savedUser.getEmail());
 
-        var tokenPair = jwtService.generatePlatformTokenPair(user);
+        var tokenPair = jwtService.generatePlatformTokenPair(savedUser);
         log.info("Platform user logged in: {}", email);
 
         return LoginResponse.builder()

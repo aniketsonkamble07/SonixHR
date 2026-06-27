@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 @Getter
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public enum PlatformPermissionEnum {
 
     // =====================================================

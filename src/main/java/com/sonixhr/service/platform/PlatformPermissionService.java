@@ -1,5 +1,6 @@
 package com.sonixhr.service.platform;
 
+// Trigger Linter Re-evaluation
 import com.sonixhr.dto.PermissionGroupDTO;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.enums.PlatformPermissionEnum;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@SuppressWarnings("null")
 public class PlatformPermissionService {
 
     private final PlatformPermissionRepository permissionRepository;

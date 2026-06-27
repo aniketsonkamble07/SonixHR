@@ -27,7 +27,7 @@ import java.util.Random;
 public class SupportTicketService {
 
     private final SupportTicketRepository supportTicketRepository;
-    private final PlatformNotificationServiceExt notificationService;
+    private final PlatformNotificationService notificationService;
     private static final Random RANDOM = new Random();
 
     /**
