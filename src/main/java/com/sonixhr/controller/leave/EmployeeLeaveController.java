@@ -50,6 +50,7 @@ public class EmployeeLeaveController {
     }
 
     @PutMapping("/{id}/cancel")
+    @org.springframework.security.access.prepost.PreAuthorize("@leaveSecurity.isLeaveOwner(#id, #currentEmployee)")
     public ResponseEntity<LeaveResponseDTO> cancelLeave(
             @PathVariable Long id,
             @RequestParam(required = false) String cancellationReason,
@@ -60,6 +61,7 @@ public class EmployeeLeaveController {
     }
 
     @PutMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@leaveSecurity.isLeaveOwner(#id, #currentEmployee)")
     public ResponseEntity<LeaveResponseDTO> updateLeave(
             @PathVariable Long id,
             @Valid @RequestBody LeaveRequestDTO request,

@@ -36,6 +36,7 @@ public class PlatformTenantService {
     private final TenantRegistrationService tenantRegistrationService;
     private final TenantRLSService tenantRLSService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final com.sonixhr.service.common.AuditLogService auditLogService;
 
     public Page<PlatformTenantResponseDTO> getAllTenants(String companyName, String status, Boolean isActive, Pageable pageable) {
         log.info("Fetching all tenants with filter - name: {}, status: {}, isActive: {}", companyName, status, isActive);
@@ -56,6 +57,7 @@ public class PlatformTenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
+        String oldStatus = tenant.getStatus() != null ? tenant.getStatus().name() : "ACTIVE";
         tenant.suspend(reason);
         Tenant savedTenant = tenantRepository.save(tenant);
 
@@ -67,6 +69,15 @@ public class PlatformTenantService {
 
         // Invalidate employee caches to force logout
         employeeDetailsService.invalidateAllCaches();
+
+        auditLogService.log(
+            savedTenant,
+            "TENANT_SUSPENDED",
+            "status",
+            oldStatus,
+            savedTenant.getStatus() != null ? savedTenant.getStatus().name() : null,
+            "{\"reason\":\"" + reason + "\"}"
+        );
 
         return convertToDTO(savedTenant);
     }

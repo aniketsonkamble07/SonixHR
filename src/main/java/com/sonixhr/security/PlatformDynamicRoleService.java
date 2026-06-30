@@ -160,8 +160,14 @@ public class PlatformDynamicRoleService {
         log.info("Invalidated authority cache for platform user: {}", email);
 
         if (cacheEnabled && redisTemplate != null) {
-            String cacheKey = REDIS_KEY_PLATFORM_USER_AUTHORITIES + email;
-            redisTemplate.delete(cacheKey);
+            try {
+                String springKey = "sonixhr:platform_user_authorities::" + email;
+                String customKey = REDIS_KEY_PLATFORM_USER_AUTHORITIES + email;
+                redisTemplate.delete(springKey);
+                redisTemplate.delete(customKey);
+            } catch (Exception e) {
+                log.warn("Failed to delete user authority cache from Redis: {}", e.getMessage());
+            }
         }
     }
 

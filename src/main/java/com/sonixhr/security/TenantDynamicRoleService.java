@@ -166,8 +166,10 @@ public class TenantDynamicRoleService {
         // Also invalidate Redis cache
         if (cacheEnabled && redisTemplate != null) {
             try {
-                String cacheKey = REDIS_KEY_TENANT_USER_AUTHORITIES + email + ":" + tenantId;
-                redisTemplate.delete(cacheKey);
+                String springKey = "sonixhr:tenant_user_authorities::" + email + ":" + tenantId;
+                String customKey = REDIS_KEY_TENANT_USER_AUTHORITIES + email + ":" + tenantId;
+                redisTemplate.delete(springKey);
+                redisTemplate.delete(customKey);
             } catch (Exception e) {
                 log.warn("Failed to delete employee authority cache from Redis: {}", e.getMessage());
             }
@@ -180,15 +182,37 @@ public class TenantDynamicRoleService {
     public void invalidateTenantCache(Long tenantId) {
         if (cacheEnabled && redisTemplate != null) {
             try {
-                String pattern = REDIS_KEY_TENANT_USER_AUTHORITIES + "*:" + tenantId;
-                Set<String> keys = redisTemplate.keys(pattern);
-                if (keys != null && !keys.isEmpty()) {
-                    redisTemplate.delete(keys);
-                    log.info("Invalidated {} authority caches for tenant: {}", keys.size(), tenantId);
-                }
+                // Invalidate Spring cache namespace keys
+                String springPattern = "sonixhr:tenant_user_authorities::*:" + tenantId;
+                // Invalidate manual keys
+                String customPattern = REDIS_KEY_TENANT_USER_AUTHORITIES + "*:" + tenantId;
+
+                scanAndDelete(springPattern);
+                scanAndDelete(customPattern);
             } catch (Exception e) {
                 log.warn("Failed to delete tenant authority caches from Redis: {}", e.getMessage());
             }
+        }
+    }
+
+    private void scanAndDelete(String pattern) {
+        try {
+            Set<String> keys = redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
+                Set<String> keySet = new java.util.HashSet<>();
+                org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
+                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000).build()
+                );
+                while (cursor.hasNext()) {
+                    keySet.add(new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8));
+                }
+                return keySet;
+            });
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.info("Invalidated {} caches matching pattern: {}", keys.size(), pattern);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to scan and delete pattern {}: {}", pattern, e.getMessage());
         }
     }
 

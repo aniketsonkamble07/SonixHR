@@ -116,7 +116,7 @@ public class PlatformAuthService {
             throw new BadCredentialsException("Token has been revoked");
         }
 
-        if (!jwtService.validateToken(refreshToken) || !jwtService.isRefreshToken(refreshToken)) {
+        if (!jwtService.validateRefreshToken(refreshToken)) {
             throw new BadCredentialsException("Invalid or expired refresh token");
         }
 

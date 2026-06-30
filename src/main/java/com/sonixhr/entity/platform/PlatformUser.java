@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Entity
@@ -209,15 +211,19 @@ public class PlatformUser extends BaseUser {
     }
 
     public boolean hasRole(String roleName) {
+        if (roles == null || roleName == null) return false;
         return roles.stream()
-                .anyMatch(role -> role.isActive() && role.getName().equals(roleName));
+                .anyMatch(role -> role.isActive() && role.getName().equalsIgnoreCase(roleName));
     }
 
     public boolean hasAnyRole(String... roleNames) {
-        if (roleNames == null || roleNames.length == 0) return false;
-        Set<String> roleSet = Set.of(roleNames);
+        if (roleNames == null || roleNames.length == 0 || roles == null) return false;
+        Set<String> roleSet = Arrays.stream(roleNames)
+                .filter(Objects::nonNull)
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
         return roles.stream()
-                .anyMatch(role -> role.isActive() && roleSet.contains(role.getName()));
+                .anyMatch(role -> role.isActive() && roleSet.contains(role.getName().toLowerCase()));
     }
 
     public Set<String> getPermissionNames() {

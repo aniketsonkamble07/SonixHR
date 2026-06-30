@@ -8,6 +8,7 @@ import com.sonixhr.enums.IndianState;
 import com.sonixhr.repository.payroll.StateProfessionalTaxConfigRepository;
 import com.sonixhr.repository.payroll.StatutoryRateConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -16,8 +17,8 @@ import java.time.LocalDate;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/public/payroll")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/payroll")
+@PreAuthorize("isAuthenticated()")
 public class PayrollController {
 
     @Autowired
@@ -36,6 +37,36 @@ public class PayrollController {
         boolean compliantMode = req.isCompliantMode();
         boolean pfCapping = req.isPfCapping();
         BigDecimal esiPeriodStartGross = req.getEsiPeriodStartGross() != null ? req.getEsiPeriodStartGross() : BigDecimal.ZERO;
+
+        // Programmatic Request Validation
+        Map<String, String> errors = new HashMap<>();
+        if (month < 1 || month > 12) {
+            errors.put("month", "Month must be between 1 and 12");
+        }
+        if (req.getYear() <= 0) {
+            errors.put("year", "Year must be greater than 0");
+        }
+        if (ctc.compareTo(BigDecimal.ZERO) < 0) {
+            errors.put("ctc", "CTC cannot be negative");
+        }
+        if (esiPeriodStartGross.compareTo(BigDecimal.ZERO) < 0) {
+            errors.put("esiPeriodStartGross", "ESI period start gross cannot be negative");
+        }
+        if (lopDays.compareTo(BigDecimal.ZERO) < 0) {
+            errors.put("lopDays", "LOP days cannot be negative");
+        }
+
+        int totalDays = 30;
+        if (errors.isEmpty()) {
+            totalDays = java.time.YearMonth.of(year, month).lengthOfMonth();
+            if (lopDays.compareTo(BigDecimal.valueOf(totalDays)) > 0) {
+                errors.put("lopDays", "LOP days cannot exceed the total days in the month (" + totalDays + ")");
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new com.sonixhr.exceptions.ValidationException(errors);
+        }
 
         LocalDate date = LocalDate.of(year, month, 1);
 
@@ -78,7 +109,6 @@ public class PayrollController {
         }
 
         // Step 2: Apply Proration and LOP (Pass 2)
-        int totalDays = 30; // standard mock month
         BigDecimal prorationFactor = BigDecimal.ONE;
 
         BigDecimal basic = basicBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
@@ -198,7 +228,7 @@ public class PayrollController {
         }
 
         for (StateProfessionalTaxConfig slab : slabs) {
-            if (slab.getStateCode() == state) {
+            if (slab.getStateCode() != null && slab.getStateCode() == state) {
                 if (slab.getApplicableMonth() != null && slab.getApplicableMonth() != month) {
                     continue;
                 }

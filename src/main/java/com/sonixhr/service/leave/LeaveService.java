@@ -87,6 +87,9 @@ public class LeaveService {
      */
     private double calculateTotalLeaveDays(Employee employee, LocalDate startDate, LocalDate endDate,
                                            LeaveType leaveType, TenantLeaveSettings settings) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException("Start date cannot be after end date");
+        }
         double totalDays = 0;
         LocalDate date = startDate;
 

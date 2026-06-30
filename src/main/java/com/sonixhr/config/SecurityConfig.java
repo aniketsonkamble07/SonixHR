@@ -36,6 +36,9 @@ import java.util.List;
 @SuppressWarnings("null")
 public class SecurityConfig {
 
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081,https://sonixhr.onrender.com}")
+    private List<String> allowedOrigins;
+
     private final UserDetailsService employeeDetailsService;
     private final UserDetailsService platformUserDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
@@ -83,8 +86,7 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/api/tenant/register",
                                 "/api/employee/auth/activate",
-                                "/api/tenant/auth/login",
-                                "/api/tenant/auth/verify-token",
+                                "/api/tenant/auth/**",
                                 "/api/forgot-password/**",
                                 "/api/employee/auth/activate",
                                 "/api/reset-password/**",
@@ -141,11 +143,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:8081",
-                "https://sonixhr.onrender.com"));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization", "Content-Type", "X-Tenant-ID", "X-Request-ID", "Accept", "Origin"));

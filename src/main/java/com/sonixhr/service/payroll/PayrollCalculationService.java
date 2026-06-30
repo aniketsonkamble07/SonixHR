@@ -79,6 +79,9 @@ public class PayrollCalculationService {
     @Autowired
     private ManualAttendanceRepository manualAttendanceRepo;
 
+    @Autowired
+    private com.sonixhr.service.common.AuditLogService auditLogService;
+
     /**
      * Executes a full payrun calculation for a tenant in a specific month and year.
      */
@@ -166,6 +169,15 @@ public class PayrollCalculationService {
             calculateEmployeePayslip(payrun, profile, tenantConfig, salaryStructure, statutoryRates, ptSlabs, lopDays,
                     month, year);
         }
+
+        auditLogService.log(
+            tenantConfig.getTenant(),
+            "PAYROLL_PROCESSED",
+            "payrunStatus",
+            null,
+            payrun.getStatus(),
+            "{\"month\":" + month + ",\"year\":" + year + ",\"payrunId\":\"" + payrun.getId() + "\"}"
+        );
 
         return payrun;
     }

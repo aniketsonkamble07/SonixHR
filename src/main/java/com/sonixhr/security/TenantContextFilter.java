@@ -36,18 +36,19 @@ public class TenantContextFilter extends OncePerRequestFilter {
         // Get tenant ID from authenticated user (set by JwtAuthFilter)
         Long tenantId = extractTenantFromRequest(request);
 
+        boolean contextIncremented = false;
         if (tenantId != null) {
             TenantContext.setCurrentTenant(tenantId);
             TenantContext.incrementDepth();
-
-
+            contextIncremented = true;
         }
 
         try {
             filterChain.doFilter(request, response);
         } finally {
-            TenantContext.decrementDepth();
-            if (TenantContext.getDepth() == 0) {
+            if (contextIncremented) {
+                TenantContext.decrementDepth();
+            } else if (TenantContext.getDepth() == 0) {
                 TenantContext.clear();
             }
         }

@@ -28,6 +28,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.sonixhr.security.TenantContext;
+import com.sonixhr.security.TenantRLSService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -43,6 +45,7 @@ public class TenantAuthController {
     private final EmployeeService employeeService;
     private final TokenBlacklistService tokenBlacklistService;
     private final ShiftConfigurationRepository shiftConfigurationRepository;
+    private final TenantRLSService tenantRLSService;
 
     public TenantAuthController(
             @Qualifier("tenantAuthenticationManager") AuthenticationManager tenantAuthenticationManager,
@@ -50,13 +53,15 @@ public class TenantAuthController {
             EmployeeRepository employeeRepository,
             EmployeeService employeeService,
             TokenBlacklistService tokenBlacklistService,
-            ShiftConfigurationRepository shiftConfigurationRepository) {
+            ShiftConfigurationRepository shiftConfigurationRepository,
+            TenantRLSService tenantRLSService) {
         this.tenantAuthenticationManager = tenantAuthenticationManager;
         this.jwtService = jwtService;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
         this.tokenBlacklistService = tokenBlacklistService;
         this.shiftConfigurationRepository = shiftConfigurationRepository;
+        this.tenantRLSService = tenantRLSService;
     }
 
     @PostMapping("/login")
@@ -141,37 +146,50 @@ public class TenantAuthController {
                 throw new TokenValidationException("Token has been revoked");
             }
 
-            if (jwtService.validateToken(refreshToken) && jwtService.isRefreshToken(refreshToken)) {
+            if (jwtService.validateRefreshToken(refreshToken)) {
                 String username = jwtService.extractUsername(refreshToken);
-                Employee employee = employeeRepository.findByEmail(username)
-                        .orElseThrow(() -> new TenantAuthException("User not found"));
-
-                if (!employee.isActive()) {
-                    log.warn("Token refresh rejected for non-active tenant user: {}", username);
-                    throw new TenantAuthException("Account is not active");
+                Long tenantId = jwtService.getTenantIdFromToken(refreshToken);
+                if (tenantId != null) {
+                    if (tokenBlacklistService.isTenantBlacklisted(tenantId)) {
+                        throw new TokenValidationException("Tenant has been suspended");
+                    }
+                    TenantContext.setCurrentTenant(tenantId);
+                    tenantRLSService.setCurrentTenantInDB(tenantId);
                 }
+                try {
+                    Employee employee = employeeRepository.findByEmail(username)
+                            .orElseThrow(() -> new TenantAuthException("User not found"));
 
-                TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
+                    if (!employee.isActive()) {
+                        log.warn("Token refresh rejected for non-active tenant user: {}", username);
+                        throw new TenantAuthException("Account is not active");
+                    }
 
-                // Register active session & invalidate previous one of same clientType
-                String finalClientType = clientType != null ? clientType : "WEB";
-                tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
+                    TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
 
-                return ResponseEntity.ok(LoginResponse.builder()
-                        .accessToken(tokenPair.getAccessToken())
-                        .refreshToken(tokenPair.getRefreshToken())
-                        .tokenType("Bearer")
-                        .expiresIn(tokenPair.getExpiresIn())
-                        .email(employee.getEmail())
-                        .fullName(employee.getFullName())
-                        .build());
+                    // Register active session & invalidate previous one of same clientType
+                    String finalClientType = clientType != null ? clientType : "WEB";
+                    tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
+
+                    return ResponseEntity.ok(LoginResponse.builder()
+                            .accessToken(tokenPair.getAccessToken())
+                            .refreshToken(tokenPair.getRefreshToken())
+                            .tokenType("Bearer")
+                            .expiresIn(tokenPair.getExpiresIn())
+                            .email(employee.getEmail())
+                            .fullName(employee.getFullName())
+                            .build());
+                } finally {
+                    TenantContext.clear();
+                    tenantRLSService.clearCurrentTenantInDB();
+                }
             }
             throw new TokenValidationException("Invalid or expired refresh token");
         } catch (TenantAuthException | TokenValidationException e) {
-            log.error("Refresh token error: {}", e.getMessage());
+            log.error("Refresh token error (auth/validation): {}", e.getMessage(), e);
             throw e;
         } catch (Exception e) {
-            log.error("Refresh token error: {}", e.getMessage());
+            log.error("Refresh token error (generic): {}", e.getMessage(), e);
             throw new TokenValidationException("Failed to refresh token: " + e.getMessage(), e);
         }
     }

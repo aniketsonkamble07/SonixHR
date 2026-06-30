@@ -6,7 +6,9 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +39,13 @@ public class JwtService {
         return refreshExpiration;
     }
 
-    private final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
+    @Autowired
+    @Lazy
+    private PlatformTokenBlacklistService platformBlacklistService;
+
+    @Autowired
+    @Lazy
+    private TokenBlacklistService tenantBlacklistService;
 
     // ========================
     // EXTRACT METHODS
@@ -91,23 +99,11 @@ public class JwtService {
     }
 
     public Claims extractAllClaims(String token) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSignKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-        } catch (ExpiredJwtException e) {
-            throw e;
-        } catch (UnsupportedJwtException e) {
-            throw e;
-        } catch (MalformedJwtException e) {
-            throw e;
-        } catch (SignatureException e) {
-            throw e;
-        } catch (IllegalArgumentException e) {
-            throw e;
-        }
+        return Jwts.parserBuilder()
+                .setSigningKey(getSignKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 
     // ========================
@@ -215,19 +211,52 @@ public class JwtService {
 
     public boolean validateToken(String token, UserDetails userDetails) {
         try {
+            if (token == null || token.isBlank()) {
+                return false;
+            }
             final String username = extractUsername(token);
             final boolean isExpired = isTokenExpired(token);
             final boolean isBlacklisted = isTokenBlacklisted(token);
-            return username.equals(userDetails.getUsername()) && !isExpired && !isBlacklisted;
-        } catch (JwtException e) {
+            final boolean isAccess = isAccessToken(token);
+            return username.equals(userDetails.getUsername()) && !isExpired && !isBlacklisted && isAccess;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean validateRefreshToken(String token, UserDetails userDetails) {
+        try {
+            if (token == null || token.isBlank()) {
+                return false;
+            }
+            final String username = extractUsername(token);
+            final boolean isExpired = isTokenExpired(token);
+            final boolean isBlacklisted = isTokenBlacklisted(token);
+            final boolean isRefresh = isRefreshToken(token);
+            return username.equals(userDetails.getUsername()) && !isExpired && !isBlacklisted && isRefresh;
+        } catch (Exception e) {
             return false;
         }
     }
 
     public boolean validateToken(String token) {
         try {
-            return !isTokenExpired(token) && !isTokenBlacklisted(token);
-        } catch (JwtException e) {
+            if (token == null || token.isBlank()) {
+                return false;
+            }
+            return !isTokenExpired(token) && !isTokenBlacklisted(token) && isAccessToken(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean validateRefreshToken(String token) {
+        try {
+            if (token == null || token.isBlank()) {
+                return false;
+            }
+            return !isTokenExpired(token) && !isTokenBlacklisted(token) && isRefreshToken(token);
+        } catch (Exception e) {
             return false;
         }
     }
@@ -252,35 +281,29 @@ public class JwtService {
 
     public void invalidateToken(String token) {
         try {
-            String jti = extractJti(token);
-            Date expiration = extractExpiration(token);
-            long ttl = expiration.getTime() - System.currentTimeMillis();
-            if (ttl > 0) {
-                tokenBlacklist.add(jti);
-                scheduleBlacklistRemoval(jti, ttl);
+            String userType = extractUserType(token);
+            if ("PLATFORM".equals(userType)) {
+                platformBlacklistService.blacklistToken(token);
+            } else if ("EMPLOYEE".equals(userType)) {
+                tenantBlacklistService.blacklistToken(token);
             }
         } catch (Exception e) {
+            log.warn("Failed to invalidate token: {}", e.getMessage());
         }
     }
 
     public boolean isTokenBlacklisted(String token) {
         try {
-            String jti = extractJti(token);
-            return tokenBlacklist.contains(jti);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void scheduleBlacklistRemoval(String jti, long ttl) {
-        new Thread(() -> {
-            try {
-                Thread.sleep(ttl);
-                tokenBlacklist.remove(jti);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            String userType = extractUserType(token);
+            if ("PLATFORM".equals(userType)) {
+                return platformBlacklistService.isBlacklisted(token);
+            } else if ("EMPLOYEE".equals(userType)) {
+                return tenantBlacklistService.isBlacklisted(token);
             }
-        }).start();
+        } catch (Exception e) {
+            log.warn("Failed to check if token is blacklisted: {}", e.getMessage());
+        }
+        return false;
     }
 
     // ========================
@@ -289,7 +312,7 @@ public class JwtService {
 
     public Optional<String> refreshAccessToken(String refreshToken, UserDetails userDetails) {
         try {
-            if (validateToken(refreshToken, userDetails) && isRefreshToken(refreshToken)) {
+            if (validateRefreshToken(refreshToken, userDetails)) {
                 String userType = extractUserType(refreshToken);
                 if ("EMPLOYEE".equals(userType) && userDetails instanceof Employee) {
                     return Optional.of(generateEmployeeToken((Employee) userDetails));
@@ -298,6 +321,7 @@ public class JwtService {
                 }
             }
         } catch (Exception e) {
+            log.warn("Failed to refresh access token: {}", e.getMessage());
         }
         return Optional.empty();
     }

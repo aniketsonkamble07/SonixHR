@@ -54,6 +54,7 @@ public class EmployeeService {
     private final PasswordEncoder passwordEncoder;
     private final TenantRoleRepository roleRepository;
     private final ShiftConfigurationRepository shiftConfigurationRepository;
+    private final com.sonixhr.service.common.AuditLogService auditLogService;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -527,10 +528,23 @@ public class EmployeeService {
         if (!subordinates.isEmpty()) {
             throw new BusinessException("Cannot delete employee with " + subordinates.size() + " subordinates");
         }
+        String oldStatus = employee.getStatus() != null ? employee.getStatus().name() : "null";
         employee.setStatus(EmployeeStatus.TERMINATED);
         employee.setLastWorkingDate(LocalDate.now());
         employee.setActive(false);
         employeeRepository.save(employee);
+
+        Long performedBy = com.sonixhr.security.TenantContext.getCurrentUserId();
+        auditLogService.log(
+            employee.getTenant(),
+            "EMPLOYEE_DELETED",
+            "status",
+            oldStatus,
+            EmployeeStatus.TERMINATED.name(),
+            performedBy,
+            "{\"employeeId\":" + id + "}"
+        );
+
         log.info("Employee soft deleted successfully: {}", id);
     }
 

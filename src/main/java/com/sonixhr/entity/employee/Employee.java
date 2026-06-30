@@ -471,6 +471,9 @@ public class Employee implements UserDetails {
         if (passwordHash == null || passwordHash.isEmpty()) {
             throw new IllegalStateException("Cannot activate employee without password");
         }
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalStateException("Cannot activate employee without at least one role");
+        }
         this.isActive = true;
         this.status = EmployeeStatus.ACTIVE;
         this.resignationDate = null;
@@ -597,7 +600,7 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> role.getName() != null &&
-                        ("Super Admin".equals(role.getName()) || "SUPER_ADMIN".equalsIgnoreCase(role.getName())));
+                        "SUPER_ADMIN".equalsIgnoreCase(role.getName()));
     }
 
     public boolean isAdmin() {
@@ -607,7 +610,7 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> role.getName() != null &&
-                        ("Admin".equals(role.getName()) || "ADMIN".equalsIgnoreCase(role.getName())));
+                        "ADMIN".equalsIgnoreCase(role.getName()));
     }
 
     public boolean isManager() {
@@ -617,7 +620,7 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> role.getName() != null &&
-                        ("Manager".equals(role.getName()) || "MANAGER".equalsIgnoreCase(role.getName())));
+                        "MANAGER".equalsIgnoreCase(role.getName()));
     }
 
     public boolean isEmployee() {
@@ -627,7 +630,7 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> role.getName() != null &&
-                        ("Employee".equals(role.getName()) || "EMPLOYEE".equalsIgnoreCase(role.getName())));
+                        "EMPLOYEE".equalsIgnoreCase(role.getName()));
     }
 
     public boolean hasRole(String roleName) {
@@ -643,10 +646,13 @@ public class Employee implements UserDetails {
         if (roles == null || roles.isEmpty() || roleNames == null || roleNames.length == 0) {
             return false;
         }
-        Set<String> roleSet = new HashSet<>(Arrays.asList(roleNames));
+        Set<String> roleSet = Arrays.stream(roleNames)
+                .filter(Objects::nonNull)
+                .map(String::toLowerCase)
+                .collect(Collectors.toSet());
         return roles.stream()
                 .filter(Objects::nonNull)
-                .anyMatch(role -> role.getName() != null && roleSet.contains(role.getName()));
+                .anyMatch(role -> role.getName() != null && roleSet.contains(role.getName().toLowerCase()));
     }
 
     // =====================================================
@@ -656,8 +662,12 @@ public class Employee implements UserDetails {
     @PrePersist
     @PreUpdate
     private void validate() {
-        if (isActive && (passwordHash == null || passwordHash.isEmpty())) {
-            throw new IllegalStateException("Active employee must have a password hash");
+        if (tenant == null) {
+            throw new IllegalStateException("Tenant is required");
+        }
+
+        if (passwordHash == null || passwordHash.isEmpty()) {
+            throw new IllegalStateException("Password hash is required");
         }
 
         if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {

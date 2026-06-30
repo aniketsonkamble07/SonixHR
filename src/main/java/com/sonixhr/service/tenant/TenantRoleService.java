@@ -43,6 +43,7 @@ public class TenantRoleService {
     private final EmployeeRepository employeeRepository;
     private final TenantDynamicRoleService dynamicRoleService;
     private final EmployeeService employeeService;
+    private final com.sonixhr.service.common.AuditLogService auditLogService;
 
     @Value("${app.tenant.role.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -747,6 +748,15 @@ public class TenantRoleService {
 
         employeeRepository.save(user);
 
+        auditLogService.log(
+            user.getTenant(),
+            "ROLE_ASSIGNED",
+            "roles",
+            null,
+            role.getName(),
+            "{\"userId\":" + userId + "}"
+        );
+
         // Invalidate caches
         dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
         usersByRoleCache.remove(roleId);
@@ -839,6 +849,15 @@ public class TenantRoleService {
         user.incrementRolesVersion();
         user.clearAuthoritiesCache();
         employeeRepository.save(user);
+
+        auditLogService.log(
+            user.getTenant(),
+            "ROLE_REMOVED",
+            "roles",
+            role.getName(),
+            null,
+            "{\"userId\":" + userId + "}"
+        );
 
         // Invalidate caches
         dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);

@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -15,7 +16,10 @@ import java.io.IOException;
 @Slf4j
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class TokenCleanupFilter extends OncePerRequestFilter {
+
+    private final TenantRLSService tenantRLSService;
 
     @Override
     protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,
@@ -25,8 +29,12 @@ public class TokenCleanupFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
-            // Clear tenant context after request completes
+            // Clear tenant context, DB RLS context, and request-scoped caches after request completes
+            if (TenantContext.hasTenantContext()) {
+                tenantRLSService.clearAllContexts();
+            }
             TenantContext.clear();
+            SecurityUtils.clearRequestCache();
         }
     }
 }

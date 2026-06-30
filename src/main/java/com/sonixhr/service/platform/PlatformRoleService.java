@@ -37,6 +37,7 @@ public class PlatformRoleService {
     private final PlatformPermissionRepository permissionRepository;
     private final PlatformUserRepository userRepository;
     private final PlatformUserDetailsService platformUserDetailsService;
+    private final org.springframework.cache.CacheManager cacheManager;
 
     @Value("${app.platform.role.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -258,8 +259,12 @@ public class PlatformRoleService {
      */
     private void invalidateUsersWithRole(Long roleId) {
         List<PlatformUser> users = userRepository.findByRolesId(roleId);
+        org.springframework.cache.Cache authCache = cacheManager != null ? cacheManager.getCache("platform_user_authorities") : null;
         for (PlatformUser user : users) {
             platformUserDetailsService.invalidateCache(user.getEmail());
+            if (authCache != null) {
+                authCache.evict(user.getEmail());
+            }
         }
         usersByRoleCache.remove(roleId);
         log.debug("Invalidated cache for {} users with role: {}", users.size(), roleId);
@@ -579,6 +584,12 @@ public class PlatformRoleService {
         userRepository.save(user);
 
         platformUserDetailsService.invalidateCache(user.getEmail());
+        if (cacheManager != null) {
+            org.springframework.cache.Cache authCache = cacheManager.getCache("platform_user_authorities");
+            if (authCache != null) {
+                authCache.evict(user.getEmail());
+            }
+        }
         usersByRoleCache.remove(roleId);
         if (cacheEnabled) {
             roleCache.remove(roleId);
@@ -649,6 +660,12 @@ public class PlatformRoleService {
         userRepository.save(user);
 
         platformUserDetailsService.invalidateCache(user.getEmail());
+        if (cacheManager != null) {
+            org.springframework.cache.Cache authCache = cacheManager.getCache("platform_user_authorities");
+            if (authCache != null) {
+                authCache.evict(user.getEmail());
+            }
+        }
         usersByRoleCache.remove(roleId);
         if (cacheEnabled) {
             roleCache.remove(roleId);

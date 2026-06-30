@@ -416,7 +416,14 @@ public class PlatformTokenBlacklistService {
         }
 
         log.info("Blacklisting all tokens for tenant: {}", tenantId);
-        // Implementation depends on your token storage strategy
+        try {
+            if (redisEnabled && redisTemplate != null) {
+                String key = "tenant:blacklist:" + tenantId;
+                redisTemplate.opsForValue().set(key, "true", 7, TimeUnit.DAYS);
+            }
+        } catch (Exception e) {
+            log.error("Failed to blacklist tenant tokens in Redis: {}", e.getMessage());
+        }
     }
 
     /**
@@ -496,11 +503,18 @@ public class PlatformTokenBlacklistService {
      * Clear positive cache for a specific user
      */
     private void clearPositiveCacheForUser(String username) {
-        // Remove entries related to this user
-        positiveCache.asMap().entrySet().removeIf(entry ->
-                entry.getKey().contains(username) ||
-                        (entry.getValue().isBlacklisted && entry.getKey().startsWith("jti:"))
-        );
+        if (username == null) return;
+        positiveCache.asMap().keySet().removeIf(key -> {
+            try {
+                if (key.startsWith("jti:")) {
+                    return false;
+                }
+                String tokenUsername = jwtService.extractUsername(key);
+                return username.equalsIgnoreCase(tokenUsername);
+            } catch (Exception e) {
+                return false;
+            }
+        });
         log.debug("Cleared positive cache for user: {}", username);
     }
 

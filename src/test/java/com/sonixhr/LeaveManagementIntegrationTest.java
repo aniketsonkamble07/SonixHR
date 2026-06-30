@@ -304,4 +304,313 @@ public class LeaveManagementIntegrationTest {
         Map<String, Object> casualBalance3 = (Map<String, Object>) balanceMap3.get("CASUAL");
         assertEquals(0.0, ((Number) casualBalance3.get("used")).doubleValue());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testLeaveApprovalCrossDepartmentBypassForbidden() throws Exception {
+        // 1. Fetch default Employee and Manager roles
+        MvcResult rolesListResult = mockMvc.perform(get("/api/tenant/roles")
+                        .header("Authorization", adminTokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<Map<String, Object>> rolesList = objectMapper.readValue(
+                rolesListResult.getResponse().getContentAsString(), List.class);
+        
+        Long employeeRoleId = null;
+        Long managerRoleId = null;
+        for (Map<String, Object> r : rolesList) {
+            String roleName = (String) r.get("name");
+            if ("Employee".equalsIgnoreCase(roleName)) {
+                employeeRoleId = ((Number) r.get("id")).longValue();
+            } else if ("Manager".equalsIgnoreCase(roleName)) {
+                managerRoleId = ((Number) r.get("id")).longValue();
+            }
+        }
+
+        assertNotNull(employeeRoleId);
+        assertNotNull(managerRoleId);
+
+        // 2. Create Department A (Engineering) and Department B (Finance)
+        DepartmentResponse deptA = createDept("Engineering-" + uniqueSuffix, "ENG-" + uniqueSuffix);
+        DepartmentResponse deptB = createDept("Finance-" + uniqueSuffix, "FIN-" + uniqueSuffix);
+
+        // 3. Create Manager A in Dept A
+        String managerAEmail = "manager.a_" + uniqueSuffix + "@leavetest.com";
+        EmployeeResponse managerA = createEmployee("Manager", "A", managerAEmail, deptA.getId(), null, Set.of(managerRoleId));
+
+        // 4. Create Employee A in Dept A reporting to Manager A
+        String employeeAEmail = "employee.a_" + uniqueSuffix + "@leavetest.com";
+        EmployeeResponse employeeA = createEmployee("Employee", "A", employeeAEmail, deptA.getId(), managerA.getId(), Set.of(employeeRoleId));
+
+        // 5. Create Manager B in Dept B
+        String managerBEmail = "manager.b_" + uniqueSuffix + "@leavetest.com";
+        EmployeeResponse managerB = createEmployee("Manager", "B", managerBEmail, deptB.getId(), null, Set.of(managerRoleId));
+
+        // 6. Login Manager B
+        String managerBToken = login(managerBEmail);
+
+        // 7. Login Employee A & Request Leave
+        String employeeAToken = login(employeeAEmail);
+
+        // Ensure policies configured (we can update policies first using admin)
+        MvcResult settingsResult = mockMvc.perform(get("/api/employees/leaves/settings")
+                        .header("Authorization", adminTokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+        
+        LeaveSettingsDTO settings = objectMapper.readValue(
+                settingsResult.getResponse().getContentAsString(), LeaveSettingsDTO.class);
+        Map<String, LeavePolicyDTO> policies = settings.getLeavePolicies();
+        if (policies == null) {
+            policies = new HashMap<>();
+        }
+        policies.put("CASUAL", LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(12)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .prorated(false)
+                .build());
+        settings.setLeavePolicies(policies);
+        settings.setPoliciesConfigured(true);
+
+        mockMvc.perform(put("/api/employees/leaves/settings")
+                        .header("Authorization", adminTokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(settings)))
+                .andExpect(status().isOk());
+
+        LocalDate nextMonday = LocalDate.now();
+        while (nextMonday.getDayOfWeek() != DayOfWeek.MONDAY) {
+            nextMonday = nextMonday.plusDays(1);
+        }
+        if (nextMonday.isBefore(LocalDate.now().plusDays(1))) {
+            nextMonday = nextMonday.plusDays(7);
+        }
+
+        LeaveRequestDTO leaveReq = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(nextMonday)
+                .endDate(nextMonday.plusDays(1))
+                .reason("Vacation")
+                .isHalfDay(false)
+                .build();
+
+        MvcResult leaveResult = mockMvc.perform(post("/api/employee/leaves")
+                        .header("Authorization", employeeAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(leaveReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        LeaveResponseDTO leaveResp = objectMapper.readValue(
+                leaveResult.getResponse().getContentAsString(), LeaveResponseDTO.class);
+
+        // 8. Attempt to approve Employee A's leave request using Manager B (Finance) -> Should be 403 Forbidden!
+        mockMvc.perform(put("/api/employees/leaves/" + leaveResp.getId() + "/approve")
+                        .header("Authorization", managerBToken))
+                .andExpect(status().isForbidden());
+
+        // 9. Login Manager A (Engineering) and approve Employee A's leave request -> Should succeed (200 OK)!
+        String managerAToken = login(managerAEmail);
+        mockMvc.perform(put("/api/employees/leaves/" + leaveResp.getId() + "/approve")
+                        .header("Authorization", managerAToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testLeaveCancellationBypassForbidden() throws Exception {
+        // 1. Fetch default Employee role
+        MvcResult rolesListResult = mockMvc.perform(get("/api/tenant/roles")
+                        .header("Authorization", adminTokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<Map<String, Object>> rolesList = objectMapper.readValue(
+                rolesListResult.getResponse().getContentAsString(), List.class);
+        
+        Long employeeRoleId = null;
+        for (Map<String, Object> r : rolesList) {
+            String roleName = (String) r.get("name");
+            if ("Employee".equalsIgnoreCase(roleName)) {
+                employeeRoleId = ((Number) r.get("id")).longValue();
+                break;
+            }
+        }
+        assertNotNull(employeeRoleId);
+
+        // 2. Create Department
+        DepartmentResponse dept = createDept("QA-" + uniqueSuffix, "QA-" + uniqueSuffix);
+
+        // 3. Create Employee A
+        String employeeAEmail = "emp.a_" + uniqueSuffix + "@leavetest.com";
+        EmployeeResponse employeeA = createEmployee("EmployeeA", "Test", employeeAEmail, dept.getId(), null, Set.of(employeeRoleId));
+
+        // 4. Create Employee B
+        String employeeBEmail = "emp.b_" + uniqueSuffix + "@leavetest.com";
+        EmployeeResponse employeeB = createEmployee("EmployeeB", "Test", employeeBEmail, dept.getId(), null, Set.of(employeeRoleId));
+
+        // 5. Login both
+        String tokenA = login(employeeAEmail);
+        String tokenB = login(employeeBEmail);
+
+        // Ensure policies configured (we can update policies first using admin)
+        MvcResult settingsResult = mockMvc.perform(get("/api/employees/leaves/settings")
+                        .header("Authorization", adminTokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+        
+        LeaveSettingsDTO settings = objectMapper.readValue(
+                settingsResult.getResponse().getContentAsString(), LeaveSettingsDTO.class);
+        Map<String, LeavePolicyDTO> policies = settings.getLeavePolicies();
+        if (policies == null) {
+            policies = new HashMap<>();
+        }
+        policies.put("CASUAL", LeavePolicyDTO.builder()
+                .allowed(true)
+                .daysPerYear(12)
+                .carryForward(false)
+                .maxCarryForwardDays(0)
+                .minimumServiceMonths(0)
+                .genderEligibility("ALL")
+                .probationPeriodAllowed(true)
+                .prorated(false)
+                .build());
+        settings.setLeavePolicies(policies);
+        settings.setPoliciesConfigured(true);
+
+        mockMvc.perform(put("/api/employees/leaves/settings")
+                        .header("Authorization", adminTokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(settings)))
+                .andExpect(status().isOk());
+
+        // 6. Employee A requests a leave
+        LocalDate nextMonday = LocalDate.now();
+        while (nextMonday.getDayOfWeek() != DayOfWeek.MONDAY) {
+            nextMonday = nextMonday.plusDays(1);
+        }
+        if (nextMonday.isBefore(LocalDate.now().plusDays(1))) {
+            nextMonday = nextMonday.plusDays(7);
+        }
+
+        LeaveRequestDTO leaveReq = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(nextMonday)
+                .endDate(nextMonday.plusDays(1))
+                .reason("A's Vacation")
+                .isHalfDay(false)
+                .build();
+
+        MvcResult leaveResult = mockMvc.perform(post("/api/employee/leaves")
+                        .header("Authorization", tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(leaveReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        LeaveResponseDTO leaveResp = objectMapper.readValue(
+                leaveResult.getResponse().getContentAsString(), LeaveResponseDTO.class);
+
+        // 7. Employee B attempts to cancel Employee A's leave -> Expect 403 Forbidden!
+        mockMvc.perform(put("/api/employee/leaves/" + leaveResp.getId() + "/cancel")
+                        .header("Authorization", tokenB))
+                .andExpect(status().isForbidden());
+
+        // 8. Employee A attempts to cancel their own leave -> Expect 200 OK!
+        mockMvc.perform(put("/api/employee/leaves/" + leaveResp.getId() + "/cancel")
+                        .header("Authorization", tokenA))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void testLeaveRequestInvertedDatesBadRequest() throws Exception {
+        // Request leave with inverted dates -> Expect 400 Bad Request
+        LocalDate nextMonday = LocalDate.now();
+        while (nextMonday.getDayOfWeek() != DayOfWeek.MONDAY) {
+            nextMonday = nextMonday.plusDays(1);
+        }
+        if (nextMonday.isBefore(LocalDate.now().plusDays(1))) {
+            nextMonday = nextMonday.plusDays(7);
+        }
+
+        // startDate is next Tuesday, endDate is next Monday (inverted)
+        LeaveRequestDTO leaveReq = LeaveRequestDTO.builder()
+                .leaveType(LeaveType.CASUAL)
+                .startDate(nextMonday.plusDays(1))
+                .endDate(nextMonday)
+                .reason("Inverted Dates")
+                .isHalfDay(false)
+                .build();
+
+        mockMvc.perform(post("/api/employee/leaves")
+                        .header("Authorization", adminTokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(leaveReq)))
+                .andExpect(status().isBadRequest());
+    }
+
+    private DepartmentResponse createDept(String name, String code) throws Exception {
+        DepartmentRequest deptRequest = DepartmentRequest.builder()
+                .name(name)
+                .code(code)
+                .description(name + " Department")
+                .build();
+
+        MvcResult deptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", adminTokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deptRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return objectMapper.readValue(deptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+    }
+
+    private EmployeeResponse createEmployee(String firstName, String lastName, String email, Long deptId, Long managerId, Set<Long> roleIds) throws Exception {
+        EmployeeCreateRequest empRequest = EmployeeCreateRequest.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .email(email)
+                .departmentId(deptId)
+                .managerId(managerId)
+                .position("Software Engineer")
+                .hireDate(LocalDate.now().minusMonths(1))
+                .phone("+919876543210")
+                .city("Bangalore")
+                .state(IndianState.KARNATAKA)
+                .country("India")
+                .workLocation("Office")
+                .employmentType(EmploymentType.FULL_TIME)
+                .probationMonths(3)
+                .roleIds(roleIds)
+                .build();
+
+        MvcResult empResult = mockMvc.perform(post("/api/employees")
+                        .header("Authorization", adminTokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(empRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return objectMapper.readValue(empResult.getResponse().getContentAsString(), EmployeeResponse.class);
+    }
+
+    private String login(String email) throws Exception {
+        LoginRequest loginRequest = new LoginRequest(email, "Admin@123");
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        LoginResponse loginResponse = objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class);
+        return "Bearer " + loginResponse.getAccessToken();
+    }
 }

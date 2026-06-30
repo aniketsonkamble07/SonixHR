@@ -286,6 +286,24 @@ public class GlobalExceptionHandler {
     }
 
     // =====================================================
+    // HANDLE ACCESS DENIED
+    // =====================================================
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(
+            org.springframework.security.access.AccessDeniedException ex) {
+
+        log.warn("Access denied: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(Map.of(
+                        "success", false,
+                        "message", "Access denied: You do not have permission to perform this action",
+                        "timestamp", LocalDateTime.now()
+                ));
+    }
+
+    // =====================================================
     // HANDLE BASE EXCEPTIONS (Custom Exceptions)
     // =====================================================
     @ExceptionHandler(BaseException.class)
@@ -304,6 +322,24 @@ public class GlobalExceptionHandler {
                         "success", false,
                         "errorCode", ex.getErrorCode(),
                         "message", ex.getUserMessage() != null ? ex.getUserMessage() : ex.getMessage(),
+                        "timestamp", LocalDateTime.now()
+                ));
+    }
+
+    // =====================================================
+    // HANDLE RESPONSE STATUS EXCEPTIONS
+    // =====================================================
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(
+            org.springframework.web.server.ResponseStatusException ex) {
+
+        log.warn("Response status exception: status={}, reason={}", ex.getStatusCode(), ex.getReason());
+
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(Map.of(
+                        "success", false,
+                        "message", ex.getReason() != null ? ex.getReason() : ex.getMessage(),
                         "timestamp", LocalDateTime.now()
                 ));
     }

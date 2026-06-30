@@ -10,6 +10,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -59,11 +61,29 @@ public class SecurityUtils {
     private String USER_TYPE_TENANT;
 
     // Local cache with Caffeine for better performance
-    private final Map<String, CachedSecurityContext> localCache = new ConcurrentHashMap<>();
+    private Map<String, CachedSecurityContext> localCache;
 
     // Cache for frequently accessed boolean results
-    private final Map<String, Boolean> roleCheckCache = new ConcurrentHashMap<>();
-    private final Map<String, Boolean> permissionCheckCache = new ConcurrentHashMap<>();
+    private Map<String, Boolean> roleCheckCache;
+    private Map<String, Boolean> permissionCheckCache;
+
+    @PostConstruct
+    public void init() {
+        localCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                .maximumSize(5000)
+                .<String, CachedSecurityContext>build().asMap();
+
+        roleCheckCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                .maximumSize(10000)
+                .<String, Boolean>build().asMap();
+
+        permissionCheckCache = Caffeine.newBuilder()
+                .expireAfterWrite(1, TimeUnit.MINUTES)
+                .maximumSize(10000)
+                .<String, Boolean>build().asMap();
+    }
 
     // Redis cache keys
     private static final String REDIS_KEY_USER_CONTEXT = "security:user:context:";
@@ -73,17 +93,22 @@ public class SecurityUtils {
     // ThreadLocal for request-scoped caching (avoid repeated calls in same request)
     private static final ThreadLocal<Map<String, Object>> requestCache = ThreadLocal.withInitial(HashMap::new);
 
-    private static class CachedSecurityContext {
-        final String email;
-        final List<String> roles;
-        final String userType;
-        final Long tenantId;  // Changed to Long for consistency
-        final Long employeeId;
-        final String employeeCode;
-        final long cachedAt;
-        final long expiresAt;
+    @com.fasterxml.jackson.annotation.JsonAutoDetect(fieldVisibility = com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY)
+    public static class CachedSecurityContext {
+        public String email;
+        public List<String> roles;
+        public String userType;
+        public Long tenantId;  // Changed to Long for consistency
+        public Long employeeId;
+        public String employeeCode;
+        public long cachedAt;
+        public long expiresAt;
 
-        CachedSecurityContext(Authentication auth, Map<String, Object> claims) {
+        // Public no-arg constructor for Jackson deserialization
+        public CachedSecurityContext() {
+        }
+
+        public CachedSecurityContext(Authentication auth, Map<String, Object> claims, long ttlMinutes) {
             this.email = auth != null ? auth.getName() : null;
             this.roles = extractRolesFromClaims(claims);
             this.userType = (String) claims.get("userType");
@@ -91,10 +116,10 @@ public class SecurityUtils {
             this.employeeId = extractEmployeeId(claims);
             this.employeeCode = (String) claims.get("employeeCode");
             this.cachedAt = System.currentTimeMillis();
-            this.expiresAt = this.cachedAt + TimeUnit.MINUTES.toMillis(5);
+            this.expiresAt = this.cachedAt + TimeUnit.MINUTES.toMillis(ttlMinutes);
         }
 
-        boolean isValid() {
+        public boolean isValid() {
             return System.currentTimeMillis() < expiresAt;
         }
 
@@ -157,15 +182,17 @@ public class SecurityUtils {
             return null;
         }
 
+        String key = getCacheKey(email);
+
         // Check request cache first (fastest - same request)
         Map<String, Object> reqCache = requestCache.get();
-        String reqCacheKey = "context_" + email;
+        String reqCacheKey = "context_" + key;
         if (reqCache.containsKey(reqCacheKey)) {
             return (CachedSecurityContext) reqCache.get(reqCacheKey);
         }
 
         // Check local cache second
-        CachedSecurityContext cached = localCache.get(email);
+        CachedSecurityContext cached = localCache.get(key);
         if (cached != null && cached.isValid()) {
             reqCache.put(reqCacheKey, cached);
             return cached;
@@ -173,10 +200,10 @@ public class SecurityUtils {
 
         // Try Redis cache
         if (cacheEnabled && redisTemplate != null) {
-            String cacheKey = REDIS_KEY_USER_CONTEXT + email;
+            String cacheKey = REDIS_KEY_USER_CONTEXT + key;
             CachedSecurityContext redisCached = (CachedSecurityContext) redisTemplate.opsForValue().get(cacheKey);
             if (redisCached != null) {
-                localCache.put(email, redisCached);
+                localCache.put(key, redisCached);
                 reqCache.put(reqCacheKey, redisCached);
                 return redisCached;
             }
@@ -188,14 +215,14 @@ public class SecurityUtils {
             return null;
         }
 
-        CachedSecurityContext context = new CachedSecurityContext(auth, claims);
+        CachedSecurityContext context = new CachedSecurityContext(auth, claims, cacheTtlMinutes);
 
         // Cache the context
         if (cacheEnabled) {
-            localCache.put(email, context);
+            localCache.put(key, context);
             reqCache.put(reqCacheKey, context);
             if (redisTemplate != null) {
-                String cacheKey = REDIS_KEY_USER_CONTEXT + email;
+                String cacheKey = REDIS_KEY_USER_CONTEXT + key;
                 redisTemplate.opsForValue().set(cacheKey, context, cacheTtlMinutes, TimeUnit.MINUTES);
             }
         }
@@ -241,10 +268,14 @@ public class SecurityUtils {
 
         Authentication auth = getCurrentAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
-            return null;
+            reqCache.put("email", "anonymousUser");
+            return "anonymousUser";
         }
 
         String email = auth.getName();
+        if (email == null || "anonymousUser".equalsIgnoreCase(email)) {
+            email = "anonymousUser";
+        }
         reqCache.put("email", email);
         log.debug("Current user email: {}", email);
         return email;
@@ -255,7 +286,7 @@ public class SecurityUtils {
      */
     public String getCurrentUserEmailCached() {
         CachedSecurityContext context = getCachedContext();
-        return context != null ? context.email : null;
+        return context != null && context.email != null ? context.email : "anonymousUser";
     }
 
     /**
@@ -276,7 +307,7 @@ public class SecurityUtils {
 
         Authentication auth = getCurrentAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
-            return Collections.emptyList();
+            return List.of("ROLE_ANONYMOUS");
         }
 
         // Try to get from authentication authorities (fastest)
@@ -302,7 +333,7 @@ public class SecurityUtils {
             }
         }
 
-        return Collections.emptyList();
+        return List.of("ROLE_ANONYMOUS");
     }
 
     /**
@@ -314,15 +345,17 @@ public class SecurityUtils {
             return Collections.emptyList();
         }
 
+        String key = getCacheKey(email);
+
         // Check request cache
         Map<String, Object> reqCache = requestCache.get();
-        String cacheKey = "roles_cached_" + email;
+        String cacheKey = "roles_cached_" + key;
         if (reqCache.containsKey(cacheKey)) {
             return (List<String>) reqCache.get(cacheKey);
         }
 
         if (cacheEnabled && redisTemplate != null) {
-            String redisKey = REDIS_KEY_USER_ROLES + email;
+            String redisKey = REDIS_KEY_USER_ROLES + key;
             List<String> cachedRoles = (List<String>) redisTemplate.opsForValue().get(redisKey);
             if (cachedRoles != null) {
                 reqCache.put(cacheKey, cachedRoles);
@@ -334,7 +367,7 @@ public class SecurityUtils {
 
         // Cache the roles
         if (cacheEnabled && redisTemplate != null && !roles.isEmpty()) {
-            String redisKey = REDIS_KEY_USER_ROLES + email;
+            String redisKey = REDIS_KEY_USER_ROLES + key;
             redisTemplate.opsForValue().set(redisKey, roles, cacheTtlMinutes, TimeUnit.MINUTES);
             reqCache.put(cacheKey, roles);
         }
@@ -358,11 +391,15 @@ public class SecurityUtils {
         }
 
         // Check local cache
-        String localCacheKey = "role_" + getCurrentUserEmail() + "_" + role;
-        Boolean cached = roleCheckCache.get(localCacheKey);
-        if (cached != null) {
-            reqCache.put(cacheKey, cached);
-            return cached;
+        String email = getCurrentUserEmail();
+        String key = email != null ? getCacheKey(email) : "anonymous";
+        String localCacheKey = "role_" + key + "_" + role;
+        if (cacheEnabled) {
+            Boolean cached = roleCheckCache.get(localCacheKey);
+            if (cached != null) {
+                reqCache.put(cacheKey, cached);
+                return cached;
+            }
         }
 
         List<String> roles = getCurrentUserRoles();
@@ -376,8 +413,8 @@ public class SecurityUtils {
                 roles.contains(roleWithoutPrefix);
 
         // Cache the result
-        if (hasRole) {
-            roleCheckCache.put(localCacheKey, true);
+        if (cacheEnabled) {
+            roleCheckCache.put(localCacheKey, hasRole);
         }
         reqCache.put(cacheKey, hasRole);
 
@@ -731,8 +768,9 @@ public class SecurityUtils {
 
         // Check local cache
         String email = getCurrentUserEmail();
-        if (email != null) {
-            String localCacheKey = "perm_" + email + "_" + permission;
+        String key = email != null ? getCacheKey(email) : "anonymous";
+        if (cacheEnabled && email != null) {
+            String localCacheKey = "perm_" + key + "_" + permission;
             Boolean cached = permissionCheckCache.get(localCacheKey);
             if (cached != null) {
                 reqCache.put(cacheKey, cached);
@@ -742,10 +780,12 @@ public class SecurityUtils {
 
         // Check Redis cache
         if (cacheEnabled && redisTemplate != null && email != null) {
-            String redisKey = REDIS_KEY_PERMISSION + email + ":" + permission;
+            String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
             Boolean cached = (Boolean) redisTemplate.opsForValue().get(redisKey);
             if (cached != null) {
-                permissionCheckCache.put("perm_" + email + "_" + permission, cached);
+                if (cacheEnabled) {
+                    permissionCheckCache.put("perm_" + key + "_" + permission, cached);
+                }
                 reqCache.put(cacheKey, cached);
                 return cached;
             }
@@ -755,10 +795,12 @@ public class SecurityUtils {
         boolean hasPermission = hasRole(permission);
 
         // Cache the result
-        if (cacheEnabled && redisTemplate != null && email != null) {
-            String redisKey = REDIS_KEY_PERMISSION + email + ":" + permission;
-            redisTemplate.opsForValue().set(redisKey, hasPermission, 1, TimeUnit.MINUTES);
-            permissionCheckCache.put("perm_" + email + "_" + permission, hasPermission);
+        if (cacheEnabled && email != null) {
+            permissionCheckCache.put("perm_" + key + "_" + permission, hasPermission);
+            if (redisTemplate != null) {
+                String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
+                redisTemplate.opsForValue().set(redisKey, hasPermission, 1, TimeUnit.MINUTES);
+            }
         }
 
         reqCache.put(cacheKey, hasPermission);
@@ -804,27 +846,65 @@ public class SecurityUtils {
      * Invalidate cache for specific user
      */
     public void invalidateUserCache(String email) {
-        // Clear local caches
-        localCache.remove(email);
+        if (email == null) {
+            return;
+        }
 
-        // Clear role and permission caches for this user
-        roleCheckCache.keySet().removeIf(key -> key.contains(email));
-        permissionCheckCache.keySet().removeIf(key -> key.contains(email));
+        String lowerEmail = email.toLowerCase();
+
+        // Clear local caches matching the email suffix or exact email
+        localCache.keySet().removeIf(k -> k.toLowerCase().endsWith(":" + lowerEmail) || k.equalsIgnoreCase(email));
+        roleCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_") || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
+        permissionCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_") || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
 
         // Clear Redis cache
         if (cacheEnabled && redisTemplate != null) {
-            String contextKey = REDIS_KEY_USER_CONTEXT + email;
-            String rolesKey = REDIS_KEY_USER_ROLES + email;
-            redisTemplate.delete(contextKey);
-            redisTemplate.delete(rolesKey);
+            try {
+                // Delete unqualified keys
+                String contextKey = REDIS_KEY_USER_CONTEXT + email;
+                String rolesKey = REDIS_KEY_USER_ROLES + email;
+                redisTemplate.delete(contextKey);
+                redisTemplate.delete(rolesKey);
 
-            // Clear permission cache (pattern-based)
-            Set<String> permissionKeys = redisTemplate.keys(REDIS_KEY_PERMISSION + email + ":*");
-            if (permissionKeys != null && !permissionKeys.isEmpty()) {
-                redisTemplate.delete(permissionKeys);
+                // Use case-insensitive non-blocking SCAN to find and delete qualified keys
+                scanAndInvalidateRedisKeys(REDIS_KEY_USER_CONTEXT + "*", lowerEmail, false);
+                scanAndInvalidateRedisKeys(REDIS_KEY_USER_ROLES + "*", lowerEmail, false);
+                scanAndInvalidateRedisKeys(REDIS_KEY_PERMISSION + "*", lowerEmail, true);
+
+                log.debug("Invalidated security cache for user: {}", email);
+            } catch (Exception e) {
+                log.warn("Failed to invalidate Redis cache for user {}: {}", email, e.getMessage());
             }
+        }
+    }
 
-            log.debug("Invalidated security cache for user: {}", email);
+    private void scanAndInvalidateRedisKeys(String pattern, String suffix, boolean containsMode) {
+        try {
+            Set<String> keys = redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
+                Set<String> keySet = new java.util.HashSet<>();
+                org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
+                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000).build()
+                );
+                while (cursor.hasNext()) {
+                    String key = new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8);
+                    String lowerKey = key.toLowerCase();
+                    if (containsMode) {
+                        if (lowerKey.contains(":" + suffix + ":")) {
+                            keySet.add(key);
+                        }
+                    } else {
+                        if (lowerKey.endsWith(":" + suffix)) {
+                            keySet.add(key);
+                        }
+                    }
+                }
+                return keySet;
+            });
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to scan and invalidate Redis keys for pattern {} and suffix {}: {}", pattern, suffix, e.getMessage());
         }
     }
 
@@ -837,29 +917,71 @@ public class SecurityUtils {
         permissionCheckCache.clear();
 
         if (cacheEnabled && redisTemplate != null) {
-            Set<String> contextKeys = redisTemplate.keys(REDIS_KEY_USER_CONTEXT + "*");
-            Set<String> rolesKeys = redisTemplate.keys(REDIS_KEY_USER_ROLES + "*");
-            Set<String> permissionKeys = redisTemplate.keys(REDIS_KEY_PERMISSION + "*");
-
-            if (contextKeys != null && !contextKeys.isEmpty()) {
-                redisTemplate.delete(contextKeys);
-            }
-            if (rolesKeys != null && !rolesKeys.isEmpty()) {
-                redisTemplate.delete(rolesKeys);
-            }
-            if (permissionKeys != null && !permissionKeys.isEmpty()) {
-                redisTemplate.delete(permissionKeys);
-            }
-
+            scanAndDelete(REDIS_KEY_USER_CONTEXT + "*");
+            scanAndDelete(REDIS_KEY_USER_ROLES + "*");
+            scanAndDelete(REDIS_KEY_PERMISSION + "*");
             log.info("Cleared all security caches");
+        }
+    }
+
+    private void scanAndDelete(String pattern) {
+        try {
+            Set<String> keys = redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
+                Set<String> keySet = new java.util.HashSet<>();
+                org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
+                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000).build()
+                );
+                while (cursor.hasNext()) {
+                    keySet.add(new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8));
+                }
+                return keySet;
+            });
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to scan and delete pattern {}: {}", pattern, e.getMessage());
         }
     }
 
     /**
      * Clear request cache (call at end of each request)
      */
-    public void clearRequestCache() {
+    public static void clearRequestCache() {
         requestCache.remove();
+    }
+
+    private String getCacheKey(String email) {
+        if (email == null || "anonymousUser".equalsIgnoreCase(email)) {
+            return "anonymousUser";
+        }
+
+        // Check request cache first
+        Map<String, Object> reqCache = requestCache.get();
+        String reqKey = "cacheKey_" + email;
+        if (reqCache.containsKey(reqKey)) {
+            return (String) reqCache.get(reqKey);
+        }
+
+        String resultKey = email;
+        Authentication auth = getCurrentAuthentication();
+        if (auth != null && email.equalsIgnoreCase(auth.getName())) {
+            Object details = auth.getDetails();
+            if (details instanceof Map) {
+                Map<String, Object> detailsMap = (Map<String, Object>) details;
+                String userType = (String) detailsMap.get("userType");
+                if ("EMPLOYEE".equals(userType)) {
+                    Object tenantIdObj = detailsMap.get("tenantId");
+                    String tenantIdStr = tenantIdObj != null ? tenantIdObj.toString() : "no-tenant";
+                    resultKey = "EMPLOYEE:" + tenantIdStr + ":" + email;
+                } else {
+                    resultKey = "PLATFORM:" + email;
+                }
+            }
+        }
+
+        reqCache.put(reqKey, resultKey);
+        return resultKey;
     }
 
     /**

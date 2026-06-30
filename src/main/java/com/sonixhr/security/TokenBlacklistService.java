@@ -23,6 +23,9 @@ public class TokenBlacklistService {
 
     private static final String REDIS_KEY_BLACKLIST = "token:blacklist:";
 
+    // Local in-memory fallback (used when Redis is unavailable)
+    private final java.util.Map<String, Long> localBlacklist = new java.util.concurrent.ConcurrentHashMap<>();
+
     /**
      * Blacklist a token
      */
@@ -40,9 +43,18 @@ public class TokenBlacklistService {
             long ttl = expiration.getTime() - System.currentTimeMillis();
 
             if (ttl > 0) {
-                String key = REDIS_KEY_BLACKLIST + jti;
-                redisTemplate.opsForValue().set(key, "true", ttl, TimeUnit.MILLISECONDS);
-                log.debug("Token blacklisted: {}, TTL: {}ms", jti, ttl);
+                boolean redisSuccess = false;
+                try {
+                    String key = REDIS_KEY_BLACKLIST + jti;
+                    redisTemplate.opsForValue().set(key, "true", ttl, TimeUnit.MILLISECONDS);
+                    log.debug("Token blacklisted in Redis: {}, TTL: {}ms", jti, ttl);
+                    redisSuccess = true;
+                } catch (Exception e) {
+                    log.warn("Failed to blacklist token in Redis, falling back to local memory: {}", e.getMessage());
+                }
+                if (!redisSuccess) {
+                    localBlacklist.put(jti, System.currentTimeMillis() + ttl);
+                }
             } else {
                 log.debug("Token already expired, no need to blacklist: {}", jti);
             }
@@ -65,11 +77,68 @@ public class TokenBlacklistService {
                 return false;
             }
 
-            String key = REDIS_KEY_BLACKLIST + jti;
-            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+            boolean isBlacklisted = false;
+            try {
+                String key = REDIS_KEY_BLACKLIST + jti;
+                isBlacklisted = Boolean.TRUE.equals(redisTemplate.hasKey(key));
+            } catch (Exception e) {
+                log.warn("Redis blacklist check failed, checking local memory: {}", e.getMessage());
+            }
+
+            if (!isBlacklisted) {
+                Long expiry = localBlacklist.get(jti);
+                if (expiry != null) {
+                    if (expiry > System.currentTimeMillis()) {
+                        isBlacklisted = true;
+                    } else {
+                        localBlacklist.remove(jti);
+                    }
+                }
+            }
+
+            return isBlacklisted;
         } catch (Exception e) {
             log.debug("Error checking blacklist: {}", e.getMessage());
             return false;
+        }
+    }
+
+    public boolean isTenantBlacklisted(Long tenantId) {
+        if (!blacklistEnabled || tenantId == null) {
+            return false;
+        }
+        try {
+            String key = "tenant:blacklist:" + tenantId;
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        } catch (Exception e) {
+            log.warn("Failed to check tenant blacklist in Redis: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public void blacklistTenant(Long tenantId) {
+        if (!blacklistEnabled || tenantId == null) {
+            return;
+        }
+        try {
+            String key = "tenant:blacklist:" + tenantId;
+            redisTemplate.opsForValue().set(key, "true");
+            log.info("Tenant suspended and blacklisted: {}", tenantId);
+        } catch (Exception e) {
+            log.error("Failed to blacklist tenant in Redis: {}", e.getMessage());
+        }
+    }
+
+    public void removeFromTenantBlacklist(Long tenantId) {
+        if (tenantId == null) {
+            return;
+        }
+        try {
+            String key = "tenant:blacklist:" + tenantId;
+            redisTemplate.delete(key);
+            log.info("Tenant removed from blacklist: {}", tenantId);
+        } catch (Exception e) {
+            log.error("Failed to remove tenant from blacklist in Redis: {}", e.getMessage());
         }
     }
 
@@ -80,8 +149,13 @@ public class TokenBlacklistService {
         try {
             String jti = jwtService.extractJti(token);
             if (jti != null) {
-                String key = REDIS_KEY_BLACKLIST + jti;
-                redisTemplate.delete(key);
+                try {
+                    String key = REDIS_KEY_BLACKLIST + jti;
+                    redisTemplate.delete(key);
+                } catch (Exception e) {
+                    log.warn("Failed to remove token from Redis blacklist: {}", e.getMessage());
+                }
+                localBlacklist.remove(jti);
                 log.info("Token removed from blacklist: {}", jti);
             }
         } catch (Exception e) {
