@@ -82,8 +82,8 @@ public class CalendarService {
             for (PublicHoliday h : holidays) {
                 boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && Boolean.TRUE.equals(settings.getIncludeNationalHolidays());
                 boolean isState = Boolean.TRUE.equals(settings.getIncludeStateHolidays()) && 
-                                  settings.getState() != null && 
-                                  settings.getState().name().equalsIgnoreCase(h.getRegion());
+                                  ((settings.getState() != null && settings.getState().name().equalsIgnoreCase(h.getRegion())) ||
+                                   (settings.getStateText() != null && settings.getStateText().equalsIgnoreCase(h.getRegion())));
                 if (isNational || isState) {
                     filteredHolidays.add(h);
                 }

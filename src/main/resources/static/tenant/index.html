@@ -1680,18 +1680,22 @@
                                         <label class="form-label" for="cfg-leave-country">Holiday Country</label>
                                         <input type="text" id="cfg-leave-country" class="form-input" placeholder="e.g. India">
                                     </div>
-                                    <div class="form-group">
-                                        <label class="form-label" for="cfg-leave-state">Holiday State</label>
-                                        <select id="cfg-leave-state" class="select-input">
-                                            <option value="">Select State</option>
-                                            <option value="AP">Andhra Pradesh</option>
-                                            <option value="DL">Delhi</option>
-                                            <option value="KA">Karnataka</option>
-                                            <option value="MH">Maharashtra</option>
-                                            <option value="TN">Tamil Nadu</option>
-                                            <option value="TS">Telangana</option>
-                                        </select>
-                                    </div>
+                                    <div class="form-group" id="cfg-leave-state-select-group">
+                                         <label class="form-label" for="cfg-leave-state">Holiday State</label>
+                                         <select id="cfg-leave-state" class="select-input">
+                                             <option value="">Select State</option>
+                                             <option value="AP">Andhra Pradesh</option>
+                                             <option value="DL">Delhi</option>
+                                             <option value="KA">Karnataka</option>
+                                             <option value="MH">Maharashtra</option>
+                                             <option value="TN">Tamil Nadu</option>
+                                             <option value="TS">Telangana</option>
+                                         </select>
+                                     </div>
+                                     <div class="form-group" id="cfg-leave-state-input-group" style="display: none;">
+                                         <label class="form-label" for="cfg-leave-stateText">Holiday State/Region</label>
+                                         <input type="text" id="cfg-leave-stateText" class="form-input" placeholder="e.g. California">
+                                     </div>
                                 </div>
                                 <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                                     <div class="form-group" style="flex-direction: row; align-items: center; gap: 12px; display: flex;">
@@ -2963,7 +2967,7 @@
           document.getElementById('profile-shift').textContent = emp.shift ? `${emp.shift.shiftName || ''} (${emp.shift.startTime || ''} - ${emp.shift.endTime || ''})` : '-';
           document.getElementById('profile-manager').textContent = emp.manager ? (emp.manager.fullName || '-') : 'None';
           document.getElementById('profile-country').textContent = emp.country || '-';
-          document.getElementById('profile-state').textContent = emp.state || '-';
+          document.getElementById('profile-state').textContent = emp.state || emp.stateText || '-';
           
           // Populate address
           document.getElementById('profile-address').textContent = emp.address || '-';
@@ -3623,6 +3627,8 @@
           document.getElementById('cfg-leave-max-consecutive').value = settings.maxConsecutiveLeaveDays || '';
           document.getElementById('cfg-leave-country').value = settings.country || '';
           document.getElementById('cfg-leave-state').value = settings.state || '';
+          document.getElementById('cfg-leave-stateText').value = settings.stateText || '';
+          toggleLeaveSettingsStateInput();
           
           document.getElementById('cfg-leave-include-nat-holidays').checked = settings.includeNationalHolidays || false;
           document.getElementById('cfg-leave-include-state-holidays').checked = settings.includeStateHolidays || false;
@@ -3687,8 +3693,11 @@
       const autoApproveForManager = document.getElementById('cfg-leave-auto-approve-mgr').checked;
       const leaveApprovalRequired = document.getElementById('cfg-leave-approval-required').checked;
       const maxConsecutiveLeaveDays = parseInt(document.getElementById('cfg-leave-max-consecutive').value) || null;
-      const country = document.getElementById('cfg-leave-country').value;
-      const state = document.getElementById('cfg-leave-state').value;
+      const countryVal = (document.getElementById('cfg-leave-country').value || '').trim();
+      const isIndia = countryVal === '' || ['INDIA', 'IN'].includes(countryVal.toUpperCase());
+      const country = countryVal;
+      const state = isIndia ? (document.getElementById('cfg-leave-state').value || null) : null;
+      const stateText = !isIndia ? (document.getElementById('cfg-leave-stateText').value || null) : null;
       
       const includeNationalHolidays = document.getElementById('cfg-leave-include-nat-holidays').checked;
       const includeStateHolidays = document.getElementById('cfg-leave-include-state-holidays').checked;
@@ -3702,7 +3711,8 @@
         leaveApprovalRequired,
         maxConsecutiveLeaveDays,
         country,
-        state: state || null,
+        state,
+        stateText,
         includeNationalHolidays,
         includeStateHolidays,
         policiesConfigured
@@ -3726,6 +3736,24 @@
         showToast('Error', 'Connection error while saving settings.', 'error');
       }
     }
+
+    function toggleLeaveSettingsStateInput() {
+      const countryVal = (document.getElementById('cfg-leave-country').value || '').trim().toUpperCase();
+      const stateSelectGroup = document.getElementById('cfg-leave-state-select-group');
+      const stateInputGroup = document.getElementById('cfg-leave-state-input-group');
+      
+      if (countryVal === 'INDIA' || countryVal === 'IN' || countryVal === '') {
+        stateSelectGroup.style.display = 'block';
+        stateInputGroup.style.display = 'none';
+        document.getElementById('cfg-leave-stateText').value = '';
+      } else {
+        stateSelectGroup.style.display = 'none';
+        stateInputGroup.style.display = 'block';
+        document.getElementById('cfg-leave-state').value = '';
+      }
+    }
+
+    document.getElementById('cfg-leave-country').addEventListener('input', toggleLeaveSettingsStateInput);
 
     async function saveIndividualPolicy(leaveType) {
       const allowed = document.getElementById(`policy-allowed-${leaveType}`).checked;

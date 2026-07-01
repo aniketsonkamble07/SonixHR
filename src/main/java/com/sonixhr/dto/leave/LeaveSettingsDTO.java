@@ -44,6 +44,7 @@ public class LeaveSettingsDTO {
     // Holiday settings
     private String country;
     private IndianState state;
+    private String stateText;
     private Boolean includeNationalHolidays;
     private Boolean includeStateHolidays;
 

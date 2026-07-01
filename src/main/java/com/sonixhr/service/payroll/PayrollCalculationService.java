@@ -23,7 +23,9 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @SuppressWarnings("null")
 public class PayrollCalculationService {
@@ -164,10 +166,19 @@ public class PayrollCalculationService {
         Map<Long, BigDecimal> finalLopDays = calculateUnpaidLeaveDaysForTenant(tenantId, month, year);
 
         // 7. Process each employee
+        List<String> payrunErrors = new ArrayList<>();
         for (EmployeeSalaryProfile profile : employeeProfiles) {
             BigDecimal lopDays = finalLopDays.getOrDefault(profile.getEmployee().getId(), BigDecimal.ZERO);
-            calculateEmployeePayslip(payrun, profile, tenantConfig, salaryStructure, statutoryRates, ptSlabs, lopDays,
-                    month, year);
+            try {
+                calculateEmployeePayslip(payrun, profile, tenantConfig, salaryStructure, statutoryRates, ptSlabs, lopDays,
+                        month, year);
+            } catch (Exception e) {
+                log.error("Failed to calculate payslip for employee ID: " + profile.getEmployee().getId(), e);
+                payrunErrors.add("Employee ID " + profile.getEmployee().getId() + ": " + e.getMessage());
+            }
+        }
+        if (!payrunErrors.isEmpty()) {
+            log.warn("Payrun processed with warnings/errors: {}", payrunErrors);
         }
 
         auditLogService.log(
@@ -421,20 +432,9 @@ public class PayrollCalculationService {
                         || "PT".equalsIgnoreCase(item.getComponentCode())) {
                     if (tenantConfig.isEnablePt()) {
                         IndianState ptState = employee.getState();
-                        if (ptState == null && employee.getWorkLocation() != null
-                                && !employee.getWorkLocation().trim().isEmpty()) {
-                            String wl = employee.getWorkLocation().trim();
-                            ptState = IndianState.fromCode(wl);
-                            if (ptState == null) {
-                                String upperLoc = wl.toUpperCase();
-                                for (IndianState s : IndianState.values()) {
-                                    if (upperLoc.contains(s.getDisplayName().toUpperCase()) ||
-                                            upperLoc.matches(".*\\b" + s.name() + "\\b.*")) {
-                                        ptState = s;
-                                        break;
-                                    }
-                                }
-                            }
+                        if (ptState == null) {
+                            log.warn("Employee ID {} missing state — PT skipped, payslip calculation failed", employee.getId());
+                            throw new com.sonixhr.exceptions.BusinessException("PT_STATE_MISSING", "Employee is missing a valid state configuration for Professional Tax calculation");
                         }
                         val = calculatePTAmount(ptState, grossEarnings, month, ptSlabs);
                     }
@@ -791,8 +791,8 @@ public class PayrollCalculationService {
                         boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType())
                                 && settings.getIncludeNationalHolidays();
                         boolean isState = settings.getIncludeStateHolidays() &&
-                                settings.getState() != null &&
-                                settings.getState().name().equalsIgnoreCase(h.getRegion());
+                                ((settings.getState() != null && settings.getState().name().equalsIgnoreCase(h.getRegion())) ||
+                                 (settings.getStateText() != null && settings.getStateText().equalsIgnoreCase(h.getRegion())));
                         if (isNational || isState) {
                             holidayDates.add(h.getHolidayDate());
                         }

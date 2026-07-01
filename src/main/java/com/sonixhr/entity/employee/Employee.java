@@ -211,6 +211,9 @@ public class Employee implements UserDetails {
     @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState state;
 
+    @Column(name = "state_text", length = 150)
+    private String stateText;
+
     @Column(length = 50)
     private String country;
 

@@ -6,6 +6,7 @@ import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,9 +44,24 @@ public class EmployeeCreateRequest {
     @NotNull(message = "Hire date is required")
     private LocalDate hireDate;
 
+    @Size(max = 500, message = "Address must be up to 500 characters")
+    private String address;
+
+    @Size(max = 100, message = "City name must be up to 100 characters")
     private String city;
+
     private IndianState state;
+
+    private String stateText;
+
+    @Size(max = 50, message = "Country name must be up to 50 characters")
     private String country;
+
+    @Size(max = 20, message = "Postal code must be up to 20 characters")
+    private String postalCode;
+
+    @Size(max = 500, message = "Permanent address must be up to 500 characters")
+    private String permanentAddress;
 
     // =====================================================
     // OPTIONAL FIELDS (HR CAN FILL IF AVAILABLE)

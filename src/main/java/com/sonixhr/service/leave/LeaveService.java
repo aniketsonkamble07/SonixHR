@@ -69,8 +69,8 @@ public class LeaveService {
         for (PublicHoliday h : holidays) {
             boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && settings.getIncludeNationalHolidays();
             boolean isState = settings.getIncludeStateHolidays() && 
-                              settings.getState() != null && 
-                              settings.getState().name().equalsIgnoreCase(h.getRegion());
+                              ((settings.getState() != null && settings.getState().name().equalsIgnoreCase(h.getRegion())) ||
+                               (settings.getStateText() != null && settings.getStateText().equalsIgnoreCase(h.getRegion())));
             if (isNational || isState) {
                 holidayDates.add(h.getHolidayDate());
             }

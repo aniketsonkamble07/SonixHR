@@ -21,7 +21,7 @@ public class IndianStateTest {
         assertNull(IndianState.fromCode(null));
         assertNull(IndianState.fromCode(""));
         assertNull(IndianState.fromCode("   "));
-        assertNull(IndianState.fromCode("InvalidStateName"));
+        assertThrows(IllegalArgumentException.class, () -> IndianState.fromCode("InvalidStateName"));
     }
 
     @Test

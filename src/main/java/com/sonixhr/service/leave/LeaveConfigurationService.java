@@ -10,6 +10,8 @@ import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.leave.PublicHolidayRepository;
 import com.sonixhr.repository.leave.TenantLeaveSettingsRepository;
+import com.sonixhr.repository.tenant.TenantRepository;
+import com.sonixhr.entity.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -30,6 +32,7 @@ public class LeaveConfigurationService {
     private final TenantLeaveSettingsRepository settingsRepository;
     private final EmployeeRepository employeeRepository;
     private final PublicHolidayRepository holidayRepository;
+    private final TenantRepository tenantRepository;
 
     /**
      * Get tenant leave settings, creates defaults if not present.
@@ -38,9 +41,15 @@ public class LeaveConfigurationService {
     public TenantLeaveSettings getTenantSettings(@NonNull Long tenantId) {
         TenantLeaveSettings settings = settingsRepository.findById(tenantId).orElse(null);
         if (settings == null) {
-            TenantLeaveSettings newSettings = TenantLeaveSettings.builder()
-                    .tenantId(tenantId)
-                    .build();
+            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            TenantLeaveSettings.TenantLeaveSettingsBuilder builder = TenantLeaveSettings.builder()
+                    .tenantId(tenantId);
+            if (tenant != null) {
+                builder.country(tenant.getCountry())
+                       .state(tenant.getState())
+                       .stateText(tenant.getStateText());
+            }
+            TenantLeaveSettings newSettings = builder.build();
             if (newSettings != null) {
                 return settingsRepository.save(newSettings);
             }
@@ -112,8 +121,18 @@ public class LeaveConfigurationService {
         if (dto.getMaxConsecutiveLeaveDays() != null) settings.setMaxConsecutiveLeaveDays(dto.getMaxConsecutiveLeaveDays());
         if (dto.getLeaveApprovalRequired() != null) settings.setLeaveApprovalRequired(dto.getLeaveApprovalRequired());
         if (dto.getAutoApproveForManager() != null) settings.setAutoApproveForManager(dto.getAutoApproveForManager());
-        if (dto.getCountry() != null) settings.setCountry(dto.getCountry());
+        if (dto.getCountry() != null) {
+            settings.setCountry(com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(dto.getCountry()));
+        }
         if (dto.getState() != null) settings.setState(dto.getState());
+        if (dto.getStateText() != null) settings.setStateText(dto.getStateText());
+
+        // Enforce country-specific integrity
+        if ("IN".equalsIgnoreCase(settings.getCountry())) {
+            settings.setStateText(null);
+        } else {
+            settings.setState(null);
+        }
         if (dto.getIncludeNationalHolidays() != null) settings.setIncludeNationalHolidays(dto.getIncludeNationalHolidays());
         if (dto.getIncludeStateHolidays() != null) settings.setIncludeStateHolidays(dto.getIncludeStateHolidays());
 
@@ -230,8 +249,8 @@ public class LeaveConfigurationService {
         for (PublicHoliday h : holidays) {
             boolean isNational = "NATIONAL".equalsIgnoreCase(h.getType()) && settings.getIncludeNationalHolidays();
             boolean isState = settings.getIncludeStateHolidays() && 
-                              settings.getState() != null && 
-                              settings.getState().name().equalsIgnoreCase(h.getRegion());
+                              ((settings.getState() != null && settings.getState().name().equalsIgnoreCase(h.getRegion())) ||
+                               (settings.getStateText() != null && settings.getStateText().equalsIgnoreCase(h.getRegion())));
             if (isNational || isState) {
                 return true;
             }
@@ -345,6 +364,7 @@ public class LeaveConfigurationService {
                 .autoApproveForManager(settings.getAutoApproveForManager())
                 .country(settings.getCountry())
                 .state(settings.getState())
+                .stateText(settings.getStateText())
                 .includeNationalHolidays(settings.getIncludeNationalHolidays())
                 .includeStateHolidays(settings.getIncludeStateHolidays())
                 .workingDays(getWorkingDaysArray(wkConfig, settings.getCustomWeekendDays()))

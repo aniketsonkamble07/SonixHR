@@ -2,6 +2,7 @@ package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
+import com.sonixhr.util.CountryUtils;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantPermission;
@@ -21,6 +22,8 @@ import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
+import com.sonixhr.repository.leave.TenantLeaveSettingsRepository;
+import com.sonixhr.entity.leave.TenantLeaveSettings;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import com.sonixhr.service.attendance.ShiftConfigurationService;
@@ -57,6 +60,7 @@ public class TenantRegistrationService {
     private final EmployeeCodeGenerator employeeCodeGenerator;
     private final ShiftConfigurationService shiftConfigurationService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final TenantLeaveSettingsRepository tenantLeaveSettingsRepository;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -92,6 +96,16 @@ public class TenantRegistrationService {
         // 4. Create Tenant
         Tenant tenant = createTenant(request, tenantCode, plan);
         log.info("Tenant created with ID: {}", tenant.getId());
+
+        // Initialize default leave settings immediately
+        TenantLeaveSettings settings = TenantLeaveSettings.builder()
+                .tenantId(tenant.getId())
+                .country(tenant.getCountry())
+                .state(tenant.getState())
+                .stateText(tenant.getStateText())
+                .build();
+        settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
+        tenantLeaveSettingsRepository.save(settings);
 
         // 5. Create default roles for this tenant (Super Admin, Admin, Employee,
         // Manager)
@@ -217,6 +231,12 @@ public class TenantRegistrationService {
         int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
         LocalDateTime endsAt = LocalDateTime.now().plusMonths(validityMonths);
 
+        String validatedCountry = CountryUtils.normalizeAndValidateCountry(request.getCountry());
+        boolean isIndia = "IN".equalsIgnoreCase(validatedCountry);
+        if (isIndia && request.getState() == null) {
+            throw new ValidationException("state", "State is required for tenants in India");
+        }
+
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
@@ -227,8 +247,9 @@ public class TenantRegistrationService {
                 .adminPhone(request.getAdminPhone())
                 .officeAddress(request.getOfficeAddress())
                 .city(request.getCity())
-                .state(request.getState())
-                .country(request.getCountry())
+                .state(isIndia ? request.getState() : null)
+                .stateText(!isIndia ? request.getStateText() : null)
+                .country(validatedCountry)
                 .status(tenantStatus)
                 .isActive(tenantActive)
                 .planStatus(initialPlanStatus)
@@ -365,6 +386,7 @@ public class TenantRegistrationService {
                 .address(tenant.getOfficeAddress())
                 .city(tenant.getCity())
                 .state(tenant.getState())
+                .stateText(tenant.getStateText())
                 .country(tenant.getCountry())
                 .workLocation(
                         tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
@@ -445,6 +467,7 @@ public class TenantRegistrationService {
                 .officeAddress(tenant.getOfficeAddress())
                 .city(tenant.getCity())
                 .state(tenant.getState())
+                .stateText(tenant.getStateText())
                 .country(tenant.getCountry())
                 .activationToken(activationToken)
                 .activationTokenExpiry(LocalDateTime.now().plusHours(24))

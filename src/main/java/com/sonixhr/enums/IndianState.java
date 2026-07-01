@@ -64,21 +64,39 @@ public enum IndianState {
     public static IndianState fromCode(String code) {
         if (code == null || code.trim().isEmpty())
             return null;
+        
         String upper = code.trim().toUpperCase();
-        if ("OR".equals(upper)) { // Compatibility with old Odisha code OR
+        String clean = upper.replaceAll("[\\s-_]", "");
+        
+        if ("OR".equals(clean)) { // Compatibility with old Odisha code OR
             return ODISHA;
         }
-        IndianState state = BY_CODE.get(upper.replace(" ", "_"));
-        if (state != null) {
-            return state;
+
+        // Direct enum name lookup
+        String standardName = upper.replace(" ", "_").replace("-", "_");
+        IndianState directMatch = BY_CODE.get(standardName);
+        if (directMatch != null) {
+            return directMatch;
         }
+
+        // Match against enum name without underscores
         for (IndianState s : values()) {
-            if (s.getDisplayName().equalsIgnoreCase(upper)) {
+            String enumClean = s.name().replace("_", "");
+            if (enumClean.equals(clean)) {
                 return s;
             }
         }
+
+        // Match against display name without spaces, hyphens, or underscores
+        for (IndianState s : values()) {
+            String displayClean = s.getDisplayName().replaceAll("[\\s-_]", "").toUpperCase();
+            if (displayClean.equals(clean)) {
+                return s;
+            }
+        }
+
         // Also support lookup by 2-letter abbreviation
-        switch (upper) {
+        switch (clean) {
             case "AP": return ANDHRA_PRADESH;
             case "AR": return ARUNACHAL_PRADESH;
             case "AS": return ASSAM;
@@ -116,36 +134,7 @@ public enum IndianState {
             case "LD": return LAKSHADWEEP;
             case "PY": return PUDUCHERRY;
         }
-        return null;
-    }
 
-    public static IndianState resolveFromCity(String text) {
-        if (text == null) return null;
-        String upper = text.trim().toUpperCase();
-        
-        if (upper.contains("BANGALORE") || upper.contains("BENGALURU")) return KARNATAKA;
-        if (upper.contains("MUMBAI") || upper.contains("PUNE") || upper.contains("NAGPUR") || upper.contains("THANE") || upper.contains("NASHIK") || upper.contains("AURANGABAD")) return MAHARASHTRA;
-        if (upper.contains("HYDERABAD") || upper.contains("SECUNDERABAD") || upper.contains("WARANGAL")) return TELANGANA;
-        if (upper.contains("CHENNAI") || upper.contains("COIMBATORE") || upper.contains("MADURAI") || upper.contains("SALEM")) return TAMIL_NADU;
-        if (upper.contains("DELHI") || upper.contains("NEW DELHI")) return DELHI;
-        if (upper.contains("KOLKATA") || upper.contains("CALCUTTA") || upper.contains("HOWRAH")) return WEST_BENGAL;
-        if (upper.contains("AHMEDABAD") || upper.contains("SURAT") || upper.contains("VADODARA") || upper.contains("RAJKOT")) return GUJARAT;
-        if (upper.contains("VISAKHAPATNAM") || upper.contains("VIJAYAWADA") || upper.contains("GUNTUR") || upper.contains("TIRUPATI")) return ANDHRA_PRADESH;
-        if (upper.contains("INDORE") || upper.contains("BHOPAL") || upper.contains("JABALPUR")) return MADHYA_PRADESH;
-        if (upper.contains("THIRUVANANTHAPURAM") || upper.contains("TRIVANDRUM") || upper.contains("KOCHI") || upper.contains("COCHIN") || upper.contains("KOZHIKODE")) return KERALA;
-        if (upper.contains("BHUBANESWAR") || upper.contains("CUTTACK")) return ODISHA;
-        if (upper.contains("RAIPUR") || upper.contains("BILASPUR")) return CHHATTISGARH;
-        if (upper.contains("PATNA")) return BIHAR;
-        if (upper.contains("RANCHI") || upper.contains("JAMSHEDPUR")) return JHARKHAND;
-        if (upper.contains("LUCKNOW") || upper.contains("KANPUR") || upper.contains("NOIDA") || upper.contains("GHAZIABAD") || upper.contains("AGRA") || upper.contains("VARANASI")) return UTTAR_PRADESH;
-        if (upper.contains("DEHRADUN")) return UTTARAKHAND;
-        if (upper.contains("CHANDIGARH")) return CHANDIGARH;
-        if (upper.contains("JAIPUR") || upper.contains("JODHPUR") || upper.contains("UDAIPUR")) return RAJASTHAN;
-        if (upper.contains("AMRITSAR") || upper.contains("LUDHIANA")) return PUNJAB;
-        if (upper.contains("GURUGRAM") || upper.contains("GURGAON") || upper.contains("FARIDABAD")) return HARYANA;
-        if (upper.contains("GUWAHATI")) return ASSAM;
-        if (upper.contains("PANAJI")) return GOA;
-        
-        return null;
+        throw new IllegalArgumentException("Invalid Indian state: " + code);
     }
 }

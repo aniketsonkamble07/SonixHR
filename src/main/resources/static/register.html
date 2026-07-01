@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register Company - SonixHR</title>
+  
+  <!-- Modern Premium Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* DESIGN SYSTEM & TOKENS */
+    :root {
+      --font-primary: 'Inter', sans-serif;
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-color: #6366f1;
+      --accent-hover: #4f46e5;
+      --input-bg: rgba(15, 23, 42, 0.6);
+      --input-border: rgba(255, 255, 255, 0.15);
+      --input-focus: #818cf8;
+      --success-bg: rgba(16, 185, 129, 0.15);
+      --success-text: #34d399;
+      --error-bg: rgba(239, 68, 68, 0.15);
+      --error-text: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-primary);
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 1rem;
+      line-height: 1.5;
+    }
+
+    /* GLASSMORPHIC CONTAINER */
+    .register-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 650px;
+      padding: 3rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .header {
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    .logo-text {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      background: linear-gradient(to right, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+
+    /* FORM STYLING */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group.full-width {
+      grid-column: span 2;
+    }
+
+    @media (max-width: 600px) {
+      .form-group.full-width {
+        grid-column: span 1;
+      }
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      font-family: var(--font-primary);
+      font-size: 0.95rem;
+      color: var(--text-main);
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    textarea {
+      resize: none;
+    }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 1.2rem;
+      padding-right: 2.5rem;
+    }
+
+    /* ACTION BUTTON */
+    .btn-submit {
+      width: 100%;
+      background: var(--accent-color);
+      color: #ffffff;
+      border: none;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 1rem;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .btn-submit:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .btn-submit:disabled {
+      background: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* NOTIFICATION / STATUS POPUP */
+    .status-alert {
+      padding: 1rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 2rem;
+      display: none;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .status-alert.success {
+      display: block;
+      background: var(--success-bg);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      color: var(--success-text);
+    }
+
+    .status-alert.error {
+      display: block;
+      background: var(--error-bg);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--error-text);
+    }
+
+    .section-divider {
+      grid-column: span 2;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin: 1.5rem 0 0.5rem 0;
+      padding-bottom: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--input-focus);
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 600px) {
+      .section-divider {
+        grid-column: span 1;
+      }
+      .register-card {
+        padding: 2rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="register-card">
+    <div class="header">
+      <div class="logo-text">SonixHR</div>
+      <div class="subtitle">Set up your company space and super-admin profile</div>
+    </div>
+
+    <!-- API Response Alert Box -->
+    <div id="statusAlert" class="status-alert"></div>
+
+    <form id="registrationForm" onsubmit="handleRegistration(event)">
+      <div class="form-grid">
+        
+        <!-- Company Section -->
+        <div class="form-group">
+          <label for="companyName">Company Name</label>
+          <input type="text" id="companyName" name="companyName" required placeholder="e.g. Acme Corp" minlength="2" maxlength="200">
+        </div>
+
+        <div class="form-group">
+          <label for="planCode">Plan Option</label>
+          <select id="planCode" name="planCode">
+            <option value="TRIAL">Trial Plan (14 Days Free)</option>
+            <option value="ENTERPRISE">Enterprise Plan</option>
+          </select>
+        </div>
+
+        <!-- Super Admin Profile -->
+        <div class="section-divider">Super Admin User</div>
+
+        <div class="form-group">
+          <label for="adminName">Admin Full Name</label>
+          <input type="text" id="adminName" name="adminName" required placeholder="e.g. Jane Doe" minlength="2" maxlength="200">
+        </div>
+
+        <div class="form-group">
+          <label for="adminEmail">Admin Email</label>
+          <input type="email" id="adminEmail" name="adminEmail" required placeholder="admin@company.com">
+        </div>
+
+        <div class="form-group full-width">
+          <label for="adminPhone">Phone Number</label>
+          <input type="tel" id="adminPhone" name="adminPhone" placeholder="e.g. +919876543210" pattern="^[+]?[0-9]{10,15}$" title="Phone number must be between 10 and 15 digits.">
+        </div>
+
+        <!-- Address Info -->
+        <div class="section-divider">Office Location</div>
+
+        <div class="form-group full-width">
+          <label for="officeAddress">Street Address</label>
+          <textarea id="officeAddress" name="officeAddress" rows="2" placeholder="Building, Street, Sector..." maxlength="500"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="city">City</label>
+          <input type="text" id="city" name="city" placeholder="City" maxlength="100">
+        </div>
+
+        <div class="form-group" id="state-select-group">
+          <label for="state">State</label>
+          <select id="state" name="state">
+            <option value="">Select State</option>
+            <option value="Andhra Pradesh">Andhra Pradesh</option>
+            <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+            <option value="Assam">Assam</option>
+            <option value="Bihar">Bihar</option>
+            <option value="Chhattisgarh">Chhattisgarh</option>
+            <option value="Goa">Goa</option>
+            <option value="Gujarat">Gujarat</option>
+            <option value="Haryana">Haryana</option>
+            <option value="Himachal Pradesh">Himachal Pradesh</option>
+            <option value="Jharkhand">Jharkhand</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Kerala">Kerala</option>
+            <option value="Madhya Pradesh">Madhya Pradesh</option>
+            <option value="Maharashtra">Maharashtra</option>
+            <option value="Manipur">Manipur</option>
+            <option value="Meghalaya">Meghalaya</option>
+            <option value="Mizoram">Mizoram</option>
+            <option value="Nagaland">Nagaland</option>
+            <option value="Odisha">Odisha</option>
+            <option value="Punjab">Punjab</option>
+            <option value="Rajasthan">Rajasthan</option>
+            <option value="Sikkim">Sikkim</option>
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Telangana">Telangana</option>
+            <option value="Tripura">Tripura</option>
+            <option value="Uttar Pradesh">Uttar Pradesh</option>
+            <option value="Uttarakhand">Uttarakhand</option>
+            <option value="West Bengal">West Bengal</option>
+            <option value="Delhi">Delhi</option>
+            <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+            <option value="Chandigarh">Chandigarh</option>
+            <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+            <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+            <option value="Ladakh">Ladakh</option>
+            <option value="Lakshadweep">Lakshadweep</option>
+            <option value="Puducherry">Puducherry</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="state-input-group" style="display: none;">
+          <label for="stateText">State/Region</label>
+          <input type="text" id="stateText" name="stateText" placeholder="State or Province" maxlength="150">
+        </div>
+
+        <div class="form-group full-width">
+          <label for="country">Country</label>
+          <input type="text" id="country" name="country" value="India" placeholder="Country" maxlength="50">
+        </div>
+
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-submit">Register Company</button>
+    </form>
+  </div>
+
+  <script>
+    async function handleRegistration(event) {
+      event.preventDefault();
+
+      const form = document.getElementById('registrationForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const statusAlert = document.getElementById('statusAlert');
+
+      // Set Loading State
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Registering space...';
+      statusAlert.className = 'status-alert';
+      statusAlert.style.display = 'none';
+
+      const countryVal = (document.getElementById('country').value || '').trim();
+      const isIndia = countryVal === '' || ['INDIA', 'IN'].includes(countryVal.toUpperCase());
+
+      // Gather form inputs into DTO structure
+      const payload = {
+        companyName: document.getElementById('companyName').value,
+        planCode: document.getElementById('planCode').value,
+        adminName: document.getElementById('adminName').value,
+        adminEmail: document.getElementById('adminEmail').value,
+        adminPhone: document.getElementById('adminPhone').value || null,
+        officeAddress: document.getElementById('officeAddress').value || null,
+        city: document.getElementById('city').value || null,
+        state: isIndia ? (document.getElementById('state').value || null) : null,
+        stateText: !isIndia ? (document.getElementById('stateText').value || null) : null,
+        country: countryVal || "IN",
+        billingCycle: 'MONTHLY'
+      };
+
+      try {
+        const response = await fetch('/api/public/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          statusAlert.className = 'status-alert success';
+          statusAlert.innerText = `Success! Your tenant code is: ${data.tenantCode}. An activation link has been sent to ${payload.adminEmail}.`;
+          form.reset();
+        } else {
+          statusAlert.className = 'status-alert error';
+          statusAlert.innerText = data.message || 'Registration failed. Please make sure the company name and email are unique.';
+        }
+      } catch (error) {
+        statusAlert.className = 'status-alert error';
+        statusAlert.innerText = 'Network error: could not connect to the backend server.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Register Company';
+      }
+    }
+    function toggleStateInput() {
+      const countryVal = (document.getElementById('country').value || '').trim().toUpperCase();
+      const stateSelectGroup = document.getElementById('state-select-group');
+      const stateInputGroup = document.getElementById('state-input-group');
+      
+      if (countryVal === 'INDIA' || countryVal === 'IN' || countryVal === '') {
+        stateSelectGroup.style.display = 'flex';
+        stateInputGroup.style.display = 'none';
+        document.getElementById('stateText').value = '';
+      } else {
+        stateSelectGroup.style.display = 'none';
+        stateInputGroup.style.display = 'flex';
+        document.getElementById('state').value = '';
+      }
+    }
+
+    document.getElementById('country').addEventListener('input', toggleStateInput);
+  </script>
+</body>
+</html>

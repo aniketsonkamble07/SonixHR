@@ -208,6 +208,10 @@ public class TenantLeaveSettings {
         @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
         private IndianState state = null;
 
+        @Column(name = "state_text", length = 150)
+        @Builder.Default
+        private String stateText = null;
+
         @Column(name = "include_national_holidays")
         @Builder.Default
         private Boolean includeNationalHolidays = true;

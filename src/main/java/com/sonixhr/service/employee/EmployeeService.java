@@ -174,37 +174,39 @@ public class EmployeeService {
         }
         if (request.getWorkLocation() != null) {
             employee.setWorkLocation(request.getWorkLocation());
-            String wl = request.getWorkLocation().trim();
-            if (!wl.isEmpty()) {
-                IndianState resolvedState = IndianState.fromCode(wl);
-                if (resolvedState == null) {
-                    String upperLoc = wl.toUpperCase();
-                    for (IndianState s : IndianState.values()) {
-                        if (upperLoc.contains(s.getDisplayName().toUpperCase()) ||
-                                upperLoc.matches(".*\\b" + s.name() + "\\b.*")) {
-                            resolvedState = s;
-                            break;
-                        }
-                    }
-                }
-                if (resolvedState == null) {
-                    resolvedState = IndianState.resolveFromCity(wl);
-                }
-                if (resolvedState != null) {
-                    employee.setState(resolvedState);
-                    employee.setCountry("India");
-                }
-                if (employee.getCity() == null || employee.getCity().isEmpty()) {
-                    employee.setCity(wl);
-                }
-            }
+        }
+        boolean addressUpdated = false;
+        if (request.getAddress() != null) {
+            employee.setAddress(request.getAddress());
+            addressUpdated = true;
         }
         if (request.getCity() != null)
             employee.setCity(request.getCity());
         if (request.getState() != null)
             employee.setState(request.getState());
+        if (request.getStateText() != null)
+            employee.setStateText(request.getStateText());
         if (request.getCountry() != null)
-            employee.setCountry(request.getCountry());
+            employee.setCountry(com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getCountry()));
+        if (request.getPostalCode() != null)
+            employee.setPostalCode(request.getPostalCode());
+
+        if (request.getPermanentAddress() != null && !request.getPermanentAddress().trim().isEmpty()) {
+            employee.setPermanentAddress(request.getPermanentAddress());
+        } else if (addressUpdated || employee.getPermanentAddress() == null || employee.getPermanentAddress().trim().isEmpty()) {
+            if (request.getPermanentAddress() == null) {
+                employee.setPermanentAddress(employee.getAddress());
+            }
+        }
+
+        // Apply country-specific validation and cleanup
+        if ("IN".equalsIgnoreCase(employee.getCountry())) {
+            validateStateForCountry(employee.getState(), employee.getCountry());
+            employee.setStateText(null);
+        } else {
+            employee.setState(null);
+        }
+
         if (request.getHireDate() != null)
             employee.setHireDate(request.getHireDate());
         if (request.getProbationMonths() != null)
@@ -606,32 +608,41 @@ public class EmployeeService {
         EmploymentType employmentType = request.getEmploymentType() != null ? request.getEmploymentType()
                 : EmploymentType.FULL_TIME;
 
+        String resolvedStateText = request.getStateText();
         IndianState resolvedState = request.getState();
         String country = request.getCountry();
         String city = request.getCity();
 
-        if (resolvedState == null && request.getWorkLocation() != null && !request.getWorkLocation().trim().isEmpty()) {
-            String wl = request.getWorkLocation().trim();
-            resolvedState = IndianState.fromCode(wl);
+        // Apply tenant-level fallbacks if address details are missing
+        String address = request.getAddress();
+        if (address == null || address.trim().isEmpty()) {
+            address = tenant.getOfficeAddress();
+        }
+        if (city == null || city.trim().isEmpty()) {
+            city = tenant.getCity();
+        }
+
+        country = com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(country != null && !country.trim().isEmpty() ? country : tenant.getCountry());
+        boolean isIndia = "IN".equalsIgnoreCase(country);
+
+        if (isIndia) {
             if (resolvedState == null) {
-                String upperLoc = wl.toUpperCase();
-                for (IndianState s : IndianState.values()) {
-                    if (upperLoc.contains(s.getDisplayName().toUpperCase()) ||
-                            upperLoc.matches(".*\\b" + s.name() + "\\b.*")) {
-                        resolvedState = s;
-                        break;
-                    }
-                }
+                resolvedState = tenant.getState();
             }
-            if (resolvedState == null) {
-                resolvedState = IndianState.resolveFromCity(wl);
+            validateStateForCountry(resolvedState, country);
+            resolvedStateText = null;
+        } else {
+            resolvedState = null;
+            if (resolvedStateText == null || resolvedStateText.trim().isEmpty()) {
+                resolvedStateText = tenant.getStateText();
             }
-            if (resolvedState != null && country == null) {
-                country = "India";
-            }
-            if (city == null || city.isEmpty()) {
-                city = wl;
-            }
+        }
+
+        String postalCode = request.getPostalCode();
+
+        String permanentAddress = request.getPermanentAddress();
+        if (permanentAddress == null || permanentAddress.trim().isEmpty()) {
+            permanentAddress = address;
         }
 
         return Employee.builder()
@@ -645,9 +656,13 @@ public class EmployeeService {
                 .position(request.getPosition())
                 .employmentType(employmentType)
                 .workLocation(request.getWorkLocation())
+                .address(address)
                 .city(city)
                 .state(resolvedState)
+                .stateText(resolvedStateText)
                 .country(country)
+                .postalCode(postalCode)
+                .permanentAddress(permanentAddress)
                 .hireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now())
                 .probationMonths(request.getProbationMonths() != null ? request.getProbationMonths() : 3)
                 .status(EmployeeStatus.INACTIVE)
@@ -715,6 +730,7 @@ public class EmployeeService {
                 .address(employee.getAddress())
                 .city(employee.getCity())
                 .state(employee.getState())
+                .stateText(employee.getStateText())
                 .country(employee.getCountry())
                 .postalCode(employee.getPostalCode())
                 .permanentAddress(employee.getPermanentAddress())
@@ -1066,5 +1082,11 @@ public class EmployeeService {
         employeeRepository.save(employee);
 
         log.info("Password reset by admin for employee: {}", employeeId);
+    }
+
+    private void validateStateForCountry(IndianState state, String country) {
+        if ("IN".equalsIgnoreCase(country) && state == null) {
+            throw new com.sonixhr.exceptions.ValidationException("state", "State is required for employees in India");
+        }
     }
 }

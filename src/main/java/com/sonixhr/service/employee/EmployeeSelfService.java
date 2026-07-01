@@ -108,8 +108,10 @@ public class EmployeeSelfService {
             employee.setCity(request.getCity());
         if (request.getState() != null)
             employee.setState(request.getState());
+        if (request.getStateText() != null)
+            employee.setStateText(request.getStateText());
         if (request.getCountry() != null)
-            employee.setCountry(request.getCountry());
+            employee.setCountry(com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getCountry()));
         if (request.getPostalCode() != null)
             employee.setPostalCode(request.getPostalCode());
         if (request.getPermanentAddress() != null)
@@ -134,6 +136,16 @@ public class EmployeeSelfService {
             employee.setGithubUrl(request.getGithubUrl());
         if (request.getTwitterUrl() != null)
             employee.setTwitterUrl(request.getTwitterUrl());
+
+        // Apply country-specific validation and cleanup
+        if ("IN".equalsIgnoreCase(employee.getCountry())) {
+            if (employee.getState() == null) {
+                throw new com.sonixhr.exceptions.ValidationException("state", "State is required for employees in India");
+            }
+            employee.setStateText(null);
+        } else {
+            employee.setState(null);
+        }
     }
 
     private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, Long tenantId) {

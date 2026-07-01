@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -546,5 +547,308 @@ public class TenantFlowIntegrationTest {
         assertTrue(selfServiceBody.contains("\"errors\""));
         assertTrue(selfServiceBody.contains("\"departmentId\""));
         assertTrue(selfServiceBody.contains("Only HR or Super Admin can update"));
+    }
+
+    @Test
+    public void testEmployeeAddressFallbackAndSynchronization() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String companyName = "Addr Flow Company " + uniqueSuffix;
+        String adminEmail = "admin_addr_flow_" + uniqueSuffix + "@testcompany.com";
+
+        // Step 1: Register Tenant with office address details
+        TenantRegistrationRequest regRequest = TenantRegistrationRequest.builder()
+                .companyName(companyName)
+                .adminEmail(adminEmail)
+                .adminName("Admin User")
+                .adminPhone("+12345678901")
+                .officeAddress("456 Company Boulevard")
+                .city("Pune")
+                .state(IndianState.MAHARASHTRA)
+                .country("India")
+                .planCode("trial")
+                .billingCycle("MONTHLY")
+                .build();
+
+        MvcResult regResult = mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(regRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRegistrationResponse regResponse = objectMapper.readValue(
+                regResult.getResponse().getContentAsString(), TenantRegistrationResponse.class);
+
+        // Step 2: Login as the registered Admin
+        LoginRequest loginRequest = new LoginRequest(adminEmail, "Admin@123");
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        LoginResponse loginResponse = objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class);
+        String tokenHeader = "Bearer " + loginResponse.getAccessToken();
+
+        // Step 3: Create Department
+        DepartmentRequest deptRequest = DepartmentRequest.builder()
+                .name("HR")
+                .code("HR")
+                .description("HR Dept")
+                .build();
+
+        MvcResult deptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deptRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse deptResponse = objectMapper.readValue(
+                deptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+
+        // Step 4: Create default role
+        List<TenantPermission> permissions = permissionRepository.findAll();
+        Set<Long> permIds = permissions.stream()
+                .map(TenantPermission::getId)
+                .limit(1)
+                .collect(Collectors.toSet());
+
+        TenantRoleCreateRequest roleRequest = TenantRoleCreateRequest.builder()
+                .name("Manager " + uniqueSuffix)
+                .description("Manager role")
+                .isDefault(false)
+                .permissionIds(permIds)
+                .category("MANAGEMENT")
+                .priority(40)
+                .build();
+
+        MvcResult roleResult = mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(roleRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRoleResponse roleResponse = objectMapper.readValue(
+                roleResult.getResponse().getContentAsString(), TenantRoleResponse.class);
+
+        // Scenario 1: Create Employee with no address fields -> should fallback to Tenant's address details,
+        // and permanentAddress should fallback to the resolved current address.
+        EmployeeCreateRequest empFallbackRequest = EmployeeCreateRequest.builder()
+                .firstName("Fallback")
+                .lastName("User")
+                .email("fallback.user_" + uniqueSuffix + "@testcompany.com")
+                .departmentId(deptResponse.getId())
+                .position("HR Generalist")
+                .hireDate(LocalDate.now())
+                .phone("+919876543211")
+                .roleIds(Set.of(roleResponse.getId()))
+                .build();
+
+        MvcResult createFallbackResult = mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(empFallbackRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        EmployeeResponse fallbackEmp = objectMapper.readValue(
+                createFallbackResult.getResponse().getContentAsString(), EmployeeResponse.class);
+
+        // Assert fallbacks to Tenant office details
+        assertEquals("456 Company Boulevard", fallbackEmp.getAddress());
+        assertEquals("Pune", fallbackEmp.getCity());
+        assertEquals(IndianState.MAHARASHTRA, fallbackEmp.getState());
+        assertEquals("IN", fallbackEmp.getCountry());
+        assertEquals("456 Company Boulevard", fallbackEmp.getPermanentAddress());
+
+        // Scenario 2: Create Employee with explicit current address but no permanent address -> should copy address to permanent address
+        EmployeeCreateRequest empPartialAddressRequest = EmployeeCreateRequest.builder()
+                .firstName("Partial")
+                .lastName("User")
+                .email("partial.user_" + uniqueSuffix + "@testcompany.com")
+                .departmentId(deptResponse.getId())
+                .position("Recruiter")
+                .hireDate(LocalDate.now())
+                .phone("+919876543212")
+                .address("789 Current Street")
+                .city("Pune")
+                .state(IndianState.MAHARASHTRA)
+                .country("India")
+                .roleIds(Set.of(roleResponse.getId()))
+                .build();
+
+        MvcResult createPartialResult = mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(empPartialAddressRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        EmployeeResponse partialEmp = objectMapper.readValue(
+                createPartialResult.getResponse().getContentAsString(), EmployeeResponse.class);
+
+        assertEquals("789 Current Street", partialEmp.getAddress());
+        assertEquals("789 Current Street", partialEmp.getPermanentAddress());
+
+        // Scenario 3: Update current address but omit permanent address -> should synchronize permanent address to match the updated address
+        EmployeeCreateRequest empUpdateRequest = EmployeeCreateRequest.builder()
+                .firstName("Partial")
+                .lastName("User")
+                .email("partial.user_" + uniqueSuffix + "@testcompany.com")
+                .departmentId(deptResponse.getId())
+                .position("Recruiter")
+                .hireDate(LocalDate.now())
+                .phone("+919876543212")
+                .address("999 New Current Street") // Updated address
+                .city("Pune")
+                .state(IndianState.MAHARASHTRA)
+                .country("India")
+                .roleIds(Set.of(roleResponse.getId()))
+                .build();
+
+        MvcResult updateResult = mockMvc.perform(put("/api/employees/" + partialEmp.getId())
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(empUpdateRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        EmployeeResponse updatedEmp = objectMapper.readValue(
+                updateResult.getResponse().getContentAsString(), EmployeeResponse.class);
+
+        assertEquals("999 New Current Street", updatedEmp.getAddress());
+        assertEquals("999 New Current Street", updatedEmp.getPermanentAddress());
+    }
+
+    @Test
+    public void testZeroDerivationAndTypeSafeValidation() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String companyName = "Test Company " + uniqueSuffix;
+        String adminEmail = "admin_" + uniqueSuffix + "@testcompany.com";
+
+        // Step 1: Register Tenant
+        TenantRegistrationRequest regRequest = TenantRegistrationRequest.builder()
+                .companyName(companyName)
+                .adminEmail(adminEmail)
+                .adminName("Admin User")
+                .adminPhone("+12345678901")
+                .officeAddress("123 Test Street")
+                .city("Bangalore")
+                .state(IndianState.KARNATAKA)
+                .country("India")
+                .planCode("trial")
+                .billingCycle("MONTHLY")
+                .build();
+
+        MvcResult regResult = mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(regRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRegistrationResponse regResponse = objectMapper.readValue(
+                regResult.getResponse().getContentAsString(), TenantRegistrationResponse.class);
+
+        // Login as the registered Admin
+        LoginRequest loginRequest = new LoginRequest(adminEmail, "Admin@123");
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        LoginResponse loginResponse = objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class);
+        String tokenHeader = "Bearer " + loginResponse.getAccessToken();
+
+        // Create Department
+        DepartmentRequest deptRequest = DepartmentRequest.builder()
+                .name("Engineering")
+                .code("ENG")
+                .description("Engineering Department")
+                .build();
+
+        MvcResult deptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deptRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse deptResponse = objectMapper.readValue(
+                deptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+
+        // Fetch custom Tenant Role
+        List<TenantPermission> permissions = permissionRepository.findAll();
+        Set<Long> permIds = permissions.stream()
+                .map(TenantPermission::getId)
+                .limit(1)
+                .collect(Collectors.toSet());
+
+        TenantRoleCreateRequest roleRequest = TenantRoleCreateRequest.builder()
+                .name("Dev " + uniqueSuffix)
+                .description("Custom role")
+                .isDefault(false)
+                .permissionIds(permIds)
+                .category("DEVELOPMENT")
+                .priority(50)
+                .build();
+
+        MvcResult roleResult = mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(roleRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRoleResponse roleResponse = objectMapper.readValue(
+                roleResult.getResponse().getContentAsString(), TenantRoleResponse.class);
+
+        // Scenario 1: JSON payload contains an invalid/unsupported state string -> should trigger 400 Bad Request at deserialization boundary
+        String malformedJson = "{"
+                + "\"firstName\":\"InvalidState\","
+                + "\"lastName\":\"User\","
+                + "\"email\":\"invalidstate.user_" + uniqueSuffix + "@testcompany.com\","
+                + "\"departmentId\":" + deptResponse.getId() + ","
+                + "\"position\":\"Software Engineer\","
+                + "\"hireDate\":\"" + LocalDate.now() + "\","
+                + "\"phone\":\"+919876543219\","
+                + "\"address\":\"123 Main St\","
+                + "\"city\":\"Pune\","
+                + "\"state\":\"InvalidState\","
+                + "\"country\":\"India\","
+                + "\"workLocation\":\"Office\","
+                + "\"roleIds\":[" + roleResponse.getId() + "]"
+                + "}";
+
+        mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(malformedJson))
+                .andExpect(status().isBadRequest());
+
+        // Scenario 2: Create a non-Indian employee (country = "United States") with null state -> should succeed (no ValidationException)
+        EmployeeCreateRequest usEmpRequest = EmployeeCreateRequest.builder()
+                .firstName("US")
+                .lastName("Employee")
+                .email("us.employee_" + uniqueSuffix + "@testcompany.com")
+                .departmentId(deptResponse.getId())
+                .position("Manager")
+                .hireDate(LocalDate.now())
+                .phone("+15550199")
+                .address("1600 Amphitheatre Pkwy")
+                .city("Mountain View")
+                .state(null)
+                .country("United States")
+                .roleIds(Set.of(roleResponse.getId()))
+                .build();
+
+        mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(usEmpRequest)))
+                .andExpect(status().isCreated());
     }
 }

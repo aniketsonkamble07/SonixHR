@@ -67,6 +67,7 @@ public class EmployeeResponse {
     private String address;
     private String city;
     private IndianState state;
+    private String stateText;
     private String country;
     private String postalCode;
     private String permanentAddress;

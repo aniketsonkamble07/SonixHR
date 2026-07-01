@@ -35,6 +35,8 @@ public class TenantUpdateRequest {
 
     private IndianState state;
 
+    private String stateText;
+
     @Size(max = 50, message = "Country name must be up to 50 characters")
     private String country;
 }

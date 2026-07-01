@@ -41,6 +41,7 @@ public class TenantRegistrationResponse {
     private String officeAddress;
     private String city;
     private IndianState state;
+    private String stateText;
     private String country;
 
     // Activation info

@@ -67,6 +67,9 @@ public class Tenant {
     @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState state;
 
+    @Column(name = "state_text", length = 150)
+    private String stateText;
+
     @Column(name = "country", length = 50)
     private String country;
 

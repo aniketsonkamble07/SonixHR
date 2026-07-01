@@ -24,6 +24,7 @@ public class PlatformTenantResponseDTO {
     private String officeAddress;
     private String city;
     private IndianState state;
+    private String stateText;
     private String country;
     private String planType;
     private UserStatus status;

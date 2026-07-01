@@ -2,6 +2,7 @@ package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.PlatformTenantResponseDTO;
 import com.sonixhr.dto.platform.TenantPlanOverrideDTO;
+import com.sonixhr.util.CountryUtils;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
@@ -192,8 +193,21 @@ public class PlatformTenantService {
         if (request.getState() != null) {
             tenant.setState(request.getState());
         }
+        if (request.getStateText() != null) {
+            tenant.setStateText(request.getStateText());
+        }
         if (request.getCountry() != null) {
-            tenant.setCountry(request.getCountry());
+            tenant.setCountry(CountryUtils.normalizeAndValidateCountry(request.getCountry()));
+        }
+
+        // Apply country-specific validation and cleanup
+        if ("IN".equalsIgnoreCase(tenant.getCountry())) {
+            if (tenant.getState() == null) {
+                throw new com.sonixhr.exceptions.ValidationException("state", "State is required for tenants in India");
+            }
+            tenant.setStateText(null);
+        } else {
+            tenant.setState(null);
         }
 
         Tenant savedTenant = tenantRepository.save(tenant);
@@ -258,6 +272,7 @@ public class PlatformTenantService {
                 .officeAddress(tenant.getOfficeAddress())
                 .city(tenant.getCity())
                 .state(tenant.getState())
+                .stateText(tenant.getStateText())
                 .country(tenant.getCountry())
                 .planType(tenant.getPlanType())
                 .status(tenant.getStatus())
