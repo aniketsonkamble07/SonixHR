@@ -29,6 +29,7 @@ import com.sonixhr.service.employee.EmployeeCodeGenerator;
 import com.sonixhr.service.attendance.ShiftConfigurationService;
 import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
 import com.sonixhr.security.TenantContext;
+import com.sonixhr.security.TenantRLSService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,6 +62,7 @@ public class TenantRegistrationService {
     private final ShiftConfigurationService shiftConfigurationService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final TenantLeaveSettingsRepository tenantLeaveSettingsRepository;
+    private final TenantRLSService tenantRLSService;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -97,53 +99,67 @@ public class TenantRegistrationService {
         Tenant tenant = createTenant(request, tenantCode, plan);
         log.info("Tenant created with ID: {}", tenant.getId());
 
-        // Initialize default leave settings immediately
-        TenantLeaveSettings settings = TenantLeaveSettings.builder()
-                .tenantId(tenant.getId())
-                .country(tenant.getCountry())
-                .state(tenant.getState())
-                .stateText(tenant.getStateText())
-                .build();
-        settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
-        tenantLeaveSettingsRepository.save(settings);
+        Long previousTenantId = TenantContext.getCurrentTenant();
+        try {
+            TenantContext.setCurrentTenant(tenant.getId());
+            tenantRLSService.setCurrentTenantInDB(tenant.getId());
 
-        // 5. Create default roles for this tenant (Super Admin, Admin, Employee,
-        // Manager)
-        TenantRole superAdminRole = createDefaultRolesForTenant(tenant.getId());
-        log.info("Default roles created for tenant, Super Admin has {} permissions",
-                superAdminRole.getPermissions().size());
+            // Initialize default leave settings immediately
+            TenantLeaveSettings settings = TenantLeaveSettings.builder()
+                    .tenantId(tenant.getId())
+                    .country(tenant.getCountry())
+                    .state(tenant.getState())
+                    .stateText(tenant.getStateText())
+                    .build();
+            settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
+            tenantLeaveSettingsRepository.save(settings);
 
-        // 6. Create Employee (Super Admin)
-        Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, superAdminRole);
-        log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
+            // 5. Create default roles for this tenant (Super Admin, Admin, Employee,
+            // Manager)
+            TenantRole superAdminRole = createDefaultRolesForTenant(tenant.getId());
+            log.info("Default roles created for tenant, Super Admin has {} permissions",
+                    superAdminRole.getPermissions().size());
 
-        // 7. Create subscription record
-        createSubscription(tenant, plan);
-        log.info("Subscription created for tenant");
+            // 6. Create Employee (Super Admin)
+            Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, superAdminRole);
+            log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
 
-        // 8. Generate activation token for employee
-        String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
-        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
+            // 7. Create subscription record
+            createSubscription(tenant, plan);
+            log.info("Subscription created for tenant");
 
-        // Send activation email to the registered Super Admin employee (disabled for
-        // development)
-        // emailService.sendActivationEmail(superAdminEmployee.getEmail(),
-        // superAdminEmployee.getFullName(), activationLink);
+            // 8. Generate activation token for employee
+            String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
+            String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
 
-        // Log the credentials for manual testing
-        log.info("==========================================");
-        log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
-        log.info(" Admin Email: {}", superAdminEmployee.getEmail());
-        log.info(" Password: Admin@123");
-        log.info(" (Optional Activation Link: {})", activationLink);
-        log.info("==========================================");
+            // Send activation email to the registered Super Admin employee (disabled for
+            // development)
+            // emailService.sendActivationEmail(superAdminEmployee.getEmail(),
+            // superAdminEmployee.getFullName(), activationLink);
 
-        log.info("Tenant registration completed: {}", tenant.getCompanyName());
+            // Log the credentials for manual testing
+            log.info("==========================================");
+            log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
+            log.info(" Admin Email: {}", superAdminEmployee.getEmail());
+            log.info(" Password: Admin@123");
+            log.info(" (Optional Activation Link: {})", activationLink);
+            log.info("==========================================");
 
-        // 9. Create default General 9-5 shift configuration
-        createDefaultShift(tenant.getId(), superAdminEmployee.getId());
+            log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
-        return buildResponse(tenant, activationToken, superAdminEmployee);
+            // 9. Create default General 9-5 shift configuration
+            createDefaultShift(tenant.getId(), superAdminEmployee.getId());
+
+            return buildResponse(tenant, activationToken, superAdminEmployee);
+        } finally {
+            if (previousTenantId != null) {
+                TenantContext.setCurrentTenant(previousTenantId);
+                tenantRLSService.setCurrentTenantInDB(previousTenantId);
+            } else {
+                TenantContext.clear();
+                tenantRLSService.clearCurrentTenantInDB();
+            }
+        }
     }
 
     private void createDefaultShift(Long tenantId, Long adminEmployeeId) {

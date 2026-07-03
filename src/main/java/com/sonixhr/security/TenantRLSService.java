@@ -118,9 +118,8 @@ public class TenantRLSService {
         try {
             String cacheKey = REDIS_KEY_TENANT_CONFIG + tenantId;
 
-            // Use a more efficient query - select only needed columns
             String query = """
-                SELECT tenant_name, schema_name, is_active, config 
+                SELECT company_name AS tenant_name, tenant_code AS schema_name, is_active, NULL AS config 
                 FROM tenants 
                 WHERE id = ? AND is_active = true
                 LIMIT 1
@@ -415,7 +414,7 @@ public class TenantRLSService {
     private TenantConfig loadTenantConfigFromDB(Long tenantId) {
         try {
             String query = """
-                SELECT tenant_name, schema_name, is_active, config 
+                SELECT company_name AS tenant_name, tenant_code AS schema_name, is_active, NULL AS config 
                 FROM tenants 
                 WHERE id = ? AND is_active = true
                 LIMIT 1
