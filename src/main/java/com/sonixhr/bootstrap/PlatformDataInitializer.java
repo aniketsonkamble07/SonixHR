@@ -72,9 +72,10 @@ public class PlatformDataInitializer implements ApplicationRunner {
             log.info("Dropping obsolete check constraints for plan_type if they exist...");
             jdbcTemplate.execute("ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_plan_type_check");
             jdbcTemplate.execute("ALTER TABLE tenant_subscriptions DROP CONSTRAINT IF EXISTS tenant_subscriptions_plan_type_check");
-            log.info("Successfully dropped obsolete plan_type check constraints.");
+            jdbcTemplate.execute("ALTER TABLE tenants DROP COLUMN IF EXISTS subdomain");
+            log.info("Successfully dropped obsolete columns and constraints.");
         } catch (Exception e) {
-            log.warn("Could not drop plan_type check constraints: {}", e.getMessage());
+            log.warn("Could not drop columns or check constraints: {}", e.getMessage());
         }
 
         // Drop obsolete state enum check constraints dynamically if they exist
