@@ -539,12 +539,24 @@ public class TenantRLSService {
     /**
      * Apply RLS policies to a table with optimized policy creation
      */
+    /**
+     * Validates that an identifier contains only safe characters for use in DDL.
+     * Prevents SQL injection when identifiers are interpolated into DDL strings.
+     */
+    private void validateSqlIdentifier(String identifier) {
+        if (identifier == null || !identifier.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new IllegalArgumentException("Invalid SQL identifier: " + identifier);
+        }
+    }
+
     @Transactional
     public void applyRLSPolicy(String tableName, String tenantColumn) {
         if (tableName == null || tenantColumn == null) {
             log.warn("Cannot apply RLS policy: tableName or tenantColumn is null");
             return;
         }
+        validateSqlIdentifier(tableName);
+        validateSqlIdentifier(tenantColumn);
 
         String enableRLS = String.format("ALTER TABLE %s ENABLE ROW LEVEL SECURITY", tableName);
         String policyName = String.format("%s_tenant_isolation", tableName);

@@ -55,7 +55,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
     }
 
     private Long extractTenantFromRequest(HttpServletRequest request) {
-        // Try to get from SecurityContext (already authenticated user)
+        // Tenant ID must come from the authenticated principal set by JwtAuthFilter.
+        // Never accept tenant ID from request headers — that allows tenant impersonation.
         var authentication = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication();
 
@@ -65,36 +66,10 @@ public class TenantContextFilter extends OncePerRequestFilter {
             return employee.getTenantId();
         }
 
-        // Try from request header (for debugging)
-        String tenantHeader = request.getHeader("X-Tenant-ID");
-        if (tenantHeader != null) {
-            try {
-                return Long.parseLong(tenantHeader);
-            } catch (NumberFormatException e) {
-            }
-        }
-
         return null;
     }
 
     private boolean isPublicPath(String path) {
-        String[] publicPaths = {
-                "/api/auth/",
-                "/api/public/",
-                "/api/tenant/auth/",
-                "/api/platform/auth/",
-                "/api/health",
-                "/actuator/",
-                "/swagger-ui/",
-                "/v3/api-docs/",
-                "/error"
-        };
-
-        for (String publicPath : publicPaths) {
-            if (path.startsWith(publicPath)) {
-                return true;
-            }
-        }
-        return false;
+        return PublicPaths.isPublic(path);
     }
 }

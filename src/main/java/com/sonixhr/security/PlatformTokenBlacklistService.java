@@ -190,35 +190,6 @@ public class PlatformTokenBlacklistService {
     }
 
     /**
-     * Alternative: Blacklist token in Redis with pipelining (better performance for bulk operations)
-     * Use this if you're blacklisting many tokens at once
-     */
-    private boolean blacklistTokenInRedisWithPipeline(String jti, String username, String userType, long ttl) {
-        try {
-            String key = REDIS_KEY_BLACKLIST + jti;
-
-            // Using RedisCallback with explicit type to avoid ambiguity
-            redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-                Map<byte[], byte[]> hash = new HashMap<>();
-                hash.put("jti".getBytes(), jti.getBytes());
-                hash.put("username".getBytes(), username != null ? username.getBytes() : new byte[0]);
-                hash.put("userType".getBytes(), userType != null ? userType.getBytes() : new byte[0]);
-                hash.put("blacklistedAt".getBytes(), String.valueOf(System.currentTimeMillis()).getBytes());
-
-                connection.hashCommands().hMSet(key.getBytes(), hash);
-                connection.keyCommands().expire(key.getBytes(), ttl / 1000);
-                return null;
-            });
-
-            log.debug("Token blacklisted in Redis (pipeline): {}, TTL: {}ms", jti, ttl);
-            return true;
-        } catch (Exception e) {
-            log.warn("Failed to blacklist token in Redis with pipeline: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Blacklist token locally (in-memory fallback)
      */
     private void blacklistTokenLocally(String jti, String username, String userType, long ttl) {

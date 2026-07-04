@@ -59,7 +59,13 @@ public class JwtService {
 
     public Long extractTenantIdAsLong(String token) {
         String tenantId = extractTenantId(token);
-        return tenantId != null ? Long.parseLong(tenantId) : null;
+        if (tenantId == null) return null;
+        try {
+            return Long.parseLong(tenantId);
+        } catch (NumberFormatException e) {
+            log.warn("Malformed tenantId claim in token: {}", tenantId);
+            return null;
+        }
     }
 
     public String extractUserType(String token) {

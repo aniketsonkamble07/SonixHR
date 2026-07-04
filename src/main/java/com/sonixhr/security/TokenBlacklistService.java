@@ -122,7 +122,9 @@ public class TokenBlacklistService {
         }
         try {
             String key = "tenant:blacklist:" + tenantId;
-            redisTemplate.opsForValue().set(key, "true");
+            // 365-day TTL prevents permanent Redis lock if removeFromTenantBlacklist()
+            // is never called (e.g. crash after suspension before re-activation).
+            redisTemplate.opsForValue().set(key, "true", 365, TimeUnit.DAYS);
             log.info("Tenant suspended and blacklisted: {}", tenantId);
         } catch (Exception e) {
             log.error("Failed to blacklist tenant in Redis: {}", e.getMessage());
