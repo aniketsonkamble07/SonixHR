@@ -46,9 +46,18 @@ public class SonixhrApplication {
 			System.out.println("[Pre-Startup] Warning: Could not read .env file: " + e.getMessage());
 		}
 
-		String url = env.getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/sonixhr_db?ssl=false");
-		String user = env.getOrDefault("DB_USERNAME", "postgres");
-		String password = env.getOrDefault("DB_PASSWORD", "root");
+		String url = System.getenv("DB_URL");
+		if (url == null || url.trim().isEmpty()) {
+			url = env.getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/sonixhr_db?ssl=false");
+		}
+		String user = System.getenv("DB_USERNAME");
+		if (user == null || user.trim().isEmpty()) {
+			user = env.getOrDefault("DB_USERNAME", "postgres");
+		}
+		String password = System.getenv("DB_PASSWORD");
+		if (password == null || password.trim().isEmpty()) {
+			password = env.getOrDefault("DB_PASSWORD", "root");
+		}
 
 		// 2. Run JDBC update
 		try (Connection conn = DriverManager.getConnection(url, user, password);
