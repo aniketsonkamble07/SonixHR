@@ -196,7 +196,7 @@ public class GlobalExceptionHandler {
                     .status(HttpStatus.BAD_REQUEST)
                     .body(Map.of(
                             "success", false,
-                            "message", message,
+                            "message", message + " | Raw: " + errorMsg,
                             "errors", errors,
                             "timestamp", LocalDateTime.now()
                     ));
