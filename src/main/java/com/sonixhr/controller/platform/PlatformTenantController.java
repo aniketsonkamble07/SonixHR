@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -89,7 +90,7 @@ public class PlatformTenantController {
             @RequestBody @Valid TenantRegistrationRequest request) {
         log.info("REST request to create organization: {}", request.getCompanyName());
         PlatformTenantResponseDTO tenant = tenantService.createTenant(request);
-        return ResponseEntity.ok(tenant);
+        return ResponseEntity.status(HttpStatus.CREATED).body(tenant);
     }
 
     @PutMapping("/{id}")
