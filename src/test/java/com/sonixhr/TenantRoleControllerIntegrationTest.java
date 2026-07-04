@@ -314,30 +314,39 @@ public class TenantRoleControllerIntegrationTest {
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isOk());
 
-        // 4. Try to delete Role A without reassignment -> should return 400 Bad Request
+        // 4. Try to delete Role A -> should return 400 Bad Request because it is assigned to a user
         mockMvc.perform(delete("/api/tenant/roles/" + roleIdA)
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isBadRequest());
 
-        // 5. Delete Role A with reassignment to Role B -> should succeed (204 No Content)
-        mockMvc.perform(delete("/api/tenant/roles/" + roleIdA)
-                        .param("reassignToRoleId", roleIdB.toString())
+        // 5. Manually assign user to Role B
+        mockMvc.perform(post("/api/tenant/roles/" + roleIdB + "/users/" + adminEmployeeId)
+                        .header("Authorization", tokenHeader))
+                .andExpect(status().isOk());
+
+        // 6. Remove user from Role A
+        mockMvc.perform(delete("/api/tenant/roles/" + roleIdA + "/users/" + adminEmployeeId)
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isNoContent());
 
-        // 6. Verify Role A returns 404 Not Found
+        // 7. Delete Role A -> should succeed now that no users are assigned
+        mockMvc.perform(delete("/api/tenant/roles/" + roleIdA)
+                        .header("Authorization", tokenHeader))
+                .andExpect(status().isNoContent());
+
+        // 8. Verify Role A returns 404 Not Found (inactive)
         mockMvc.perform(get("/api/tenant/roles/" + roleIdA)
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isNotFound());
 
-        // 7. Verify Role B now has the user assigned
+        // 9. Verify Role B now has the user assigned
         MvcResult usersResult = mockMvc.perform(get("/api/tenant/roles/" + roleIdB + "/users")
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isOk())
                 .andReturn();
 
         String body = usersResult.getResponse().getContentAsString();
-        assertTrue(body.contains("\"id\":" + adminEmployeeId), "User should have been reassigned to Role B");
+        assertTrue(body.contains("\"id\":" + adminEmployeeId), "User should be assigned to Role B");
     }
 
     @Test

@@ -180,9 +180,7 @@ public class Employee implements UserDetails {
     @Column(name = "hire_date", nullable = false)
     private LocalDate hireDate;
 
-    @Column(name = "probation_months")
-    @Builder.Default
-    private Integer probationMonths = 3;
+
 
     @Column(name = "confirmation_date")
     private LocalDate confirmationDate;
@@ -220,8 +218,7 @@ public class Employee implements UserDetails {
     @Column(name = "postal_code", length = 20)
     private String postalCode;
 
-    @Column(name = "permanent_address", columnDefinition = "TEXT")
-    private String permanentAddress;
+
 
     // =====================================================
     // EMERGENCY CONTACT

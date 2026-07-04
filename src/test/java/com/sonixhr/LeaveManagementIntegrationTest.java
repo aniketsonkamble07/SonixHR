@@ -143,7 +143,6 @@ public class LeaveManagementIntegrationTest {
                 .country("India")
                 .workLocation("Office")
                 .employmentType(EmploymentType.FULL_TIME)
-                .probationMonths(3)
                 .roleIds(Set.of(employeeRoleId))
                 .build();
 
@@ -587,7 +586,6 @@ public class LeaveManagementIntegrationTest {
                 .country("India")
                 .workLocation("Office")
                 .employmentType(EmploymentType.FULL_TIME)
-                .probationMonths(3)
                 .roleIds(roleIds)
                 .build();
 

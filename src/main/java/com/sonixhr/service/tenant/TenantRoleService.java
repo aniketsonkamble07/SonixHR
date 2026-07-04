@@ -576,8 +576,8 @@ public class TenantRoleService {
 
     @Transactional
     @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
-    public void deleteRole(Long roleId, Long tenantId, Long reassignToRoleId) {
-        log.info("Deleting tenant role: {} (reassignTo: {}) for tenant: {}", roleId, reassignToRoleId, tenantId);
+    public void deleteRole(Long roleId, Long tenantId) {
+        log.info("Deleting tenant role: {} for tenant: {}", roleId, tenantId);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
 
@@ -587,35 +587,8 @@ public class TenantRoleService {
 
         long userCount = employeeRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
         if (userCount > 0) {
-            if (reassignToRoleId != null) {
-                // Bulk reassign users to the new role
-                TenantRole newRole = getRoleByIdAndTenant(reassignToRoleId, tenantId);
-                if (!newRole.isActive()) {
-                    throw new BusinessException("Cannot reassign users to an inactive role: " + newRole.getName());
-                }
-                List<Employee> users = employeeRepository.findByRolesIdAndTenantId(roleId, tenantId);
-                for (Employee user : users) {
-                    user.getRoles().removeIf(r -> r.getId().equals(roleId));
-                    user.getRoles().add(newRole);
-                    user.incrementRolesVersion();
-                    user.clearAuthoritiesCache();
-                    employeeRepository.save(user);
-                    
-                    // Invalidate caches for this user
-                    dynamicRoleService.invalidateEmployeeAuthorityCache(user.getEmail(), tenantId);
-                    userRoleAssignmentCache.remove(user.getId());
-                }
-                usersByRoleCache.remove(roleId);
-                usersByRoleCache.remove(reassignToRoleId);
-                if (cacheEnabled) {
-                    roleCache.remove(buildCacheKey(tenantId, reassignToRoleId));
-                }
-                log.info("Bulk reassigned {} users from role {} to role {} in tenant {}", 
-                        userCount, roleId, reassignToRoleId, tenantId);
-            } else {
-                throw new BusinessException("Cannot delete role that is assigned to " + userCount +
-                        " user(s). Remove the role from users or specify a reassignToRoleId parameter.");
-            }
+            throw new BusinessException("Cannot delete role that is assigned to " + userCount +
+                    " employee(s). You must manually reassign these employees to another role first.");
         }
 
         long totalRoles = roleRepository.countByTenantId(tenantId);

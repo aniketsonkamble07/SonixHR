@@ -2,9 +2,11 @@ package com.sonixhr.service.employee;
 
 import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
+import com.sonixhr.dto.employee.EmployeeUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
+import com.sonixhr.dto.employee.EmployeeDropdownDTO;
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
@@ -12,6 +14,7 @@ import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.employee.SalaryType;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.department.DepartmentRepository;
@@ -19,6 +22,8 @@ import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.attendance.ShiftConfigurationRepository;
+import com.sonixhr.repository.payroll.EmployeeSalaryProfileRepository;
+import com.sonixhr.entity.payroll.EmployeeSalaryProfile;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
 import org.springframework.cache.annotation.CacheEvict;
@@ -55,6 +60,7 @@ public class EmployeeService {
     private final TenantRoleRepository roleRepository;
     private final ShiftConfigurationRepository shiftConfigurationRepository;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
+    private final EmployeeSalaryProfileRepository employeeSalaryProfileRepository;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -105,7 +111,12 @@ public class EmployeeService {
 
         // Set manager if provided
         Long managerId = request.getManagerId();
-        if (managerId != null) {
+        String managerCode = request.getManagerCode();
+        if (managerCode != null && !managerCode.trim().isEmpty()) {
+            Employee manager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode.trim())
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
+            employee.setManager(manager);
+        } else if (managerId != null) {
             Employee manager = employeeRepository.findById(managerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Manager not found with id: " + managerId));
             if (!manager.getTenantId().equals(tenantId)) {
@@ -133,6 +144,28 @@ public class EmployeeService {
         // emailService.sendActivationEmail(savedEmployee.getEmail(), savedEmployee.getFullName(), activationLink);
         // log.info("Activation email sent to new employee: {}", savedEmployee.getEmail());
 
+        if (request.getSalary() != null) {
+            java.math.BigDecimal monthlyCtc;
+            if (request.getSalaryType() == SalaryType.YEARLY) {
+                monthlyCtc = request.getSalary().divide(java.math.BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
+            } else {
+                monthlyCtc = request.getSalary();
+            }
+
+            EmployeeSalaryProfile salaryProfile = EmployeeSalaryProfile.builder()
+                    .tenant(savedEmployee.getTenant())
+                    .employee(savedEmployee)
+                    .monthlyCtc(monthlyCtc)
+                    .currency(request.getCurrency() != null ? request.getCurrency() : "INR")
+                    .taxRegime(request.getTaxRegime() != null ? request.getTaxRegime() : "NEW_REGIME")
+                    .version(1)
+                    .effectiveFrom(savedEmployee.getHireDate() != null ? savedEmployee.getHireDate() : LocalDate.now())
+                    .isActive(true)
+                    .createdBy(getCurrentEmployeeId())
+                    .build();
+            employeeSalaryProfileRepository.save(salaryProfile);
+        }
+
         return convertToResponse(savedEmployee);
     }
 
@@ -140,16 +173,87 @@ public class EmployeeService {
     // UPDATE EMPLOYEE
     // =====================================================
     @Transactional
-    public EmployeeResponse updateEmployee(@NonNull Long id, @NonNull Long tenantId, EmployeeCreateRequest request) {
+    public EmployeeResponse updateEmployee(@NonNull Long id, @NonNull Long tenantId, EmployeeUpdateRequest request) {
         log.info("Updating employee with id: {} for tenant: {}", id, tenantId);
 
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean hasEditAuthority = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("EMPLOYEE_EDIT"));
+
+        if (!hasEditAuthority) {
+            Map<String, String> errors = new HashMap<>();
+            String msg = "Only HR or Super Admin can update this restricted field";
+
+            if (request.getSalary() != null) {
+                List<EmployeeSalaryProfile> activeProfiles = employeeSalaryProfileRepository.findActiveByEmployeeId(id);
+                java.math.BigDecimal currentSalary = (activeProfiles != null && !activeProfiles.isEmpty()) ? activeProfiles.get(0).getMonthlyCtc() : null;
+                java.math.BigDecimal targetSalary = request.getSalary();
+                if (request.getSalaryType() == SalaryType.YEARLY) {
+                    targetSalary = targetSalary.divide(java.math.BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
+                }
+                if (currentSalary == null || currentSalary.compareTo(targetSalary) != 0) {
+                    errors.put("salary", msg);
+                }
+            }
+            if (request.getDepartmentId() != null && (employee.getDepartment() == null || !employee.getDepartment().getId().equals(request.getDepartmentId()))) {
+                errors.put("departmentId", msg);
+            }
+            if (request.getPosition() != null && !request.getPosition().equals(employee.getPosition())) {
+                errors.put("position", msg);
+            }
+            if (request.getWorkLocation() != null && !request.getWorkLocation().equals(employee.getWorkLocation())) {
+                errors.put("workLocation", msg);
+            }
+            if (request.getEmploymentType() != null && request.getEmploymentType() != employee.getEmploymentType()) {
+                errors.put("employmentType", msg);
+            }
+            if (request.getHireDate() != null && !request.getHireDate().equals(employee.getHireDate())) {
+                errors.put("hireDate", msg);
+            }
+            if (request.getManagerId() != null && (employee.getManager() == null || !employee.getManager().getId().equals(request.getManagerId()))) {
+                errors.put("managerId", msg);
+            }
+            if (request.getManagerCode() != null && (employee.getManager() == null || !employee.getManager().getEmployeeCode().equals(request.getManagerCode()))) {
+                errors.put("managerCode", msg);
+            }
+            if (request.getShiftId() != null && (employee.getShift() == null || !employee.getShift().getId().equals(request.getShiftId()))) {
+                errors.put("shiftId", msg);
+            }
+            if (request.getBankDetails() != null && (employee.getBankDetails() == null || !employee.getBankDetails().equals(request.getBankDetails()))) {
+                errors.put("bankDetails", msg);
+            }
+
+            if (!errors.isEmpty()) {
+                throw new com.sonixhr.exceptions.ValidationException(errors);
+            }
+        }
 
         // Update personal information
         if (request.getFirstName() != null)
             employee.setFirstName(request.getFirstName());
         if (request.getLastName() != null)
             employee.setLastName(request.getLastName());
+        if (request.getDateOfBirth() != null)
+            employee.setDateOfBirth(request.getDateOfBirth());
+        if (request.getGender() != null)
+            employee.setGender(request.getGender());
+        if (request.getMaritalStatus() != null)
+            employee.setMaritalStatus(request.getMaritalStatus());
+        if (request.getBloodGroup() != null)
+            employee.setBloodGroup(request.getBloodGroup());
+        if (request.getNationality() != null)
+            employee.setNationality(request.getNationality());
+        if (request.getPersonalEmail() != null)
+            employee.setPersonalEmail(request.getPersonalEmail());
+        if (request.getBankDetails() != null)
+            employee.setBankDetails(request.getBankDetails());
+        if (request.getShiftId() != null) {
+            com.sonixhr.entity.attendance.ShiftConfiguration shift = shiftConfigurationRepository.findById(request.getShiftId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Shift not found"));
+            employee.setShift(shift);
+        }
         if (request.getEmail() != null && !request.getEmail().equals(employee.getEmail())) {
             if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
                 throw new com.sonixhr.exceptions.ValidationException("email", "Employee with email " + request.getEmail() + " already exists");
@@ -191,30 +295,18 @@ public class EmployeeService {
         if (request.getPostalCode() != null)
             employee.setPostalCode(request.getPostalCode());
 
-        if (request.getPermanentAddress() != null && !request.getPermanentAddress().trim().isEmpty()) {
-            employee.setPermanentAddress(request.getPermanentAddress());
-        } else if (addressUpdated || employee.getPermanentAddress() == null || employee.getPermanentAddress().trim().isEmpty()) {
-            if (request.getPermanentAddress() == null) {
-                employee.setPermanentAddress(employee.getAddress());
-            }
-        }
-
-        // Apply country-specific validation and cleanup
-        if ("IN".equalsIgnoreCase(employee.getCountry())) {
-            validateStateForCountry(employee.getState(), employee.getCountry());
-            employee.setStateText(null);
-        } else {
-            employee.setState(null);
-        }
-
         if (request.getHireDate() != null)
             employee.setHireDate(request.getHireDate());
-        if (request.getProbationMonths() != null)
-            employee.setProbationMonths(request.getProbationMonths());
 
         // Update manager if changed
         Long managerId = request.getManagerId();
-        if (managerId != null && (employee.getManager() == null ||
+        String managerCode = request.getManagerCode();
+        if (managerCode != null && !managerCode.trim().isEmpty()) {
+            Employee newManager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode.trim())
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
+            validateManagerAssignment(employee, newManager, tenantId);
+            employee.setManager(newManager);
+        } else if (managerId != null && (employee.getManager() == null ||
                 !employee.getManager().getId().equals(managerId))) {
             Employee newManager = findEmployeeByIdAndTenant(managerId, tenantId);
             validateManagerAssignment(employee, newManager, tenantId);
@@ -229,6 +321,57 @@ public class EmployeeService {
         employee.setUpdatedBy(getCurrentEmployeeId());
         Employee updatedEmployee = employeeRepository.save(employee);
         log.info("Employee updated successfully: {}", id);
+
+        if (request.getSalary() != null) {
+            java.math.BigDecimal monthlyCtc;
+            if (request.getSalaryType() == SalaryType.YEARLY) {
+                monthlyCtc = request.getSalary().divide(java.math.BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
+            } else {
+                monthlyCtc = request.getSalary();
+            }
+
+            String currency = request.getCurrency() != null ? request.getCurrency() : "INR";
+            String taxRegime = request.getTaxRegime() != null ? request.getTaxRegime() : "NEW_REGIME";
+
+            List<EmployeeSalaryProfile> activeProfiles = employeeSalaryProfileRepository.findActiveByEmployeeId(id);
+            if (activeProfiles != null && !activeProfiles.isEmpty()) {
+                EmployeeSalaryProfile activeProfile = activeProfiles.get(0);
+                if (activeProfile.getMonthlyCtc().compareTo(monthlyCtc) != 0 ||
+                        !activeProfile.getCurrency().equalsIgnoreCase(currency) ||
+                        !activeProfile.getTaxRegime().equalsIgnoreCase(taxRegime)) {
+                    
+                    activeProfile.setActive(false);
+                    activeProfile.setEffectiveTo(LocalDate.now().minusDays(1));
+                    employeeSalaryProfileRepository.save(activeProfile);
+
+                    EmployeeSalaryProfile newProfile = EmployeeSalaryProfile.builder()
+                            .tenant(updatedEmployee.getTenant())
+                            .employee(updatedEmployee)
+                            .monthlyCtc(monthlyCtc)
+                            .currency(currency)
+                            .taxRegime(taxRegime)
+                            .version(activeProfile.getVersion() + 1)
+                            .effectiveFrom(LocalDate.now())
+                            .isActive(true)
+                            .createdBy(getCurrentEmployeeId())
+                            .build();
+                    employeeSalaryProfileRepository.save(newProfile);
+                }
+            } else {
+                EmployeeSalaryProfile newProfile = EmployeeSalaryProfile.builder()
+                        .tenant(updatedEmployee.getTenant())
+                        .employee(updatedEmployee)
+                        .monthlyCtc(monthlyCtc)
+                        .currency(currency)
+                        .taxRegime(taxRegime)
+                        .version(1)
+                        .effectiveFrom(updatedEmployee.getHireDate() != null ? updatedEmployee.getHireDate() : LocalDate.now())
+                        .isActive(true)
+                        .createdBy(getCurrentEmployeeId())
+                        .build();
+                employeeSalaryProfileRepository.save(newProfile);
+            }
+        }
 
         return convertToResponse(updatedEmployee);
     }
@@ -640,11 +783,6 @@ public class EmployeeService {
 
         String postalCode = request.getPostalCode();
 
-        String permanentAddress = request.getPermanentAddress();
-        if (permanentAddress == null || permanentAddress.trim().isEmpty()) {
-            permanentAddress = address;
-        }
-
         return Employee.builder()
                 .tenant(tenant)
                 .employeeCode(employeeCode)
@@ -662,9 +800,7 @@ public class EmployeeService {
                 .stateText(resolvedStateText)
                 .country(country)
                 .postalCode(postalCode)
-                .permanentAddress(permanentAddress)
                 .hireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now())
-                .probationMonths(request.getProbationMonths() != null ? request.getProbationMonths() : 3)
                 .status(EmployeeStatus.INACTIVE)
                 .isActive(false)
                 .createdBy(getCurrentEmployeeId())
@@ -674,7 +810,7 @@ public class EmployeeService {
     }
 
     public EmployeeResponse convertToResponse(Employee employee) {
-        return EmployeeResponse.builder()
+        EmployeeResponse.EmployeeResponseBuilder builder = EmployeeResponse.builder()
                 .id(employee.getId())
                 .tenantId(employee.getTenantId())
                 .employeeCode(employee.getEmployeeCode())
@@ -720,7 +856,6 @@ public class EmployeeService {
                 .employmentType(employee.getEmploymentType())
                 .workLocation(employee.getWorkLocation())
                 .hireDate(employee.getHireDate())
-                .probationMonths(employee.getProbationMonths())
                 .confirmationDate(employee.getConfirmationDate())
                 .resignationDate(employee.getResignationDate())
                 .lastWorkingDate(employee.getLastWorkingDate())
@@ -733,7 +868,6 @@ public class EmployeeService {
                 .stateText(employee.getStateText())
                 .country(employee.getCountry())
                 .postalCode(employee.getPostalCode())
-                .permanentAddress(employee.getPermanentAddress())
                 .emergencyContactName(employee.getEmergencyContactName())
                 .emergencyContactPhone(employee.getEmergencyContactPhone())
                 .emergencyContactRelation(employee.getEmergencyContactRelation())
@@ -752,8 +886,19 @@ public class EmployeeService {
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .createdBy(employee.getCreatedBy())
-                .updatedBy(employee.getUpdatedBy())
-                .build();
+                .updatedBy(employee.getUpdatedBy());
+
+        if (employeeSalaryProfileRepository != null) {
+            List<EmployeeSalaryProfile> profiles = employeeSalaryProfileRepository.findActiveByEmployeeId(employee.getId());
+            if (profiles != null && !profiles.isEmpty()) {
+                EmployeeSalaryProfile activeProfile = profiles.get(0);
+                builder.monthlyCtc(activeProfile.getMonthlyCtc())
+                       .currency(activeProfile.getCurrency())
+                       .taxRegime(activeProfile.getTaxRegime());
+            }
+        }
+
+        return builder.build();
     }
 
     public EmployeeSummaryResponse convertToSummaryResponse(Employee employee) {
@@ -1082,6 +1227,11 @@ public class EmployeeService {
         employeeRepository.save(employee);
 
         log.info("Password reset by admin for employee: {}", employeeId);
+    }
+
+    public List<EmployeeDropdownDTO> getActiveEmployeesForDropdown(@NonNull Long tenantId) {
+        log.info("Getting active employees for dropdown for tenant: {}", tenantId);
+        return employeeRepository.findActiveEmployeesForDropdown(tenantId);
     }
 
     private void validateStateForCountry(IndianState state, String country) {

@@ -277,30 +277,35 @@ public class PlatformRoleControllerIntegrationTest {
         testUser = userRepository.save(testUser);
         Long userId = testUser.getId();
 
-        // 4. Try to delete Role A without reassignment -> should return 400 Bad Request
+        // 4. Try to delete Role A -> should return 400 Bad Request because it is assigned to a user
         mockMvc.perform(delete("/api/platform/roles/" + roleIdA)
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isBadRequest());
 
-        // 5. Delete Role A with reassignment to Role B -> should succeed (204 No Content)
+        // 5. Manually reassign the user to Role B
+        PlatformRole roleEntityB = roleRepository.findById(roleIdB).orElseThrow();
+        testUser.getRoles().clear();
+        testUser.getRoles().add(roleEntityB);
+        userRepository.save(testUser);
+
+        // 6. Delete Role A -> should succeed now that no users are assigned
         mockMvc.perform(delete("/api/platform/roles/" + roleIdA)
-                        .param("reassignToRoleId", roleIdB.toString())
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isNoContent());
 
-        // 6. Verify Role A returns 404 Not Found
+        // 7. Verify Role A returns 404 Not Found (inactive)
         mockMvc.perform(get("/api/platform/roles/" + roleIdA)
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isNotFound());
 
-        // 7. Verify Role B now has the user assigned
+        // 8. Verify Role B now has the user assigned
         MvcResult usersResult = mockMvc.perform(get("/api/platform/roles/" + roleIdB + "/users")
                         .header("Authorization", tokenHeader))
                 .andExpect(status().isOk())
                 .andReturn();
 
         String body = usersResult.getResponse().getContentAsString();
-        assertTrue(body.contains("\"id\":" + userId), "User should have been reassigned to Role B");
+        assertTrue(body.contains("\"id\":" + userId), "User should be assigned to Role B");
 
         // Cleanup
         userRepository.delete(userRepository.findById(userId).orElseThrow());

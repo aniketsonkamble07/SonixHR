@@ -54,12 +54,16 @@ public class EmployeeResponse {
     private EmploymentType employmentType;
     private String workLocation;
     private LocalDate hireDate;
-    private Integer probationMonths;
+
     private LocalDate confirmationDate;
     private LocalDate resignationDate;
     private LocalDate lastWorkingDate;
     private Integer tenureInMonths;
     private EmployeeStatus status;
+
+    private java.math.BigDecimal monthlyCtc;
+    private String currency;
+    private String taxRegime;
 
     // =====================================================
     // ADDRESS INFORMATION
@@ -70,7 +74,7 @@ public class EmployeeResponse {
     private String stateText;
     private String country;
     private String postalCode;
-    private String permanentAddress;
+
 
     // =====================================================
     // EMERGENCY CONTACT

@@ -396,7 +396,6 @@ public class TenantRegistrationService {
                 .position("Super Admin")
                 .employmentType(EmploymentType.FULL_TIME)
                 .hireDate(LocalDate.now())
-                .probationMonths(0)
                 .status(employeeStatus)
                 .isActive(employeeActive)
                 .address(tenant.getOfficeAddress())

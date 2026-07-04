@@ -2,9 +2,11 @@ package com.sonixhr.controller.employee;
 
 import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
+import com.sonixhr.dto.employee.EmployeeUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
+import com.sonixhr.dto.employee.EmployeeDropdownDTO;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.service.employee.EmployeeService;
@@ -122,6 +124,21 @@ public class EmployeeController {
         log.info("REST request to get current employee: {}", currentEmployee.getEmail());
         EmployeeResponse response = employeeService.getEmployeeById(currentEmployee.getId(), currentEmployee.getTenantId());
         return ResponseEntity.ok(response);
+    }
+
+    // =====================================================
+    // GET LIGHTWEIGHT LIST FOR DROPDOWN
+    // =====================================================
+
+    @GetMapping("/dropdown")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM')")
+    @Operation(summary = "Get active employees for dropdown", description = "Retrieves a lightweight list of all active employees for selection dropdowns")
+    public ResponseEntity<List<EmployeeDropdownDTO>> getActiveEmployeesForDropdown(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to get lightweight employee list for dropdown for tenant: {}", tenantId);
+        List<EmployeeDropdownDTO> list = employeeService.getActiveEmployeesForDropdown(tenantId);
+        return ResponseEntity.ok(list);
     }
 
     // =====================================================
@@ -244,7 +261,7 @@ public class EmployeeController {
     public ResponseEntity<EmployeeResponse> updateEmployee(
             @Parameter(description = "Employee ID", required = true)
             @PathVariable Long id,
-            @Valid @RequestBody EmployeeCreateRequest request,
+            @Valid @RequestBody EmployeeUpdateRequest request,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();

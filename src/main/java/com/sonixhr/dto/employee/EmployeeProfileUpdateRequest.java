@@ -31,7 +31,6 @@ public class EmployeeProfileUpdateRequest {
     private String stateText;
     private String country;
     private String postalCode;
-    private String permanentAddress;
 
     // Emergency Contact
     private String emergencyContactName;
@@ -41,22 +40,8 @@ public class EmployeeProfileUpdateRequest {
     private String secondaryEmergencyName;
     private String secondaryEmergencyPhone;
 
-    // Bank Details
-    private Map<String, Object> bankDetails;
-
     // Social Links
     private String linkedinUrl;
     private String githubUrl;
     private String twitterUrl;
-
-    // =====================================================
-    // ONLY SUPER ADMIN / HR CAN UPDATE
-    // =====================================================
-    private Long departmentId;
-    private String position;
-    private String workLocation;
-    private Long managerId;
-
-
-
 }

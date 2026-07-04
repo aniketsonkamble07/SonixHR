@@ -1,6 +1,7 @@
 package com.sonixhr.repository.employee;
 
 import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.dto.employee.EmployeeDropdownDTO;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -272,6 +273,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("SELECT e.id, e.email, e.firstName, e.lastName FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
     List<Object[]> findActiveEmployeeSummariesByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT new com.sonixhr.dto.employee.EmployeeDropdownDTO(e.employeeCode, CONCAT(e.firstName, ' ', e.lastName)) " +
+           "FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
+    List<EmployeeDropdownDTO> findActiveEmployeesForDropdown(@Param("tenantId") Long tenantId);
 
     @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
     Page<Employee> findActiveEmployeesByTenantId(@Param("tenantId") Long tenantId, Pageable pageable);

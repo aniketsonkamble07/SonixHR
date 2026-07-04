@@ -101,12 +101,11 @@ public class PlatformRoleController {
     @PreAuthorize("hasAuthority('DELETE_PLATFORM_ROLE')")
     public ResponseEntity<Void> deleteRole(
             @PathVariable Long roleId,
-            @RequestParam(required = false) Long reassignToRoleId,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        log.info("Platform admin {} deleting role: {} (reassignTo: {})", currentAdmin.getEmail(), roleId, reassignToRoleId);
+        log.info("Platform admin {} deleting role: {}", currentAdmin.getEmail(), roleId);
 
-        roleService.deleteRole(roleId, reassignToRoleId);
+        roleService.deleteRole(roleId);
         return ResponseEntity.noContent().build();
     }
 

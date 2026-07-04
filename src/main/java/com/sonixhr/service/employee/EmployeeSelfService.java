@@ -46,41 +46,9 @@ public class EmployeeSelfService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         // =====================================================
-        // CHECK PERMISSIONS FROM SECURITY CONTEXT
-        // =====================================================
-        boolean isSuperAdmin = isCurrentUserSuperAdmin();
-        boolean isHR = isCurrentUserHR();
-
-        log.debug("User permissions - SuperAdmin: {}, HR: {}", isSuperAdmin, isHR);
-
-        // =====================================================
         // PERSONAL INFORMATION (All employees can update)
         // =====================================================
         updatePersonalInfo(employee, request);
-
-        // =====================================================
-        // PROFESSIONAL INFORMATION (Only Super Admin/HR can update)
-        // =====================================================
-        if (isSuperAdmin || isHR) {
-            updateProfessionalInfo(employee, request, tenantId);
-        } else if (hasProfessionalInfoRequest(request)) {
-            log.warn("Employee {} attempted to update professional fields without permission", email);
-            Map<String, String> errors = new HashMap<>();
-            String msg = "Only HR or Super Admin can update this professional field";
-            if (request.getDepartmentId() != null) {
-                errors.put("departmentId", msg);
-            }
-            if (request.getPosition() != null) {
-                errors.put("position", msg);
-            }
-            if (request.getWorkLocation() != null) {
-                errors.put("workLocation", msg);
-            }
-            if (request.getManagerId() != null) {
-                errors.put("managerId", msg);
-            }
-            throw new com.sonixhr.exceptions.ValidationException(errors);
-        }
 
         Employee updatedEmployee = employeeRepository.save(employee);
         log.info("Profile updated successfully for employee: {}", email);
@@ -114,8 +82,6 @@ public class EmployeeSelfService {
             employee.setCountry(com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getCountry()));
         if (request.getPostalCode() != null)
             employee.setPostalCode(request.getPostalCode());
-        if (request.getPermanentAddress() != null)
-            employee.setPermanentAddress(request.getPermanentAddress());
         if (request.getEmergencyContactName() != null)
             employee.setEmergencyContactName(request.getEmergencyContactName());
         if (request.getEmergencyContactPhone() != null)
@@ -128,8 +94,6 @@ public class EmployeeSelfService {
             employee.setSecondaryEmergencyName(request.getSecondaryEmergencyName());
         if (request.getSecondaryEmergencyPhone() != null)
             employee.setSecondaryEmergencyPhone(request.getSecondaryEmergencyPhone());
-        if (request.getBankDetails() != null)
-            employee.setBankDetails(request.getBankDetails());
         if (request.getLinkedinUrl() != null)
             employee.setLinkedinUrl(request.getLinkedinUrl());
         if (request.getGithubUrl() != null)
@@ -146,74 +110,6 @@ public class EmployeeSelfService {
         } else {
             employee.setState(null);
         }
-    }
-
-    private void updateProfessionalInfo(Employee employee, EmployeeProfileUpdateRequest request, Long tenantId) {
-        if (request.getDepartmentId() != null) {
-            Department department = departmentRepository.findById(request.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Department not found with id: " + request.getDepartmentId()));
-            employee.setDepartment(department);
-            log.info("Department updated to: {} (ID: {})", department.getName(), department.getId());
-        }
-        if (request.getPosition() != null) {
-            employee.setPosition(request.getPosition());
-            log.info("Position updated to: {}", request.getPosition());
-        }
-        if (request.getWorkLocation() != null) {
-            employee.setWorkLocation(request.getWorkLocation());
-            log.info("Work location updated to: {}", request.getWorkLocation());
-        }
-        if (request.getManagerId() != null) {
-            Employee manager = employeeRepository.findById(request.getManagerId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Manager not found with id: " + request.getManagerId()));
-            employeeService.validateManagerAssignment(employee, manager, tenantId);
-            employee.setManager(manager);
-            log.info("Manager updated to: {} (ID: {})", manager.getFullName(), manager.getId());
-        }
-    }
-
-    private boolean hasProfessionalInfoRequest(EmployeeProfileUpdateRequest request) {
-        return request.getDepartmentId() != null ||
-                request.getPosition() != null ||
-                request.getWorkLocation() != null ||
-                request.getManagerId() != null;
-    }
-
-    private boolean isCurrentUserSuperAdmin() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof Employee) {
-            return ((Employee) principal).isSuperAdmin();
-        } else if (principal instanceof PlatformUser) {
-            return ((PlatformUser) principal).isSuperAdmin();
-        }
-
-        // Check if user has SUPER_ADMIN authority
-        return authentication.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("SUPER_ADMIN") ||
-                        auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
-    }
-
-    private boolean isCurrentUserHR() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-
-        // Standard RBAC: check if user has permission to edit employee records,
-        // or check if their authorities list explicitly includes fallback HR/Admin roles.
-        return authentication.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("EMPLOYEE_EDIT") ||
-                        auth.getAuthority().equals("HR") ||
-                        auth.getAuthority().equals("ROLE_HR") ||
-                        auth.getAuthority().equals("ADMIN") ||
-                        auth.getAuthority().equals("ROLE_ADMIN"));
     }
 
     // =====================================================

@@ -169,7 +169,6 @@ public class TenantFlowIntegrationTest {
                 .country("India")
                 .workLocation("Office")
                 .employmentType(EmploymentType.FULL_TIME)
-                .probationMonths(3)
                 .roleIds(Set.of(roleResponse.getId()))
                 .build();
 
@@ -365,7 +364,6 @@ public class TenantFlowIntegrationTest {
                 .country("India")
                 .workLocation("Office")
                 .employmentType(EmploymentType.FULL_TIME)
-                .probationMonths(3)
                 .roleIds(null) // Null roleIds
                 .build();
 
@@ -395,7 +393,6 @@ public class TenantFlowIntegrationTest {
                 .country("India")
                 .workLocation("Office")
                 .employmentType(EmploymentType.FULL_TIME)
-                .probationMonths(3)
                 .roleIds(Set.of(roleResponse.getId()))
                 .build();
 
@@ -530,13 +527,16 @@ public class TenantFlowIntegrationTest {
                 emp1LoginResult.getResponse().getContentAsString(), LoginResponse.class);
         String emp1TokenHeader = "Bearer " + emp1LoginResponse.getAccessToken();
 
-        // 9. Try to update professional info via self-service PUT /api/employee/profile -> should fail with ValidationException on departmentId
-        com.sonixhr.dto.employee.EmployeeProfileUpdateRequest selfServiceRequest = com.sonixhr.dto.employee.EmployeeProfileUpdateRequest.builder()
-                .phone("+918888888888") // allowed personal info change
-                .departmentId(deptResponse.getId()) // unauthorized professional info change
-                .build();
+        // 9. Try to update professional info via general PUT /api/employees/{id} -> should fail with ValidationException on departmentId
+        com.sonixhr.dto.employee.EmployeeUpdateRequest selfServiceRequest = new com.sonixhr.dto.employee.EmployeeUpdateRequest();
+        selfServiceRequest.setFirstName("EmpOne");
+        selfServiceRequest.setLastName("Test");
+        selfServiceRequest.setEmail(emp1Response.getEmail());
+        selfServiceRequest.setDepartmentId(deptResponse.getId() + 1); // unauthorized professional info change
+        selfServiceRequest.setPosition("Software Engineer"); // required
+        selfServiceRequest.setHireDate(LocalDate.now()); // required
 
-        MvcResult selfServiceResult = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/employee/profile")
+        MvcResult selfServiceResult = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/employees/" + emp1Response.getId())
                         .header("Authorization", emp1TokenHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(selfServiceRequest)))
@@ -661,7 +661,6 @@ public class TenantFlowIntegrationTest {
         assertEquals("Pune", fallbackEmp.getCity());
         assertEquals(IndianState.MAHARASHTRA, fallbackEmp.getState());
         assertEquals("IN", fallbackEmp.getCountry());
-        assertEquals("456 Company Boulevard", fallbackEmp.getPermanentAddress());
 
         // Scenario 2: Create Employee with explicit current address but no permanent address -> should copy address to permanent address
         EmployeeCreateRequest empPartialAddressRequest = EmployeeCreateRequest.builder()
@@ -690,7 +689,6 @@ public class TenantFlowIntegrationTest {
                 createPartialResult.getResponse().getContentAsString(), EmployeeResponse.class);
 
         assertEquals("789 Current Street", partialEmp.getAddress());
-        assertEquals("789 Current Street", partialEmp.getPermanentAddress());
 
         // Scenario 3: Update current address but omit permanent address -> should synchronize permanent address to match the updated address
         EmployeeCreateRequest empUpdateRequest = EmployeeCreateRequest.builder()
@@ -719,7 +717,6 @@ public class TenantFlowIntegrationTest {
                 updateResult.getResponse().getContentAsString(), EmployeeResponse.class);
 
         assertEquals("999 New Current Street", updatedEmp.getAddress());
-        assertEquals("999 New Current Street", updatedEmp.getPermanentAddress());
     }
 
     @Test

@@ -407,13 +407,7 @@ public class PlatformRoleService {
     @Transactional
     @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
     public void deleteRole(Long roleId) {
-        deleteRole(roleId, null);
-    }
-
-    @Transactional
-    @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
-    public void deleteRole(Long roleId, Long reassignToRoleId) {
-        log.info("Deleting platform role: {} (reassignTo: {})", roleId, reassignToRoleId);
+        log.info("Deleting platform role: {}", roleId);
 
         PlatformRole role = getRoleById(roleId);
 
@@ -423,31 +417,8 @@ public class PlatformRoleService {
 
         long userCount = userRepository.countUsersByRoleId(roleId);
         if (userCount > 0) {
-            if (reassignToRoleId != null) {
-                PlatformRole newRole = getRoleById(reassignToRoleId);
-                if (!newRole.isActive()) {
-                    throw new BusinessException("Cannot reassign users to an inactive role: " + newRole.getName());
-                }
-                List<PlatformUser> users = userRepository.findByRolesId(roleId);
-                for (PlatformUser user : users) {
-                    user.getRoles().removeIf(r -> r.getId().equals(roleId));
-                    user.getRoles().add(newRole);
-                    user.incrementRolesVersion();
-                    userRepository.save(user);
-
-                    platformUserDetailsService.invalidateCache(user.getEmail());
-                }
-                usersByRoleCache.remove(roleId);
-                usersByRoleCache.remove(reassignToRoleId);
-                if (cacheEnabled) {
-                    roleCache.remove(reassignToRoleId);
-                }
-                log.info("Bulk reassigned {} platform users from role {} to role {}", 
-                        userCount, roleId, reassignToRoleId);
-            } else {
-                throw new BusinessException("Cannot delete role that is assigned to " + userCount +
-                        " user(s). Remove the role from users or specify a reassignToRoleId parameter.");
-            }
+            throw new BusinessException("Cannot delete platform role that is assigned to " + userCount +
+                    " user(s). You must manually reassign these users to another role first.");
         }
 
         // Soft delete - deactivate instead of hard delete

@@ -2,6 +2,7 @@ package com.sonixhr.dto.employee;
 
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.employee.SalaryType;
 import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -60,8 +61,7 @@ public class EmployeeCreateRequest {
     @Size(max = 20, message = "Postal code must be up to 20 characters")
     private String postalCode;
 
-    @Size(max = 500, message = "Permanent address must be up to 500 characters")
-    private String permanentAddress;
+
 
     // =====================================================
     // OPTIONAL FIELDS (HR CAN FILL IF AVAILABLE)
@@ -70,14 +70,19 @@ public class EmployeeCreateRequest {
     private String phone;
     private String workLocation;
     private Long managerId;
+    private String managerCode;
 
     @Builder.Default
     private EmploymentType employmentType = EmploymentType.FULL_TIME;
 
-    @Builder.Default
-    private Integer probationMonths = 3;
+
     private Set<Long> roleIds;
 
     private WeekendConfig weekendConfig;
     private String customWeekendDays;
+
+    private java.math.BigDecimal salary;
+    private SalaryType salaryType; // MONTHLY or YEARLY
+    private String currency;
+    private String taxRegime;
 }

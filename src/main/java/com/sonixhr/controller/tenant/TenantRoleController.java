@@ -159,14 +159,13 @@ public class TenantRoleController {
     @PreAuthorize("hasAuthority('ROLE_DELETE')")
     public ResponseEntity<Void> deleteRole(
             @PathVariable Long roleId,
-            @RequestParam(required = false) Long reassignToRoleId,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = getCurrentTenantId(currentEmployee);
-        log.info("Employee {} deleting role: {} (reassignTo: {}) for tenant: {}",
-                currentEmployee.getEmail(), roleId, reassignToRoleId, tenantId);
+        log.info("Employee {} deleting role: {} for tenant: {}",
+                currentEmployee.getEmail(), roleId, tenantId);
 
-        roleService.deleteRole(roleId, tenantId, reassignToRoleId);
+        roleService.deleteRole(roleId, tenantId);
         return ResponseEntity.noContent().build();
     }
 
