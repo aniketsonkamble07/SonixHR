@@ -64,6 +64,13 @@ public class SonixhrApplication {
 				Statement stmt = conn.createStatement()) {
 			System.out.println("[Pre-Startup] Connected to database successfully.");
 
+			// Reset database schema: Drop and recreate public schema
+			System.out.println("[Pre-Startup] Dropping public schema CASCADE...");
+			stmt.execute("DROP SCHEMA IF EXISTS public CASCADE");
+			stmt.execute("CREATE SCHEMA public");
+			stmt.execute("GRANT ALL ON SCHEMA public TO public");
+			System.out.println("[Pre-Startup] Public schema dropped and recreated successfully.");
+
 			// Check if subscription_plans table exists
 			boolean plansTableExists = false;
 			try {
