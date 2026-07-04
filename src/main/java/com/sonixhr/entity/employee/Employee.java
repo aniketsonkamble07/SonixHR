@@ -602,8 +602,11 @@ public class Employee implements UserDetails {
         }
         return roles.stream()
                 .filter(Objects::nonNull)
-                .anyMatch(role -> role.getName() != null &&
-                        "SUPER_ADMIN".equalsIgnoreCase(role.getName()));
+                .anyMatch(role -> {
+                    if (role.getName() == null) return false;
+                    String normalized = role.getName().trim().replace(" ", "_").toUpperCase();
+                    return "SUPER_ADMIN".equals(normalized);
+                });
     }
 
     public boolean isAdmin() {
@@ -612,8 +615,11 @@ public class Employee implements UserDetails {
         }
         return roles.stream()
                 .filter(Objects::nonNull)
-                .anyMatch(role -> role.getName() != null &&
-                        "ADMIN".equalsIgnoreCase(role.getName()));
+                .anyMatch(role -> {
+                    if (role.getName() == null) return false;
+                    String normalized = role.getName().trim().replace(" ", "_").toUpperCase();
+                    return "ADMIN".equals(normalized) || "SUPER_ADMIN".equals(normalized);
+                });
     }
 
     public boolean isManager() {
