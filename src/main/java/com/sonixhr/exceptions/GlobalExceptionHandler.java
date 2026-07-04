@@ -358,7 +358,7 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
                         "success", false,
-                        "message", "Something went wrong. Please try again later.",
+                        "message", "Something went wrong. Please try again later. | Raw: " + ex.getClass().getName() + ": " + ex.getMessage(),
                         "timestamp", LocalDateTime.now()
                 ));
     }
