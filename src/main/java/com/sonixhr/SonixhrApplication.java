@@ -64,20 +64,6 @@ public class SonixhrApplication {
 				Statement stmt = conn.createStatement()) {
 			System.out.println("[Pre-Startup] Connected to database successfully.");
 
-			// Reset database: Drop all tables in public schema CASCADE
-			System.out.println("[Pre-Startup] Resetting database tables: Dropping all tables in public schema CASCADE...");
-			stmt.execute(
-				"DO $$\n" +
-				"DECLARE\n" +
-				"    r RECORD;\n" +
-				"BEGIN\n" +
-				"    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP\n" +
-				"        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';\n" +
-				"    END LOOP;\n" +
-				"END $$;"
-			);
-			System.out.println("[Pre-Startup] Database tables reset completed successfully.");
-
 			// Check if subscription_plans table exists
 			boolean plansTableExists = false;
 			try {
