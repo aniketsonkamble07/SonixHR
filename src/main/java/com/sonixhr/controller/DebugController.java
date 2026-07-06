@@ -271,4 +271,27 @@ public class DebugController {
                 "users", result
         ));
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.sonixhr.service.payroll.PayrollCalculationService payrollCalculationService;
+
+    @GetMapping("/run-payrun")
+    public ResponseEntity<?> runPayrunDebug() {
+        try {
+            var result = payrollCalculationService.processPayrun(1L, 6, 2026);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "payrunId", result.getId()
+            ));
+        } catch (Exception e) {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+            e.printStackTrace(pw);
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "error", e.getMessage(),
+                "stackTrace", sw.toString()
+            ));
+        }
+    }
 }
