@@ -42,7 +42,7 @@ public class TenantPayrollConfigurationController {
             @ApiResponse(responseCode = "404", description = "Tenant not found")
     })
     @PutMapping("/tenants/{tenantId}/global")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('SETTINGS_EDIT')")
     public ResponseEntity<TenantPayrollConfigResponse> updateGlobalConfig(
             @Parameter(description = "Tenant ID", required = true)
             @PathVariable @NonNull Long tenantId,
@@ -82,7 +82,7 @@ public class TenantPayrollConfigurationController {
             @ApiResponse(responseCode = "404", description = "Tenant not found")
     })
     @PostMapping("/tenants/{tenantId}/components")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('SETTINGS_EDIT')")
     public ResponseEntity<SalaryComponentDefinitionResponse> createComponent(
             @Parameter(description = "Tenant ID", required = true)
             @PathVariable @NonNull Long tenantId,

@@ -29,7 +29,7 @@ public class PayrollConfigurationController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAuthority('SETTINGS_EDIT')")
     public ResponseEntity<TenantPayrollConfigResponse> updateTenantConfig(
             @Valid @RequestBody TenantPayrollConfigRequest request) {
         Long tenantId = TenantContext.getCurrentTenantOrThrow();
