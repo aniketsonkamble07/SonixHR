@@ -179,6 +179,7 @@ public class PayrollCalculationService {
         }
         if (!payrunErrors.isEmpty()) {
             log.warn("Payrun processed with warnings/errors: {}", payrunErrors);
+            throw new RuntimeException("Payrun errors: " + String.join("; ", payrunErrors));
         }
 
         auditLogService.log(
