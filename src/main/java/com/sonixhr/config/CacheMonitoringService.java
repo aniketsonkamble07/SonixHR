@@ -1,7 +1,7 @@
 package com.sonixhr.config;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -12,65 +12,85 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Logs L1 (Caffeine) hit/miss stats every minute and L2 (Redis) availability
+ * every 5 minutes.
+ *
+ * The primary CacheManager is a CompositeCacheManager, so the individual
+ * caffeine/redis beans are injected by qualifier to avoid instanceof checks
+ * that would always fail against the composite.
+ */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CacheMonitoringService {
 
-    private final CacheManager cacheManager;
-
+    private final CaffeineCacheManager caffeineCacheManager;
+    private final RedisCacheManager redisCacheManager;
     private final Map<String, CacheStats> cacheStats = new ConcurrentHashMap<>();
 
-    @Scheduled(fixedDelay = 60000) // Every minute
+    public CacheMonitoringService(
+            @Qualifier("caffeineCacheManager") CacheManager caffeineCacheManager,
+            @Qualifier("redisCacheManager") CacheManager redisCacheManager) {
+        this.caffeineCacheManager = (CaffeineCacheManager) caffeineCacheManager;
+        this.redisCacheManager    = (RedisCacheManager) redisCacheManager;
+    }
+
+    @Scheduled(fixedDelay = 60_000)  // every minute
     public void logCacheStats() {
-        if (cacheManager instanceof CaffeineCacheManager caffeineCacheManager) {
-            caffeineCacheManager.getCacheNames().forEach(cacheName -> {
-                if (cacheName == null) return;
-                Cache cache = caffeineCacheManager.getCache(cacheName);
-                if (cache != null && cache.getNativeCache() instanceof com.github.benmanes.caffeine.cache.Cache nativeCache) {
-                    com.github.benmanes.caffeine.cache.stats.CacheStats stats = nativeCache.stats();
-
-                    CacheStats currentStats = cacheStats.computeIfAbsent(cacheName, k -> new CacheStats());
-                    currentStats.hitCount = stats.hitCount();
-                    currentStats.missCount = stats.missCount();
-                    currentStats.loadSuccessCount = stats.loadSuccessCount();
-                    currentStats.loadFailureCount = stats.loadFailureCount();
-                    currentStats.totalLoadTime = stats.totalLoadTime();
-
-                    double hitRate = stats.hitRate();
-                    double missRate = stats.missRate();
-
-                    log.info("Cache '{}' - Hit Rate: {:.2f}%, Miss Rate: {:.2f}%, Size: {}",
-                            cacheName, hitRate * 100, missRate * 100,
-                            nativeCache.estimatedSize());
-
-                    // Alert if hit rate is too low
-                    if (hitRate < 0.5) {
-                        log.warn("Cache '{}' has low hit rate: {:.2f}%", cacheName, hitRate * 100);
-                    }
-                }
-            });
-        }
-    }
-
-    @Scheduled(fixedDelay = 300000) // Every 5 minutes
-    public void logRedisCacheStats() {
-        if (cacheManager instanceof RedisCacheManager redisCacheManager) {
-            redisCacheManager.getCacheNames().forEach(cacheName -> {
-                // Redis stats can be obtained via RedisTemplate or Actuator
-                log.debug("Redis cache '{}' available", cacheName);
-            });
-        }
-    }
-
-    public void evictAllCaches() {
-        cacheManager.getCacheNames().forEach(cacheName -> {
+        caffeineCacheManager.getCacheNames().forEach(cacheName -> {
             if (cacheName == null) return;
-            Cache cache = cacheManager.getCache(cacheName);
-            if (cache != null) {
-                cache.clear();
-                log.info("Cleared cache: {}", cacheName);
+            Cache cache = caffeineCacheManager.getCache(cacheName);
+            if (cache == null) return;
+
+            Object native0 = cache.getNativeCache();
+            if (!(native0 instanceof com.github.benmanes.caffeine.cache.Cache<?, ?> nativeCache)) return;
+
+            com.github.benmanes.caffeine.cache.stats.CacheStats stats = nativeCache.stats();
+
+            CacheStats current = cacheStats.computeIfAbsent(cacheName, k -> new CacheStats());
+            current.hitCount         = stats.hitCount();
+            current.missCount        = stats.missCount();
+            current.loadSuccessCount = stats.loadSuccessCount();
+            current.loadFailureCount = stats.loadFailureCount();
+            current.totalLoadTime    = stats.totalLoadTime();
+
+            double hitRate  = stats.hitRate();
+            double missRate = stats.missRate();
+            long   size     = nativeCache.estimatedSize();
+
+            // SLF4J uses {} placeholders, not {:.2f}
+            log.info("L1 cache '{}' — hitRate={:.1f}% missRate={:.1f}% size={}",
+                    cacheName,
+                    Math.round(hitRate * 1000) / 10.0,
+                    Math.round(missRate * 1000) / 10.0,
+                    size);
+
+            if (hitRate < 0.5 && (current.hitCount + current.missCount) > 10) {
+                log.warn("L1 cache '{}' has low hit rate: {}%", cacheName,
+                        Math.round(hitRate * 1000) / 10.0);
             }
+        });
+    }
+
+    @Scheduled(fixedDelay = 300_000)  // every 5 minutes
+    public void logRedisCacheStats() {
+        long count = redisCacheManager.getCacheNames().stream()
+                .filter(name -> name != null && redisCacheManager.getCache(name) != null)
+                .count();
+        log.debug("L2 Redis: {} named caches available", count);
+    }
+
+    /** Emergency: wipe every cache. Use sparingly. */
+    public void evictAllCaches() {
+        caffeineCacheManager.getCacheNames().forEach(name -> {
+            if (name == null) return;
+            Cache c = caffeineCacheManager.getCache(name);
+            if (c != null) { c.clear(); log.info("Cleared L1 cache: {}", name); }
+        });
+        redisCacheManager.getCacheNames().forEach(name -> {
+            if (name == null) return;
+            Cache c = redisCacheManager.getCache(name);
+            if (c != null) { c.clear(); log.info("Cleared L2 cache: {}", name); }
         });
     }
 
@@ -85,11 +105,11 @@ public class CacheMonitoringService {
         long loadFailureCount = 0;
         long totalLoadTime = 0;
 
-        public long getHitCount() { return hitCount; }
-        public long getMissCount() { return missCount; }
-        public double getHitRate() {
+        public long   getHitCount()  { return hitCount; }
+        public long   getMissCount() { return missCount; }
+        public double getHitRate()   {
             long total = hitCount + missCount;
-            return total == 0 ? 0 : (double) hitCount / total;
+            return total == 0 ? 0.0 : (double) hitCount / total;
         }
     }
 }

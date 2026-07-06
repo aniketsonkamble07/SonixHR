@@ -306,7 +306,7 @@ public class EmployeeDetailsService implements UserDetailsService {
 
         CompletableFuture.runAsync(() -> {
             try {
-                java.util.List<Employee> activeEmployees = employeeRepository.findTop100ByIsActiveTrue();
+                java.util.List<Employee> activeEmployees = employeeRepository.findTop100ByIsActiveTrue(org.springframework.data.domain.PageRequest.of(0, 100));
                 int loadedCount = 0;
                 for (Employee employee : activeEmployees) {
                     if (employee.isActive()) {

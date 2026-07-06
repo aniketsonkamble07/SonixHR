@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface EmployeeTaskRepository extends JpaRepository<EmployeeTask, Long> {
-    Page<EmployeeTask> findByAssignedToId(Long employeeId, Pageable pageable);
+    Page<EmployeeTask> findByTenantIdAndAssignedToId(Long tenantId, Long employeeId, Pageable pageable);
     Page<EmployeeTask> findByTenantId(Long tenantId, Pageable pageable);
+    Page<EmployeeTask> findByTenantIdAndAssignedToDepartmentId(Long tenantId, Long departmentId, Pageable pageable);
 }

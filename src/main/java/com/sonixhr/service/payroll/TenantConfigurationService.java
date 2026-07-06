@@ -579,7 +579,7 @@ public class TenantConfigurationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found: " + tenantId));
 
         // Get all active employees for this tenant
-        List<Employee> employees = employeeRepository.findActiveByTenantId(tenantId);
+        List<Employee> employees = employeeRepository.findActiveEmployeesByTenantId(tenantId);
 
         if (employees.isEmpty()) {
             log.info("No active employees found for tenant: {}", tenantId);
@@ -844,7 +844,7 @@ public class TenantConfigurationService {
         tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found: " + tenantId));
 
-        List<Employee> employees = employeeRepository.findActiveByTenantId(tenantId);
+        List<Employee> employees = employeeRepository.findActiveEmployeesByTenantId(tenantId);
         List<EmployeeSalaryProfileResponse> responses = new ArrayList<>();
 
         for (Employee employee : employees) {

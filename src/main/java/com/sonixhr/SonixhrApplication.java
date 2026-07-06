@@ -149,7 +149,6 @@ public class SonixhrApplication {
 			System.out.println("[Pre-Startup] Pre-startup database migration checks completed successfully.");
 		} catch (Exception e) {
 			System.out.println("[Pre-Startup] Error during migration check: " + e.getMessage());
-			e.printStackTrace();
 		}
 	}
 }

@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -164,7 +165,10 @@ public class ManualAttendanceService {
      * Mark attendance for today
      */
     @Transactional
-    @CacheEvict(value = "attendance", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "attendance", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public AttendanceRecord markAttendance(Long targetEmployeeId, AttendanceStatus status,
                                            String reason, Double overtimeHours,
                                            Employee currentUser) {
@@ -184,7 +188,10 @@ public class ManualAttendanceService {
      * Mark attendance for specific date (with strict date validation)
      */
     @Transactional
-    @CacheEvict(value = "attendance", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "attendance", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public AttendanceRecord markAttendanceForDate(Long targetEmployeeId, LocalDate date,
                                                   AttendanceStatus status, String reason,
                                                   Double overtimeHours, Employee currentUser) {
@@ -263,7 +270,10 @@ public class ManualAttendanceService {
      * Mark attendance for multiple team members at once
      */
     @Transactional
-    @CacheEvict(value = "attendance", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "attendance", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public List<AttendanceRecord> markTeamAttendance(Long managerId, LocalDate date,
                                                      Map<Long, AttendanceStatus> attendanceMap,
                                                      Map<Long, String> reasonMap,
@@ -308,7 +318,10 @@ public class ManualAttendanceService {
      * Quick mark all team members with same status (for today only)
      */
     @Transactional
-    @CacheEvict(value = "attendance", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "attendance", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public List<AttendanceRecord> quickMarkTeamAttendance(Long managerId, AttendanceStatus defaultStatus) {
         log.info("Manager {} quick marking all team members as: {}", managerId, defaultStatus);
 
@@ -328,7 +341,10 @@ public class ManualAttendanceService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = "attendance", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "attendance", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public AttendanceRecord addOvertime(Long employeeId, LocalDate date, Double overtimeHours,
                                         String reason, Employee currentUser) {
 
@@ -396,7 +412,7 @@ public class ManualAttendanceService {
         Employee manager = employeeRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
 
-        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+        List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId, manager.getTenant().getId());
 
         log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
         return teamMembers;
@@ -404,7 +420,9 @@ public class ManualAttendanceService {
 
     public Page<Employee> getTeamMembersPaginated(Long managerId, Pageable pageable) {
         log.info("Getting paginated team members for manager: {}", managerId);
-        return employeeRepository.findByManagerId(managerId, pageable);
+        Employee manager = employeeRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+        return employeeRepository.findByManagerIdAndTenantId(managerId, manager.getTenant().getId(), pageable);
     }
 
     public List<ManualTeamMemberAttendanceDTO> getTeamWithTodayAttendance(Long managerId) {
@@ -414,52 +432,10 @@ public class ManualAttendanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
         Long tenantId = manager.getTenant().getId();
 
-        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+        List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId, tenantId);
         log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
 
-        LocalDate today = LocalDate.now(Clock.systemUTC());
-
-        List<Long> employeeIds = teamMembers.stream()
-                .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
-                .map(Employee::getId)
-                .collect(Collectors.toList());
-
-        Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
-        if (!employeeIds.isEmpty()) {
-            List<AttendanceRecord> records = attendanceRepository
-                    .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
-            for (AttendanceRecord record : records) {
-                attendanceMap.put(record.getEmployee().getId(), record);
-            }
-        }
-
-        List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
-
-        for (Employee employee : teamMembers) {
-            if (employee.getHireDate() != null && employee.getHireDate().isAfter(today)) {
-                continue;
-            }
-
-            Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
-
-            ManualTeamMemberAttendanceDTO dto = ManualTeamMemberAttendanceDTO.builder()
-                    .employeeId(employee.getId())
-                    .employeeCode(employee.getEmployeeCode())
-                    .employeeName(employee.getFullName())
-                    .email(employee.getEmail())
-                    .position(employee.getPosition())
-                    .profilePicture(employee.getProfilePictureUrl())
-                    .hireDate(employee.getHireDate())
-                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
-                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
-                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
-                    .isMarked(attendance.isPresent())
-                    .build();
-
-            teamAttendance.add(dto);
-        }
-
-        return teamAttendance;
+        return buildTeamAttendanceDTOs(teamMembers, tenantId, LocalDate.now(Clock.systemUTC()));
     }
 
     public List<Employee> searchTeamMembers(Long managerId, String searchTerm) {
@@ -487,49 +463,7 @@ public class ManualAttendanceService {
         Employee manager = employeeRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
         Long tenantId = manager.getTenant().getId();
-        LocalDate today = LocalDate.now(Clock.systemUTC());
-
-        List<Long> employeeIds = teamMembers.stream()
-                .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
-                .map(Employee::getId)
-                .collect(Collectors.toList());
-
-        Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
-        if (!employeeIds.isEmpty()) {
-            List<AttendanceRecord> records = attendanceRepository
-                    .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
-            for (AttendanceRecord record : records) {
-                attendanceMap.put(record.getEmployee().getId(), record);
-            }
-        }
-
-        List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
-
-        for (Employee employee : teamMembers) {
-            if (employee.getHireDate() != null && employee.getHireDate().isAfter(today)) {
-                continue;
-            }
-
-            Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
-
-            ManualTeamMemberAttendanceDTO dto = ManualTeamMemberAttendanceDTO.builder()
-                    .employeeId(employee.getId())
-                    .employeeCode(employee.getEmployeeCode())
-                    .employeeName(employee.getFullName())
-                    .email(employee.getEmail())
-                    .position(employee.getPosition())
-                    .profilePicture(employee.getProfilePictureUrl())
-                    .hireDate(employee.getHireDate())
-                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
-                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
-                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
-                    .isMarked(attendance.isPresent())
-                    .build();
-
-            teamAttendance.add(dto);
-        }
-
-        return teamAttendance;
+        return buildTeamAttendanceDTOs(teamMembers, tenantId, LocalDate.now(Clock.systemUTC()));
     }
 
 
@@ -553,7 +487,7 @@ public class ManualAttendanceService {
                     .map(Employee::getId)
                     .collect(Collectors.toList());
         } else {
-            List<Employee> team = employeeRepository.findByManagerId(currentUser.getId());
+            List<Employee> team = employeeRepository.findByManagerIdAndTenantId(currentUser.getId(), tenantId);
             teamIds = team.stream()
                     .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(endDate))
                     .map(Employee::getId)
@@ -688,7 +622,7 @@ public class ManualAttendanceService {
         Long tenantId = manager.getTenant().getId();
 
         // Get manager's team members
-        List<Employee> teamMembers = employeeRepository.findByManagerId(managerId);
+        List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId, tenantId);
         log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
 
         List<Long> teamIds = teamMembers.stream()
@@ -877,7 +811,7 @@ public class ManualAttendanceService {
                     .collect(Collectors.toList());
             todaysRecords = attendanceRepository.findByTenantIdAndAttendanceDate(tenantId, today);
         } else {
-            List<Employee> team = employeeRepository.findByManagerId(currentUser.getId());
+            List<Employee> team = employeeRepository.findByManagerIdAndTenantId(currentUser.getId(), tenantId);
             teamIds = team.stream()
                     .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
                     .map(Employee::getId)
@@ -930,6 +864,45 @@ public class ManualAttendanceService {
     // =====================================================
     // HELPER METHODS
     // =====================================================
+
+    private List<ManualTeamMemberAttendanceDTO> buildTeamAttendanceDTOs(
+            List<Employee> teamMembers, Long tenantId, LocalDate today) {
+        List<Long> employeeIds = teamMembers.stream()
+                .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
+                .map(Employee::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
+        if (!employeeIds.isEmpty()) {
+            List<AttendanceRecord> records = attendanceRepository
+                    .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
+            for (AttendanceRecord record : records) {
+                attendanceMap.put(record.getEmployee().getId(), record);
+            }
+        }
+
+        List<ManualTeamMemberAttendanceDTO> teamAttendance = new ArrayList<>();
+        for (Employee employee : teamMembers) {
+            if (employee.getHireDate() != null && employee.getHireDate().isAfter(today)) {
+                continue;
+            }
+            Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
+            teamAttendance.add(ManualTeamMemberAttendanceDTO.builder()
+                    .employeeId(employee.getId())
+                    .employeeCode(employee.getEmployeeCode())
+                    .employeeName(employee.getFullName())
+                    .email(employee.getEmail())
+                    .position(employee.getPosition())
+                    .profilePicture(employee.getProfilePictureUrl())
+                    .hireDate(employee.getHireDate())
+                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
+                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
+                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
+                    .isMarked(attendance.isPresent())
+                    .build());
+        }
+        return teamAttendance;
+    }
 
     private boolean isWeekend(LocalDate date) {
         String day = date.getDayOfWeek().toString();

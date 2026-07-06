@@ -62,7 +62,11 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", allEntries = true),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public TenantRoleResponse createRole(TenantRoleCreateRequest request, Long tenantId, Long createdBy) {
         long startTime = System.nanoTime();
         log.info("Creating tenant role: {} for tenant: {}", request.getName(), tenantId);
@@ -171,7 +175,11 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public TenantRoleResponse updateRole(Long roleId, TenantRoleCreateRequest request, Long tenantId) {
         log.info("Updating tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -257,7 +265,11 @@ public class TenantRoleService {
     }
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public TenantRoleResponse updateRolePermissions(Long roleId, Set<Long> permissionIds, Long tenantId) {
         log.info("Updating permissions for role: {} in tenant: {}", roleId, tenantId);
 
@@ -575,7 +587,11 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public void deleteRole(Long roleId, Long tenantId) {
         log.info("Deleting tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -614,7 +630,11 @@ public class TenantRoleService {
      * Hard delete role (use with caution)
      */
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public void hardDeleteRole(Long roleId, Long tenantId) {
         log.warn("Hard deleting tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -645,7 +665,11 @@ public class TenantRoleService {
      * Activate a deactivated role
      */
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public TenantRole activateRole(Long roleId, Long tenantId) {
         log.info("Activating tenant role: {} for tenant: {}", roleId, tenantId);
 
@@ -884,7 +908,11 @@ public class TenantRoleService {
     // =====================================================
 
     @Transactional
-    @CacheEvict(value = {"tenantRoles", "tenantRolesList", "tenantRolesLookup"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
+        @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
+    })
     public TenantRoleResponse setDefaultRole(Long roleId, Long tenantId) {
         log.info("Setting default role: {} for tenant: {}", roleId, tenantId);
 

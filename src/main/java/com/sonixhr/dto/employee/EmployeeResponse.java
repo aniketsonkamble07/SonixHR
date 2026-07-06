@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,7 @@ public class EmployeeResponse {
     // BASIC IDENTIFIERS
     // =====================================================
     private Long id;
+    @JsonIgnore
     private Long tenantId;
     private String employeeCode;
     private Long userId;
@@ -115,7 +117,9 @@ public class EmployeeResponse {
     // =====================================================
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    @JsonIgnore
     private Long createdBy;
+    @JsonIgnore
     private Long updatedBy;
 
     // =====================================================

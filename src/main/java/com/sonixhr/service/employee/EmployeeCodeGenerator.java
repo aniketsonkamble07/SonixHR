@@ -37,7 +37,7 @@ public class EmployeeCodeGenerator {
         int currentYear = Year.now().getValue();
 
         // Find the last employee code for this tenant
-        String lastCode = employeeRepository.findLastEmployeeCodeByTenant(tenant.getId());
+        String lastCode = employeeRepository.findLastEmployeeCodeByTenant(tenant.getId()).orElse(null);
 
         // Calculate next sequential number
         int nextNumber = getNextNumber(lastCode, prefix, currentYear);

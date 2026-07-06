@@ -1,5 +1,6 @@
 package com.sonixhr.dto.task;
 
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -23,5 +24,6 @@ public class TaskCreateRequestDTO {
     @NotNull(message = "Assigned to employee ID is required")
     private Long assignedToId;
 
+    @FutureOrPresent(message = "Due date must be today or in the future")
     private LocalDate dueDate;
 }

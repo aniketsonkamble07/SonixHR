@@ -45,7 +45,8 @@ public class PayslipController {
                 request.getYear()
         );
         
-        return ResponseEntity.ok(new PayrunResponseDto(payrun.getId(), payrun.getStatus(), payrun.getProcessedAt().toString()));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(new PayrunResponseDto(payrun.getId(), payrun.getStatus(), payrun.getProcessedAt().toString()));
     }
 
     @Data
@@ -107,16 +108,18 @@ public class PayslipController {
 
     @GetMapping("/api/payroll/payslips")
     @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM', 'SETTINGS_VIEW')")
-    @Operation(summary = "Get tenant payslips for a specific payrun month and year", 
-               description = "Retrieves all payslips generated for a tenant's payrun.")
+    @Operation(summary = "Get tenant payslips for a specific payrun month and year",
+               description = "Retrieves payslips for a tenant's payrun. EMPLOYEE_VIEW_ALL/SETTINGS_VIEW returns all (paginated). EMPLOYEE_VIEW_TEAM returns only direct reports.")
     public ResponseEntity<List<PayslipSummaryResponse>> getTenantPayslips(
             @RequestParam Integer month,
             @RequestParam Integer year,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "50") int size,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to get payslips for tenant {} in {}/{} by {}", tenantId, month, year, currentEmployee.getId());
-        List<PayslipSummaryResponse> response = payslipService.getTenantPayslips(tenantId, month, year, currentEmployee);
+        List<PayslipSummaryResponse> response = payslipService.getTenantPayslips(tenantId, month, year, currentEmployee, page, size);
         return ResponseEntity.ok(response);
     }
 }

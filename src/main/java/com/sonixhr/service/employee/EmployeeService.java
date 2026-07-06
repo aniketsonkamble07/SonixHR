@@ -126,7 +126,7 @@ public class EmployeeService {
         }
 
         // Set default values (active immediately for testing)
-        employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
+        employee.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
         employee.setStatus(EmployeeStatus.ACTIVE);
         employee.setActive(true);
 
@@ -1030,11 +1030,18 @@ public class EmployeeService {
     public void forgotPassword(String email) {
         log.info("Forgot password request for email: {}", email);
 
-        Employee employee = employeeRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
+        // Silently return if email not found — avoids leaking whether an account exists.
+        Optional<Employee> employeeOpt = employeeRepository.findByEmail(email);
+        if (employeeOpt.isEmpty()) {
+            log.info("Forgot-password request for unknown email (silently ignored): {}", email);
+            return;
+        }
 
+        Employee employee = employeeOpt.get();
         if (!employee.isActive()) {
-            throw new BusinessException("Cannot reset password for inactive employee");
+            // Still return silently — don't leak that the account is inactive.
+            log.info("Forgot-password request for non-active employee (silently ignored): {}", email);
+            return;
         }
 
         // Generate password reset token
@@ -1124,7 +1131,7 @@ public class EmployeeService {
         employee.setPasswordHash(passwordEncoder.encode(password));
         employee.setActive(true);
         employee.setStatus(EmployeeStatus.ACTIVE);
-        employee.setMustChangePassword(true);
+        employee.setMustChangePassword(false);
         employee.incrementRolesVersion();
         employee.clearAuthoritiesCache();
 

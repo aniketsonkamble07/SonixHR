@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -16,6 +17,7 @@ public interface TenantLeaveSettingsRepository extends JpaRepository<TenantLeave
 
     boolean existsByTenantId(Long tenantId);
 
+    @Transactional
     @Modifying
     @Query("UPDATE TenantLeaveSettings t SET t.weekendConfig = :weekendConfig, " +
             "t.customWeekendDays = :customWeekendDays, t.countWeekendsAsLeave = :countWeekendsAsLeave, " +
@@ -26,6 +28,7 @@ public interface TenantLeaveSettingsRepository extends JpaRepository<TenantLeave
                               @Param("countWeekendsAsLeave") Boolean countWeekendsAsLeave,
                               @Param("countHolidaysAsLeave") Boolean countHolidaysAsLeave);
 
+    @Transactional
     @Modifying
     @Query("UPDATE TenantLeaveSettings t SET t.casualLeavePerYear = :casual, " +
             "t.sickLeavePerYear = :sick, t.earnedLeavePerYear = :earned, " +
@@ -43,6 +46,7 @@ public interface TenantLeaveSettingsRepository extends JpaRepository<TenantLeave
                             @Param("unpaid") Integer unpaid,
                             @Param("compensatory") Integer compensatory);
 
+    @Transactional
     @Modifying
     @Query("UPDATE TenantLeaveSettings t SET t.country = :country, t.state = :state, " +
             "t.includeNationalHolidays = :includeNational, t.includeStateHolidays = :includeState " +

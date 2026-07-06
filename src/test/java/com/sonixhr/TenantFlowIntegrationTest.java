@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -292,8 +293,7 @@ public class TenantFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        TenantRegistrationResponse regResponse = objectMapper.readValue(
-                regResult.getResponse().getContentAsString(), TenantRegistrationResponse.class);
+
 
         // Step 2: Login as the registered Admin
         LoginRequest loginRequest = new LoginRequest(adminEmail, "Admin@123");
@@ -424,8 +424,7 @@ public class TenantFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        EmployeeResponse emp2Response = objectMapper.readValue(
-                emp2Result.getResponse().getContentAsString(), EmployeeResponse.class);
+
 
         // 4. Try to create another employee with Employee 1's email -> should fail on email field
         EmployeeCreateRequest duplicateEmailRequest = EmployeeCreateRequest.builder()
@@ -575,8 +574,7 @@ public class TenantFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        TenantRegistrationResponse regResponse = objectMapper.readValue(
-                regResult.getResponse().getContentAsString(), TenantRegistrationResponse.class);
+
 
         // Step 2: Login as the registered Admin
         LoginRequest loginRequest = new LoginRequest(adminEmail, "Admin@123");
@@ -745,8 +743,7 @@ public class TenantFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        TenantRegistrationResponse regResponse = objectMapper.readValue(
-                regResult.getResponse().getContentAsString(), TenantRegistrationResponse.class);
+
 
         // Login as the registered Admin
         LoginRequest loginRequest = new LoginRequest(adminEmail, "Admin@123");
@@ -847,5 +844,537 @@ public class TenantFlowIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(usEmpRequest)))
                 .andExpect(status().isCreated());
+    }
+
+    // =====================================================
+    // TEST: DEFAULT ROLES SEEDED AFTER TENANT REGISTRATION
+    // =====================================================
+
+    /**
+     * After registering a tenant, the system should automatically seed 3 default roles:
+     * Super Admin, Manager, Employee. This test verifies the seeding via the roles API.
+     */
+    @Test
+    public void testDefaultRolesSeededAfterTenantRegistration() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String adminEmail = "admin_roles_" + uniqueSuffix + "@testcompany.com";
+
+        // Register tenant
+        TenantRegistrationRequest regRequest = TenantRegistrationRequest.builder()
+                .companyName("Roles Seed Co " + uniqueSuffix)
+                .adminEmail(adminEmail)
+                .adminName("Admin User")
+                .adminPhone("+12345678901")
+                .officeAddress("1 Seed Avenue")
+                .city("Bangalore")
+                .state(IndianState.KARNATAKA)
+                .country("India")
+                .planCode("trial")
+                .billingCycle("MONTHLY")
+                .build();
+
+        mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(regRequest)))
+                .andExpect(status().isCreated());
+
+        // Login
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(adminEmail, "Admin@123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        LoginResponse loginResponse = objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class);
+        String tokenHeader = "Bearer " + loginResponse.getAccessToken();
+
+        // GET /api/tenant/roles -> verify 3 default roles are present
+        MvcResult rolesResult = mockMvc.perform(get("/api/tenant/roles")
+                        .header("Authorization", tokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String rolesBody = rolesResult.getResponse().getContentAsString();
+        assertTrue(rolesBody.contains("\"name\""), "Response should contain role objects with a name field");
+        assertTrue(rolesBody.contains("Super Admin"), "Super Admin role should be seeded automatically");
+        assertTrue(rolesBody.contains("Employee"), "Employee role should be seeded automatically");
+        assertTrue(rolesBody.contains("Manager"), "Manager role should be seeded automatically");
+
+        // GET /api/tenant/roles/default -> verify default-flagged roles exist
+        MvcResult defaultRolesResult = mockMvc.perform(get("/api/tenant/roles/default")
+                        .header("Authorization", tokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String defaultRolesBody = defaultRolesResult.getResponse().getContentAsString();
+        // Super Admin and Employee are seeded with isDefault=true
+        assertTrue(defaultRolesBody.contains("Super Admin") || defaultRolesBody.contains("Employee"),
+                "At least one default-flagged role should exist after tenant registration");
+    }
+
+    // =====================================================
+    // TEST: DEPARTMENT UNIQUE NAME AND CODE CONSTRAINTS
+    // =====================================================
+
+    /**
+     * Within a tenant, department names and codes must be unique.
+     * Creating a department with a duplicate name or code should return a 4xx error.
+     */
+    @Test
+    public void testDepartmentUniqueNameAndCodeConstraints() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String adminEmail = "admin_deptcon_" + uniqueSuffix + "@testcompany.com";
+
+        // Register + login
+        mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRegistrationRequest.builder()
+                                .companyName("Dept Constraint Co " + uniqueSuffix)
+                                .adminEmail(adminEmail)
+                                .adminName("Admin User")
+                                .adminPhone("+12345678901")
+                                .officeAddress("2 Constraint Ave")
+                                .city("Bangalore")
+                                .state(IndianState.KARNATAKA)
+                                .country("India")
+                                .planCode("trial")
+                                .billingCycle("MONTHLY")
+                                .build())))
+                .andExpect(status().isCreated());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(adminEmail, "Admin@123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String tokenHeader = "Bearer " + objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class).getAccessToken();
+
+        // Step 1: Create Engineering department successfully
+        mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Engineering")
+                                .code("ENG")
+                                .description("Engineering Department")
+                                .build())))
+                .andExpect(status().isCreated());
+
+        // Step 2: Attempt duplicate name (different code) -> must fail
+        MvcResult dupNameResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Engineering")   // same name
+                                .code("ENG2")
+                                .description("Duplicate name attempt")
+                                .build())))
+                .andExpect(status().is4xxClientError())
+                .andReturn();
+
+        String dupNameBody = dupNameResult.getResponse().getContentAsString();
+        assertTrue(dupNameBody.contains("name") || dupNameBody.contains("Department") || dupNameBody.contains("already"),
+                "Duplicate department name should produce a descriptive error mentioning name or conflict");
+
+        // Step 3: Attempt duplicate code (different name) -> must fail
+        MvcResult dupCodeResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Engineering V2")
+                                .code("ENG")   // same code
+                                .description("Duplicate code attempt")
+                                .build())))
+                .andExpect(status().is4xxClientError())
+                .andReturn();
+
+        String dupCodeBody = dupCodeResult.getResponse().getContentAsString();
+        assertTrue(dupCodeBody.contains("code") || dupCodeBody.contains("Department") || dupCodeBody.contains("already"),
+                "Duplicate department code should produce a descriptive error mentioning code or conflict");
+
+        // Step 4: Creating a department with a unique name and code succeeds
+        MvcResult secondDeptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Human Resources")
+                                .code("HR")
+                                .description("HR Department")
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse secondDept = objectMapper.readValue(
+                secondDeptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+        assertNotNull(secondDept.getId(), "Second department with unique name/code should be created");
+        assertEquals("Human Resources", secondDept.getName());
+    }
+
+    // =====================================================
+    // TEST: ROLE DUPLICATE NAME REJECTED PER TENANT
+    // =====================================================
+
+    /**
+     * Role names must be unique within a tenant.
+     * Creating a role with the same name as an existing role should fail.
+     */
+    @Test
+    public void testRoleDuplicateNameRejectedPerTenant() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String adminEmail = "admin_roledup_" + uniqueSuffix + "@testcompany.com";
+
+        // Register + login
+        mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRegistrationRequest.builder()
+                                .companyName("Role Dup Co " + uniqueSuffix)
+                                .adminEmail(adminEmail)
+                                .adminName("Admin User")
+                                .adminPhone("+12345678901")
+                                .officeAddress("3 Role Ave")
+                                .city("Bangalore")
+                                .state(IndianState.KARNATAKA)
+                                .country("India")
+                                .planCode("trial")
+                                .billingCycle("MONTHLY")
+                                .build())))
+                .andExpect(status().isCreated());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(adminEmail, "Admin@123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String tokenHeader = "Bearer " + objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class).getAccessToken();
+
+        List<TenantPermission> permissions = permissionRepository.findAll();
+        assertFalse(permissions.isEmpty(), "Permissions must be seeded before role creation");
+        Set<Long> permIds = permissions.stream()
+                .map(TenantPermission::getId)
+                .limit(2)
+                .collect(Collectors.toSet());
+
+        String roleName = "Senior Engineer " + uniqueSuffix;
+
+        // Step 1: Create role with unique name -> should succeed
+        mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRoleCreateRequest.builder()
+                                .name(roleName)
+                                .description("First creation")
+                                .isDefault(false)
+                                .permissionIds(permIds)
+                                .category("ENGINEERING")
+                                .priority(50)
+                                .build())))
+                .andExpect(status().isCreated());
+
+        // Step 2: Create same role name again -> must fail
+        MvcResult dupRoleResult = mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRoleCreateRequest.builder()
+                                .name(roleName)   // same name
+                                .description("Duplicate role attempt")
+                                .isDefault(false)
+                                .permissionIds(permIds)
+                                .category("ENGINEERING")
+                                .priority(60)
+                                .build())))
+                .andExpect(status().is4xxClientError())
+                .andReturn();
+
+        String dupRoleBody = dupRoleResult.getResponse().getContentAsString();
+        assertTrue(dupRoleBody.contains("role") || dupRoleBody.contains("Role")
+                        || dupRoleBody.contains("name") || dupRoleBody.contains("exists") || dupRoleBody.contains("already"),
+                "Duplicate role name should produce a descriptive conflict error");
+    }
+
+    // =====================================================
+    // TEST: MANAGER-SUBORDINATE RELATIONSHIP
+    // =====================================================
+
+    /**
+     * An employee can be assigned a manager at creation time.
+     * The response should reflect the manager relationship correctly.
+     */
+    @Test
+    public void testManagerSubordinateRelationship() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String adminEmail = "admin_mgr_" + uniqueSuffix + "@testcompany.com";
+
+        // Register + login
+        mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRegistrationRequest.builder()
+                                .companyName("Manager Hierarchy Co " + uniqueSuffix)
+                                .adminEmail(adminEmail)
+                                .adminName("Admin User")
+                                .adminPhone("+12345678901")
+                                .officeAddress("4 Hierarchy Ave")
+                                .city("Bangalore")
+                                .state(IndianState.KARNATAKA)
+                                .country("India")
+                                .planCode("trial")
+                                .billingCycle("MONTHLY")
+                                .build())))
+                .andExpect(status().isCreated());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(adminEmail, "Admin@123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String tokenHeader = "Bearer " + objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class).getAccessToken();
+
+        // Create department
+        MvcResult deptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Technology")
+                                .code("TECH")
+                                .description("Tech Department")
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse dept = objectMapper.readValue(
+                deptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+
+        // Create role
+        Set<Long> permIds = permissionRepository.findAll().stream()
+                .map(TenantPermission::getId)
+                .limit(1)
+                .collect(Collectors.toSet());
+
+        MvcResult roleResult = mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRoleCreateRequest.builder()
+                                .name("Tech Lead " + uniqueSuffix)
+                                .description("Tech lead role")
+                                .isDefault(false)
+                                .permissionIds(permIds)
+                                .category("MANAGEMENT")
+                                .priority(60)
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRoleResponse role = objectMapper.readValue(
+                roleResult.getResponse().getContentAsString(), TenantRoleResponse.class);
+
+        // Create manager employee (no managerId)
+        MvcResult managerResult = mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(EmployeeCreateRequest.builder()
+                                .firstName("Alice")
+                                .lastName("Manager")
+                                .email("alice.manager_" + uniqueSuffix + "@testcompany.com")
+                                .departmentId(dept.getId())
+                                .position("Engineering Manager")
+                                .hireDate(LocalDate.now())
+                                .roleIds(Set.of(role.getId()))
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        EmployeeResponse manager = objectMapper.readValue(
+                managerResult.getResponse().getContentAsString(), EmployeeResponse.class);
+        assertNotNull(manager.getId(), "Manager employee should be created with an ID");
+
+        // Create subordinate employee with managerId pointing to the manager
+        MvcResult subordinateResult = mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(EmployeeCreateRequest.builder()
+                                .firstName("Bob")
+                                .lastName("Engineer")
+                                .email("bob.engineer_" + uniqueSuffix + "@testcompany.com")
+                                .departmentId(dept.getId())
+                                .position("Software Engineer")
+                                .hireDate(LocalDate.now())
+                                .roleIds(Set.of(role.getId()))
+                                .managerId(manager.getId())
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        EmployeeResponse subordinate = objectMapper.readValue(
+                subordinateResult.getResponse().getContentAsString(), EmployeeResponse.class);
+
+        assertNotNull(subordinate.getId(), "Subordinate employee should be created");
+        assertNotNull(subordinate.getManager(), "Subordinate should have a manager set in the response");
+        assertEquals(manager.getId(), subordinate.getManager().getId(),
+                "Subordinate's manager ID should match the created manager");
+        assertEquals("Alice Manager", subordinate.getManager().getFullName(),
+                "Manager full name should be 'Alice Manager'");
+    }
+
+    // =====================================================
+    // TEST: MULTIPLE DEPARTMENTS AND EMPLOYEE COUNT PER DEPARTMENT
+    // =====================================================
+
+    /**
+     * Multiple departments can be created for a tenant. Employees are counted per department.
+     * Verifies the department listing API and per-department employee count endpoints.
+     */
+    @Test
+    public void testMultipleDepartmentsAndEmployeeCountPerDepartment() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String adminEmail = "admin_multidept_" + uniqueSuffix + "@testcompany.com";
+
+        // Register + login
+        mockMvc.perform(post("/api/public/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRegistrationRequest.builder()
+                                .companyName("Multi Dept Co " + uniqueSuffix)
+                                .adminEmail(adminEmail)
+                                .adminName("Admin User")
+                                .adminPhone("+12345678901")
+                                .officeAddress("5 Multi Ave")
+                                .city("Bangalore")
+                                .state(IndianState.KARNATAKA)
+                                .country("India")
+                                .planCode("trial")
+                                .billingCycle("MONTHLY")
+                                .build())))
+                .andExpect(status().isCreated());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/tenant/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(adminEmail, "Admin@123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String tokenHeader = "Bearer " + objectMapper.readValue(
+                loginResult.getResponse().getContentAsString(), LoginResponse.class).getAccessToken();
+
+        // Create Engineering department
+        MvcResult engDeptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Engineering")
+                                .code("ENG")
+                                .description("Engineering Dept")
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse engDept = objectMapper.readValue(
+                engDeptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+
+        // Create HR department
+        MvcResult hrDeptResult = mockMvc.perform(post("/api/tenant/departments")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(DepartmentRequest.builder()
+                                .name("Human Resources")
+                                .code("HR")
+                                .description("HR Dept")
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        DepartmentResponse hrDept = objectMapper.readValue(
+                hrDeptResult.getResponse().getContentAsString(), DepartmentResponse.class);
+
+        // Verify at least 2 departments are returned from the list endpoint
+        MvcResult deptListResult = mockMvc.perform(get("/api/tenant/departments/list")
+                        .header("Authorization", tokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String deptListBody = deptListResult.getResponse().getContentAsString();
+        assertTrue(deptListBody.contains("Engineering"), "Engineering dept should appear in list");
+        assertTrue(deptListBody.contains("Human Resources"), "HR dept should appear in list");
+
+        // Create role for employees
+        Set<Long> permIds = permissionRepository.findAll().stream()
+                .map(TenantPermission::getId)
+                .limit(1)
+                .collect(Collectors.toSet());
+
+        MvcResult roleResult = mockMvc.perform(post("/api/tenant/roles")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(TenantRoleCreateRequest.builder()
+                                .name("Developer " + uniqueSuffix)
+                                .description("Developer role")
+                                .isDefault(false)
+                                .permissionIds(permIds)
+                                .category("DEVELOPMENT")
+                                .priority(40)
+                                .build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TenantRoleResponse role = objectMapper.readValue(
+                roleResult.getResponse().getContentAsString(), TenantRoleResponse.class);
+
+        // Create 2 employees in Engineering department
+        for (int i = 1; i <= 2; i++) {
+            mockMvc.perform(post("/api/employees")
+                            .header("Authorization", tokenHeader)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(EmployeeCreateRequest.builder()
+                                    .firstName("Eng")
+                                    .lastName("Employee" + i)
+                                    .email("eng.emp" + i + "_" + uniqueSuffix + "@testcompany.com")
+                                    .departmentId(engDept.getId())
+                                    .position("Software Engineer")
+                                    .hireDate(LocalDate.now())
+                                    .roleIds(Set.of(role.getId()))
+                                    .build())))
+                    .andExpect(status().isCreated());
+        }
+
+        // Create 1 employee in HR department
+        mockMvc.perform(post("/api/employees")
+                        .header("Authorization", tokenHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(EmployeeCreateRequest.builder()
+                                .firstName("HR")
+                                .lastName("Specialist")
+                                .email("hr.specialist_" + uniqueSuffix + "@testcompany.com")
+                                .departmentId(hrDept.getId())
+                                .position("HR Generalist")
+                                .hireDate(LocalDate.now())
+                                .roleIds(Set.of(role.getId()))
+                                .build())))
+                .andExpect(status().isCreated());
+
+        // Verify Engineering department has exactly 2 employees
+        MvcResult engCountResult = mockMvc.perform(
+                        get("/api/tenant/departments/" + engDept.getId() + "/employee-count/total")
+                                .header("Authorization", tokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Long engCount = objectMapper.readValue(
+                engCountResult.getResponse().getContentAsString(), Long.class);
+        assertEquals(2L, engCount, "Engineering department should have exactly 2 employees");
+
+        // Verify HR department has exactly 1 employee
+        MvcResult hrCountResult = mockMvc.perform(
+                        get("/api/tenant/departments/" + hrDept.getId() + "/employee-count/total")
+                                .header("Authorization", tokenHeader))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Long hrCount = objectMapper.readValue(
+                hrCountResult.getResponse().getContentAsString(), Long.class);
+        assertEquals(1L, hrCount, "HR department should have exactly 1 employee");
     }
 }

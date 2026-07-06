@@ -5,6 +5,7 @@ import com.sonixhr.entity.leave.Notification;
 import com.sonixhr.service.leave.NotificationEmitterService;
 import com.sonixhr.service.leave.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +13,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 @SuppressWarnings("null")
 public class NotificationController {
 
@@ -54,6 +57,28 @@ public class NotificationController {
             @AuthenticationPrincipal Employee currentEmployee) {
         log.info("REST request to mark notification {} as read", id);
         notificationService.markAsRead(id, currentEmployee.getId(), currentEmployee.getTenantId());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Get the count of unread notifications for the authenticated employee.
+     */
+    @GetMapping("/unread-count")
+    public ResponseEntity<Map<String, Long>> getUnreadCount(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to get unread notification count for employee: {}", currentEmployee.getId());
+        long count = notificationService.getUnreadCount(currentEmployee.getId(), currentEmployee.getTenantId());
+        return ResponseEntity.ok(Map.of("count", count));
+    }
+
+    /**
+     * Mark all notifications as read for the authenticated employee.
+     */
+    @PutMapping("/read-all")
+    public ResponseEntity<Void> markAllAsRead(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to mark all notifications as read for employee: {}", currentEmployee.getId());
+        notificationService.markAllAsRead(currentEmployee.getId(), currentEmployee.getTenantId());
         return ResponseEntity.ok().build();
     }
 }

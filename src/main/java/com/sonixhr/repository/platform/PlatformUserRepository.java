@@ -127,15 +127,6 @@ public interface PlatformUserRepository extends JpaRepository<PlatformUser, Long
     boolean userHasRole(@Param("userId") Long userId, @Param("roleId") Long roleId);
 
     // =====================================================
-    // DELETION
-    // =====================================================
-
-    @Modifying
-    @Transactional
-    @Query("UPDATE PlatformUser u SET u.status = :status WHERE u.id = :userId")
-    int softDeleteUser(@Param("userId") Long userId, @Param("status") UserStatus status);
-
-    // =====================================================
     // STATISTICS QUERIES
     // =====================================================
 

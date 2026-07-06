@@ -1,17 +1,10 @@
 package com.sonixhr.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
-import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
- 
+
 @Configuration
-@SuppressWarnings("deprecation")
 public class WebConfig implements WebMvcConfigurer {
- 
-    @Override
-    public void configurePathMatch(@NonNull PathMatchConfigurer configurer) {
-        // Enable trailing slash matching (e.g. /api/tenant/departments/ matches /api/tenant/departments)
-        configurer.setUseTrailingSlashMatch(true);
-    }
+    // Trailing-slash matching removed: deprecated in Spring 6 and removed in Spring 6.x.
+    // Normalize trailing slashes at the frontend/gateway level, or add explicit routes.
 }

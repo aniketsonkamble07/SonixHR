@@ -21,7 +21,6 @@ public class PlatformUserCacheDTO implements Serializable {
     private Long id;
     private String email;
     private String fullName;
-    private String password;
     private String designation;
     private UserStatus status;
     private boolean active;
@@ -34,7 +33,6 @@ public class PlatformUserCacheDTO implements Serializable {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .password(user.getPassword())
                 .designation(user.getDesignation())
                 .status(user.getStatus())
                 .active(user.isActive())

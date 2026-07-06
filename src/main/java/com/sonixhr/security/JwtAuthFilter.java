@@ -15,7 +15,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
  
 import java.io.IOException;
@@ -35,7 +34,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final PlatformUserDetailsService platformUserDetailsService;
     private final EmployeeDetailsService employeeDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     @Value("${app.jwt.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -51,50 +49,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     // Cache for authentication tokens
     private Cache<String, UsernamePasswordAuthenticationToken> authCache;
-
-    // Pre-compiled public path patterns for faster matching
-    private static final Set<String> EXACT_PUBLIC_PATHS = Set.of(
-            "/api/health",
-            "/actuator/health",
-            "/api/tenants/register",
-            "/error");
-
-    private static final List<PathPattern> WILDCARD_PATTERNS = List.of(
-            new PathPattern("/api/auth/", true),
-            new PathPattern("/api/platform/auth/", true),
-            new PathPattern("/api/tenant/auth/", true),
-            new PathPattern("/api/public/", true),
-            new PathPattern("/swagger-ui/", true),
-            new PathPattern("/v3/api-docs/", true),
-            new PathPattern("/api-docs/", true),
-            new PathPattern("/api/debug/", true),
-            new PathPattern("/api/forgot-password/", true),
-            new PathPattern("/api/reset-password/", true));
-
-    private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/**",
-            "/api/platform/auth/login",
-            "/api/platform/auth/refresh",
-            "/api/platform/auth/activate",
-            "/api/platform/auth/forgot-password",
-            "/api/platform/auth/reset-password",
-            "/api/platform/auth/verify-token",
-            "/api/tenant/auth/**",
-            "/api/public/**",
-            "/api/employee/auth/activate",
-            "/api/health",
-            "/actuator/health",
-            "/api/tenants/register",
-            "/api/forgot-password/**",
-            "/api/reset-password/**",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/api-docs/**",
-            "/error",
-            "/api/debug/**");
-
-    private record PathPattern(String prefix, boolean isWildcard) {
-    }
 
     public JwtAuthFilter(
             JwtService jwtService,
@@ -147,9 +101,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
-            } else {
-                token = request.getParameter("token");
             }
+            // Note: token from URL query params (?token=...) is intentionally NOT supported.
+            // URL tokens are logged by servers, proxies, and stored in browser history.
 
             if (token == null || token.isEmpty()) {
                 filterChain.doFilter(request, response);
@@ -332,7 +286,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         // Check exact match first (fastest)
-        if (EXACT_PUBLIC_PATHS.contains(path)) {
+        if (PublicPaths.EXACT.contains(path)) {
             return true;
         }
 
@@ -342,24 +296,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return cached;
         }
 
-        // Check wildcard patterns (optimized)
-        for (PathPattern pattern : WILDCARD_PATTERNS) {
-            if (path.startsWith(pattern.prefix)) {
+        // Check prefix patterns via shared PublicPaths constant
+        for (String prefix : PublicPaths.PREFIXES) {
+            if (path.startsWith(prefix)) {
                 publicPathCache.put(path, true);
                 return true;
             }
         }
 
-        // Fallback to AntPathMatcher for complex patterns
-        boolean isPublic = PUBLIC_PATHS.stream()
-                .anyMatch(pattern -> pathMatcher.match(pattern, path));
-
-        // Cache the result
-        if (publicPathCache.size() < 500) { // Limit cache size
-            publicPathCache.put(path, isPublic);
+        // Cache negative result (limit cache size)
+        if (publicPathCache.size() < 500) {
+            publicPathCache.put(path, false);
         }
 
-        return isPublic;
+        return false;
     }
 
     /**

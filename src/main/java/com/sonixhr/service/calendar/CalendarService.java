@@ -18,6 +18,8 @@ import com.sonixhr.service.leave.LeaveService;
 import com.sonixhr.service.leave.LeaveConfigurationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,13 +43,19 @@ public class CalendarService {
     private final LeaveConfigurationService leaveConfigService;
 
     /**
-     * Get employee calendar by combining attendance, leave, and holiday data
+     * Get employee calendar by combining attendance, leave, and holiday data.
+     * Cached per employee per month; evict via {@link #evictCalendarCache}.
      */
+    @Cacheable(
+        value = "calendar",
+        key = "#tenantId + ':' + #employeeId + ':' + #year + ':' + #month",
+        unless = "#result == null"
+    )
     public CalendarMonthDTO getEmployeeCalendar(Long employeeId, Long tenantId, int year, int month) {
         log.info("Getting calendar for employee: {} for {}-{}", employeeId, year, month);
 
         Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                .orElseThrow(() -> new com.sonixhr.exceptions.ResourceNotFoundException("Employee not found"));
 
         TenantLeaveSettings settings = settingsRepository.findById(tenantId).orElse(null);
 
@@ -281,6 +289,24 @@ public class CalendarService {
             case UNPAID:
             default: return "#9e9e9e";
         }
+    }
+
+    /**
+     * Evict the cached calendar for a specific employee and month.
+     * Call this whenever attendance, leave, or holidays change for this employee.
+     */
+    @CacheEvict(value = "calendar", key = "#tenantId + ':' + #employeeId + ':' + #year + ':' + #month")
+    public void evictCalendarCache(Long tenantId, Long employeeId, int year, int month) {
+        log.debug("Evicted calendar cache for employee {} {}-{}", employeeId, year, month);
+    }
+
+    /**
+     * Evict all calendar entries for an employee across all months.
+     * Use this when an employee's profile or settings change.
+     */
+    @CacheEvict(value = "calendar", allEntries = true)
+    public void evictAllCalendarCaches() {
+        log.info("Evicted all calendar caches");
     }
 
     private Map<String, Object> calculateSummary(List<CalendarDayDTO> days) {

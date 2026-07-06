@@ -59,7 +59,13 @@ public class JwtService {
 
     public Long extractTenantIdAsLong(String token) {
         String tenantId = extractTenantId(token);
-        return tenantId != null ? Long.parseLong(tenantId) : null;
+        if (tenantId == null) return null;
+        try {
+            return Long.parseLong(tenantId);
+        } catch (NumberFormatException e) {
+            log.warn("Malformed tenantId claim in token: {}", tenantId);
+            return null;
+        }
     }
 
     public String extractUserType(String token) {
@@ -89,6 +95,10 @@ public class JwtService {
 
     public String extractEmployeeCode(String token) {
         return extractClaim(token, claims -> claims.get("employeeCode", String.class));
+    }
+
+    public Integer extractRolesVersion(String token) {
+        return extractClaim(token, claims -> claims.get("rolesVersion", Integer.class));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -311,6 +321,8 @@ public class JwtService {
     public Optional<String> refreshAccessToken(String refreshToken, UserDetails userDetails) {
         try {
             if (validateRefreshToken(refreshToken, userDetails)) {
+                // Invalidate the used refresh token to prevent reuse attacks
+                invalidateToken(refreshToken);
                 String userType = extractUserType(refreshToken);
                 if ("EMPLOYEE".equals(userType) && userDetails instanceof Employee) {
                     return Optional.of(generateEmployeeToken((Employee) userDetails));
@@ -375,8 +387,5 @@ public class JwtService {
     private Key getSignKey() {
         byte[] keyBytes = Base64.getDecoder().decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
-    }
-    public Integer extractRolesVersion(String token) {
-        return extractClaim(token, claims -> claims.get("rolesVersion", Integer.class));
     }
 }

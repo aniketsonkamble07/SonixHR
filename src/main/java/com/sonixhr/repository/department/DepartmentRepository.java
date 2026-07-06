@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
 public interface DepartmentRepository extends TenantAwareRepository<Department, Long> {
@@ -56,7 +55,7 @@ public interface DepartmentRepository extends TenantAwareRepository<Department, 
             "LEFT JOIN Employee e ON e.department.id = d.id " +
             "WHERE d.tenant.id = :tenantId " +
             "GROUP BY d.id ORDER BY d.name ASC")
-    List<Object[]> findAllWithEmployeeCount(@Param("tenantId") UUID tenantId);
+    List<Object[]> findAllWithEmployeeCount(@Param("tenantId") Long tenantId);
 
     // =====================================================
     // SEARCH QUERIES

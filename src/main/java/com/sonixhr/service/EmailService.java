@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.mail.MailException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import jakarta.mail.MessagingException;
@@ -528,7 +529,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("Leave status notification email sent successfully to: {}", to);
-        } catch (Exception e) {
+        } catch (MessagingException | MailException e) {
             log.error("Failed to send leave status email to: {}", to, e);
         }
     }
@@ -581,7 +582,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("Task notification email sent successfully to: {}", to);
-        } catch (Exception e) {
+        } catch (MessagingException | MailException e) {
             log.error("Failed to send task notification email to: {}", to, e);
         }
     }
@@ -645,7 +646,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("Support ticket alert email sent successfully to: {}", to);
-        } catch (Exception e) {
+        } catch (MessagingException | MailException e) {
             log.error("Failed to send support ticket alert email to: {}", to, e);
         }
     }

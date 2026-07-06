@@ -61,7 +61,9 @@ public class AuditLogService {
 
     @Transactional
     public void log(Tenant tenant, String action, String fieldName, String oldValue, String newValue, Long performedBy, String metadata) {
-        UUID performedByUuid = performedBy != null ? new UUID(0, performedBy) : null;
+        UUID performedByUuid = performedBy != null
+                ? UUID.nameUUIDFromBytes(String.valueOf(performedBy).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                : null;
         log(tenant, action, fieldName, oldValue, newValue, performedByUuid, metadata);
     }
 

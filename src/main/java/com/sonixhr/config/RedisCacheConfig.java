@@ -25,6 +25,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
+import com.sonixhr.common.constant.CacheConstants;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,38 +37,35 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("null")
 public class RedisCacheConfig implements CachingConfigurer {
 
-    // FIX: original Map.of() only holds 10 entries — bumped to Map.ofEntries().
-    // Added platformUsers, platformUsersPage, platformStatistics so @Cacheable
-    // on PlatformUserService actually writes to Redis.
+    // TTLs reference CacheConstants so there is one source of truth.
     private static final Map<String, Duration> CACHE_TTL = Map.ofEntries(
-            Map.entry("employees",          Duration.ofMinutes(10)),
-            Map.entry("tenantRoles",        Duration.ofMinutes(30)),
-            Map.entry("platformRoles",      Duration.ofMinutes(60)),
-            Map.entry("permissions",        Duration.ofMinutes(60)),
-            Map.entry("loginAttempts",      Duration.ofMinutes(30)),
-            Map.entry("lockedAccounts",     Duration.ofMinutes(30)),
-            Map.entry("userAuthorities",    Duration.ofMinutes(5)),
-            Map.entry("jwtTokens",          Duration.ofMinutes(15)),
-            Map.entry("tenantDetails",      Duration.ofMinutes(60)),
-            Map.entry("employeeDetails",    Duration.ofMinutes(10)),
-            Map.entry("attendance",         Duration.ofMinutes(10)),
-            // Platform user caches (used by PlatformUserService)
-            Map.entry("platformUsers",      Duration.ofMinutes(30)),
-            Map.entry("platformUsersPage",  Duration.ofMinutes(5)),
-            Map.entry("platformStatistics", Duration.ofMinutes(5)),
-            // Missing caches
-            Map.entry("tenantRolesList",    Duration.ofMinutes(30)),
-            Map.entry("platformRolesList",  Duration.ofMinutes(60)),
-            Map.entry("platformPermissions", Duration.ofMinutes(60)),
-            Map.entry("employeePermissions", Duration.ofMinutes(60)),
-            Map.entry("tenant_user_authorities", Duration.ofMinutes(5)),
-            Map.entry("tenant_role_permissions", Duration.ofMinutes(30)),
-            Map.entry("platform_user_authorities", Duration.ofMinutes(5)),
-            Map.entry("platform_role_permissions", Duration.ofMinutes(60)),
-            Map.entry("tenantRolesLookup", Duration.ofMinutes(30)),
-            Map.entry("departmentsLookup", Duration.ofMinutes(60)),
-            Map.entry("platformRolesLookup", Duration.ofMinutes(60)),
-            Map.entry("tenantUsers",        Duration.ofMinutes(10))
+            Map.entry("employees",                 CacheConstants.TTL_EMPLOYEES),
+            Map.entry("employeeDetails",           CacheConstants.TTL_EMPLOYEES),
+            Map.entry("tenantUsers",               CacheConstants.TTL_EMPLOYEES),
+            Map.entry("attendance",                CacheConstants.TTL_ATTENDANCE),
+            Map.entry("calendar",                  CacheConstants.TTL_CALENDAR),
+            Map.entry("platformUsersPage",         CacheConstants.TTL_CALENDAR),
+            Map.entry("platformStatistics",        CacheConstants.TTL_CALENDAR),
+            Map.entry("userAuthorities",           CacheConstants.TTL_AUTHORITIES),
+            Map.entry("tenant_user_authorities",   CacheConstants.TTL_AUTHORITIES),
+            Map.entry("platform_user_authorities", CacheConstants.TTL_AUTHORITIES),
+            Map.entry("loginAttempts",             CacheConstants.TTL_LOGIN_ATTEMPTS),
+            Map.entry("lockedAccounts",            CacheConstants.TTL_LOGIN_ATTEMPTS),
+            Map.entry("jwtTokens",                 CacheConstants.TTL_JWT),
+            Map.entry("tenantRoles",               CacheConstants.TTL_ROLES),
+            Map.entry("tenantRolesList",           CacheConstants.TTL_ROLES),
+            Map.entry("tenantRolesLookup",         CacheConstants.TTL_ROLES),
+            Map.entry("tenant_role_permissions",   CacheConstants.TTL_ROLES),
+            Map.entry("platformUsers",             CacheConstants.TTL_ROLES),
+            Map.entry("permissions",               CacheConstants.TTL_PERMISSIONS),
+            Map.entry("platformRoles",             CacheConstants.TTL_PERMISSIONS),
+            Map.entry("platformRolesList",         CacheConstants.TTL_PERMISSIONS),
+            Map.entry("platformRolesLookup",       CacheConstants.TTL_PERMISSIONS),
+            Map.entry("platformPermissions",       CacheConstants.TTL_PERMISSIONS),
+            Map.entry("employeePermissions",       CacheConstants.TTL_PERMISSIONS),
+            Map.entry("platform_role_permissions", CacheConstants.TTL_PERMISSIONS),
+            Map.entry("tenantDetails",             CacheConstants.TTL_TENANT),
+            Map.entry("departmentsLookup",         CacheConstants.TTL_DEPARTMENTS)
     );
 
     @Bean

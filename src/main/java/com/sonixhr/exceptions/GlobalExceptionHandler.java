@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
@@ -98,26 +100,9 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "success", false,
+                        "errorCode", ex.getErrorCode(),
                         "message", "Please check the highlighted fields",
                         "errors", ex.getErrors(),
-                        "timestamp", LocalDateTime.now()
-                ));
-    }
-
-    // =====================================================
-    // HANDLE DUPLICATE RESOURCE
-    // =====================================================
-    @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<Map<String, Object>> handleDuplicateException(
-            DuplicateResourceException ex) {
-
-        log.warn("Duplicate resource: {}", ex.getMessage());
-
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(Map.of(
-                        "success", false,
-                        "message", ex.getMessage(),
                         "timestamp", LocalDateTime.now()
                 ));
     }
@@ -129,13 +114,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBusinessException(
             BusinessException ex) {
 
-        log.warn("Business error: {}", ex.getMessage());
+        log.warn("Business error: errorCode={}, statusCode={}, message={}", ex.getErrorCode(), ex.getStatusCode(), ex.getMessage());
+
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode());
+        if (status == null) {
+            status = HttpStatus.BAD_REQUEST;
+        }
 
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
+                .status(status)
                 .body(Map.of(
                         "success", false,
-                        "message", ex.getMessage(),
+                        "errorCode", ex.getErrorCode(),
+                        "message", ex.getUserMessage() != null ? ex.getUserMessage() : ex.getMessage(),
                         "timestamp", LocalDateTime.now()
                 ));
     }
@@ -276,11 +267,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(
             IllegalArgumentException ex) {
 
+        log.warn("Invalid argument: {}", ex.getMessage());
+
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "success", false,
-                        "message", ex.getMessage(),
+                        "message", "Invalid request parameter",
                         "timestamp", LocalDateTime.now()
                 ));
     }
@@ -299,6 +292,32 @@ public class GlobalExceptionHandler {
                 .body(Map.of(
                         "success", false,
                         "message", "Access denied: You do not have permission to perform this action",
+                        "timestamp", LocalDateTime.now()
+                ));
+    }
+
+    // =====================================================
+    // HANDLE CONSTRAINT VIOLATIONS (@Validated on path/query params)
+    // =====================================================
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> errors = ex.getConstraintViolations().stream()
+                .collect(Collectors.toMap(
+                        v -> {
+                            String path = v.getPropertyPath().toString();
+                            int dot = path.lastIndexOf('.');
+                            return dot >= 0 ? path.substring(dot + 1) : path;
+                        },
+                        v -> v.getMessage(),
+                        (a, b) -> a
+                ));
+        log.warn("Constraint violation: {}", errors);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "success", false,
+                        "message", "Please check the highlighted fields",
+                        "errors", errors,
                         "timestamp", LocalDateTime.now()
                 ));
     }

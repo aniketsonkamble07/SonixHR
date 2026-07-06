@@ -80,14 +80,14 @@ public class ShiftConfigurationRequestDTO {
         return startTime == null || endTime == null || !startTime.equals(endTime);
     }
 
-    @AssertTrue(message = "Half day hours must be less than full day hours")
+    @AssertTrue(message = "Half day hours must be less than or equal to full day hours")
     private boolean isHalfDayLessThanFullDay() {
-        return fullDayHours == null || halfDayHours == null || halfDayHours < fullDayHours;
+        return fullDayHours == null || halfDayHours == null || halfDayHours <= fullDayHours;
     }
 
-    @AssertTrue(message = "Quarter day hours must be less than half day hours")
+    @AssertTrue(message = "Quarter day hours must be less than or equal to half day hours")
     private boolean isQuarterDayLessThanHalfDay() {
-        return halfDayHours == null || quarterDayHours == null || quarterDayHours < halfDayHours;
+        return halfDayHours == null || quarterDayHours == null || quarterDayHours <= halfDayHours;
     }
 
     @AssertTrue(message = "Minimum break cannot exceed maximum break")

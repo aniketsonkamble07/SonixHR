@@ -15,10 +15,14 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,53 +35,76 @@ public class TenantRoleSeeder implements ApplicationRunner {
     private final TenantRoleRepository roleRepository;
     private final TenantPermissionRepository permissionRepository;
     private final TenantRepository tenantRepository;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        log.info("=========================================");
-        log.info("Tenant Role Seeder Started");
-        log.info("=========================================");
+        // Distributed lock: prevents duplicate role creation when multiple instances start simultaneously
+        final String LOCK_KEY = "bootstrap:tenant-role-seeder:lock";
+        Boolean lockAcquired = null;
+        try {
+            lockAcquired = redisTemplate.opsForValue()
+                    .setIfAbsent(LOCK_KEY, "running", 5, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.warn("Redis unavailable for TenantRoleSeeder lock — proceeding without lock: {}", e.getMessage());
+        }
 
-        // Get all tenants that need roles
-        List<Tenant> tenants = tenantRepository.findAll();
-
-        if (tenants.isEmpty()) {
-            log.warn("No tenants found! Please ensure TenantSeeder runs first.");
+        if (Boolean.FALSE.equals(lockAcquired)) {
+            log.info("TenantRoleSeeder lock held by another instance. Skipping to avoid duplicate seeding.");
             return;
         }
 
-        List<TenantPermission> allPermissions = permissionRepository.findAll();
-        log.info("Found {} permissions", allPermissions.size());
+        try {
+            log.info("=========================================");
+            log.info("Tenant Role Seeder Started");
+            log.info("=========================================");
 
-        if (allPermissions.isEmpty()) {
-            log.warn("No permissions found! Please ensure TenantPermissionSeeder runs first.");
-            return;
+            List<TenantPermission> allPermissions = permissionRepository.findAll();
+            log.info("Found {} permissions", allPermissions.size());
+
+            if (allPermissions.isEmpty()) {
+                log.warn("No permissions found! Please ensure TenantPermissionSeeder runs first.");
+                return;
+            }
+
+            // Process tenants in pages to avoid loading the entire table into memory
+            final int PAGE_SIZE = 100;
+            int page = 0;
+            List<Tenant> tenants;
+            int totalProcessed = 0;
+
+            do {
+                tenants = tenantRepository.findAll(PageRequest.of(page++, PAGE_SIZE)).getContent();
+                for (Tenant tenant : tenants) {
+                    log.debug("Creating roles for tenant: {} (ID: {})", tenant.getCompanyName(), tenant.getId());
+                    createRolesForTenant(tenant.getId(), allPermissions);
+                }
+                totalProcessed += tenants.size();
+            } while (tenants.size() == PAGE_SIZE);
+
+            if (totalProcessed == 0) {
+                log.warn("No tenants found — skipping role seeding.");
+            }
+
+            log.info("=========================================");
+            log.info("Tenant Role Seeder Completed");
+            log.info("=========================================");
+        } finally {
+            if (Boolean.TRUE.equals(lockAcquired)) {
+                try {
+                    redisTemplate.delete(LOCK_KEY);
+                } catch (Exception e) {
+                    log.warn("Could not release TenantRoleSeeder lock: {}", e.getMessage());
+                }
+            }
         }
-
-        // Create roles for each tenant
-        for (Tenant tenant : tenants) {
-            log.info("Creating roles for tenant: {} (ID: {})", tenant.getCompanyName(), tenant.getId());
-            createRolesForTenant(tenant.getId(), allPermissions);
-        }
-
-        log.info("=========================================");
-        log.info("Tenant Role Seeder Completed");
-        log.info("=========================================");
     }
 
     private void createRolesForTenant(Long tenantId, List<TenantPermission> allPermissions) {
-        // Create Super Admin role for this tenant
         createSuperAdminRole(tenantId, allPermissions);
-
-        // Create Admin role for this tenant
-        // createAdminRole(tenantId, allPermissions);
-
-        // Create Employee role for this tenant
-        // createEmployeeRole(tenantId, allPermissions);
-
-        // Create Manager role for this tenant
-        // createManagerRole(tenantId, allPermissions);
+        createManagerRole(tenantId, allPermissions);
+        createEmployeeRole(tenantId, allPermissions);
     }
 
     private void createSuperAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -100,56 +127,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
 
         roleRepository.save(superAdminRole);
         log.info("Created Super Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
-    }
-
-    private void createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Admin");
-        if (existingRole.isPresent()) {
-            log.debug("Admin role already exists for tenant: {}", tenantId);
-            return;
-        }
-
-        // Define admin permissions as Strings (enum names)
-        Set<String> adminPermissionNames = Set.of(
-                TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
-                TenantPermissionEnum.EMPLOYEE_VIEW_TEAM.name(),
-                TenantPermissionEnum.EMPLOYEE_VIEW_ALL.name(),
-                TenantPermissionEnum.EMPLOYEE_CREATE.name(),
-                TenantPermissionEnum.EMPLOYEE_EDIT.name(),
-                TenantPermissionEnum.LEAVE_REQUEST.name(),
-                TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
-                TenantPermissionEnum.LEAVE_VIEW_TEAM.name(),
-                TenantPermissionEnum.LEAVE_APPROVE_DEPARTMENT.name(),
-                TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
-                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
-                TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
-                TenantPermissionEnum.DEPARTMENT_VIEW.name(),
-                TenantPermissionEnum.DEPARTMENT_CREATE.name(),
-                TenantPermissionEnum.DEPARTMENT_EDIT.name(),
-                TenantPermissionEnum.ROLE_VIEW.name(),
-                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name(),
-                TenantPermissionEnum.REPORT_EXPORT.name(),
-                TenantPermissionEnum.SETTINGS_VIEW.name(),
-                TenantPermissionEnum.VIEW_BILLING.name()
-        );
-
-        Set<TenantPermission> adminPermissions = allPermissions.stream()
-                .filter(p -> adminPermissionNames.contains(p.getPermissionName()))
-                .collect(Collectors.toSet());
-
-        TenantRole adminRole = TenantRole.builder()
-                .tenantId(tenantId)
-                .name("Admin")
-                .description("Administrator with limited management access")
-                .isDefault(false)
-                .active(true)
-                .priority(80)
-                .category("ADMINISTRATION")
-                .permissions(adminPermissions)
-                .build();
-
-        roleRepository.save(adminRole);
-        log.info("Created Admin role for tenant {} with {} permissions", tenantId, adminPermissions.size());
     }
 
     private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {

@@ -4,23 +4,16 @@ import com.sonixhr.dto.employee.EmployeeProfileUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.employee.MyOrgChartResponse;
-import com.sonixhr.entity.department.Department;
 import com.sonixhr.entity.employee.Employee;
-import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.exceptions.ResourceNotFoundException;
-import com.sonixhr.repository.department.DepartmentRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +24,6 @@ import java.util.stream.Collectors;
 public class EmployeeSelfService {
 
     private final EmployeeRepository employeeRepository;
-    private final DepartmentRepository departmentRepository;
     private final EmployeeService employeeService;
 
     // =====================================================

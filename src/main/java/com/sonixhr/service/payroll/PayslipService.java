@@ -14,10 +14,14 @@ import com.sonixhr.repository.payroll.PayslipRepository;
 import com.sonixhr.repository.payroll.PayrunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,11 +47,20 @@ public class PayslipService {
             throw new BusinessException("Access denied: Payslip does not belong to this tenant");
         }
 
-        // Security check
-        boolean hasViewAllPermission = currentEmployee.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("EMPLOYEE_VIEW_ALL") || a.getAuthority().equals("EMPLOYEE_VIEW_TEAM"));
+        // Fix 2: EMPLOYEE_VIEW_ALL grants access to all payslips.
+        // EMPLOYEE_VIEW_TEAM grants access only to direct reports' payslips (manager check).
+        // All others can only view their own payslip.
+        Set<String> authorities = currentEmployee.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .collect(Collectors.toSet());
 
-        if (!hasViewAllPermission && !currentEmployee.getId().equals(payslip.getEmployee().getId())) {
+        boolean hasViewAll     = authorities.contains("EMPLOYEE_VIEW_ALL");
+        boolean isOwnPayslip   = currentEmployee.getId().equals(payslip.getEmployee().getId());
+        boolean isDirectReport = authorities.contains("EMPLOYEE_VIEW_TEAM")
+                && payslip.getEmployee().getManager() != null
+                && payslip.getEmployee().getManager().getId().equals(currentEmployee.getId());
+
+        if (!hasViewAll && !isDirectReport && !isOwnPayslip) {
             throw new BusinessException("Access denied: You do not have permission to view this payslip.");
         }
 
@@ -94,26 +107,44 @@ public class PayslipService {
             throw new BusinessException("Access denied: Employee does not belong to this tenant");
         }
 
-        // Security check
-        boolean hasViewAllPermission = currentEmployee.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("EMPLOYEE_VIEW_ALL") || a.getAuthority().equals("EMPLOYEE_VIEW_TEAM"));
+        // Fix 2: EMPLOYEE_VIEW_TEAM can only view direct reports, not any employee.
+        Set<String> authorities = currentEmployee.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .collect(Collectors.toSet());
 
-        if (!hasViewAllPermission && !currentEmployee.getId().equals(employeeId)) {
+        boolean hasViewAll     = authorities.contains("EMPLOYEE_VIEW_ALL");
+        boolean isOwnRequest   = currentEmployee.getId().equals(employeeId);
+        boolean isDirectReport = authorities.contains("EMPLOYEE_VIEW_TEAM")
+                && employee.getManager() != null
+                && employee.getManager().getId().equals(currentEmployee.getId());
+
+        if (!hasViewAll && !isDirectReport && !isOwnRequest) {
             throw new BusinessException("Access denied: You do not have permission to view these payslips.");
         }
 
-        List<Payslip> payslips = payslipRepo.findByEmployeeId(employeeId);
+        List<Payslip> payslips = payslipRepo.findByEmployeeId(tenantId, employeeId);
+
+        // Fix 1: batch-fetch all payruns in one query instead of N individual queries.
+        List<UUID> payrunIds = payslips.stream().map(Payslip::getPayrunId).collect(Collectors.toList());
+        Map<UUID, Payrun> payrunMap = payrunRepo.findAllById(payrunIds).stream()
+                .collect(Collectors.toMap(Payrun::getId, r -> r));
+
         return payslips.stream()
                 .map(p -> {
-                    Payrun payrun = payrunRepo.findById(p.getPayrunId()).orElse(null);
+                    // Fix 4: throw instead of silently producing null month/year in the response.
+                    Payrun payrun = payrunMap.get(p.getPayrunId());
+                    if (payrun == null) {
+                        throw new ResourceNotFoundException(
+                                "Payrun not found for payslip " + p.getId() + " — data integrity issue");
+                    }
                     return PayslipSummaryResponse.builder()
                             .id(p.getId())
                             .payrunId(p.getPayrunId())
                             .employeeId(p.getEmployee().getId())
                             .employeeCode(p.getEmployee().getEmployeeCode())
                             .fullName(p.getEmployee().getFullName())
-                            .month(payrun != null ? payrun.getMonth() : null)
-                            .year(payrun != null ? payrun.getYear() : null)
+                            .month(payrun.getMonth())
+                            .year(payrun.getYear())
                             .grossEarnings(p.getGrossEarnings())
                             .totalDeductions(p.getTotalDeductions())
                             .netPay(p.getNetPay())
@@ -122,15 +153,48 @@ public class PayslipService {
                 .collect(Collectors.toList());
     }
 
-    public List<PayslipSummaryResponse> getTenantPayslips(Long tenantId, Integer month, Integer year, Employee currentEmployee) {
+    public List<PayslipSummaryResponse> getTenantPayslips(
+            Long tenantId, Integer month, Integer year, Employee currentEmployee, int page, int size) {
         log.info("Fetching payslips for tenant {} in {}/{}", tenantId, month, year);
-        boolean hasViewAllPermission = currentEmployee.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("EMPLOYEE_VIEW_ALL") || a.getAuthority().equals("EMPLOYEE_VIEW_TEAM") || a.getAuthority().equals("SETTINGS_VIEW"));
-        if (!hasViewAllPermission) {
+
+        // Fix 5: validate month and year before hitting the DB.
+        if (month == null || year == null) {
+            throw new BusinessException("VALIDATION_ERROR", "Month and year are required");
+        }
+        if (month < 1 || month > 12) {
+            throw new BusinessException("VALIDATION_ERROR", "Month must be between 1 and 12");
+        }
+
+        // Fix 2: separate EMPLOYEE_VIEW_ALL/SETTINGS_VIEW (full access) from EMPLOYEE_VIEW_TEAM
+        // (direct reports only). Previously EMPLOYEE_VIEW_TEAM was treated identically to EMPLOYEE_VIEW_ALL.
+        Set<String> authorities = currentEmployee.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .collect(Collectors.toSet());
+
+        boolean hasViewAll  = authorities.contains("EMPLOYEE_VIEW_ALL") || authorities.contains("SETTINGS_VIEW");
+        boolean hasViewTeam = authorities.contains("EMPLOYEE_VIEW_TEAM");
+
+        if (!hasViewAll && !hasViewTeam) {
             throw new BusinessException("Access denied: You do not have permission to view tenant-wide payslips.");
         }
 
-        List<Payslip> payslips = payslipRepo.findByTenantAndMonthAndYear(tenantId, month, year);
+        List<Payslip> payslips;
+        if (hasViewAll) {
+            // Fix 3: paginate for admin / SETTINGS_VIEW access to avoid full-table load.
+            payslips = payslipRepo.findByTenantAndMonthAndYearPaged(
+                    tenantId, month, year,
+                    PageRequest.of(page, size, Sort.by("id").ascending())
+            ).getContent();
+        } else {
+            // EMPLOYEE_VIEW_TEAM: fetch all and filter to direct reports in memory.
+            // Team sizes are bounded so in-memory filtering is acceptable.
+            Long managerId = currentEmployee.getId();
+            payslips = payslipRepo.findByTenantAndMonthAndYear(tenantId, month, year).stream()
+                    .filter(p -> p.getEmployee().getManager() != null
+                            && p.getEmployee().getManager().getId().equals(managerId))
+                    .collect(Collectors.toList());
+        }
+
         return payslips.stream()
                 .map(p -> PayslipSummaryResponse.builder()
                         .id(p.getId())

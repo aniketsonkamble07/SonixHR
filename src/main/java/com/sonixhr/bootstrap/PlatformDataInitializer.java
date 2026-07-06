@@ -47,7 +47,6 @@ public class PlatformDataInitializer implements ApplicationRunner {
     private final StateProfessionalTaxConfigRepository statePtConfigRepo;
 
     private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
-    private static final String SUPER_ADMIN_PASSWORD = "Admin@123";
     private static final String SUPER_ADMIN_NAME = "Super Administrator";
 
 
@@ -58,13 +57,23 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("Platform Data Initializer Started");
         log.info("=========================================");
 
-        // Run DDL update for blood_group column
+        // Alter blood_group only if the column type/length does not already match — avoids a table lock on every boot
         try {
-            log.info("Altering employees.blood_group column type to VARCHAR(20) if necessary...");
-            jdbcTemplate.execute("ALTER TABLE employees ALTER COLUMN blood_group TYPE VARCHAR(20)");
-            log.info("Successfully altered employees.blood_group column type.");
+            Long mismatch = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns " +
+                    "WHERE table_schema = 'public' AND table_name = 'employees' " +
+                    "AND column_name = 'blood_group' " +
+                    "AND NOT (data_type = 'character varying' AND character_maximum_length = 20)",
+                    Long.class);
+            if (mismatch != null && mismatch > 0) {
+                log.info("Altering employees.blood_group column type to VARCHAR(20)...");
+                jdbcTemplate.execute("ALTER TABLE employees ALTER COLUMN blood_group TYPE VARCHAR(20)");
+                log.info("Successfully altered employees.blood_group column type.");
+            } else {
+                log.debug("employees.blood_group is already VARCHAR(20), skipping ALTER.");
+            }
         } catch (Exception e) {
-            log.warn("Could not alter employees.blood_group column (table might not exist or column already altered): {}", e.getMessage());
+            log.warn("Could not check/alter employees.blood_group column: {}", e.getMessage());
         }
 
         // Drop obsolete enum check constraints on tenants and tenant_subscriptions
@@ -237,11 +246,21 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
     private PlatformRole createSuperAdminRole() {
         log.info("Creating Super Admin role...");
+        Set<PlatformPermission> allPermissions = new HashSet<>(permissionRepository.findAll());
 
         return roleRepository.findByName("Super Admin")
+                .map(existing -> {
+                    // Refresh permissions when new ones have been added to the enum
+                    if (existing.getPermissions().size() < allPermissions.size()) {
+                        existing.setPermissions(allPermissions);
+                        PlatformRole updated = roleRepository.save(existing);
+                        log.info("✅ Updated Super Admin role: {} permissions", allPermissions.size());
+                        return updated;
+                    }
+                    log.debug("Super Admin role up to date: {} permissions", existing.getPermissions().size());
+                    return existing;
+                })
                 .orElseGet(() -> {
-                    Set<PlatformPermission> allPermissions = new HashSet<>(permissionRepository.findAll());
-
                     PlatformRole role = PlatformRole.builder()
                             .name("Super Admin")
                             .description("Full platform access - has ALL permissions")
@@ -251,7 +270,6 @@ public class PlatformDataInitializer implements ApplicationRunner {
                             .category("SYSTEM_ADMINISTRATION")
                             .permissions(allPermissions)
                             .build();
-
                     PlatformRole saved = roleRepository.save(role);
                     log.info("✅ Created Super Admin role with {} permissions", allPermissions.size());
                     return saved;
@@ -266,9 +284,22 @@ public class PlatformDataInitializer implements ApplicationRunner {
             return;
         }
 
+        String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
+        final String password;
+        if (envPassword != null && !envPassword.isBlank()) {
+            password = envPassword;
+        } else {
+            password = java.util.UUID.randomUUID().toString();
+            log.warn("=========================================");
+            log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set.");
+            log.warn("Generated one-time password: {}", password);
+            log.warn("Set SONIXHR_SUPER_ADMIN_PASSWORD before deploying to production.");
+            log.warn("=========================================");
+        }
+
         PlatformUser superAdmin = PlatformUser.builder()
                 .email(SUPER_ADMIN_EMAIL)
-                .password(passwordEncoder.encode(SUPER_ADMIN_PASSWORD))
+                .password(passwordEncoder.encode(password))
                 .fullName(SUPER_ADMIN_NAME)
                 .designation("System Administrator")
                 .status(UserStatus.ACTIVE)
@@ -281,86 +312,15 @@ public class PlatformDataInitializer implements ApplicationRunner {
         log.info("=========================================");
         log.info("✅ SUPER ADMIN CREATED WITH ALL PERMISSIONS!");
         log.info("   Email: {}", SUPER_ADMIN_EMAIL);
-        log.info("   Password: {}", SUPER_ADMIN_PASSWORD);
         log.info("   Name: {}", SUPER_ADMIN_NAME);
         log.info("   Role: Super Admin (ALL permissions)");
         log.info("   Authorities: {}", superAdmin.getAuthorities().size());
         log.info("=========================================");
-        log.warn("⚠️  PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN!");
-        log.info("=========================================");
     }
 
     private void createOtherDefaultRoles() {
-        log.info("Creating other default roles...");
-
-        // Platform Admin Role
-        createRoleIfMissing("Platform Admin",
-                "Manages platform operations",
-                Set.of(
-                        PlatformPermissionEnum.VIEW_TENANTS,
-                        PlatformPermissionEnum.VIEW_TENANT_DETAILS,
-                        PlatformPermissionEnum.VIEW_PLATFORM_USERS,
-                        PlatformPermissionEnum.VIEW_PLATFORM_ROLES,
-                        PlatformPermissionEnum.VIEW_SUBSCRIPTIONS,
-                        PlatformPermissionEnum.VIEW_ANALYTICS
-                ));
-
-        // Support Admin Role
-        createRoleIfMissing("Support Admin",
-                "Handles support tickets",
-                Set.of(
-                        PlatformPermissionEnum.VIEW_TENANTS,
-                        PlatformPermissionEnum.VIEW_SUPPORT_TICKETS,
-                        PlatformPermissionEnum.MANAGE_SUPPORT_TICKETS,
-                        PlatformPermissionEnum.RESOLVE_ISSUES
-                ));
-
-        // Billing Admin Role
-        createRoleIfMissing("Billing Admin",
-                "Manages billing and subscriptions",
-                Set.of(
-                        PlatformPermissionEnum.VIEW_SUBSCRIPTIONS,
-                        PlatformPermissionEnum.MANAGE_SUBSCRIPTIONS,
-                        PlatformPermissionEnum.VIEW_INVOICES,
-                        PlatformPermissionEnum.PROCESS_PAYMENTS,
-                        PlatformPermissionEnum.VIEW_BILLING_REPORTS
-                ));
-
-        log.info("✅ Default roles created successfully");
-    }
-
-    // ✅ KEEP ONLY ONE of these methods - THIS IS THE CORRECT ONE (using .name())
-    private void createRoleIfMissing(String roleName, String description, Set<PlatformPermissionEnum> permissionEnums) {
-        if (roleRepository.findByName(roleName).isPresent()) {
-            log.debug("Role already exists: {}", roleName);
-            return;
-        }
-
-        Set<PlatformPermission> permissions = new HashSet<>();
-        for (PlatformPermissionEnum permEnum : permissionEnums) {
-            // Use .name() to convert enum to String
-            permissionRepository.findByPermission(permEnum.name()).ifPresent(permissions::add);
-        }
-
-        PlatformRole role = PlatformRole.builder()
-                .name(roleName)
-                .description(description)
-                .systemRole(false)
-                .active(true)
-                .priority(50)
-                .category(determineCategory(roleName))
-                .permissions(permissions)
-                .build();
-
-        roleRepository.save(role);
-        log.info("✅ Created role: {} with {} permissions", roleName, permissions.size());
-    }
-
-    private String determineCategory(String roleName) {
-        if (roleName.contains("Admin")) return "ADMINISTRATION";
-        if (roleName.contains("Support")) return "SUPPORT";
-        if (roleName.contains("Billing")) return "BILLING";
-        return "CUSTOM";
+        // No additional platform roles — only Super Admin is seeded.
+        log.info("✅ Platform roles: only Super Admin is seeded.");
     }
 
     private void seedStatutoryRatesAndPtConfigs() {
