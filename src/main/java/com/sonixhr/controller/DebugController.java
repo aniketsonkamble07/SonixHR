@@ -283,13 +283,13 @@ public class DebugController {
                 "success", true,
                 "payrunId", result.getId()
             ));
-        } catch (Exception e) {
+        } catch (Throwable e) {
             java.io.StringWriter sw = new java.io.StringWriter();
             java.io.PrintWriter pw = new java.io.PrintWriter(sw);
             e.printStackTrace(pw);
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
-                "error", e.getMessage(),
+                "error", e.getMessage() != null ? e.getMessage() : e.toString(),
                 "stackTrace", sw.toString()
             ));
         }
