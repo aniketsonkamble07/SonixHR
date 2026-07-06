@@ -1,5 +1,6 @@
 package com.sonixhr.service.task;
 
+import com.sonixhr.dto.task.TaskAssigneeDTO;
 import com.sonixhr.dto.task.TaskCreateRequestDTO;
 import com.sonixhr.dto.task.TaskResponseDTO;
 import com.sonixhr.entity.employee.Employee;
@@ -21,6 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.PageRequest;
 
 @Slf4j
 @Service
@@ -86,10 +91,6 @@ public class EmployeeTaskService {
                 .status(TaskStatus.PENDING)
                 .build();
 
-        if (task == null) {
-            throw new BusinessException("Failed to build employee task");
-        }
-
         EmployeeTask saved = taskRepository.save(task);
         log.info("Task created successfully with ID: {}", saved.getId());
 
@@ -140,6 +141,28 @@ public class EmployeeTaskService {
         task.setAcknowledgedAt(LocalDateTime.now());
 
         EmployeeTask saved = taskRepository.save(task);
+
+        // Notify assigner that the task was acknowledged
+        Employee assigner = saved.getAssignedBy();
+        Employee assignee = saved.getAssignedTo();
+
+        if (assigner.getEmail() != null) {
+            emailService.sendTaskNotification(
+                    assigner.getEmail(),
+                    assigner.getFullName(),
+                    saved.getTitle(),
+                    "ACKNOWLEDGED",
+                    assignee.getFullName()
+            );
+        }
+
+        notificationService.sendNotification(
+                assigner,
+                "Task Acknowledged",
+                String.format("Task '%s' was acknowledged by %s.", saved.getTitle(), assignee.getFullName()),
+                "TASK"
+        );
+
         return convertToResponse(saved);
     }
 
@@ -177,14 +200,14 @@ public class EmployeeTaskService {
             if (task.getStatus() != TaskStatus.ACCEPTED) {
                 throw new BusinessException("Task must be accepted before starting work");
             }
-            if (!isAssignee && !isDirectManager && !isSuperAdmin) {
+            if (!isAssignee && !isSuperAdmin) {
                 throw new BusinessException("You are not authorized to update this task status");
             }
         } else if (newStatus == TaskStatus.COMPLETED) {
             if (task.getStatus() != TaskStatus.ACCEPTED && task.getStatus() != TaskStatus.IN_PROGRESS) {
                 throw new BusinessException("Task must be accepted or in progress before completing");
             }
-            if (!isAssignee && !isDirectManager && !isSuperAdmin) {
+            if (!isAssignee && !isSuperAdmin) {
                 throw new BusinessException("You are not authorized to update this task status");
             }
             task.setCompletedAt(LocalDateTime.now());
@@ -195,7 +218,9 @@ public class EmployeeTaskService {
         task.setStatus(newStatus);
         EmployeeTask saved = taskRepository.save(task);
         return convertToResponse(saved);
-    }    @Transactional
+    }
+
+    @Transactional
     public TaskResponseDTO acceptTask(@NonNull Long taskId, @NonNull Long employeeId) {
         log.info("Accepting task: {} by employee: {}", taskId, employeeId);
 
@@ -217,6 +242,7 @@ public class EmployeeTaskService {
         }
 
         task.setStatus(TaskStatus.ACCEPTED);
+        task.setAcceptedAt(LocalDateTime.now());
         EmployeeTask saved = taskRepository.save(task);
 
         // Send notifications to assigner
@@ -301,17 +327,70 @@ public class EmployeeTaskService {
     }
 
     public Page<TaskResponseDTO> getMyTasks(@NonNull Long employeeId, @NonNull Pageable pageable) {
-        Page<EmployeeTask> tasks = taskRepository.findByAssignedToId(employeeId, pageable);
-        return tasks.map(this::convertToResponse);
-    }
-
-    public Page<TaskResponseDTO> getAllTasks(Pageable pageable) {
         Long tenantId = TenantContext.getCurrentTenant();
         if (tenantId == null) {
             throw new BusinessException("Tenant context is required");
         }
-        Page<EmployeeTask> tasks = taskRepository.findByTenantId(tenantId, pageable);
+        Page<EmployeeTask> tasks = taskRepository.findByTenantIdAndAssignedToId(tenantId, employeeId, pageable);
         return tasks.map(this::convertToResponse);
+    }
+
+    public Page<TaskResponseDTO> getAllTasks(@NonNull Long callerId, Pageable pageable) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant context is required");
+        }
+
+        Employee caller = employeeRepository.findById(callerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        Page<EmployeeTask> tasks;
+        if (caller.isSuperAdmin() || caller.hasPermission("TASK_VIEW_ALL")) {
+            tasks = taskRepository.findByTenantId(tenantId, pageable);
+        } else if (caller.isManager() && caller.getDepartment() != null) {
+            tasks = taskRepository.findByTenantIdAndAssignedToDepartmentId(tenantId, caller.getDepartment().getId(), pageable);
+        } else {
+            tasks = taskRepository.findByTenantId(tenantId, pageable);
+        }
+
+        return tasks.map(this::convertToResponse);
+    }
+
+    public List<TaskAssigneeDTO> getAssignableEmployees(@NonNull Long callerId, String query, int size) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant context is required");
+        }
+
+        Employee caller = employeeRepository.findById(callerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        String safeQuery = (query == null) ? "" : query.trim();
+        org.springframework.data.domain.Pageable pageable = PageRequest.of(0, Math.min(size, 100));
+
+        List<Employee> employees;
+        if (caller.isSuperAdmin() || caller.hasPermission("TASK_CREATE")) {
+            employees = employeeRepository.searchAssignableEmployees(tenantId, callerId, safeQuery, pageable);
+        } else if (caller.isManager() && caller.getDepartment() != null) {
+            employees = employeeRepository.searchAssignableEmployeesForManager(
+                    tenantId, caller.getDepartment().getId(), callerId, callerId, safeQuery, pageable);
+        } else if (caller.isManager()) {
+            employees = employeeRepository.searchAssignableDirectReports(tenantId, callerId, callerId, safeQuery, pageable);
+        } else {
+            employees = List.of();
+        }
+
+        return employees.stream().map(this::toTaskAssigneeDTO).collect(Collectors.toList());
+    }
+
+    private TaskAssigneeDTO toTaskAssigneeDTO(Employee e) {
+        return TaskAssigneeDTO.builder()
+                .id(e.getId())
+                .fullName(e.getFullName())
+                .employeeCode(e.getEmployeeCode())
+                .departmentName(e.getDepartment() != null ? e.getDepartment().getName() : null)
+                .designation(e.getPosition())
+                .build();
     }
 
     private TaskResponseDTO convertToResponse(EmployeeTask task) {
@@ -327,6 +406,7 @@ public class EmployeeTaskService {
                 .dueDate(task.getDueDate())
                 .status(task.getStatus())
                 .acknowledgedAt(task.getAcknowledgedAt())
+                .acceptedAt(task.getAcceptedAt())
                 .completedAt(task.getCompletedAt())
                 .declineReason(task.getDeclineReason())
                 .createdAt(task.getCreatedAt())

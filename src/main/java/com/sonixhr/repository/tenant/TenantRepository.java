@@ -30,9 +30,9 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     boolean existsByCompanyName(String companyName);
 
     // ===== Paginated Queries =====
-    Page<Tenant> findByStatus(@Param("status") String status, Pageable pageable);  // ✅ ADDED @Param
-    Page<Tenant> findByIsActive(@Param("isActive") Boolean isActive, Pageable pageable);  // ✅ ADDED @Param
-    Page<Tenant> findByCompanyNameContainingIgnoreCase(@Param("companyName") String companyName, Pageable pageable);  // ✅ ADDED @Param
+    Page<Tenant> findByStatus(String status, Pageable pageable);
+    Page<Tenant> findByIsActive(Boolean isActive, Pageable pageable);
+    Page<Tenant> findByCompanyNameContainingIgnoreCase(String companyName, Pageable pageable);
 
     // ===== List Queries =====
     List<Tenant> findByStatus(String status);

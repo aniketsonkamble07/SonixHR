@@ -5,6 +5,7 @@ import com.sonixhr.entity.payroll.StatutoryRateConfig;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.payroll.StateProfessionalTaxConfigRepository;
 import com.sonixhr.repository.payroll.StatutoryRateConfigRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -36,7 +37,7 @@ public class PlatformPayrollController {
 
     @PostMapping("/statutory-rates")
     @PreAuthorize("hasAuthority('MANAGE_SYSTEM_SETTINGS')")
-    public ResponseEntity<StatutoryRateConfig> createStatutoryRate(@RequestBody StatutoryRateConfig config) {
+    public ResponseEntity<StatutoryRateConfig> createStatutoryRate(@Valid @RequestBody StatutoryRateConfig config) {
         log.info("REST request to create statutory rate config for: {}", config.getComponentCode());
         StatutoryRateConfig saved = statutoryRateConfigRepository.save(config);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
@@ -84,7 +85,7 @@ public class PlatformPayrollController {
 
     @PostMapping("/pt-configs")
     @PreAuthorize("hasAuthority('MANAGE_SYSTEM_SETTINGS')")
-    public ResponseEntity<StateProfessionalTaxConfig> createPtConfig(@RequestBody StateProfessionalTaxConfig config) {
+    public ResponseEntity<StateProfessionalTaxConfig> createPtConfig(@Valid @RequestBody StateProfessionalTaxConfig config) {
         log.info("REST request to create state PT config for: {}", config.getStateCode());
         StateProfessionalTaxConfig saved = statePtConfigRepository.save(config);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);

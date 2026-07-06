@@ -48,14 +48,14 @@ public class CalendarService {
      */
     @Cacheable(
         value = "calendar",
-        key = "#employeeId + ':' + #year + ':' + #month",
+        key = "#tenantId + ':' + #employeeId + ':' + #year + ':' + #month",
         unless = "#result == null"
     )
     public CalendarMonthDTO getEmployeeCalendar(Long employeeId, Long tenantId, int year, int month) {
         log.info("Getting calendar for employee: {} for {}-{}", employeeId, year, month);
 
         Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                .orElseThrow(() -> new com.sonixhr.exceptions.ResourceNotFoundException("Employee not found"));
 
         TenantLeaveSettings settings = settingsRepository.findById(tenantId).orElse(null);
 
@@ -295,8 +295,8 @@ public class CalendarService {
      * Evict the cached calendar for a specific employee and month.
      * Call this whenever attendance, leave, or holidays change for this employee.
      */
-    @CacheEvict(value = "calendar", key = "#employeeId + ':' + #year + ':' + #month")
-    public void evictCalendarCache(Long employeeId, int year, int month) {
+    @CacheEvict(value = "calendar", key = "#tenantId + ':' + #employeeId + ':' + #year + ':' + #month")
+    public void evictCalendarCache(Long tenantId, Long employeeId, int year, int month) {
         log.debug("Evicted calendar cache for employee {} {}-{}", employeeId, year, month);
     }
 

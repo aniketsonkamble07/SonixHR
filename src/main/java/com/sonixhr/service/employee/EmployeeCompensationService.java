@@ -191,12 +191,7 @@ public class EmployeeCompensationService {
         }
 
         // Fetch salary history
-        // Note: Currently Spring Data JPA findAll by employee.id can be fetched. Let's do it using raw repo or standard methods.
-        // We'll write a query to fetch all profiles for employee
-        List<EmployeeSalaryProfile> history = employeeSalaryProfileRepo.findAll().stream()
-                .filter(p -> p.getEmployee().getId().equals(employeeId))
-                .sorted(Comparator.comparing(EmployeeSalaryProfile::getEffectiveFrom).reversed())
-                .collect(Collectors.toList());
+        List<EmployeeSalaryProfile> history = employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromDesc(employeeId);
 
         List<EmployeeCompensationResponse.SalaryProfileHistoryInfo> salaryHistory = history.stream()
                 .map(p -> EmployeeCompensationResponse.SalaryProfileHistoryInfo.builder()

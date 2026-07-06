@@ -139,21 +139,25 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
     /**
      * Check for overlapping leave requests
      */
-    @Query("SELECT COUNT(l) > 0 FROM LeaveRequest l WHERE l.employee.id = :employeeId " +
+    @Query("SELECT COUNT(l) > 0 FROM LeaveRequest l WHERE l.tenant.id = :tenantId " +
+            "AND l.employee.id = :employeeId " +
             "AND l.status IN ('PENDING', 'APPROVED') " +
             "AND ((l.startDate <= :endDate AND l.endDate >= :startDate))")
-    boolean hasOverlappingLeave(@Param("employeeId") Long employeeId,
+    boolean hasOverlappingLeave(@Param("tenantId") Long tenantId,
+                                @Param("employeeId") Long employeeId,
                                 @Param("startDate") LocalDate startDate,
                                 @Param("endDate") LocalDate endDate);
 
     /**
      * Check for overlapping leave excluding a specific leave ID
      */
-    @Query("SELECT COUNT(l) > 0 FROM LeaveRequest l WHERE l.employee.id = :employeeId " +
+    @Query("SELECT COUNT(l) > 0 FROM LeaveRequest l WHERE l.tenant.id = :tenantId " +
+            "AND l.employee.id = :employeeId " +
             "AND l.id != :leaveId " +
             "AND l.status IN ('PENDING', 'APPROVED') " +
             "AND ((l.startDate <= :endDate AND l.endDate >= :startDate))")
-    boolean hasOverlappingLeaveExcludingSelf(@Param("employeeId") Long employeeId,
+    boolean hasOverlappingLeaveExcludingSelf(@Param("tenantId") Long tenantId,
+                                             @Param("employeeId") Long employeeId,
                                              @Param("leaveId") Long leaveId,
                                              @Param("startDate") LocalDate startDate,
                                              @Param("endDate") LocalDate endDate);
@@ -167,7 +171,7 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
      */
     @Query("SELECT COALESCE(SUM(l.totalDays), 0) FROM LeaveRequest l WHERE l.employee.id = :employeeId " +
             "AND l.leaveType = :leaveType AND l.status = 'APPROVED' " +
-            "AND YEAR(l.startDate) = :year")
+            "AND EXTRACT(YEAR FROM l.startDate) = :year")
     double getUsedLeaveDays(@Param("employeeId") Long employeeId,
                             @Param("leaveType") LeaveType leaveType,
                             @Param("year") int year);
@@ -177,7 +181,7 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
      */
     @Query("SELECT l.leaveType, COALESCE(SUM(l.totalDays), 0) FROM LeaveRequest l " +
             "WHERE l.employee.id = :employeeId AND l.status = 'APPROVED' " +
-            "AND YEAR(l.startDate) = :year GROUP BY l.leaveType")
+            "AND EXTRACT(YEAR FROM l.startDate) = :year GROUP BY l.leaveType")
     List<Object[]> getUsedLeaveDaysByType(@Param("employeeId") Long employeeId,
                                           @Param("year") int year);
 

@@ -78,8 +78,8 @@ public class CacheEvictionService {
     /**
      * Evict the calendar cache for a specific employee and month.
      */
-    public void evictCalendarCache(Long employeeId, int year, int month) {
-        evictKey(CacheConstants.CACHE_CALENDAR, employeeId + ":" + year + ":" + month);
+    public void evictCalendarCache(Long tenantId, Long employeeId, int year, int month) {
+        evictKey(CacheConstants.CACHE_CALENDAR, tenantId + ":" + employeeId + ":" + year + ":" + month);
         log.debug("Evicted calendar cache for employee {} {}-{}", employeeId, year, month);
     }
 

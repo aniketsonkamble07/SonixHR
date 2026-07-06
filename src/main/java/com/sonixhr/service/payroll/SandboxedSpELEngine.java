@@ -1,5 +1,6 @@
 package com.sonixhr.service.payroll;
 
+import com.sonixhr.exceptions.TechnicalException;
 import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -70,7 +71,7 @@ public class SandboxedSpELEngine {
             }
             return BigDecimal.valueOf(result).setScale(2, RoundingMode.HALF_UP);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid salary component formula: " + formula, e);
+            throw new TechnicalException("TECH_FORMULA", "Salary formula evaluation failed", "Invalid formula expression: " + formula, e);
         }
     }
 

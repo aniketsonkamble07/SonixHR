@@ -60,6 +60,9 @@ public class EmployeeTask {
     @Column(name = "acknowledged_at")
     private LocalDateTime acknowledgedAt;
 
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 

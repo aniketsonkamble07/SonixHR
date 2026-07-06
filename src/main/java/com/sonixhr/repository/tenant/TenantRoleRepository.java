@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.hibernate.annotations.QueryHints.CACHEABLE;
+import org.hibernate.jpa.HibernateHints;
 
 @Repository
 public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
@@ -73,7 +73,7 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
      * Find role by ID and tenant ID with permissions eagerly loaded
      */
     @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.id = :id AND r.tenantId = :tenantId")
-    @QueryHints(@QueryHint(name = CACHEABLE, value = "true"))
+    @QueryHints(@QueryHint(name = HibernateHints.HINT_CACHEABLE, value = "true"))
     Optional<TenantRole> findByIdAndTenantIdWithPermissions(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     // =====================================================
@@ -94,14 +94,14 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
      * Find all roles for a tenant with permissions eagerly loaded
      */
     @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId = :tenantId")
-    @QueryHints(@QueryHint(name = CACHEABLE, value = "true"))
+    @QueryHints(@QueryHint(name = HibernateHints.HINT_CACHEABLE, value = "true"))
     List<TenantRole> findAllByTenantIdWithPermissions(@Param("tenantId") Long tenantId);
 
     /**
      * Find all active roles for a tenant with permissions eagerly loaded
      */
     @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId = :tenantId AND r.active = true")
-    @QueryHints(@QueryHint(name = CACHEABLE, value = "true"))
+    @QueryHints(@QueryHint(name = HibernateHints.HINT_CACHEABLE, value = "true"))
     List<TenantRole> findAllByTenantIdAndActiveTrueWithPermissions(@Param("tenantId") Long tenantId);
 
     // =====================================================
@@ -201,8 +201,6 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
      * Delete all roles for a tenant
      */
     void deleteByTenantId(Long tenantId);
-
-    Optional<TenantRole> findByNameAndTenantId(String name, Long tenantId);
 
     /**
      * Find roles by IDs with tenant validation

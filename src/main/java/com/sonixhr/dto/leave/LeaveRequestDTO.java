@@ -1,7 +1,8 @@
 package com.sonixhr.dto.leave;
 
 import com.sonixhr.enums.leave.LeaveType;
-import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -23,7 +24,7 @@ public class LeaveRequestDTO {
 
     @NotNull(message = "Start date is required")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-    @Future(message = "Start date must be in the future")
+    @FutureOrPresent(message = "Start date must be today or in the future")
     private LocalDate startDate;
 
     @NotNull(message = "End date is required")
@@ -34,4 +35,9 @@ public class LeaveRequestDTO {
     private String reason;
 
     private Boolean isHalfDay;
+
+    @AssertTrue(message = "End date must be on or after start date")
+    private boolean isEndDateOnOrAfterStartDate() {
+        return startDate == null || endDate == null || !endDate.isBefore(startDate);
+    }
 }

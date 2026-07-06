@@ -235,8 +235,8 @@ public class ShiftConfigurationService {
                 .collect(Collectors.toList());
     }
 
-    public List<ShiftConfigurationDTO> getAllActiveShifts() {
-        return shiftConfigurationRepository.findAllByIsActiveTrue().stream()
+    public List<ShiftConfigurationDTO> getAllActiveShifts(Long tenantId) {
+        return shiftConfigurationRepository.findAllByTenantIdAndIsActiveTrue(tenantId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -426,8 +426,8 @@ public class ShiftConfigurationService {
                 .collect(Collectors.toList());
     }
 
-    public List<ShiftConfigurationSummaryDTO> getAllActiveShiftsSummary() {
-        return getAllActiveShifts().stream()
+    public List<ShiftConfigurationSummaryDTO> getAllActiveShiftsSummary(Long tenantId) {
+        return getAllActiveShifts(tenantId).stream()
                 .map(ShiftConfigurationSummaryDTO::fromFullDTO)
                 .collect(Collectors.toList());
     }

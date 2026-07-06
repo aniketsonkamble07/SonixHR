@@ -141,7 +141,7 @@ public class TenantRegistrationService {
             log.info("==========================================");
             log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
             log.info(" Admin Email: {}", superAdminEmployee.getEmail());
-            log.info(" Password: Admin@123");
+            log.info(" (Password set to a secure random value)");
             log.info(" (Optional Activation Link: {})", activationLink);
             log.info("==========================================");
 
@@ -384,7 +384,7 @@ public class TenantRegistrationService {
 
         EmployeeStatus employeeStatus = EmployeeStatus.ACTIVE;
         boolean employeeActive = true;
-        String passwordHash = passwordEncoder.encode("Admin@123");
+        String passwordHash = passwordEncoder.encode(java.util.UUID.randomUUID().toString());
 
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)

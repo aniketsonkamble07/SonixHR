@@ -4,6 +4,8 @@ import com.sonixhr.dto.ActivationRequest;
 import com.sonixhr.dto.LoginRequest;
 // Force re-indexing of imports
 import com.sonixhr.dto.LoginResponse;
+import com.sonixhr.dto.SetPasswordRequest;
+import com.sonixhr.security.RateLimiterService;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.attendance.ShiftConfigurationRepository;
@@ -11,6 +13,7 @@ import com.sonixhr.security.JwtService;
 import com.sonixhr.security.TokenBlacklistService;
 import com.sonixhr.security.TokenPair;
 import com.sonixhr.service.employee.EmployeeService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -46,6 +49,7 @@ public class TenantAuthController {
     private final TokenBlacklistService tokenBlacklistService;
     private final ShiftConfigurationRepository shiftConfigurationRepository;
     private final TenantRLSService tenantRLSService;
+    private final RateLimiterService rateLimiterService;
 
     public TenantAuthController(
             @Qualifier("tenantAuthenticationManager") AuthenticationManager tenantAuthenticationManager,
@@ -54,7 +58,8 @@ public class TenantAuthController {
             EmployeeService employeeService,
             TokenBlacklistService tokenBlacklistService,
             ShiftConfigurationRepository shiftConfigurationRepository,
-            TenantRLSService tenantRLSService) {
+            TenantRLSService tenantRLSService,
+            RateLimiterService rateLimiterService) {
         this.tenantAuthenticationManager = tenantAuthenticationManager;
         this.jwtService = jwtService;
         this.employeeRepository = employeeRepository;
@@ -62,6 +67,7 @@ public class TenantAuthController {
         this.tokenBlacklistService = tokenBlacklistService;
         this.shiftConfigurationRepository = shiftConfigurationRepository;
         this.tenantRLSService = tenantRLSService;
+        this.rateLimiterService = rateLimiterService;
     }
 
     @PostMapping("/login")
@@ -110,7 +116,7 @@ public class TenantAuthController {
             throw new TenantAuthException("Account is disabled or locked", e);
         } catch (Exception e) {
             log.error("Login error for user {}: {}", request.getEmail(), e.getMessage());
-            throw new TenantAuthException("Login failed: " + e.getMessage(), e);
+            throw new TenantAuthException("Login failed. Please try again.", e);
         }
     }
 
@@ -190,19 +196,17 @@ public class TenantAuthController {
             throw e;
         } catch (Exception e) {
             log.error("Refresh token error (generic): {}", e.getMessage(), e);
-            throw new TokenValidationException("Failed to refresh token: " + e.getMessage(), e);
+            throw new TokenValidationException("Failed to refresh token. Please log in again.", e);
         }
     }
 
     @PostMapping("/activate")
     public ResponseEntity<Map<String, Object>> activateUser(
             @Valid @RequestBody ActivationRequest request,
-            @RequestHeader(value = "X-Client-Type", required = false) String clientType) {
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType,
+            HttpServletRequest httpRequest) {
+        rateLimiterService.checkOrThrow("tenant:activate:ip:" + httpRequest.getRemoteAddr(), 5, 60);
         log.info("Activating tenant user with token: {}", request.getToken());
-
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new BusinessException("Passwords do not match");
-        }
 
         Employee employee = employeeService.activateEmployee(
                 request.getToken(),
@@ -235,7 +239,10 @@ public class TenantAuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<Map<String, String>> forgotPassword(@RequestParam String email) {
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @RequestParam String email,
+            HttpServletRequest httpRequest) {
+        rateLimiterService.checkOrThrow("tenant:forgot:ip:" + httpRequest.getRemoteAddr(), 3, 600);
         log.info("Forgot password request for tenant email: {}", email);
 
         employeeService.forgotPassword(email);
@@ -248,17 +255,12 @@ public class TenantAuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(
-            @RequestParam String token,
-            @RequestParam String newPassword,
-            @RequestParam String confirmPassword) {
+            @Valid @RequestBody SetPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimiterService.checkOrThrow("tenant:reset:ip:" + httpRequest.getRemoteAddr(), 5, 600);
+        log.info("Reset password request with token");
 
-        log.info("Reset password request with token: {}", token);
-
-        if (!newPassword.equals(confirmPassword)) {
-            throw new BusinessException("Passwords do not match");
-        }
-
-        employeeService.resetPasswordWithToken(token, newPassword, confirmPassword);
+        employeeService.resetPasswordWithToken(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
 
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully!",
@@ -335,7 +337,7 @@ public class TenantAuthController {
             log.error("Token verification error: {}", e.getMessage());
             return ResponseEntity.ok(Map.of(
                     "valid", false,
-                    "error", e.getMessage()
+                    "error", "Token verification failed"
             ));
         }
     }

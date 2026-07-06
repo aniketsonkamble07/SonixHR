@@ -4,6 +4,7 @@ import com.sonixhr.dto.ActivationRequest;
 import com.sonixhr.dto.LoginRequest;
 import com.sonixhr.dto.LoginResponse;
 import com.sonixhr.dto.RefreshTokenRequest;
+import com.sonixhr.dto.SetPasswordRequest;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.security.PlatformTokenBlacklistService;
@@ -156,15 +157,13 @@ public class PlatformAuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(
-            @RequestParam String token,
-            @RequestParam String newPassword,
-            @RequestParam String confirmPassword,
+            @Valid @RequestBody SetPasswordRequest request,
             HttpServletRequest httpRequest) {
 
         // Rate-limit: 5 per 10 minutes per IP.
         rateLimiterService.checkOrThrow("reset:ip:" + resolveClientIp(httpRequest), 5, 600);
 
-        platformUserService.resetPasswordWithToken(token, newPassword, confirmPassword);
+        platformUserService.resetPasswordWithToken(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully",
                 "status",  "success"

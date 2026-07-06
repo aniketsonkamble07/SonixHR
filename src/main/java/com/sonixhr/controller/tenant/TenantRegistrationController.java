@@ -63,45 +63,15 @@ public class TenantRegistrationController {
     public ResponseEntity<Void> setPassword(@Valid @RequestBody SetPasswordRequest request) {
         log.info("Setting password for tenant admin with token: {}", request.getToken());
 
-        // Validate token exists
-        if (request.getToken() == null || request.getToken().trim().isEmpty()) {
-            throw new BusinessException("Activation token is required");
-        }
-
-        // Validate passwords match
+        // @Valid enforces @NotBlank on token and @Pattern on newPassword — only passwords-match needs manual check
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new BusinessException("Passwords do not match");
         }
 
-        // Validate password strength
-        validatePasswordStrength(request.getNewPassword());
-
-        // Set password and activate account
         activationTokenService.setPassword(request.getToken(), request.getNewPassword());
 
         log.info("Tenant admin activated successfully with token: {}", request.getToken());
 
         return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Validate password strength
-     */
-    private void validatePasswordStrength(String password) {
-        if (password == null || password.length() < 8) {
-            throw new BusinessException("Password must be at least 8 characters long");
-        }
-        if (!password.matches(".*[A-Z].*")) {
-            throw new BusinessException("Password must contain at least one uppercase letter");
-        }
-        if (!password.matches(".*[a-z].*")) {
-            throw new BusinessException("Password must contain at least one lowercase letter");
-        }
-        if (!password.matches(".*\\d.*")) {
-            throw new BusinessException("Password must contain at least one number");
-        }
-        if (!password.matches(".*[@#$%^&+=!].*")) {
-            throw new BusinessException("Password must contain at least one special character (@#$%^&+=!)");
-        }
     }
 }

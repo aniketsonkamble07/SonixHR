@@ -7,6 +7,7 @@ import com.sonixhr.entity.payroll.StatutoryRateConfig;
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.repository.payroll.StateProfessionalTaxConfigRepository;
 import com.sonixhr.repository.payroll.StatutoryRateConfigRepository;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +29,7 @@ public class PayrollController {
     private StateProfessionalTaxConfigRepository statePtConfigRepo;
 
     @PostMapping("/calculate")
-    public PayrollCalculationResponse calculate(@RequestBody PayrollCalculationRequest req) {
+    public PayrollCalculationResponse calculate(@Valid @RequestBody PayrollCalculationRequest req) {
         BigDecimal ctc = req.getCtc() != null ? req.getCtc() : BigDecimal.ZERO;
         IndianState state = req.getState() != null ? req.getState() : IndianState.MAHARASHTRA;
         int month = req.getMonth();

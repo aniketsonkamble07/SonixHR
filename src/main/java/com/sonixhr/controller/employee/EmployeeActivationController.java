@@ -4,6 +4,7 @@ import com.sonixhr.dto.ActivationRequest;
 // Force re-indexing of imports
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.security.JwtService;
+import com.sonixhr.security.TokenBlacklistService;
 import com.sonixhr.service.ActivationTokenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +23,12 @@ public class EmployeeActivationController {
  
     private final ActivationTokenService activationTokenService;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/activate")
     public ResponseEntity<Map<String, Object>> activateEmployee(
-            @Valid @RequestBody ActivationRequest request) {
+            @Valid @RequestBody ActivationRequest request,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType) {
 
         log.info("Employee activation request for token: {}", request.getToken());
 
@@ -43,7 +46,11 @@ public class EmployeeActivationController {
         // Step 2: Generate JWT token for employee
         var tokenPair = jwtService.generateEmployeeTokenPair(employee);
 
-        // Step 3: Build response
+        // Step 3: Register active session and invalidate any prior session for the same client type
+        String resolvedClientType = clientType != null ? clientType : "WEB";
+        tokenBlacklistService.registerActiveSession(employee.getId(), resolvedClientType, tokenPair.getAccessToken());
+
+        // Step 4: Build response
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Account activated successfully!");

@@ -13,4 +13,8 @@ public class TechnicalException extends BaseException {
     public TechnicalException(String errorCode, String userMessage, String technicalMessage) {
         super(errorCode, 500, userMessage, technicalMessage);
     }
+
+    public TechnicalException(String errorCode, String userMessage, String technicalMessage, Throwable cause) {
+        super(errorCode, 500, userMessage, technicalMessage, cause);
+    }
 }

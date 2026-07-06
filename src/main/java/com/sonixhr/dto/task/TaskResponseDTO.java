@@ -25,6 +25,7 @@ public class TaskResponseDTO {
     private LocalDate dueDate;
     private TaskStatus status;
     private LocalDateTime acknowledgedAt;
+    private LocalDateTime acceptedAt;
     private LocalDateTime completedAt;
     private String declineReason;
     private LocalDateTime createdAt;

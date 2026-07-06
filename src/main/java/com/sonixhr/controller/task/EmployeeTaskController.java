@@ -1,5 +1,6 @@
 package com.sonixhr.controller.task;
 
+import com.sonixhr.dto.task.TaskAssigneeDTO;
 import com.sonixhr.dto.task.TaskCreateRequestDTO;
 import com.sonixhr.dto.task.TaskResponseDTO;
 import com.sonixhr.entity.employee.Employee;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.List;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,20 +27,24 @@ public class EmployeeTaskController {
 
     private final EmployeeTaskService taskService;
 
+    @GetMapping("/assignees")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or #currentEmployee.isManager() or #currentEmployee.isSuperAdmin()")
+    public ResponseEntity<List<TaskAssigneeDTO>> getAssignableEmployees(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to get assignable employees by: {}", currentEmployee.getFullName());
+        List<TaskAssigneeDTO> result = taskService.getAssignableEmployees(currentEmployee.getId(), q, size);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping
     @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or #currentEmployee.isManager() or #currentEmployee.isSuperAdmin()")
     public ResponseEntity<TaskResponseDTO> createTask(
             @Valid @RequestBody TaskCreateRequestDTO dto,
             @AuthenticationPrincipal Employee currentEmployee) {
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long assignerId = currentEmployee.getId();
-        if (assignerId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to create task: {} by {}", dto.getTitle(), currentEmployee.getFullName());
-        TaskResponseDTO response = taskService.createTask(dto, assignerId);
+        TaskResponseDTO response = taskService.createTask(dto, currentEmployee.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -47,18 +53,8 @@ public class EmployeeTaskController {
     public ResponseEntity<Page<TaskResponseDTO>> getMyTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long employeeId = currentEmployee.getId();
-        if (employeeId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        if (pageable == null) {
-            return ResponseEntity.badRequest().build();
-        }
         log.info("REST request to get own tasks for: {}", currentEmployee.getFullName());
-        Page<TaskResponseDTO> response = taskService.getMyTasks(employeeId, pageable);
+        Page<TaskResponseDTO> response = taskService.getMyTasks(currentEmployee.getId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -67,11 +63,8 @@ public class EmployeeTaskController {
     public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to get all tenant tasks by: {}", currentEmployee.getFullName());
-        Page<TaskResponseDTO> response = taskService.getAllTasks(pageable);
+        Page<TaskResponseDTO> response = taskService.getAllTasks(currentEmployee.getId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -80,18 +73,8 @@ public class EmployeeTaskController {
     public ResponseEntity<TaskResponseDTO> acknowledgeTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
-        if (id == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long employeeId = currentEmployee.getId();
-        if (employeeId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to acknowledge task: {} by {}", id, currentEmployee.getFullName());
-        TaskResponseDTO response = taskService.acknowledgeTask(id, employeeId);
+        TaskResponseDTO response = taskService.acknowledgeTask(id, currentEmployee.getId());
         return ResponseEntity.ok(response);
     }
 
@@ -101,18 +84,8 @@ public class EmployeeTaskController {
             @PathVariable Long id,
             @RequestParam TaskStatus status,
             @AuthenticationPrincipal Employee currentEmployee) {
-        if (id == null || status == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long employeeId = currentEmployee.getId();
-        if (employeeId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to update task: {} status to {} by {}", id, status, currentEmployee.getFullName());
-        TaskResponseDTO response = taskService.updateTaskStatus(id, status, employeeId);
+        TaskResponseDTO response = taskService.updateTaskStatus(id, status, currentEmployee.getId());
         return ResponseEntity.ok(response);
     }
 
@@ -121,18 +94,8 @@ public class EmployeeTaskController {
     public ResponseEntity<TaskResponseDTO> acceptTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
-        if (id == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long employeeId = currentEmployee.getId();
-        if (employeeId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to accept task: {} by {}", id, currentEmployee.getFullName());
-        TaskResponseDTO response = taskService.acceptTask(id, employeeId);
+        TaskResponseDTO response = taskService.acceptTask(id, currentEmployee.getId());
         return ResponseEntity.ok(response);
     }
 
@@ -142,21 +105,8 @@ public class EmployeeTaskController {
             @PathVariable Long id,
             @RequestParam String declineReason,
             @AuthenticationPrincipal Employee currentEmployee) {
-        if (id == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (declineReason == null || declineReason.trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-        if (currentEmployee == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long employeeId = currentEmployee.getId();
-        if (employeeId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         log.info("REST request to decline task: {} with reason: {} by {}", id, declineReason, currentEmployee.getFullName());
-        TaskResponseDTO response = taskService.declineTask(id, declineReason, employeeId);
+        TaskResponseDTO response = taskService.declineTask(id, declineReason, currentEmployee.getId());
         return ResponseEntity.ok(response);
     }
 }

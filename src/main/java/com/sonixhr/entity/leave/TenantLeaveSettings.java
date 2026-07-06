@@ -1,6 +1,7 @@
 package com.sonixhr.entity.leave;
 
 import com.sonixhr.enums.IndianState;
+import com.sonixhr.enums.leave.LeaveType;
 import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -38,7 +39,7 @@ public class TenantLeaveSettings {
                 // CASUAL
                 policies.put("CASUAL", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(12)
+                                .daysPerYear(LeaveType.CASUAL.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -50,7 +51,7 @@ public class TenantLeaveSettings {
                 // SICK
                 policies.put("SICK", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(12)
+                                .daysPerYear(LeaveType.SICK.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -62,7 +63,7 @@ public class TenantLeaveSettings {
                 // EARNED
                 policies.put("EARNED", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(15)
+                                .daysPerYear(LeaveType.EARNED.getDefaultDaysPerYear())
                                 .carryForward(true)
                                 .maxCarryForwardDays(30)
                                 .minimumServiceMonths(6)
@@ -74,7 +75,7 @@ public class TenantLeaveSettings {
                 // EMERGENCY
                 policies.put("EMERGENCY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(3)
+                                .daysPerYear(LeaveType.EMERGENCY.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -83,10 +84,10 @@ public class TenantLeaveSettings {
                                 .prorated(false)
                                 .build());
 
-                // MATERNITY
+                // MATERNITY — Maternity Benefit (Amendment) Act 2017: 26 weeks for first 2 children
                 policies.put("MATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(84)
+                                .daysPerYear(LeaveType.MATERNITY.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -98,7 +99,7 @@ public class TenantLeaveSettings {
                 // PATERNITY
                 policies.put("PATERNITY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(5)
+                                .daysPerYear(LeaveType.PATERNITY.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -110,7 +111,7 @@ public class TenantLeaveSettings {
                 // UNPAID
                 policies.put("UNPAID", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(0)
+                                .daysPerYear(LeaveType.UNPAID.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)
@@ -122,7 +123,7 @@ public class TenantLeaveSettings {
                 // COMPENSATORY
                 policies.put("COMPENSATORY", com.sonixhr.dto.leave.LeavePolicyDTO.builder()
                                 .allowed(true)
-                                .daysPerYear(0)
+                                .daysPerYear(LeaveType.COMPENSATORY.getDefaultDaysPerYear())
                                 .carryForward(false)
                                 .maxCarryForwardDays(0)
                                 .minimumServiceMonths(0)

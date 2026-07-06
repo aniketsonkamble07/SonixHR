@@ -8,6 +8,7 @@ import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.lang.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,6 +55,7 @@ public class TenantPermissionService {
     /**
      * Get all permissions grouped by category (with caching)
      */
+    @Cacheable(value = "permissions", key = "'grouped'")
     public List<PermissionGroupDTO> getGroupedPermissions() {
         log.debug("Fetching grouped permissions from database");
 

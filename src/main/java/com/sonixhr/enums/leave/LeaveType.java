@@ -8,7 +8,7 @@ public enum LeaveType {
     SICK("Sick Leave", 12, "SL", "For medical reasons"),
     EARNED("Earned Leave", 15, "EL", "Accrued based on service"),
     EMERGENCY("Emergency Leave", 3, "EML", "For urgent situations"),
-    MATERNITY("Maternity Leave", 84, "ML", "For new mothers"),
+    MATERNITY("Maternity Leave", 182, "ML", "For new mothers"),
     PATERNITY("Paternity Leave", 5, "PL", "For new fathers"),
     UNPAID("Unpaid Leave", 0, "UL", "Leave without pay"),
     COMPENSATORY("Compensatory Off", 0, "CO", "Compensation for extra work");

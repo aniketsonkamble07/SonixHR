@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -184,6 +185,7 @@ public interface ManualAttendanceRepository extends TenantAwareRepository<Attend
     /**
      * Delete all attendance records for a tenant on a specific date
      */
+    @Transactional
     @Modifying
     @Query("DELETE FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
             "AND a.attendanceDate = :date")
@@ -194,6 +196,7 @@ public interface ManualAttendanceRepository extends TenantAwareRepository<Attend
     /**
      * Delete attendance record for specific employee and date
      */
+    @Transactional
     @Modifying
     @Query("DELETE FROM AttendanceRecord a WHERE a.tenant.id = :tenantId " +
             "AND a.employee.id = :employeeId " +

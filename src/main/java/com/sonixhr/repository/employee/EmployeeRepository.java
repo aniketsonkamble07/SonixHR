@@ -4,7 +4,6 @@ import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.dto.employee.EmployeeDropdownDTO;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -61,12 +60,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Page<Employee> findByManagerIdAndTenantId(@Param("managerId") Long managerId,
                                               @Param("tenantId") Long tenantId,
                                               Pageable pageable);
-
-    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.manager WHERE e.manager.id = :managerId")
-    List<Employee> findByManagerId(@Param("managerId") Long managerId);
-
-    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId")
-    Page<Employee> findByManagerId(@Param("managerId") Long managerId, Pageable pageable);
 
     boolean existsByManagerIdAndTenant_Id(Long managerId, Long tenantId);
 
@@ -157,26 +150,26 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query(value = "SELECT employee_code FROM employees WHERE tenant_id = :tenantId ORDER BY id DESC LIMIT 1",
             nativeQuery = true)
-    String findLastEmployeeCodeByTenant(@Param("tenantId") Long tenantId);
+    Optional<String> findLastEmployeeCodeByTenant(@Param("tenantId") Long tenantId);
 
     @Query(value = "SELECT employee_code FROM employees WHERE tenant_id = :tenantId AND " +
             "employee_code LIKE CONCAT(:prefix, '%') ORDER BY id DESC LIMIT 1", nativeQuery = true)
-    String findLastEmployeeCodeByTenantAndPrefix(@Param("tenantId") Long tenantId,
-                                                 @Param("prefix") String prefix);
+    Optional<String> findLastEmployeeCodeByTenantAndPrefix(@Param("tenantId") Long tenantId,
+                                                           @Param("prefix") String prefix);
 
     @Query(value = "SELECT employee_code FROM employees WHERE tenant_id = :tenantId AND " +
             "employee_code LIKE CONCAT(:prefix, '-', :year, '-%') ORDER BY id DESC LIMIT 1", nativeQuery = true)
-    String findLastEmployeeCodeByTenantAndYear(@Param("tenantId") Long tenantId,
-                                               @Param("year") int year,
-                                               @Param("prefix") String prefix);
+    Optional<String> findLastEmployeeCodeByTenantAndYear(@Param("tenantId") Long tenantId,
+                                                         @Param("year") int year,
+                                                         @Param("prefix") String prefix);
 
     @Query(value = "SELECT employee_code FROM employees WHERE tenant_id = :tenantId AND " +
             "department_id = (SELECT id FROM departments WHERE name = :department) AND " +
             "employee_code LIKE CONCAT(:deptCode, '-', :year, '-%') ORDER BY id DESC LIMIT 1", nativeQuery = true)
-    String findLastEmployeeCodeByTenantAndDepartment(@Param("tenantId") Long tenantId,
-                                                     @Param("department") String department,
-                                                     @Param("year") int year,
-                                                     @Param("deptCode") String deptCode);
+    Optional<String> findLastEmployeeCodeByTenantAndDepartment(@Param("tenantId") Long tenantId,
+                                                               @Param("department") String department,
+                                                               @Param("year") int year,
+                                                               @Param("deptCode") String deptCode);
 
     // =====================================================
     // BIRTHDAY & ANNIVERSARY QUERIES
@@ -209,7 +202,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE Employee e SET e.manager.id = :managerId WHERE e.tenant.id = :tenantId AND e.id IN :employeeIds")
+    @Query(value = "UPDATE employees SET manager_id = :managerId WHERE tenant_id = :tenantId AND id IN :employeeIds", nativeQuery = true)
     int bulkAssignManager(@Param("tenantId") Long tenantId,
                           @Param("employeeIds") List<Long> employeeIds,
                           @Param("managerId") Long managerId);
@@ -415,20 +408,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
 
     /**
-     * Alternative if you need pagination for preloading
-     */
-    default List<Employee> findTop100ByIsActiveTrue() {
-        return findTop100ByIsActiveTrue(PageRequest.of(0, 100));
-    }
-
-    /**
      * Find top active employees with pagination
      */
     @Query("SELECT e FROM Employee e WHERE e.isActive = true ORDER BY e.lastLoginAt DESC")
     List<Employee> findTop100ByIsActiveTrue(Pageable pageable);
-
-    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
-    List<Employee> findActiveByTenantId(@Param("tenantId") Long tenantId);
 
     @Query("SELECT e FROM Employee e WHERE e.email = :email AND e.tenant.id = :tenantId")
     Optional<Employee> findByEmailAndTenantId(@Param("email") String email, @Param("tenantId") Long tenantId);
@@ -437,6 +420,49 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByEmployeeCodeAndTenantId(@Param("employeeCode") String employeeCode,
                                                      @Param("tenantId") Long tenantId);
 
+    // =====================================================
+    // TASK ASSIGNMENT QUERIES
+    // =====================================================
 
+    /** All active employees in the tenant, excluding the caller, matching optional query. */
+    @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
+            "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
+            "(:query = '' OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "e.employeeCode LIKE CONCAT('%', :query, '%') OR " +
+            "(d IS NOT NULL AND LOWER(d.name) LIKE LOWER(CONCAT('%', :query, '%'))))")
+    List<Employee> searchAssignableEmployees(@Param("tenantId") Long tenantId,
+                                             @Param("excludeId") Long excludeId,
+                                             @Param("query") String query,
+                                             Pageable pageable);
+
+    /** Active employees in the given department OR reporting to managerId, excluding the caller. */
+    @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
+            "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
+            "(e.department.id = :departmentId OR e.manager.id = :managerId) AND " +
+            "(:query = '' OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "e.employeeCode LIKE CONCAT('%', :query, '%') OR " +
+            "(d IS NOT NULL AND LOWER(d.name) LIKE LOWER(CONCAT('%', :query, '%'))))")
+    List<Employee> searchAssignableEmployeesForManager(@Param("tenantId") Long tenantId,
+                                                       @Param("departmentId") Long departmentId,
+                                                       @Param("managerId") Long managerId,
+                                                       @Param("excludeId") Long excludeId,
+                                                       @Param("query") String query,
+                                                       Pageable pageable);
+
+    /** Active direct reports of the given manager, excluding the caller. */
+    @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
+            "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
+            "e.manager.id = :managerId AND " +
+            "(:query = '' OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "e.employeeCode LIKE CONCAT('%', :query, '%') OR " +
+            "(d IS NOT NULL AND LOWER(d.name) LIKE LOWER(CONCAT('%', :query, '%'))))")
+    List<Employee> searchAssignableDirectReports(@Param("tenantId") Long tenantId,
+                                                 @Param("managerId") Long managerId,
+                                                 @Param("excludeId") Long excludeId,
+                                                 @Param("query") String query,
+                                                 Pageable pageable);
 
 }

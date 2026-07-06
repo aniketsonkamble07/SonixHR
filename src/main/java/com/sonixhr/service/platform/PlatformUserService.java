@@ -8,7 +8,7 @@ import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.exceptions.BusinessException;
-import com.sonixhr.exceptions.NotFoundException;
+import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -167,7 +167,7 @@ public class PlatformUserService {
     @Transactional
     public void resendActivationEmail(String email) {
         PlatformUser user = platformUserRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getStatus() == UserStatus.ACTIVE)
             throw new BusinessException("User is already activated");
         if (user.getStatus() != UserStatus.PENDING_VERIFICATION)
@@ -188,7 +188,7 @@ public class PlatformUserService {
     public PlatformUserResponse getUserById(@NonNull Long userId) {
         log.debug("Loading platform user from DB: {}", userId);
         PlatformUser user = platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return toResponse(user);
     }
 
@@ -196,7 +196,7 @@ public class PlatformUserService {
     public PlatformUserResponse getUserByEmail(String email) {
         log.debug("Loading platform user by email from DB: {}", email);
         PlatformUser user = platformUserRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("User not found: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return toResponse(user);
     }
 
@@ -238,7 +238,7 @@ public class PlatformUserService {
         log.info("Updating platform user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if ("admin@sonixhr.com".equals(user.getEmail())) {
             throw new BusinessException("Cannot modify the default Super Admin");
@@ -287,7 +287,7 @@ public class PlatformUserService {
         log.info("Updating status for user {} to {}", userId, status);
 
         PlatformUser user = platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if ("admin@sonixhr.com".equals(user.getEmail()) && status != UserStatus.ACTIVE) {
             throw new BusinessException("Cannot change status of the default Super Admin");
@@ -313,7 +313,7 @@ public class PlatformUserService {
         log.info("Updating roles for user: {}", userId);
 
         PlatformUser user = platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (roleIds == null || roleIds.isEmpty()) throw new BusinessException("At least one valid role must be assigned");
         Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(roleIds));
@@ -447,7 +447,7 @@ public class PlatformUserService {
 
     private PlatformUser requireUser(@NonNull Long userId) {
         return platformUserRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     private void validatePasswordStrength(String password) {

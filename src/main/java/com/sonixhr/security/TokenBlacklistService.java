@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -162,6 +163,17 @@ public class TokenBlacklistService {
             }
         } catch (Exception e) {
             log.warn("Failed to remove token from blacklist: {}", e.getMessage());
+        }
+    }
+
+    /** Purge expired entries from the local in-memory fallback every hour. */
+    @Scheduled(fixedDelayString = "${app.token.blacklist.cleanup-interval:3600000}")
+    public void cleanupLocalBlacklist() {
+        int before = localBlacklist.size();
+        localBlacklist.entrySet().removeIf(e -> e.getValue() < System.currentTimeMillis());
+        int removed = before - localBlacklist.size();
+        if (removed > 0) {
+            log.debug("Local blacklist cleaned: removed {} expired entries", removed);
         }
     }
 

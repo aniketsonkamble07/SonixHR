@@ -186,8 +186,9 @@ public class ShiftConfigurationController {
 
     @GetMapping("/active")
     @PreAuthorize("hasPermission('SHIFT_VIEW_ALL')")
-    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts() {
-        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllActiveShiftsSummary();
+    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllActiveShiftsSummary(currentEmployee.getTenantId());
         return ResponseEntity.ok(shifts);
     }
 

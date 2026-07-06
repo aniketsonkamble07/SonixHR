@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.annotation.PostConstruct;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -133,15 +132,15 @@ public class SecurityUtils {
 
         private Long extractTenantIdAsLong(Map<String, Object> claims) {
             Object tenantIdObj = claims.get("tenantId");
-            if (tenantIdObj instanceof Long) {
-                return (Long) tenantIdObj;
+            if (tenantIdObj instanceof Long l) {
+                return l;
             }
-            if (tenantIdObj instanceof Integer) {
-                return ((Integer) tenantIdObj).longValue();
+            if (tenantIdObj instanceof Integer i) {
+                return i.longValue();
             }
-            if (tenantIdObj instanceof String) {
+            if (tenantIdObj instanceof String s) {
                 try {
-                    return Long.parseLong((String) tenantIdObj);
+                    return Long.parseLong(s);
                 } catch (NumberFormatException e) {
                     log.debug("Invalid tenant ID format: {}", tenantIdObj);
                 }
@@ -151,11 +150,11 @@ public class SecurityUtils {
 
         private Long extractEmployeeId(Map<String, Object> claims) {
             Object employeeIdObj = claims.get("employeeId");
-            if (employeeIdObj instanceof Integer) {
-                return ((Integer) employeeIdObj).longValue();
+            if (employeeIdObj instanceof Integer i) {
+                return i.longValue();
             }
-            if (employeeIdObj instanceof Long) {
-                return (Long) employeeIdObj;
+            if (employeeIdObj instanceof Long l) {
+                return l;
             }
             return null;
         }
@@ -200,12 +199,16 @@ public class SecurityUtils {
 
         // Try Redis cache
         if (cacheEnabled && redisTemplate != null) {
-            String cacheKey = REDIS_KEY_USER_CONTEXT + key;
-            CachedSecurityContext redisCached = (CachedSecurityContext) redisTemplate.opsForValue().get(cacheKey);
-            if (redisCached != null) {
-                localCache.put(key, redisCached);
-                reqCache.put(reqCacheKey, redisCached);
-                return redisCached;
+            try {
+                String cacheKey = REDIS_KEY_USER_CONTEXT + key;
+                CachedSecurityContext redisCached = (CachedSecurityContext) redisTemplate.opsForValue().get(cacheKey);
+                if (redisCached != null) {
+                    localCache.put(key, redisCached);
+                    reqCache.put(reqCacheKey, redisCached);
+                    return redisCached;
+                }
+            } catch (Exception e) {
+                log.warn("Redis unavailable for security context cache (possible restart): {}", e.getMessage());
             }
         }
 
@@ -222,8 +225,12 @@ public class SecurityUtils {
             localCache.put(key, context);
             reqCache.put(reqCacheKey, context);
             if (redisTemplate != null) {
-                String cacheKey = REDIS_KEY_USER_CONTEXT + key;
-                redisTemplate.opsForValue().set(cacheKey, context, cacheTtlMinutes, TimeUnit.MINUTES);
+                try {
+                    String cacheKey = REDIS_KEY_USER_CONTEXT + key;
+                    redisTemplate.opsForValue().set(cacheKey, context, cacheTtlMinutes, TimeUnit.MINUTES);
+                } catch (Exception e) {
+                    log.warn("Redis unavailable for security context cache write (possible restart): {}", e.getMessage());
+                }
             }
         }
 
@@ -355,11 +362,15 @@ public class SecurityUtils {
         }
 
         if (cacheEnabled && redisTemplate != null) {
-            String redisKey = REDIS_KEY_USER_ROLES + key;
-            List<String> cachedRoles = (List<String>) redisTemplate.opsForValue().get(redisKey);
-            if (cachedRoles != null) {
-                reqCache.put(cacheKey, cachedRoles);
-                return cachedRoles;
+            try {
+                String redisKey = REDIS_KEY_USER_ROLES + key;
+                List<String> cachedRoles = (List<String>) redisTemplate.opsForValue().get(redisKey);
+                if (cachedRoles != null) {
+                    reqCache.put(cacheKey, cachedRoles);
+                    return cachedRoles;
+                }
+            } catch (Exception e) {
+                log.warn("Redis unavailable for roles cache read (possible restart): {}", e.getMessage());
             }
         }
 
@@ -367,8 +378,12 @@ public class SecurityUtils {
 
         // Cache the roles
         if (cacheEnabled && redisTemplate != null && !roles.isEmpty()) {
-            String redisKey = REDIS_KEY_USER_ROLES + key;
-            redisTemplate.opsForValue().set(redisKey, roles, cacheTtlMinutes, TimeUnit.MINUTES);
+            try {
+                String redisKey = REDIS_KEY_USER_ROLES + key;
+                redisTemplate.opsForValue().set(redisKey, roles, cacheTtlMinutes, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                log.warn("Redis unavailable for roles cache write (possible restart): {}", e.getMessage());
+            }
             reqCache.put(cacheKey, roles);
         }
 
@@ -526,9 +541,9 @@ public class SecurityUtils {
         if (details instanceof Map) {
             Map<String, Object> detailsMap = (Map<String, Object>) details;
             Object userType = detailsMap.get("userType");
-            if (userType instanceof String) {
-                reqCache.put("userType", (String) userType);
-                return (String) userType;
+            if (userType instanceof String s) {
+                reqCache.put("userType", s);
+                return s;
             }
         }
 
@@ -585,18 +600,18 @@ public class SecurityUtils {
             Map<String, Object> detailsMap = (Map<String, Object>) details;
             Object tenantId = detailsMap.get("tenantId");
 
-            if (tenantId instanceof Long) {
-                reqCache.put("tenantId", (Long) tenantId);
-                return (Long) tenantId;
+            if (tenantId instanceof Long l) {
+                reqCache.put("tenantId", l);
+                return l;
             }
-            if (tenantId instanceof Integer) {
-                Long tid = ((Integer) tenantId).longValue();
+            if (tenantId instanceof Integer i) {
+                Long tid = i.longValue();
                 reqCache.put("tenantId", tid);
                 return tid;
             }
-            if (tenantId instanceof String) {
+            if (tenantId instanceof String s) {
                 try {
-                    Long tid = Long.parseLong((String) tenantId);
+                    Long tid = Long.parseLong(s);
                     reqCache.put("tenantId", tid);
                     return tid;
                 } catch (NumberFormatException e) {
@@ -639,18 +654,18 @@ public class SecurityUtils {
         if (details instanceof Map) {
             Map<String, Object> detailsMap = (Map<String, Object>) details;
             Object employeeId = detailsMap.get("employeeId");
-            if (employeeId instanceof Integer) {
-                Long eid = ((Integer) employeeId).longValue();
+            if (employeeId instanceof Integer i) {
+                Long eid = i.longValue();
                 reqCache.put("employeeId", eid);
                 return eid;
             }
-            if (employeeId instanceof Long) {
-                reqCache.put("employeeId", (Long) employeeId);
-                return (Long) employeeId;
+            if (employeeId instanceof Long l) {
+                reqCache.put("employeeId", l);
+                return l;
             }
-            if (employeeId instanceof String) {
+            if (employeeId instanceof String s) {
                 try {
-                    Long eid = Long.parseLong((String) employeeId);
+                    Long eid = Long.parseLong(s);
                     reqCache.put("employeeId", eid);
                     return eid;
                 } catch (NumberFormatException e) {
@@ -686,9 +701,9 @@ public class SecurityUtils {
         if (details instanceof Map) {
             Map<String, Object> detailsMap = (Map<String, Object>) details;
             Object employeeCode = detailsMap.get("employeeCode");
-            if (employeeCode instanceof String) {
-                reqCache.put("employeeCode", (String) employeeCode);
-                return (String) employeeCode;
+            if (employeeCode instanceof String s) {
+                reqCache.put("employeeCode", s);
+                return s;
             }
         }
         return null;
@@ -713,9 +728,9 @@ public class SecurityUtils {
         if (details instanceof Map) {
             Map<String, Object> detailsMap = (Map<String, Object>) details;
             Object fullName = detailsMap.get("fullName");
-            if (fullName instanceof String) {
-                reqCache.put("fullName", (String) fullName);
-                return (String) fullName;
+            if (fullName instanceof String s) {
+                reqCache.put("fullName", s);
+                return s;
             }
         }
         return null;
@@ -780,14 +795,18 @@ public class SecurityUtils {
 
         // Check Redis cache
         if (cacheEnabled && redisTemplate != null && email != null) {
-            String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
-            Boolean cached = (Boolean) redisTemplate.opsForValue().get(redisKey);
-            if (cached != null) {
-                if (cacheEnabled) {
-                    permissionCheckCache.put("perm_" + key + "_" + permission, cached);
+            try {
+                String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
+                Boolean cached = (Boolean) redisTemplate.opsForValue().get(redisKey);
+                if (cached != null) {
+                    if (cacheEnabled) {
+                        permissionCheckCache.put("perm_" + key + "_" + permission, cached);
+                    }
+                    reqCache.put(cacheKey, cached);
+                    return cached;
                 }
-                reqCache.put(cacheKey, cached);
-                return cached;
+            } catch (Exception e) {
+                log.warn("Redis unavailable for permission cache read (possible restart): {}", e.getMessage());
             }
         }
 
@@ -798,8 +817,12 @@ public class SecurityUtils {
         if (cacheEnabled && email != null) {
             permissionCheckCache.put("perm_" + key + "_" + permission, hasPermission);
             if (redisTemplate != null) {
-                String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
-                redisTemplate.opsForValue().set(redisKey, hasPermission, 1, TimeUnit.MINUTES);
+                try {
+                    String redisKey = REDIS_KEY_PERMISSION + key + ":" + permission;
+                    redisTemplate.opsForValue().set(redisKey, hasPermission, 1, TimeUnit.MINUTES);
+                } catch (Exception e) {
+                    log.warn("Redis unavailable for permission cache write (possible restart): {}", e.getMessage());
+                }
             }
         }
 

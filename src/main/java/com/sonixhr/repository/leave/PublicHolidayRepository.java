@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -62,10 +63,12 @@ public interface PublicHolidayRepository extends JpaRepository<PublicHoliday, Lo
     // BULK OPERATIONS
     // =====================================================
 
+    @Transactional
     @Modifying
     @Query("DELETE FROM PublicHoliday h WHERE h.tenantId = :tenantId AND h.year = :year")
     int deleteHolidaysForYear(@Param("tenantId") Long tenantId, @Param("year") int year);
 
+    @Transactional
     @Modifying
     @Query("DELETE FROM PublicHoliday h WHERE h.tenantId = :tenantId AND h.holidayDate = :date")
     int deleteHolidayByDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);

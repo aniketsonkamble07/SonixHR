@@ -195,9 +195,20 @@ public class PlatformTokenBlacklistService {
     private void blacklistTokenLocally(String jti, String username, String userType, long ttl) {
         localBlacklist.put(jti, new BlacklistEntry(jti, username, userType, System.currentTimeMillis() + ttl));
 
-        // Clean up local cache if it exceeds size limit
+        // Enforce size cap: first remove expired entries, then evict soonest-to-expire if still over limit
         if (localBlacklist.size() > localCacheSize) {
-            cleanupLocalBlacklist();
+            localBlacklist.entrySet().removeIf(e -> e.getValue().isExpired());
+            if (localBlacklist.size() > localCacheSize) {
+                int toEvict = localBlacklist.size() - (int) (localCacheSize * 0.8);
+                localBlacklist.entrySet().stream()
+                        .sorted(java.util.Comparator.comparingLong(e -> e.getValue().expiryTime))
+                        .limit(toEvict)
+                        .map(java.util.Map.Entry::getKey)
+                        .collect(java.util.stream.Collectors.toList())
+                        .forEach(localBlacklist::remove);
+                log.warn("Local blacklist exceeded capacity ({}). Evicted {} entries with earliest expiry.",
+                        localCacheSize, toEvict);
+            }
         }
 
         log.debug("Token blacklisted locally: {}, TTL: {}ms", jti, ttl);
@@ -390,7 +401,7 @@ public class PlatformTokenBlacklistService {
         try {
             if (redisEnabled && redisTemplate != null) {
                 String key = "tenant:blacklist:" + tenantId;
-                redisTemplate.opsForValue().set(key, "true", 7, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(key, "true", 365, TimeUnit.DAYS);
             }
         } catch (Exception e) {
             log.error("Failed to blacklist tenant tokens in Redis: {}", e.getMessage());
@@ -429,8 +440,17 @@ public class PlatformTokenBlacklistService {
 
         if (redisEnabled && redisTemplate != null) {
             try {
-                Set<String> keys = redisTemplate.keys(REDIS_KEY_BLACKLIST + "*");
-                stats.redisSize = keys != null ? keys.size() : 0;
+                final AtomicLong count = new AtomicLong(0);
+                org.springframework.data.redis.core.ScanOptions opts =
+                    org.springframework.data.redis.core.ScanOptions.scanOptions()
+                        .match(REDIS_KEY_BLACKLIST + "*").count(500).build();
+                redisTemplate.execute((RedisCallback<Void>) connection -> {
+                    org.springframework.data.redis.core.Cursor<byte[]> cursor =
+                        connection.keyCommands().scan(opts);
+                    while (cursor.hasNext()) { cursor.next(); count.incrementAndGet(); }
+                    return null;
+                });
+                stats.redisSize = (int) count.get();
             } catch (Exception e) {
                 log.debug("Failed to get Redis stats: {}", e.getMessage());
             }

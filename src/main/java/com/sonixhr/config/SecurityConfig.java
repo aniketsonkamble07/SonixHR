@@ -36,7 +36,7 @@ import java.util.List;
 @SuppressWarnings("null")
 public class SecurityConfig {
 
-    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081,https://sonixhr.onrender.com}")
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081}")
     private List<String> allowedOrigins;
 
     private final UserDetailsService employeeDetailsService;
@@ -70,6 +70,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // CSRF disabled: stateless JWT authentication — no session, no cookie-based state
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .exceptionHandling(exception -> exception
@@ -81,22 +82,17 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/platform/auth/**",
                                 "/api/public/**",
-                                "/api/debug/**",
                                 "/api/health",
                                 "/actuator/health",
                                 "/api/tenant/register",
                                 "/api/employee/auth/activate",
                                 "/api/tenant/auth/**",
                                 "/api/forgot-password/**",
-                                "/api/employee/auth/activate",
                                 "/api/reset-password/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
                                 "/",
-
-                                "/platform/**",
-                                "/tenant/**",
                                 "/*.html",
                                 "/*.css",
                                 "/*.js",

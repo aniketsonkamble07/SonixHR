@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -414,7 +416,7 @@ public class LeaveService {
         }
 
         // Check for overlapping leave
-        if (leaveRepository.hasOverlappingLeave(employeeId, request.getStartDate(), request.getEndDate())) {
+        if (leaveRepository.hasOverlappingLeave(employee.getTenant().getId(), employeeId, request.getStartDate(), request.getEndDate())) {
             throw new BusinessException("You already have a pending or approved leave in this date range");
         }
 
@@ -584,6 +586,10 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "leaveRequests", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public LeaveResponseDTO approveLeave(@NonNull Long leaveId, @NonNull Long approverId, String approverName) {
         log.info("Approving leave request: {} by {}", leaveId, approverName);
 
@@ -636,6 +642,10 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "leaveRequests", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public LeaveResponseDTO rejectLeave(@NonNull Long leaveId, String rejectionReason, @NonNull Long rejectorId, String rejectorName) {
         log.info("Rejecting leave request: {} by {}", leaveId, rejectorName);
 
@@ -713,6 +723,10 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "leaveRequests", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public LeaveResponseDTO cancelLeave(@NonNull Long leaveId, @NonNull Long employeeId, String cancellationReason) {
         log.info("Cancelling leave request: {} by employee: {}", leaveId, employeeId);
 
@@ -756,6 +770,10 @@ public class LeaveService {
     // =====================================================
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "leaveRequests", allEntries = true),
+        @CacheEvict(value = "calendar", allEntries = true)
+    })
     public LeaveResponseDTO updateLeaveRequest(@NonNull Long leaveId, @NonNull Long employeeId, LeaveRequestDTO request, Employee currentUser) {
         log.info("Updating leave request: {} by employee: {}", leaveId, employeeId);
 
@@ -874,7 +892,7 @@ public class LeaveService {
         }
 
         // Check for overlapping leave requests (excluding this leave request ID)
-        if (leaveRepository.hasOverlappingLeaveExcludingSelf(employeeId, leaveId, request.getStartDate(), request.getEndDate())) {
+        if (leaveRepository.hasOverlappingLeaveExcludingSelf(leave.getTenant().getId(), employeeId, leaveId, request.getStartDate(), request.getEndDate())) {
             throw new BusinessException("You already have a pending or approved leave in this date range");
         }
 

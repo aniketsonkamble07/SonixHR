@@ -32,8 +32,11 @@ public class DatabaseFunctionInitializer {
                 $$ LANGUAGE plpgsql;
                 """;
 
-        jdbcTemplate.execute(createFunctionSql);
-
-        log.info("PostgreSQL function set_current_tenant created successfully");
+        try {
+            jdbcTemplate.execute(createFunctionSql);
+            log.info("PostgreSQL function set_current_tenant created successfully");
+        } catch (Exception e) {
+            log.error("Failed to create PostgreSQL function set_current_tenant — RLS may not work correctly: {}", e.getMessage());
+        }
     }
 }

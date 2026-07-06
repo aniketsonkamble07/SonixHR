@@ -68,7 +68,11 @@ public class ActivationTokenService {
 
     private String getToken(String key) {
         try {
-            return redisTemplate.opsForValue().get(key);
+            String value = redisTemplate.opsForValue().get(key);
+            if (value == null) {
+                log.debug("Token key not found in Redis: {} (may have expired or been lost on Redis restart)", key);
+            }
+            return value;
         } catch (Exception e) {
             log.warn("Redis is down, retrieving token from in-memory fallback. Error: {}", e.getMessage());
             TokenInfo info = fallbackTokenStore.get(key);
@@ -133,25 +137,21 @@ public class ActivationTokenService {
     }
 
     /**
-     * Get employee ID from activation token
+     * Get employee ID from activation token (activation namespace only).
+     * Does NOT fall back to the reset-token namespace — reset and activation
+     * tokens are intentionally separate to prevent type-confusion.
      */
     public Long getEmployeeIdFromToken(String token) {
-        log.debug("Getting employee ID from token: {}", token);
+        log.debug("Getting employee ID from activation token: {}", token);
 
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
         String employeeIdStr = getToken(key);
 
         if (employeeIdStr == null) {
-            // Also check reset token
-            key = REDIS_PREFIX_EMPLOYEE_RESET + token;
-            employeeIdStr = getToken(key);
-        }
-
-        if (employeeIdStr == null) {
             throw new BusinessException("Invalid or expired token");
         }
 
-        return Long.parseLong(employeeIdStr);
+        return Long.valueOf(employeeIdStr);
     }
 
     /**
@@ -184,7 +184,7 @@ public class ActivationTokenService {
             throw new BusinessException("Invalid or expired activation token");
         }
 
-        Long employeeId = Long.parseLong(employeeIdStr);
+        Long employeeId = Long.valueOf(employeeIdStr);
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
@@ -242,7 +242,7 @@ public class ActivationTokenService {
             throw new BusinessException("Invalid or expired activation token");
         }
 
-        Long userId = Long.parseLong(userIdStr);
+        Long userId = Long.valueOf(userIdStr);
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
@@ -293,7 +293,7 @@ public class ActivationTokenService {
             throw new BusinessException("Invalid or expired reset token");
         }
 
-        Long userId = Long.parseLong(userIdStr);
+        Long userId = Long.valueOf(userIdStr);
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("Platform user not found"));
 
@@ -338,7 +338,7 @@ public class ActivationTokenService {
             throw new BusinessException("Invalid or expired reset token");
         }
 
-        Long employeeId = Long.parseLong(employeeIdStr);
+        Long employeeId = Long.valueOf(employeeIdStr);
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
@@ -407,7 +407,7 @@ public class ActivationTokenService {
             throw new BusinessException("Invalid or expired token");
         }
 
-        return Long.parseLong(userIdStr);
+        return Long.valueOf(userIdStr);
     }
 
     /**
