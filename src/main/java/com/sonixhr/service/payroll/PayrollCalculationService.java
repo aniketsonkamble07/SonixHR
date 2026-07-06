@@ -95,6 +95,9 @@ public class PayrollCalculationService {
             }
             payslipRepo.deleteAll(oldPayslips);
             payrunConfigRepo.findByPayrunId(existingPayrun.get().getId()).ifPresent(payrunConfigRepo::delete);
+            payslipItemRepo.flush();
+            payslipRepo.flush();
+            payrunConfigRepo.flush();
         }
 
         LocalDate monthStart = LocalDate.of(year, month, 1);
