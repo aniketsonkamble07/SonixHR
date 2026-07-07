@@ -93,6 +93,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
                                 "/",
+                                "/tenant/**",
+                                "/platform/**",
                                 "/*.html",
                                 "/*.css",
                                 "/*.js",
