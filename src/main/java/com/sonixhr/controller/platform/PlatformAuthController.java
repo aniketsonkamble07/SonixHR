@@ -15,25 +15,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-
-// FIXES APPLIED:
-//
-// 1. Rate limiting added to login, refresh, forgot-password, reset-password, and activate.
-//    These are the endpoints most vulnerable to brute-force and enumeration attacks.
-//    RateLimiterService (backed by Redis) is injected; returns 429 when the bucket is empty.
-//
-// 2. Client IP extraction extracted to a helper so X-Forwarded-For is respected
-//    when the app sits behind a proxy/load-balancer.
 
 @Slf4j
 @RestController
@@ -56,26 +47,41 @@ public class PlatformAuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
 
-        // Rate-limit by IP: 10 attempts per minute.
-        // Keyed by email too so credential-stuffing from many IPs is also throttled.
         String ip = resolveClientIp(httpRequest);
-        rateLimiterService.checkOrThrow("login:ip:"    + ip,                  10, 60);
+        String userAgent = httpRequest.getHeader("User-Agent");
         String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : "";
         String hashedEmail = DigestUtils.md5DigestAsHex(email.getBytes());
-        rateLimiterService.checkOrThrow("login:email:" + hashedEmail,  5,  60);
 
-        log.info("Login request for platform user: {}", request.getEmail());
-        LoginResponse response = platformAuthService.login(request.getEmail(), request.getPassword());
-        return ResponseEntity.ok(response);
+        log.info("Login attempt for platform user: {}, IP: {}, User-Agent: {}", 
+            request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
+
+        rateLimiterService.checkOrThrow("login:ip:" + ip, 10, 60);
+        rateLimiterService.checkOrThrow("login:email:" + hashedEmail, 5, 60);
+
+        try {
+            LoginResponse response = platformAuthService.login(request.getEmail(), request.getPassword());
+            
+            // Reset rate limits on successful login
+            rateLimiterService.reset("login:ip:" + ip);
+            rateLimiterService.reset("login:email:" + hashedEmail);
+            
+            log.info("Successful login for platform user: {}, IP: {}", request.getEmail(), ip);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.warn("Login failed for user: {}, IP: {}", request.getEmail(), ip);
+            throw e;
+        }
     }
 
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> logout(
             @AuthenticationPrincipal PlatformUser user,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            HttpServletRequest httpRequest) {
 
-        log.info("Logout request for platform user: {}", user.getEmail());
+        String ip = resolveClientIp(httpRequest);
+        log.info("Logout request for platform user: {}, IP: {}", user.getEmail(), ip);
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             tokenBlacklistService.blacklistToken(authHeader.substring(7));
@@ -85,7 +91,7 @@ public class PlatformAuthController {
 
         return ResponseEntity.ok(Map.of(
                 "message", "Logout successful",
-                "status",  "success"
+                "status", "success"
         ));
     }
 
@@ -94,11 +100,10 @@ public class PlatformAuthController {
             @Valid @RequestBody RefreshTokenRequest request,
             HttpServletRequest httpRequest) {
 
-        // Rate-limit refresh: 20 per minute per IP. Less strict than login since
-        // a valid refresh token is already a secret the caller holds.
-        rateLimiterService.checkOrThrow("refresh:ip:" + resolveClientIp(httpRequest), 20, 60);
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("refresh:ip:" + ip, 20, 60);
 
-        log.info("Token refresh request");
+        log.info("Token refresh request from IP: {}", ip);
         LoginResponse response = platformAuthService.refresh(request.getRefreshToken());
         return ResponseEntity.ok(response);
     }
@@ -108,11 +113,10 @@ public class PlatformAuthController {
             @Valid @RequestBody ActivationRequest request,
             HttpServletRequest httpRequest) {
 
-        // Rate-limit activation: 5 per minute per IP. Activation tokens are single-use
-        // but an attacker can still try to guess/brute-force them.
-        rateLimiterService.checkOrThrow("activate:ip:" + resolveClientIp(httpRequest), 5, 60);
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("activate:ip:" + ip, 5, 60);
 
-        log.info("Activating platform user with token");
+        log.info("Activating platform user from IP: {}", ip);
 
         PlatformUser user = platformUserService.activateUser(
                 request.getToken(),
@@ -121,21 +125,21 @@ public class PlatformAuthController {
         );
 
         var tokenPair = jwtService.generatePlatformTokenPair(user);
-        log.info("Platform user activated successfully: {}", user.getEmail());
+        log.info("Platform user activated successfully: {}, IP: {}", user.getEmail(), ip);
 
-        return ResponseEntity.ok(Map.ofEntries(
-                Map.entry("success",      true),
-                Map.entry("message",      "Account activated successfully"),
-                Map.entry("accessToken",  tokenPair.getAccessToken()),
-                Map.entry("refreshToken", tokenPair.getRefreshToken()),
-                Map.entry("tokenType",    "Bearer"),
-                Map.entry("expiresIn",    tokenPair.getExpiresIn()),
-                Map.entry("userType",     "PLATFORM"),
-                Map.entry("userId",       user.getId()),
-                Map.entry("email",        user.getEmail()),
-                Map.entry("fullName",     user.getFullName()),
-                Map.entry("designation",  user.getDesignation())
-        ));
+        // Return minimal response
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("success", true);
+        response.put("message", "Account activated successfully");
+        response.put("accessToken", tokenPair.getAccessToken());
+        response.put("refreshToken", tokenPair.getRefreshToken());
+        response.put("tokenType", "Bearer");
+        response.put("expiresIn", tokenPair.getExpiresIn());
+        response.put("userType", "PLATFORM");
+        response.put("userId", user.getId());
+        response.put("email", user.getEmail());
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/forgot-password")
@@ -143,15 +147,22 @@ public class PlatformAuthController {
             @RequestParam String email,
             HttpServletRequest httpRequest) {
 
-        // Rate-limit: 3 per 10 minutes per IP. This endpoint is often targeted
-        // for email enumeration; the service already returns the same response
-        // whether the email exists or not.
-        rateLimiterService.checkOrThrow("forgot:ip:" + resolveClientIp(httpRequest), 3, 600);
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("forgot:ip:" + ip, 3, 600);
+
+        // Email-based rate limiting to prevent enumeration
+        String hashedEmail = DigestUtils.md5DigestAsHex(email.toLowerCase().trim().getBytes());
+        rateLimiterService.checkOrThrow("forgot:email:" + hashedEmail, 2, 3600);
+
+        // Random delay to prevent timing attacks
+        try {
+            Thread.sleep(500 + (long) (Math.random() * 500));
+        } catch (InterruptedException ignored) {}
 
         platformUserService.forgotPassword(email);
         return ResponseEntity.ok(Map.of(
                 "message", "If the email exists, a password reset link has been sent.",
-                "status",  "success"
+                "status", "success"
         ));
     }
 
@@ -160,18 +171,29 @@ public class PlatformAuthController {
             @Valid @RequestBody SetPasswordRequest request,
             HttpServletRequest httpRequest) {
 
-        // Rate-limit: 5 per 10 minutes per IP.
-        rateLimiterService.checkOrThrow("reset:ip:" + resolveClientIp(httpRequest), 5, 600);
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("reset:ip:" + ip, 5, 600);
 
-        platformUserService.resetPasswordWithToken(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
+        platformUserService.resetPasswordWithToken(
+            request.getToken(), 
+            request.getNewPassword(), 
+            request.getConfirmPassword()
+        );
+        
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully",
-                "status",  "success"
+                "status", "success"
         ));
     }
 
     @GetMapping("/verify-token")
-    public ResponseEntity<Map<String, Object>> verifyToken(@RequestParam String token) {
+    public ResponseEntity<Map<String, Object>> verifyToken(
+            @RequestParam String token,
+            HttpServletRequest httpRequest) {
+
+        // ✅ Add rate limiting for token verification
+        rateLimiterService.checkOrThrow("verify-token:ip:" + resolveClientIp(httpRequest), 20, 60);
+
         if (tokenBlacklistService.isBlacklisted(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("valid", false, "error", "Token has been revoked"));
@@ -185,9 +207,9 @@ public class PlatformAuthController {
             }
 
             return ResponseEntity.ok(Map.of(
-                    "valid",    true,
+                    "valid", true,
                     "userType", jwtService.extractUserType(token),
-                    "email",    jwtService.extractUsername(token)
+                    "email", jwtService.extractUsername(token)
             ));
         } catch (Exception e) {
             log.warn("Token verification failed: {}", e.getMessage());
@@ -200,16 +222,15 @@ public class PlatformAuthController {
     // Helpers
     // -------------------------------------------------------
 
-    /**
-     * Resolves the real client IP, respecting X-Forwarded-For when the app
-     * runs behind a reverse proxy or load balancer.
-     * Takes only the first address from the header to avoid spoofing via appended IPs.
-     */
     private String resolveClientIp(HttpServletRequest request) {
         if (trustProxy) {
             String forwarded = request.getHeader("X-Forwarded-For");
             if (forwarded != null && !forwarded.isBlank()) {
                 return forwarded.split(",")[0].trim();
+            }
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank()) {
+                return realIp.trim();
             }
         }
         return request.getRemoteAddr();

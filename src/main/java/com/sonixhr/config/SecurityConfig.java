@@ -92,6 +92,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
                                 "/",
+                                "/error",
                                 "/tenant/**",
                                 "/platform/**",
                                 "/*.html",

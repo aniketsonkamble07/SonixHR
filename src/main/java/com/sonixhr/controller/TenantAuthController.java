@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.TenantAuthException;
 import com.sonixhr.exceptions.TokenValidationException;
 import org.springframework.security.authentication.AuthenticationManager;
