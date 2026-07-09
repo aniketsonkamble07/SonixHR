@@ -54,8 +54,9 @@ public class CacheMonitoringService {
             current.loadFailureCount = stats.loadFailureCount();
             current.totalLoadTime    = stats.totalLoadTime();
 
-            double hitRate  = stats.hitRate();
-            double missRate = stats.missRate();
+            long requestCount = stats.requestCount();
+            double hitRate  = requestCount == 0 ? 0.0 : stats.hitRate();
+            double missRate = requestCount == 0 ? 0.0 : stats.missRate();
             long   size     = nativeCache.estimatedSize();
 
             // SLF4J uses {} placeholders, not {:.2f}
