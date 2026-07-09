@@ -41,34 +41,40 @@ public class TenantRegistrationController {
             @RequestParam String email,
             HttpServletRequest request) {
 
-        // Rate limit by IP
         String clientIp = getClientIp(request);
+
+        // Rate limit by IP
         try {
             rateLimiterService.checkOrThrow("email-check:" + clientIp, 10, 60);
         } catch (BusinessException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(Map.of("error", "Too many requests. Please try again later."));
+                    .body(Map.of("error", "Too many requests. Please try again later."));
         }
 
-        // Normalize and validate email
+        // Validate email
         if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest()
-                .body(Map.of("available", false, "message", "Email is required"));
+                    .body(Map.of("message", "Email is required"));
         }
 
         String normalizedEmail = email.trim().toLowerCase();
         if (!isValidEmailFormat(normalizedEmail)) {
             return ResponseEntity.badRequest()
-                .body(Map.of("available", false, "message", "Invalid email format"));
+                    .body(Map.of("message", "Invalid email format"));
         }
 
+        // Check existence
         boolean available = !employeeRepository.existsByEmail(normalizedEmail);
 
-        // Generic response to prevent email enumeration
+        // ✅ Log for monitoring but don't reveal to client
+        if (log.isDebugEnabled()) {
+            log.debug("Email check - IP: {}, email: {}, available: {}",
+                    clientIp, maskEmail(normalizedEmail), available);
+        }
+
+        // ✅ Always return the same generic response
         return ResponseEntity.ok(Map.of(
-            "available", available,
-            "message", "Email check completed"
-        ));
+                "message", "If this email is available, you will receive further instructions."));
     }
 
     @PostMapping("/register")
@@ -77,12 +83,13 @@ public class TenantRegistrationController {
             HttpServletRequest httpRequest) {
 
         String clientIp = getClientIp(httpRequest);
-        log.info("Tenant registration request from IP: {}, company: {}", 
-            clientIp, request.getCompanyName());
+        String companyName = request.getCompanyName();
+
+        log.info("Tenant registration request from IP: {}, company: {}", clientIp, companyName);
 
         // Rate limit registration
         try {
-            rateLimiterService.checkOrThrow("register:" + clientIp, 3, 3600); // 3 per hour
+            rateLimiterService.checkOrThrow("register:" + clientIp, 3, 3600);
         } catch (BusinessException e) {
             throw new BusinessException("Too many registration attempts. Please try again later.");
         }
@@ -106,9 +113,9 @@ public class TenantRegistrationController {
         }
 
         // Log token prefix only (NOT full token)
-        String tokenPrefix = request.getToken() != null && request.getToken().length() > 8 
-            ? request.getToken().substring(0, 8) + "..." 
-            : "null";
+        String tokenPrefix = request.getToken() != null && request.getToken().length() > 8
+                ? request.getToken().substring(0, 8) + "..."
+                : "null";
         log.info("Set password request from IP: {}, token prefix: {}", clientIp, tokenPrefix);
 
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
@@ -119,15 +126,15 @@ public class TenantRegistrationController {
             activationTokenService.setPassword(request.getToken(), request.getNewPassword());
             log.info("Password set successfully for token prefix: {}", tokenPrefix);
         } catch (BusinessException e) {
-            log.warn("Failed set password attempt from IP: {}, token prefix: {}, error: {}", 
-                clientIp, tokenPrefix, e.getMessage());
+            log.warn("Failed set password attempt from IP: {}, token prefix: {}, error: {}",
+                    clientIp, tokenPrefix, e.getMessage());
             throw e;
         }
 
         return ResponseEntity.ok().build();
     }
 
-    // Protected debug endpoint
+    // ✅ Protected debug endpoint - NO STACK TRACE EXPOSURE
     @GetMapping("/debug-redis")
     public ResponseEntity<Map<String, Object>> debugRedis(
             @RequestHeader(value = "X-Debug-Key", required = false) String providedKey) {
@@ -147,13 +154,16 @@ public class TenantRegistrationController {
             result.put("success", true);
         } catch (Throwable e) {
             result.put("success", false);
-            result.put("error", e.getMessage());
-            java.io.StringWriter sw = new java.io.StringWriter();
-            e.printStackTrace(new java.io.PrintWriter(sw));
-            result.put("stackTrace", sw.toString());
+            result.put("error", "Redis connection error. Check server logs for details.");
+            // ✅ Log to server logs only
+            log.error("Redis debug endpoint error: {}", e.getMessage(), e);
         }
         return ResponseEntity.ok(result);
     }
+
+    // ==============================
+    // HELPER METHODS
+    // ==============================
 
     private String getClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
@@ -164,6 +174,21 @@ public class TenantRegistrationController {
     }
 
     private boolean isValidEmailFormat(String email) {
-        return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
+        // ✅ Use a proper email validator
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.length() < 5)
+            return "***";
+        String[] parts = email.split("@");
+        if (parts.length != 2)
+            return "***";
+        String local = parts[0];
+        String domain = parts[1];
+        if (local.length() <= 2) {
+            return "*@" + domain;
+        }
+        return local.charAt(0) + "***" + local.charAt(local.length() - 1) + "@" + domain;
     }
 }

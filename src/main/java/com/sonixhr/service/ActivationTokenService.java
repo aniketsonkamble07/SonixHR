@@ -16,6 +16,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.sonixhr.security.RateLimiterService;
+import com.sonixhr.security.TenantContext;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class ActivationTokenService {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final RedisTemplate<String, String> redisTemplate;
+    private final RateLimiterService rateLimiterService;
 
     @Value("${app.activation.token.expiry-hours:24}")
     private long tokenExpiryHours;
@@ -142,7 +145,8 @@ public class ActivationTokenService {
      * tokens are intentionally separate to prevent type-confusion.
      */
     public Long getEmployeeIdFromToken(String token) {
-        log.debug("Getting employee ID from activation token: {}", token);
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.debug("Getting employee ID from activation token: {}", tokenPrefix);
 
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
         String employeeIdStr = getToken(key);
@@ -175,12 +179,25 @@ public class ActivationTokenService {
 
     @Transactional
     public Employee activateEmployee(String token, String password) {
-        log.info("Activating employee with token: {}", token);
+        String clientIp = getClientIp();
+        String rateKey = "activation:attempts:" + clientIp;
+        try {
+            rateLimiterService.checkOrThrow(rateKey, 5, 1800); // 5 attempts per 30 minutes
+        } catch (Exception e) {
+            log.warn("IP blocked from activation due to too many attempts: {}", clientIp);
+            throw new BusinessException("Too many activation attempts. Please try again later.");
+        }
+
+        validatePasswordStrength(password);
+
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Activating employee with token: {}", tokenPrefix);
 
         String key = REDIS_PREFIX_EMPLOYEE_ACTIVATION + token;
         String employeeIdStr = getToken(key);
 
         if (employeeIdStr == null) {
+            log.warn("Failed activation attempt from IP: {} for invalid token", clientIp);
             throw new BusinessException("Invalid or expired activation token");
         }
 
@@ -210,6 +227,9 @@ public class ActivationTokenService {
         // Delete used token
         deleteToken(key);
 
+        // Success - reset attempts
+        rateLimiterService.reset(rateKey);
+
         log.info("Employee activated successfully: {}", employee.getEmail());
         return savedEmployee;
     }
@@ -233,12 +253,25 @@ public class ActivationTokenService {
 
     @Transactional
     public PlatformUser activatePlatformUser(String token, String password) {
-        log.info("Activating platform user with token: {}", token);
+        String clientIp = getClientIp();
+        String rateKey = "platform-activation:attempts:" + clientIp;
+        try {
+            rateLimiterService.checkOrThrow(rateKey, 5, 1800); // 5 attempts per 30 minutes
+        } catch (Exception e) {
+            log.warn("IP blocked from platform activation due to too many attempts: {}", clientIp);
+            throw new BusinessException("Too many activation attempts. Please try again later.");
+        }
+
+        validatePasswordStrength(password);
+
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Activating platform user with token: {}", tokenPrefix);
 
         String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
         String userIdStr = getToken(key);
 
         if (userIdStr == null) {
+            log.warn("Failed platform activation attempt from IP: {} for invalid token", clientIp);
             throw new BusinessException("Invalid or expired activation token");
         }
 
@@ -260,6 +293,9 @@ public class ActivationTokenService {
 
         // Delete used token
         deleteToken(key);
+
+        // Success - reset attempts
+        rateLimiterService.reset(rateKey);
 
         log.info("Platform user activated successfully: {}", user.getEmail());
         return savedUser;
@@ -284,7 +320,8 @@ public class ActivationTokenService {
 
     @Transactional
     public void resetPasswordForPlatformUser(String token, String newPassword) {
-        log.info("Resetting password for platform user with token: {}", token);
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Resetting password for platform user with token: {}", tokenPrefix);
 
         String key = REDIS_PREFIX_PLATFORM_RESET + token;
         String userIdStr = getToken(key);
@@ -329,7 +366,8 @@ public class ActivationTokenService {
 
     @Transactional
     public void resetPasswordForEmployee(String token, String newPassword) {
-        log.info("Resetting password for employee with token: {}", token);
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Resetting password for employee with token: {}", tokenPrefix);
 
         String key = REDIS_PREFIX_EMPLOYEE_RESET + token;
         String employeeIdStr = getToken(key);
@@ -359,6 +397,13 @@ public class ActivationTokenService {
     // =====================================================
 
     public boolean isValidToken(String token) {
+        try {
+            rateLimiterService.checkOrThrow("token-check:" + getClientIp(), 20, 60); // 20 checks per minute
+        } catch (Exception e) {
+            log.warn("Rate limit exceeded for token validation from IP: {}", getClientIp());
+            return false;
+        }
+
         String[] patterns = {
                 REDIS_PREFIX_EMPLOYEE_ACTIVATION + token,
                 REDIS_PREFIX_EMPLOYEE_RESET + token,
@@ -386,28 +431,34 @@ public class ActivationTokenService {
             deleteToken(pattern);
         }
 
-        log.info("Token invalidated: {}", token);
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Token invalidated: {}", tokenPrefix);
     }
 
     /**
      * Get platform user ID from token
      */
     public Long getPlatformUserIdFromToken(String token) {
-        log.debug("Getting platform user ID from token: {}", token);
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.debug("Getting platform user ID from token: {}", tokenPrefix);
 
+        // Check activation token first
         String key = REDIS_PREFIX_PLATFORM_ACTIVATION + token;
         String userIdStr = getToken(key);
 
-        if (userIdStr == null) {
-            key = REDIS_PREFIX_PLATFORM_RESET + token;
-            userIdStr = getToken(key);
+        if (userIdStr != null) {
+            return Long.valueOf(userIdStr);
         }
 
-        if (userIdStr == null) {
-            throw new BusinessException("Invalid or expired token");
+        // Check reset token separately (prevent type confusion)
+        String resetKey = REDIS_PREFIX_PLATFORM_RESET + token;
+        userIdStr = getToken(resetKey);
+
+        if (userIdStr != null) {
+            return Long.valueOf(userIdStr);
         }
 
-        return Long.valueOf(userIdStr);
+        throw new BusinessException("Invalid or expired token");
     }
 
     /**
@@ -416,7 +467,10 @@ public class ActivationTokenService {
      */
     @Transactional
     public void setPassword(String token, String newPassword) {
-        log.info("Setting password with token: {}", token);
+        validatePasswordStrength(newPassword);
+
+        String tokenPrefix = token != null && token.length() > 8 ? token.substring(0, 8) + "..." : "null";
+        log.info("Setting password with token: {}", tokenPrefix);
 
         // Get employee ID from token
         Long employeeId = getEmployeeIdFromToken(token);
@@ -469,5 +523,33 @@ public class ActivationTokenService {
             test.put("error", e.getMessage());
         }
         return test;
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null || password.length() < 8) {
+            throw new BusinessException("Password must be at least 8 characters long");
+        }
+
+        boolean hasUpper = false;
+        boolean hasLower = false;
+        boolean hasDigit = false;
+        boolean hasSpecial = false;
+
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) hasUpper = true;
+            else if (Character.isLowerCase(c)) hasLower = true;
+            else if (Character.isDigit(c)) hasDigit = true;
+            else if (!Character.isLetterOrDigit(c)) hasSpecial = true;
+        }
+
+        if (!hasUpper || !hasLower || !hasDigit || !hasSpecial) {
+            throw new BusinessException(
+                "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+            );
+        }
+    }
+
+    private String getClientIp() {
+        return TenantContext.getClientIp();
     }
 }

@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -45,6 +47,7 @@ public class TenantRegistrationRequest {
     @Size(max = 50, message = "Country name must be up to 50 characters")
     private String country;
 
+    @JsonAlias("planType")
     private String planCode;
 
     private String billingCycle;
