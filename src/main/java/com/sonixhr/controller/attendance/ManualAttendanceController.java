@@ -212,8 +212,8 @@ public class ManualAttendanceController {
                 .halfDay((Long) summary.get("halfDay"))
                 .late((Long) summary.get("late"))
                 .onLeave((Long) summary.get("onLeave"))
-                .totalOvertimeHours((Double) summary.get("totalOvertimeHours"))
-                .attendanceRate((Double) summary.get("attendanceRate"))
+                .totalOvertimeHours(getAsPrimitiveDouble(summary.get("totalOvertimeHours")))
+                .attendanceRate(getAsPrimitiveDouble(summary.get("attendanceRate")))
                 .build();
     }
 
@@ -225,7 +225,7 @@ public class ManualAttendanceController {
                 .absent((Long) stats.get("absent"))
                 .onLeave((Long) stats.get("onLeave"))
                 .pending((Long) stats.get("pending"))
-                .attendancePercentage((Double) stats.get("attendancePercentage"))
+                .attendancePercentage(getAsPrimitiveDouble(stats.get("attendancePercentage")))
                 .build();
     }
 
@@ -253,7 +253,7 @@ public class ManualAttendanceController {
                             .dayOfWeek((String) dayInfo.get("dayOfWeek"))
                             .status((String) dayInfo.get("status"))
                             .reason((String) dayInfo.get("reason"))
-                            .overtimeHours((Double) dayInfo.get("overtimeHours"))
+                            .overtimeHours(getAsDouble(dayInfo.get("overtimeHours")))
                             .markedBy((String) dayInfo.get("markedBy"))
                             .isWeekend((Boolean) dayInfo.get("isWeekend"))
                             .build());
@@ -267,5 +267,29 @@ public class ManualAttendanceController {
                 .month(month)
                 .calendar(convertedCalendar)
                 .build();
+    }
+
+    private double getAsPrimitiveDouble(Object val) {
+        if (val == null) return 0.0;
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        try {
+            return Double.parseDouble(val.toString());
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private Double getAsDouble(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        try {
+            return Double.parseDouble(val.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
