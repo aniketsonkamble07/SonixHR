@@ -74,4 +74,19 @@ public class TenantRegistrationController {
 
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/debug-redis")
+    public ResponseEntity<Map<String, Object>> debugRedis() {
+        Map<String, Object> result = new java.util.HashMap<>();
+        try {
+            result.put("redisTemplateClass", activationTokenService.getRedisTemplateClass());
+            result.put("redisTest", activationTokenService.testRedis());
+            result.put("success", true);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            result.put("stackTrace", org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+        }
+        return ResponseEntity.ok(result);
+    }
 }

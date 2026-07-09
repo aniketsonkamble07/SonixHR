@@ -450,4 +450,24 @@ public class ActivationTokenService {
 
         log.info("Password set successfully for employee: {}", employee.getEmail());
     }
+
+    public String getRedisTemplateClass() {
+        return this.redisTemplate == null ? "null" : this.redisTemplate.getClass().getName();
+    }
+
+    public java.util.Map<String, Object> testRedis() {
+        java.util.Map<String, Object> test = new java.util.HashMap<>();
+        try {
+            String testKey = "test:debug:key";
+            redisTemplate.opsForValue().set(testKey, "working", 5, java.util.concurrent.TimeUnit.MINUTES);
+            test.put("set_status", "success");
+            String val = redisTemplate.opsForValue().get(testKey);
+            test.put("get_value", val);
+            Boolean deleted = redisTemplate.delete(testKey);
+            test.put("delete_status", deleted);
+        } catch (Exception e) {
+            test.put("error", e.getMessage());
+        }
+        return test;
+    }
 }
