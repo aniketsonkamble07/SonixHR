@@ -240,6 +240,19 @@ public interface ManualAttendanceRepository extends TenantAwareRepository<Attend
             @Param("date") LocalDate date);
 
     /**
+     * Get today's attendance summary for specific employees
+     */
+    @Query("SELECT a.status, COUNT(a) FROM AttendanceRecord a " +
+            "WHERE a.tenant.id = :tenantId " +
+            "AND a.employee.id IN :employeeIds " +
+            "AND a.attendanceDate = :date " +
+            "GROUP BY a.status")
+    List<Object[]> getTodayAttendanceSummaryForEmployees(
+            @Param("tenantId") Long tenantId,
+            @Param("employeeIds") List<Long> employeeIds,
+            @Param("date") LocalDate date);
+
+    /**
      * Get attendance percentage for date range
      */
     @Query("SELECT COUNT(DISTINCT a.employee.id) FROM AttendanceRecord a " +

@@ -48,6 +48,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT e FROM Employee e WHERE e.manager IS NULL AND e.tenant.id = :tenantId")
     List<Employee> findEmployeesWithNoManager(@Param("tenantId") Long tenantId);
 
+    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND (e.hireDate IS NULL OR e.hireDate <= :today)")
+    long countByTenantIdAndHireDateBeforeOrNull(@Param("tenantId") Long tenantId, @Param("today") LocalDate today);
+
+    @Query("SELECT e.id FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId AND (e.hireDate IS NULL OR e.hireDate <= :today)")
+    List<Long> findEmployeeIdsByManagerIdAndTenantIdAndHireDateBeforeOrNull(
+            @Param("managerId") Long managerId,
+            @Param("tenantId") Long tenantId,
+            @Param("today") LocalDate today);
+
     // =====================================================
     // MANAGER QUERIES
     // =====================================================

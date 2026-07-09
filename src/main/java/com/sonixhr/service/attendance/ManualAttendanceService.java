@@ -800,42 +800,37 @@ public class ManualAttendanceService {
         LocalDate today = LocalDate.now(Clock.systemUTC());
         Long tenantId = currentUser.getTenantId();
 
-        List<Long> teamIds;
-        List<AttendanceRecord> todaysRecords;
+        long totalEmployees;
+        List<Object[]> summary;
 
         if (currentUser.isSuperAdmin()) {
-            List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
-            teamIds = allEmployees.stream()
-                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
-                    .map(Employee::getId)
-                    .collect(Collectors.toList());
-            todaysRecords = attendanceRepository.findByTenantIdAndAttendanceDate(tenantId, today);
+            totalEmployees = employeeRepository.countByTenantIdAndHireDateBeforeOrNull(tenantId, today);
+            summary = attendanceRepository.getTodayAttendanceSummary(tenantId, today);
         } else {
-            List<Employee> team = employeeRepository.findByManagerIdAndTenantId(currentUser.getId(), tenantId);
-            teamIds = team.stream()
-                    .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(today))
-                    .map(Employee::getId)
-                    .collect(Collectors.toList());
+            List<Long> teamIds = employeeRepository.findEmployeeIdsByManagerIdAndTenantIdAndHireDateBeforeOrNull(
+                    currentUser.getId(), tenantId, today);
+            totalEmployees = teamIds.size();
             if (teamIds.isEmpty()) {
-                todaysRecords = Collections.emptyList();
+                summary = Collections.emptyList();
             } else {
-                todaysRecords = attendanceRepository.findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(
-                        tenantId, teamIds, today, today);
+                summary = attendanceRepository.getTodayAttendanceSummaryForEmployees(tenantId, teamIds, today);
             }
         }
 
-        long totalEmployees = teamIds.size();
-        long presentToday = todaysRecords.stream()
-                .filter(r -> r.getStatus() == AttendanceStatus.PRESENT
-                        || r.getStatus() == AttendanceStatus.LATE
-                        || r.getStatus() == AttendanceStatus.HALF_DAY)
-                .count();
-        long absentToday = todaysRecords.stream()
-                .filter(r -> r.getStatus() == AttendanceStatus.ABSENT)
-                .count();
-        long onLeaveToday = todaysRecords.stream()
-                .filter(r -> r.getStatus() == AttendanceStatus.ON_LEAVE)
-                .count();
+        Map<AttendanceStatus, Long> counts = new EnumMap<>(AttendanceStatus.class);
+        if (summary != null) {
+            for (Object[] row : summary) {
+                if (row != null && row.length >= 2 && row[0] instanceof AttendanceStatus) {
+                    counts.put((AttendanceStatus) row[0], (Long) row[1]);
+                }
+            }
+        }
+
+        long presentToday = counts.getOrDefault(AttendanceStatus.PRESENT, 0L)
+                + counts.getOrDefault(AttendanceStatus.LATE, 0L)
+                + counts.getOrDefault(AttendanceStatus.HALF_DAY, 0L);
+        long absentToday = counts.getOrDefault(AttendanceStatus.ABSENT, 0L);
+        long onLeaveToday = counts.getOrDefault(AttendanceStatus.ON_LEAVE, 0L);
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("date", today);
