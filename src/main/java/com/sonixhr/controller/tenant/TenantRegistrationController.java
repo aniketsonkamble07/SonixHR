@@ -82,10 +82,12 @@ public class TenantRegistrationController {
             result.put("redisTemplateClass", activationTokenService.getRedisTemplateClass());
             result.put("redisTest", activationTokenService.testRedis());
             result.put("success", true);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             result.put("success", false);
             result.put("error", e.getMessage());
-            result.put("stackTrace", org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+            java.io.StringWriter sw = new java.io.StringWriter();
+            e.printStackTrace(new java.io.PrintWriter(sw));
+            result.put("stackTrace", sw.toString());
         }
         return ResponseEntity.ok(result);
     }
