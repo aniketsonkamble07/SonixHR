@@ -36,6 +36,9 @@ public class TenantRegistrationController {
     @Value("${app.debug.key:}")
     private String debugKey;
 
+    @Value("${app.trust-proxy:false}")
+    private boolean trustProxy;
+
     @GetMapping("/check-email")
     public ResponseEntity<Map<String, Object>> checkEmail(
             @RequestParam String email,
@@ -166,9 +169,15 @@ public class TenantRegistrationController {
     // ==============================
 
     private String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        if (trustProxy) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",")[0].trim();
+            }
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank()) {
+                return realIp.trim();
+            }
         }
         return request.getRemoteAddr();
     }
