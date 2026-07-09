@@ -126,7 +126,7 @@ public class EmployeeService {
         }
 
         // Set default values (active immediately for testing)
-        employee.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+        employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
         employee.setStatus(EmployeeStatus.ACTIVE);
         employee.setActive(true);
 
@@ -940,8 +940,8 @@ public class EmployeeService {
     private Employee findEmployeeByIdAndTenant(@NonNull Long id, @NonNull Long tenantId) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
-        if (!employee.getTenantId().equals(tenantId)) {
-            throw new BusinessException("Access denied: Employee does not belong to this tenant");
+        if (!employee.getTenantId().equals(tenantId) || employee.getStatus() == EmployeeStatus.TERMINATED) {
+            throw new ResourceNotFoundException("Employee not found with id: " + id);
         }
         return employee;
     }

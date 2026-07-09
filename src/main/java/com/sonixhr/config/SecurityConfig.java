@@ -5,6 +5,7 @@ import com.sonixhr.security.JwtAccessDeniedHandler;
 import com.sonixhr.security.JwtAuthenticationEntryPoint;
 import com.sonixhr.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -36,7 +37,7 @@ import java.util.List;
 @SuppressWarnings("null")
 public class SecurityConfig {
 
-    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081}")
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081}")
     private List<String> allowedOrigins;
 
     private final UserDetailsService employeeDetailsService;
@@ -61,7 +62,6 @@ public class SecurityConfig {
         this.permissionEvaluator = permissionEvaluator;
     }
 
-    // ADD THIS MISSING PASSWORD ENCODER BEAN
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
@@ -70,7 +70,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF disabled: stateless JWT authentication — no session, no cookie-based state
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .exceptionHandling(exception -> exception
@@ -134,7 +133,6 @@ public class SecurityConfig {
     @Primary
     @Bean
     public AuthenticationManager authenticationManager() {
-        // Default to platform authentication manager
         return platformAuthenticationManager();
     }
 

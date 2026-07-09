@@ -410,7 +410,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     /**
      * Find top active employees with pagination
      */
-    @Query("SELECT e FROM Employee e WHERE e.isActive = true ORDER BY e.lastLoginAt DESC")
+    @Query("SELECT DISTINCT e FROM Employee e " +
+           "LEFT JOIN FETCH e.roles r " +
+           "LEFT JOIN FETCH r.permissions " +
+           "WHERE e.isActive = true ORDER BY e.lastLoginAt DESC")
     List<Employee> findTop100ByIsActiveTrue(Pageable pageable);
 
     @Query("SELECT e FROM Employee e WHERE e.email = :email AND e.tenant.id = :tenantId")

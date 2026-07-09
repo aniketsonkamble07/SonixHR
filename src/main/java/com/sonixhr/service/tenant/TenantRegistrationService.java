@@ -384,7 +384,7 @@ public class TenantRegistrationService {
 
         EmployeeStatus employeeStatus = EmployeeStatus.ACTIVE;
         boolean employeeActive = true;
-        String passwordHash = passwordEncoder.encode("admin@123");
+        String passwordHash = passwordEncoder.encode("Admin@123");
 
         Employee superAdmin = Employee.builder()
                 .tenant(tenant)

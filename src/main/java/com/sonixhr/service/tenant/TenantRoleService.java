@@ -167,7 +167,7 @@ public class TenantRoleService {
     }
 
     private String buildCacheKey(Long tenantId, Long roleId) {
-        return tenantId + ":" + roleId;
+        return roleId + ":" + tenantId;
     }
 
     // =====================================================
@@ -176,7 +176,7 @@ public class TenantRoleService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
@@ -266,7 +266,7 @@ public class TenantRoleService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
@@ -588,7 +588,7 @@ public class TenantRoleService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
@@ -631,7 +631,7 @@ public class TenantRoleService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
@@ -666,7 +666,7 @@ public class TenantRoleService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
@@ -909,7 +909,7 @@ public class TenantRoleService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "tenantRoles", key = "#tenantId + ':' + #roleId"),
+        @CacheEvict(value = "tenantRoles", key = "#roleId + ':' + #tenantId"),
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })

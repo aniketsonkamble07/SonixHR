@@ -59,7 +59,7 @@ public class CacheMonitoringService {
             long   size     = nativeCache.estimatedSize();
 
             // SLF4J uses {} placeholders, not {:.2f}
-            log.info("L1 cache '{}' — hitRate={:.1f}% missRate={:.1f}% size={}",
+            log.info("L1 cache '{}' — hitRate={}% missRate={}% size={}",
                     cacheName,
                     Math.round(hitRate * 1000) / 10.0,
                     Math.round(missRate * 1000) / 10.0,

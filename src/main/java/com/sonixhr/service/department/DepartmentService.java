@@ -345,7 +345,7 @@ public class DepartmentService {
                 .build();
     }
 
-    @Cacheable(value = "departmentsLookup", key = "#tenantId", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "departmentsLookup", key = "#tenantId", unless = "#result == null")
     public List<DepartmentLookupResponse> getDepartmentLookup(Long tenantId) {
         log.debug("Fetching department lookup for tenant: {}", tenantId);
         List<Department> departments = departmentRepository.findByTenant_Id(tenantId);

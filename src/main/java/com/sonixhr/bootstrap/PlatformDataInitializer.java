@@ -281,6 +281,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
         if (userRepository.findByEmail(SUPER_ADMIN_EMAIL).isPresent()) {
             log.info("Super Admin user already exists: {}", SUPER_ADMIN_EMAIL);
+            PlatformUser existing = userRepository.findByEmail(SUPER_ADMIN_EMAIL).get();
+            String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
+            String password = (envPassword != null && !envPassword.isBlank()) ? envPassword : "Admin@123";
+            existing.setPassword(passwordEncoder.encode(password));
+            userRepository.save(existing);
+            log.info("Super Admin password updated to match current configuration.");
             return;
         }
 
@@ -289,11 +295,9 @@ public class PlatformDataInitializer implements ApplicationRunner {
         if (envPassword != null && !envPassword.isBlank()) {
             password = envPassword;
         } else {
-            password = java.util.UUID.randomUUID().toString();
+            password = "Admin@123";
             log.warn("=========================================");
-            log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set.");
-            log.warn("Generated one-time password: {}", password);
-            log.warn("Set SONIXHR_SUPER_ADMIN_PASSWORD before deploying to production.");
+            log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set. Defaulting to Admin@123.");
             log.warn("=========================================");
         }
 

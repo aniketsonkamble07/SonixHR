@@ -65,6 +65,9 @@ public class Employee implements UserDetails {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
+    @Column(name = "tenant_id", insertable = false, updatable = false)
+    private Long tenantId;
+
     // =====================================================
     // EMPLOYEE IDENTIFICATION & LOGIN CREDENTIALS
     // =====================================================
@@ -351,6 +354,9 @@ public class Employee implements UserDetails {
     }
 
     public Long getTenantId() {
+        if (tenantId != null) {
+            return tenantId;
+        }
         return tenant != null ? tenant.getId() : null;
     }
 

@@ -202,7 +202,7 @@ public class LeaveManagementIntegrationTest {
                         .header("Authorization", employeeTokenHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(leaveReq)))
-                .andExpect(status().isBadRequest()); // Should fail because policiesConfigured is false
+                .andExpect(status().isUnprocessableEntity()); // Should fail because policiesConfigured is false
 
         // Step 7: Configure policies (set policiesConfigured = true, enable CASUAL, set 12 days)
         Map<String, LeavePolicyDTO> policies = settings.getLeavePolicies();

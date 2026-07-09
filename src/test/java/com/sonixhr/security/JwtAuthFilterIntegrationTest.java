@@ -170,10 +170,10 @@ public class JwtAuthFilterIntegrationTest {
                         .header("Authorization", "Bearer " + platToken))
                 .andExpect(status().isForbidden()); // 403 shows auth was set
 
-        // TA-04: Token in Query Param (?token=xxx)
+        // TA-04: Token in Query Param (?token=xxx) - Should be Unauthorized as query param tokens are not supported for security
         mockMvc.perform(get("/api/tenant/departments")
                         .param("token", token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         // TA-05: Missing Token
         mockMvc.perform(get("/api/tenant/departments"))
