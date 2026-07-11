@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class EmployeeResponse {
 
     // =====================================================
@@ -132,6 +134,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ManagerInfo {
         private Long id;
         private String fullName;
@@ -144,6 +147,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class DepartmentInfo {
         private Long id;
         private String name;
@@ -153,6 +157,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ShiftInfo {
         private Long id;
         private String shiftName;
