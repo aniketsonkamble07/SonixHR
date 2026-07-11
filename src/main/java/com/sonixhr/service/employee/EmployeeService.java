@@ -2,6 +2,7 @@ package com.sonixhr.service.employee;
 
 import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
+import com.sonixhr.dto.employee.EmployeeCreateResponse;
 import com.sonixhr.dto.employee.EmployeeUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
@@ -77,7 +78,7 @@ public class EmployeeService {
             @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
             @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
-    public EmployeeResponse createEmployee(@NonNull Long tenantId, EmployeeCreateRequest request) {
+    public EmployeeCreateResponse createEmployee(@NonNull Long tenantId, EmployeeCreateRequest request) {
         log.info("Creating employee for tenant: {}", tenantId);
         log.debug("Request roleIds: {}", request.getRoleIds());
 
@@ -186,7 +187,7 @@ public class EmployeeService {
             employeeSalaryProfileRepository.save(salaryProfile);
         }
 
-        return convertToResponse(savedEmployee);
+        return convertToCreateResponse(savedEmployee);
     }
 
     // =====================================================
@@ -878,6 +879,23 @@ public class EmployeeService {
                 .weekendConfig(weekendConfig)
                 .customWeekendDays(customWeekendDays)
                 .bankDetails(convertBankDetailsToMap(request.getBankDetails()))
+                .build();
+    }
+
+    public EmployeeCreateResponse convertToCreateResponse(Employee employee) {
+        return EmployeeCreateResponse.builder()
+                .id(employee.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .firstName(employee.getFirstName())
+                .lastName(employee.getLastName())
+                .fullName(employee.getFullName())
+                .email(employee.getEmail())
+                .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
+                .departmentCode(employee.getDepartment() != null ? employee.getDepartment().getCode() : null)
+                .position(employee.getPosition())
+                .status(employee.getStatus())
+                .hireDate(employee.getHireDate())
+                .message("Employee created successfully")
                 .build();
     }
 

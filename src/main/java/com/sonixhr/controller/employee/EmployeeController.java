@@ -2,6 +2,7 @@ package com.sonixhr.controller.employee;
 
 import com.sonixhr.dto.employee.DepartmentStat;
 import com.sonixhr.dto.employee.EmployeeCreateRequest;
+import com.sonixhr.dto.employee.EmployeeCreateResponse;
 import com.sonixhr.dto.employee.EmployeeUpdateRequest;
 import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
@@ -46,7 +47,7 @@ public class EmployeeController {
     @PostMapping
     @PreAuthorize("hasAuthority('EMPLOYEE_CREATE')")
     @Operation(summary = "Create a new employee", description = "Creates a new employee for the authenticated tenant")
-    public ResponseEntity<EmployeeResponse> createEmployee(
+    public ResponseEntity<EmployeeCreateResponse> createEmployee(
             @Valid @RequestBody EmployeeCreateRequest request,
             @AuthenticationPrincipal Employee currentEmployee) {
 
@@ -54,7 +55,7 @@ public class EmployeeController {
         Long employeeId = currentEmployee.getId();
 
         log.info("REST request to create employee for tenant: {} by employee: {}", tenantId, employeeId);
-        EmployeeResponse response = employeeService.createEmployee(tenantId, request);
+        EmployeeCreateResponse response = employeeService.createEmployee(tenantId, request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
