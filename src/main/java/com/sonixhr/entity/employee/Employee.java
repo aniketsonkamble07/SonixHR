@@ -193,8 +193,6 @@ public class Employee implements UserDetails {
     @Column(name = "hire_date", nullable = false)
     private LocalDate hireDate;
 
-
-
     @Column(name = "confirmation_date")
     private LocalDate confirmationDate;
 
@@ -230,8 +228,6 @@ public class Employee implements UserDetails {
 
     @Column(name = "postal_code", length = 20)
     private String postalCode;
-
-
 
     // =====================================================
     // EMERGENCY CONTACT
@@ -616,7 +612,8 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> {
-                    if (role.getName() == null) return false;
+                    if (role.getName() == null)
+                        return false;
                     String normalized = role.getName().trim().replace(" ", "_").toUpperCase();
                     return "SUPER_ADMIN".equals(normalized);
                 });
@@ -629,7 +626,8 @@ public class Employee implements UserDetails {
         return roles.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(role -> {
-                    if (role.getName() == null) return false;
+                    if (role.getName() == null)
+                        return false;
                     String normalized = role.getName().trim().replace(" ", "_").toUpperCase();
                     return "ADMIN".equals(normalized) || "SUPER_ADMIN".equals(normalized);
                 });

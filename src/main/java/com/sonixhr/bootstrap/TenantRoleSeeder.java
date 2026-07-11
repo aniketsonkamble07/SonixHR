@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 @Order(3)
-@SuppressWarnings({"null", "unused"})
+@SuppressWarnings({ "null", "unused" })
 public class TenantRoleSeeder implements ApplicationRunner {
 
     private final TenantRoleRepository roleRepository;
@@ -40,7 +40,8 @@ public class TenantRoleSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        // Distributed lock: prevents duplicate role creation when multiple instances start simultaneously
+        // Distributed lock: prevents duplicate role creation when multiple instances
+        // start simultaneously
         final String LOCK_KEY = "bootstrap:tenant-role-seeder:lock";
         Boolean lockAcquired = null;
         try {
@@ -102,22 +103,22 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createRolesForTenant(Long tenantId, List<TenantPermission> allPermissions) {
-        createSuperAdminRole(tenantId, allPermissions);
+        createAdminRole(tenantId, allPermissions);
         createManagerRole(tenantId, allPermissions);
         createEmployeeRole(tenantId, allPermissions);
     }
 
-    private void createSuperAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Super Admin");
+    private void createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Admin");
         if (existingRole.isPresent()) {
-            log.debug("Super Admin role already exists for tenant: {}", tenantId);
+            log.debug("Admin role already exists for tenant: {}", tenantId);
             return;
         }
 
-        TenantRole superAdminRole = TenantRole.builder()
+        TenantRole adminRole = TenantRole.builder()
                 .tenantId(tenantId)
-                .name("Super Admin")
-                .description("Super Administrator with full access to all tenant features")
+                .name("Admin")
+                .description("Administrator with full access to all tenant features")
                 .isDefault(true)
                 .active(true)
                 .priority(100)
@@ -125,8 +126,8 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .permissions(new HashSet<>(allPermissions))
                 .build();
 
-        roleRepository.save(superAdminRole);
-        log.info("Created Super Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
+        roleRepository.save(adminRole);
+        log.info("Created Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
     }
 
     private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
@@ -143,8 +144,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
                 TenantPermissionEnum.LEAVE_CANCEL_OWN.name(),
                 TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
-                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name()
-        );
+                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name());
 
         Set<TenantPermission> employeePermissions = allPermissions.stream()
                 .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
@@ -185,8 +185,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
                 TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
                 TenantPermissionEnum.DEPARTMENT_VIEW.name(),
-                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name()
-        );
+                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name());
 
         Set<TenantPermission> managerPermissions = allPermissions.stream()
                 .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
