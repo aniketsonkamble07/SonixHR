@@ -20,7 +20,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class EmployeeResponse {
 
     // =====================================================
@@ -134,7 +134,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class ManagerInfo {
         private Long id;
         private String fullName;
@@ -147,7 +147,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class DepartmentInfo {
         private Long id;
         private String name;
@@ -157,7 +157,7 @@ public class EmployeeResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static class ShiftInfo {
         private Long id;
         private String shiftName;
