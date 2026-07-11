@@ -264,18 +264,6 @@ public class EmployeeService {
             employee.setFirstName(request.getFirstName());
         if (request.getLastName() != null)
             employee.setLastName(request.getLastName());
-        if (request.getDateOfBirth() != null)
-            employee.setDateOfBirth(request.getDateOfBirth());
-        if (request.getGender() != null)
-            employee.setGender(request.getGender());
-        if (request.getMaritalStatus() != null)
-            employee.setMaritalStatus(request.getMaritalStatus());
-        if (request.getBloodGroup() != null)
-            employee.setBloodGroup(request.getBloodGroup());
-        if (request.getNationality() != null)
-            employee.setNationality(request.getNationality());
-        if (request.getPersonalEmail() != null)
-            employee.setPersonalEmail(request.getPersonalEmail());
         if (request.getBankDetails() != null)
             employee.setBankDetails(convertBankDetailsToMap(request.getBankDetails()));
         if (request.getShiftId() != null) {
