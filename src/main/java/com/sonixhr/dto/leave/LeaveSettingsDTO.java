@@ -2,6 +2,7 @@ package com.sonixhr.dto.leave;
 
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.leave.WeekendConfig;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,6 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class LeaveSettingsDTO {
 
     private java.util.Map<String, LeavePolicyDTO> leavePolicies;
