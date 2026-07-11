@@ -555,14 +555,25 @@ public class Employee implements UserDetails {
             return cachedAuthorities;
         }
 
+        Set<GrantedAuthority> authorities = new HashSet<>();
+
+        // Add permissions
         Set<String> permissions = getEffectivePermissions();
-        if (permissions.isEmpty()) {
-            return Collections.emptySet();
+        if (permissions != null) {
+            for (String p : permissions) {
+                authorities.add(new SimpleGrantedAuthority(p));
+            }
         }
 
-        Collection<SimpleGrantedAuthority> authorities = permissions.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toSet());
+        // Add roles with ROLE_ prefix (normalized)
+        if (roles != null) {
+            for (TenantRole role : roles) {
+                if (role != null && role.isActive() && role.getName() != null) {
+                    String roleName = role.getName().trim().toUpperCase().replace(" ", "_");
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
+                }
+            }
+        }
 
         // Cache the authorities
         this.cachedAuthorities = authorities;
