@@ -20,6 +20,4 @@ public class EmployeeUpdateRequest extends EmployeeCreateRequest {
     private com.sonixhr.enums.BloodGroup bloodGroup;
     private String nationality;
     private String personalEmail;
-    private Map<String, Object> bankDetails;
-    private Long shiftId;
 }

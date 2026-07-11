@@ -42,4 +42,20 @@ public enum BloodGroup {
         }
         return O_POSITIVE;
     }
+
+    @com.fasterxml.jackson.annotation.JsonCreator
+    public static BloodGroup fromString(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String clean = value.trim().replace(" ", "_").toUpperCase();
+        for (BloodGroup bg : values()) {
+            if (bg.name().equalsIgnoreCase(clean) ||
+                bg.code.equalsIgnoreCase(value.trim()) ||
+                bg.displayName.equalsIgnoreCase(value.trim())) {
+                return bg;
+            }
+        }
+        return null;
+    }
 }

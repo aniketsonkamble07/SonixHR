@@ -185,7 +185,7 @@ public class TenantRegistrationService {
                 .overtimeMultiplier(1.5)
                 .overtimeThresholdMinutes(30)
                 .maxOvertimeHoursPerDay(4.0)
-                .weeklyOffs(List.of("SATURDAY", "SUNDAY"))
+                .weeklyOffs(List.of("SUNDAY"))
                 .alternateWeekOff(false)
                 .effectiveFrom(LocalDate.now())
                 .build();

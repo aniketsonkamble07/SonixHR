@@ -96,7 +96,8 @@ public class EmployeeSelfService {
         // Apply country-specific validation and cleanup
         if ("IN".equalsIgnoreCase(employee.getCountry())) {
             if (employee.getState() == null) {
-                throw new com.sonixhr.exceptions.ValidationException("state", "State is required for employees in India");
+                throw new com.sonixhr.exceptions.ValidationException("state",
+                        "State is required for employees in India");
             }
             employee.setStateText(null);
         } else {

@@ -14,6 +14,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Set;
 
 @Data
@@ -45,23 +46,6 @@ public class EmployeeCreateRequest {
     @NotNull(message = "Hire date is required")
     private LocalDate hireDate;
 
-    @Size(max = 500, message = "Address must be up to 500 characters")
-    private String address;
-
-    @Size(max = 100, message = "City name must be up to 100 characters")
-    private String city;
-
-    private IndianState state;
-
-    private String stateText;
-
-    @Size(max = 50, message = "Country name must be up to 50 characters")
-    private String country;
-
-    @Size(max = 20, message = "Postal code must be up to 20 characters")
-    private String postalCode;
-
-
 
     // =====================================================
     // OPTIONAL FIELDS (HR CAN FILL IF AVAILABLE)
@@ -69,12 +53,14 @@ public class EmployeeCreateRequest {
 
     private String phone;
     private String workLocation;
+    private IndianState workState;
+    private String workStateText;
+    private String workCountry;
     private Long managerId;
     private String managerCode;
 
     @Builder.Default
     private EmploymentType employmentType = EmploymentType.FULL_TIME;
-
 
     private Set<Long> roleIds;
 
@@ -85,4 +71,7 @@ public class EmployeeCreateRequest {
     private SalaryType salaryType; // MONTHLY or YEARLY
     private String currency;
     private String taxRegime;
+    private Long shiftId;
+    @jakarta.validation.Valid
+    private BankAccountRequest bankDetails;
 }

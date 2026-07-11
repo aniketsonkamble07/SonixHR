@@ -53,4 +53,20 @@ public enum MaritalStatus {
     public String toString() {
         return displayName;
     }
+
+    @com.fasterxml.jackson.annotation.JsonCreator
+    public static MaritalStatus fromString(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String clean = value.trim();
+        for (MaritalStatus status : values()) {
+            if (status.name().equalsIgnoreCase(clean) ||
+                status.code.equalsIgnoreCase(clean) ||
+                status.displayName.equalsIgnoreCase(clean)) {
+                return status;
+            }
+        }
+        return null;
+    }
 }

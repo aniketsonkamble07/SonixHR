@@ -180,6 +180,16 @@ public class Employee implements UserDetails {
     @Column(name = "work_location", length = 200)
     private String workLocation;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_state", length = 50)
+    private IndianState workState;
+
+    @Column(name = "work_state_text", length = 150)
+    private String workStateText;
+
+    @Column(name = "work_country", length = 100)
+    private String workCountry;
+
     @Column(name = "hire_date", nullable = false)
     private LocalDate hireDate;
 

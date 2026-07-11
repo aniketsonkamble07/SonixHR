@@ -55,6 +55,9 @@ public class EmployeeResponse {
     private ShiftInfo shift;
     private EmploymentType employmentType;
     private String workLocation;
+    private com.sonixhr.enums.IndianState workState;
+    private String workStateText;
+    private String workCountry;
     private LocalDate hireDate;
 
     private LocalDate confirmationDate;
@@ -92,7 +95,7 @@ public class EmployeeResponse {
     // PROFILE & DOCUMENTS
     // =====================================================
     private String profilePictureUrl;
-    private Map<String, Object> bankDetails;
+    private BankAccountResponse bankDetails;
     private Map<String, Object> documents;
     private Map<String, Object> certifications;
 

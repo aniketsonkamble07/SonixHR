@@ -471,14 +471,25 @@ public class PayrollCalculationService {
                     }
                 } else if ("PT_DEDUCTION".equalsIgnoreCase(code) || "PT".equalsIgnoreCase(code)) {
                     if (tenantConfig.isEnablePt()) {
-                        IndianState ptState = employee.getState();
-                        if (ptState == null) {
-                            log.warn("Employee ID {} missing state — PT skipped, payslip calculation failed",
-                                    employee.getId());
-                            throw new com.sonixhr.exceptions.BusinessException("PT_STATE_MISSING",
-                                    "Employee is missing a valid state configuration for Professional Tax calculation");
+                        String workCountry = employee.getWorkCountry();
+                        if (workCountry != null && !"IN".equalsIgnoreCase(workCountry)) {
+                            val = BigDecimal.ZERO;
+                        } else {
+                            IndianState ptState = employee.getWorkState();
+                            if (ptState == null && employee.getTenant() != null) {
+                                ptState = employee.getTenant().getState();
+                            }
+                            if (ptState == null) {
+                                ptState = employee.getState();
+                            }
+                            if (ptState == null) {
+                                log.warn("Employee ID {} missing state — PT skipped, payslip calculation failed",
+                                         employee.getId());
+                                throw new com.sonixhr.exceptions.BusinessException("PT_STATE_MISSING",
+                                        "Employee is missing a valid work state or personal state configuration for Professional Tax calculation");
+                            }
+                            val = calculatePTAmount(ptState, data.grossEarnings, month, ptSlabs);
                         }
-                        val = calculatePTAmount(ptState, data.grossEarnings, month, ptSlabs);
                     }
                 } else if ("EPF_EE".equalsIgnoreCase(code)) {
                     if (tenantConfig.isEnablePfCapping()) {

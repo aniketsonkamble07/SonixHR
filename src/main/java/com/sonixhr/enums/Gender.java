@@ -36,4 +36,20 @@ public enum Gender {
         }
         return PREFER_NOT_TO_SAY;
     }
+
+    @com.fasterxml.jackson.annotation.JsonCreator
+    public static Gender fromString(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String clean = value.trim();
+        for (Gender gender : values()) {
+            if (gender.name().equalsIgnoreCase(clean) ||
+                gender.code.equalsIgnoreCase(clean) ||
+                gender.displayName.equalsIgnoreCase(clean)) {
+                return gender;
+            }
+        }
+        return PREFER_NOT_TO_SAY;
+    }
 }

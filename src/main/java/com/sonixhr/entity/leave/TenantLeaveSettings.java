@@ -138,7 +138,7 @@ public class TenantLeaveSettings {
         @Enumerated(EnumType.STRING)
         @Column(name = "weekend_config")
         @Builder.Default
-        private WeekendConfig weekendConfig = WeekendConfig.SATURDAY_SUNDAY;
+        private WeekendConfig weekendConfig = WeekendConfig.SUNDAY_ONLY;
 
         @Column(name = "custom_weekend_days")
         @Builder.Default
