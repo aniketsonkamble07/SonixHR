@@ -34,31 +34,11 @@ public interface PlatformRoleRepository extends JpaRepository<PlatformRole, Long
     // =====================================================
     // ADD THESE USEFUL METHODS
     // =====================================================
-
-    List<PlatformRole> findByCategory(String category);
-
-    @Query("SELECT r FROM PlatformRole r ORDER BY r.priority DESC")
-    List<PlatformRole> findAllOrderByPriorityDesc();
-
     List<PlatformRole> findByActiveTrue();
-
     List<PlatformRole> findByNameContainingIgnoreCase(String name);
-
-    Page<PlatformRole> findByCategory(String category, Pageable pageable);
-
-    @Query("SELECT r.category, COUNT(r) FROM PlatformRole r GROUP BY r.category")
-    List<Object[]> countRolesByCategory();
-
     @Query("SELECT COUNT(u) > 0 FROM PlatformUser u JOIN u.roles r WHERE r.id = :roleId")
     boolean isRoleAssignedToUsers(@Param("roleId") Long roleId);
-
     List<PlatformRole> findAllByIdIn(Set<Long> ids);
- 
-    @Modifying
-    @Transactional
-    @Query("UPDATE PlatformRole r SET r.priority = :priority WHERE r.id = :roleId")
-    int updatePriority(@Param("roleId") Long roleId, @Param("priority") Integer priority);
-
     @Modifying
     @Transactional
     @Query("UPDATE PlatformRole r SET r.active = false WHERE r.id IN :roleIds")

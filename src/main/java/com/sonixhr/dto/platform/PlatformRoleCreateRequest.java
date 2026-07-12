@@ -26,7 +26,5 @@ public class PlatformRoleCreateRequest {
     @NotNull(message = "Permission IDs cannot be null")
     private Set<Long> permissionIds;
 
-    // Optional fields for better role management
-    private String category;
-    private Integer priority;
+
 }

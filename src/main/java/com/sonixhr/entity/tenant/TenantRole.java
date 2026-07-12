@@ -198,7 +198,6 @@ public class TenantRole extends BaseRole {
                 ", isSystemRole=" + isSystemRole() +
                 ", isDefault=" + isDefault +
                 ", isActive=" + active +
-                ", category='" + getCategory() + '\'' +
                 ", permissionCount=" + getPermissionCount() +
                 '}';
     }

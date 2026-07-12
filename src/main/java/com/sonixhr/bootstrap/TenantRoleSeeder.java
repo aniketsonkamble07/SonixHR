@@ -121,8 +121,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .description("Administrator with full access to all tenant features")
                 .isDefault(true)
                 .active(true)
-                .priority(100)
-                .category("ADMINISTRATION")
                 .permissions(new HashSet<>(allPermissions))
                 .build();
 
@@ -156,8 +154,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .description("Basic employee access - default role for new employees")
                 .isDefault(true)
                 .active(true)
-                .priority(40)
-                .category("EMPLOYMENT")
                 .permissions(employeePermissions)
                 .build();
 
@@ -197,8 +193,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .description("Team manager with people management access")
                 .isDefault(false)
                 .active(true)
-                .priority(60)
-                .category("MANAGEMENT")
                 .permissions(managerPermissions)
                 .build();
 

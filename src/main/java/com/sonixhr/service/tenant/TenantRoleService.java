@@ -17,7 +17,7 @@ import com.sonixhr.repository.tenant.TenantRoleRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.security.TenantDynamicRoleService;
 import com.sonixhr.service.employee.EmployeeService;
-import lombok.RequiredArgsConstructor;
+import lombok.RequiredArgsConstructor; // Force re-index in IDE
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
@@ -76,20 +76,12 @@ public class TenantRoleService {
         }
 
         Set<TenantPermission> permissions = fetchPermissions(request.getPermissionIds());
-
-        boolean isFirstRole = roleRepository.countByTenantId(tenantId) == 0;
-        boolean isDefault = request.getIsDefault() != null ? request.getIsDefault() : isFirstRole;
-
-        // Determine category and priority from request or derive from name
-        String category = determineCategory(request);
-        Integer priority = determinePriority(request, category);
+        boolean isDefault = roleRepository.countByTenantId(tenantId) == 0;
 
         TenantRole role = TenantRole.builder()
                 .tenantId(tenantId)
                 .name(request.getName())
                 .description(request.getDescription())
-                .category(category)
-                .priority(priority)
                 .isDefault(isDefault)
                 .active(true)
                 .permissions(permissions)
@@ -133,39 +125,6 @@ public class TenantRoleService {
                 .collect(Collectors.toSet());
     }
 
-    private String determineCategory(TenantRoleCreateRequest request) {
-        if (request.getCategory() != null && !request.getCategory().isEmpty()) {
-            return request.getCategory();
-        }
-
-        String name = request.getName().toUpperCase();
-
-        // Dynamic category detection based on name patterns (configurable)
-        if (name.contains("ADMIN")) return "ADMINISTRATION";
-        if (name.contains("MANAGER")) return "MANAGEMENT";
-        if (name.contains("HR")) return "HUMAN_RESOURCES";
-        if (name.contains("LEAD")) return "LEADERSHIP";
-        if (name.contains("EMPLOYEE")) return "EMPLOYMENT";
-
-        return "CUSTOM";
-    }
-
-    private Integer determinePriority(TenantRoleCreateRequest request, String category) {
-        if (request.getPriority() != null) {
-            return request.getPriority();
-        }
-
-        // Dynamic priority based on category
-        switch (category) {
-            case "ADMINISTRATION": return 100;
-            case "MANAGEMENT": return 80;
-            case "LEADERSHIP": return 70;
-            case "HUMAN_RESOURCES": return 60;
-            case "EMPLOYMENT": return 40;
-            default: return 50;
-        }
-    }
-
     private String buildCacheKey(Long tenantId, Long roleId) {
         return roleId + ":" + tenantId;
     }
@@ -202,15 +161,6 @@ public class TenantRoleService {
             changed = true;
         }
 
-        if (request.getCategory() != null && !request.getCategory().equals(role.getCategory())) {
-            role.setCategory(request.getCategory());
-            changed = true;
-        }
-
-        if (request.getPriority() != null && !request.getPriority().equals(role.getPriority())) {
-            role.setPriority(request.getPriority());
-            changed = true;
-        }
 
         // Update permissions if provided
         if (request.getPermissionIds() != null) {
@@ -218,11 +168,6 @@ public class TenantRoleService {
             role.setPermissions(permissions);
             changed = true;
             log.info("Updated permissions for role: {}", roleId);
-        }
-
-        // Handle default role flag
-        if (request.getIsDefault() != null) {
-            changed = handleDefaultRoleFlag(role, request.getIsDefault(), tenantId, roleId) || changed;
         }
 
         if (changed) {
@@ -239,29 +184,6 @@ public class TenantRoleService {
         }
 
         return toResponse(role);
-    }
-
-    private boolean handleDefaultRoleFlag(TenantRole role, Boolean isDefault, Long tenantId, Long roleId) {
-        if (isDefault && !role.isDefault()) {
-            // Remove default flag from all other roles
-            List<TenantRole> defaultRoles = roleRepository.findByTenantIdAndIsDefaultTrue(tenantId);
-            for (TenantRole defaultRole : defaultRoles) {
-                if (!defaultRole.getId().equals(roleId)) {
-                    defaultRole.removeDefaultFlag();
-                    roleRepository.save(defaultRole);
-                }
-            }
-            role.setAsDefault();
-            return true;
-        } else if (!isDefault && role.isDefault()) {
-            long defaultCount = roleRepository.countByTenantIdAndIsDefaultTrue(tenantId);
-            if (defaultCount <= 1) {
-                throw new BusinessException("Cannot remove default flag. At least one role must be default.");
-            }
-            role.removeDefaultFlag();
-            return true;
-        }
-        return false;
     }
 
     @Transactional
@@ -561,13 +483,7 @@ public class TenantRoleService {
         return roleRepository.findAllByTenantId(tenantId, pageable);
     }
 
-    /**
-     * Get roles by category
-     */
-    public List<TenantRole> getRolesByCategory(Long tenantId, String category) {
-        log.debug("Fetching roles by category: {} for tenant: {}", category, tenantId);
-        return roleRepository.findByTenantIdAndCategory(tenantId, category);
-    }
+
 
     /**
      * Get active roles only
@@ -1012,13 +928,7 @@ public class TenantRoleService {
         stats.put("activeRoles", roleRepository.countByTenantIdAndActiveTrue(tenantId));
         stats.put("defaultRoles", roleRepository.countByTenantIdAndIsDefaultTrue(tenantId));
 
-        // Roles by category
-        List<Object[]> rolesByCategory = roleRepository.countRolesByCategory(tenantId);
-        Map<String, Long> categoryMap = new HashMap<>();
-        for (Object[] row : rolesByCategory) {
-            categoryMap.put((String) row[0], (Long) row[1]);
-        }
-        stats.put("rolesByCategory", categoryMap);
+
 
         // Cache stats
         stats.put("cachedRoles", roleCache.size());

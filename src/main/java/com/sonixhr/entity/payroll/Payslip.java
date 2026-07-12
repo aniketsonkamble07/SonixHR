@@ -51,4 +51,7 @@ public class Payslip {
 
     @Column(name = "contribution_period_gross", precision = 12, scale = 2)
     private BigDecimal contributionPeriodGross; // Gross salary at start of ESI contribution period
+
+    @Column(name = "taxable_gross_earnings", precision = 12, scale = 2)
+    private BigDecimal taxableGrossEarnings;
 }

@@ -12,6 +12,9 @@ import java.util.UUID;
 @Repository
 public interface PayrunRepository extends JpaRepository<Payrun, UUID> {
 
-    @Query("SELECT p FROM Payrun p WHERE p.tenant.id = :tenantId AND p.month = :month AND p.year = :year")
+    @Query("SELECT p FROM Payrun p WHERE p.tenant.id = :tenantId AND p.month = :month AND p.year = :year AND p.status <> 'SUPERSEDED'")
     Optional<Payrun> findByTenantAndMonthAndYear(@Param("tenantId") Long tenantId, @Param("month") Integer month, @Param("year") Integer year);
+
+    @Query("SELECT COALESCE(MAX(p.version), 0) FROM Payrun p WHERE p.tenant.id = :tenantId AND p.month = :month AND p.year = :year")
+    Integer findLatestVersionNumber(@Param("tenantId") Long tenantId, @Param("month") Integer month, @Param("year") Integer year);
 }

@@ -21,12 +21,6 @@ public abstract class BaseRole extends BaseEntity {
     @Column(length = 200)
     private String description;
 
-    @Column(name = "category", length = 50)
-    private String category;
-
-    @Column(name = "priority")
-    @Builder.Default
-    private Integer priority = 0;
 
     @Column(name = "is_system_role")
     @Builder.Default

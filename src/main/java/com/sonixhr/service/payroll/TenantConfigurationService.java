@@ -36,7 +36,7 @@ public class TenantConfigurationService {
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepo;
     private final EmployeeSalaryComponentRepository employeeSalaryComponentRepo;
     private final EmployeeSalaryProfileHistoryRepository profileHistoryRepo;
-    private final SandboxedSpELEngine spelEngine;
+    private final FormulaService formulaService;
     private final ObjectMapper objectMapper;
 
     // ============ Tenant Global Configuration ============
@@ -74,7 +74,7 @@ public class TenantConfigurationService {
                 .enableOvertime(request.isEnableOvertime())
                 .overtimeRatePerHour(request.getOvertimeRatePerHour())
                 .defaultCurrency(request.getDefaultCurrency() != null ? request.getDefaultCurrency() : "INR")
-                .defaultTaxRegime(request.getDefaultTaxRegime() != null ? request.getDefaultTaxRegime() : "OLD_REGIME")
+                .defaultTaxRegime(request.getDefaultTaxRegime() != null ? request.getDefaultTaxRegime() : "NEW_REGIME")
                 .effectiveFrom(effectiveFrom)
                 .effectiveTo(null)
                 .isActive(true)
@@ -688,7 +688,7 @@ public class TenantConfigurationService {
             testVariables.put("HRA", 20000.0);
             testVariables.put("EPF_ER_RATE", 0.12);
             testVariables.put("EPS_ER_CAP", 1250.0);
-            spelEngine.evaluate(formula, testVariables);
+            formulaService.evaluate(formula, testVariables);
         } catch (Exception e) {
             throw new BusinessException("Invalid formula syntax: " + e.getMessage());
         }
@@ -712,7 +712,7 @@ public class TenantConfigurationService {
             testVariables.put("ESI_EE_RATE", 0.0075);
             testVariables.put("WAGES_BASE", 50000.0);
             testVariables.put("GROSS", 100000.0);
-            spelEngine.evaluate(formula, testVariables);
+            formulaService.evaluate(formula, testVariables);
             return true;
         } catch (Exception e) {
             log.debug("Formula validation failed: {}", e.getMessage());

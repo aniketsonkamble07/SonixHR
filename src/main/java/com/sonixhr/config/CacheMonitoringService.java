@@ -32,32 +32,35 @@ public class CacheMonitoringService {
             @Qualifier("caffeineCacheManager") CacheManager caffeineCacheManager,
             @Qualifier("redisCacheManager") CacheManager redisCacheManager) {
         this.caffeineCacheManager = (CaffeineCacheManager) caffeineCacheManager;
-        this.redisCacheManager    = (RedisCacheManager) redisCacheManager;
+        this.redisCacheManager = (RedisCacheManager) redisCacheManager;
     }
 
-    @Scheduled(fixedDelay = 60_000)  // every minute
+    @Scheduled(fixedDelay = 60_000) // every minute
     public void logCacheStats() {
         caffeineCacheManager.getCacheNames().forEach(cacheName -> {
-            if (cacheName == null) return;
+            if (cacheName == null)
+                return;
             Cache cache = caffeineCacheManager.getCache(cacheName);
-            if (cache == null) return;
+            if (cache == null)
+                return;
 
             Object native0 = cache.getNativeCache();
-            if (!(native0 instanceof com.github.benmanes.caffeine.cache.Cache<?, ?> nativeCache)) return;
+            if (!(native0 instanceof com.github.benmanes.caffeine.cache.Cache<?, ?> nativeCache))
+                return;
 
             com.github.benmanes.caffeine.cache.stats.CacheStats stats = nativeCache.stats();
 
             CacheStats current = cacheStats.computeIfAbsent(cacheName, k -> new CacheStats());
-            current.hitCount         = stats.hitCount();
-            current.missCount        = stats.missCount();
+            current.hitCount = stats.hitCount();
+            current.missCount = stats.missCount();
             current.loadSuccessCount = stats.loadSuccessCount();
             current.loadFailureCount = stats.loadFailureCount();
-            current.totalLoadTime    = stats.totalLoadTime();
+            current.totalLoadTime = stats.totalLoadTime();
 
             long requestCount = stats.requestCount();
-            double hitRate  = requestCount == 0 ? 0.0 : stats.hitRate();
+            double hitRate = requestCount == 0 ? 0.0 : stats.hitRate();
             double missRate = requestCount == 0 ? 0.0 : stats.missRate();
-            long   size     = nativeCache.estimatedSize();
+            long size = nativeCache.estimatedSize();
 
             // SLF4J uses {} placeholders, not {:.2f}
             log.info("L1 cache '{}' — hitRate={}% missRate={}% size={}",
@@ -73,7 +76,7 @@ public class CacheMonitoringService {
         });
     }
 
-    @Scheduled(fixedDelay = 300_000)  // every 5 minutes
+    @Scheduled(fixedDelay = 300_000) // every 5 minutes
     public void logRedisCacheStats() {
         long count = redisCacheManager.getCacheNames().stream()
                 .filter(name -> name != null && redisCacheManager.getCache(name) != null)
@@ -84,14 +87,22 @@ public class CacheMonitoringService {
     /** Emergency: wipe every cache. Use sparingly. */
     public void evictAllCaches() {
         caffeineCacheManager.getCacheNames().forEach(name -> {
-            if (name == null) return;
+            if (name == null)
+                return;
             Cache c = caffeineCacheManager.getCache(name);
-            if (c != null) { c.clear(); log.info("Cleared L1 cache: {}", name); }
+            if (c != null) {
+                c.clear();
+                log.info("Cleared L1 cache: {}", name);
+            }
         });
         redisCacheManager.getCacheNames().forEach(name -> {
-            if (name == null) return;
+            if (name == null)
+                return;
             Cache c = redisCacheManager.getCache(name);
-            if (c != null) { c.clear(); log.info("Cleared L2 cache: {}", name); }
+            if (c != null) {
+                c.clear();
+                log.info("Cleared L2 cache: {}", name);
+            }
         });
     }
 
@@ -106,9 +117,15 @@ public class CacheMonitoringService {
         long loadFailureCount = 0;
         long totalLoadTime = 0;
 
-        public long   getHitCount()  { return hitCount; }
-        public long   getMissCount() { return missCount; }
-        public double getHitRate()   {
+        public long getHitCount() {
+            return hitCount;
+        }
+
+        public long getMissCount() {
+            return missCount;
+        }
+
+        public double getHitRate() {
             long total = hitCount + missCount;
             return total == 0 ? 0.0 : (double) hitCount / total;
         }

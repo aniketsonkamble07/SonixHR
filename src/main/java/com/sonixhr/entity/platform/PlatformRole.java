@@ -242,8 +242,6 @@ public class PlatformRole extends BaseRole {
         summary.put("id", getId());
         summary.put("name", getName());
         summary.put("description", getDescription());
-        summary.put("category", getCategory());
-        summary.put("priority", priority);
         summary.put("systemRole", isSystemRole());
         summary.put("active", active);
         summary.put("permissionCount", getPermissionCount());
@@ -273,8 +271,6 @@ public class PlatformRole extends BaseRole {
                 "id=" + getId() +
                 ", name='" + getName() + '\'' +
                 ", description='" + getDescription() + '\'' +
-                ", category='" + getCategory() + '\'' +
-                ", priority=" + priority +
                 ", systemRole=" + isSystemRole() +
                 ", active=" + active +
                 ", permissionCount=" + getPermissionCount() +

@@ -114,33 +114,32 @@ public class TenantRegistrationService {
             settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
             tenantLeaveSettingsRepository.save(settings);
 
-            // 5. Create default roles for this tenant (Super Admin, Admin, Employee,
-            // Manager)
-            TenantRole superAdminRole = createDefaultRolesForTenant(tenant.getId());
-            log.info("Default roles created for tenant, Super Admin has {} permissions",
-                    superAdminRole.getPermissions().size());
+            // 5. Create default roles for this tenant (Admin, Employee, Manager)
+            TenantRole adminRole = createDefaultRolesForTenant(tenant.getId());
+            log.info("Default roles created for tenant, Admin has {} permissions",
+                    adminRole.getPermissions().size());
 
-            // 6. Create Employee (Super Admin)
-            Employee superAdminEmployee = createSuperAdminEmployee(tenant, request, superAdminRole);
-            log.info("Super Admin employee created with ID: {}", superAdminEmployee.getId());
+            // 6. Create Employee (Admin)
+            Employee adminEmployee = createSuperAdminEmployee(tenant, request, adminRole);
+            log.info("Admin employee created with ID: {}", adminEmployee.getId());
 
             // 7. Create subscription record
             createSubscription(tenant, plan);
             log.info("Subscription created for tenant");
 
             // 8. Generate activation token for employee
-            String activationToken = activationTokenService.generateTokenForEmployee(superAdminEmployee.getId());
+            String activationToken = activationTokenService.generateTokenForEmployee(adminEmployee.getId());
             String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
 
-            // Send activation email to the registered Super Admin employee (disabled for
+            // Send activation email to the registered Admin employee (disabled for
             // development)
-            // emailService.sendActivationEmail(superAdminEmployee.getEmail(),
-            // superAdminEmployee.getFullName(), activationLink);
+            // emailService.sendActivationEmail(adminEmployee.getEmail(),
+            // adminEmployee.getFullName(), activationLink);
 
             // Log the credentials for manual testing
             log.info("==========================================");
             log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
-            log.info(" Admin Email: {}", superAdminEmployee.getEmail());
+            log.info(" Admin Email: {}", adminEmployee.getEmail());
             log.info(" (Password set to a secure random value)");
             log.info(" (Optional Activation Link: {})", activationLink);
             log.info("==========================================");
@@ -148,9 +147,9 @@ public class TenantRegistrationService {
             log.info("Tenant registration completed: {}", tenant.getCompanyName());
 
             // 9. Create default General 9-5 shift configuration
-            createDefaultShift(tenant.getId(), superAdminEmployee.getId());
+            createDefaultShift(tenant.getId(), adminEmployee.getId());
 
-            return buildResponse(tenant, activationToken, superAdminEmployee);
+            return buildResponse(tenant, activationToken, adminEmployee);
         } finally {
             if (previousTenantId != null) {
                 TenantContext.setCurrentTenant(previousTenantId);
@@ -289,42 +288,18 @@ public class TenantRegistrationService {
 
         log.info("Found {} global permissions to assign to default roles", allPermissions.size());
 
-        // 1. Super Admin
-        TenantRole superAdminRole = TenantRole.builder()
-                .tenantId(tenantId)
-                .name("Super Admin")
-                .description("Super Administrator with full access to all tenant features")
-                .isDefault(true)
-                .active(true)
-                .priority(100)
-                .category("ADMINISTRATION")
-                .permissions(new HashSet<>(allPermissions))
-                .build();
-        TenantRole savedSuperAdmin = roleRepository.save(superAdminRole);
-
-        // 2. Admin
-        Set<String> adminPermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "EMPLOYEE_VIEW_ALL", "EMPLOYEE_CREATE", "EMPLOYEE_EDIT",
-                "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM", "LEAVE_APPROVE_DEPARTMENT",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN", "ATTENDANCE_VIEW_TEAM",
-                "DEPARTMENT_VIEW", "DEPARTMENT_CREATE", "DEPARTMENT_EDIT", "ROLE_VIEW",
-                "REPORT_VIEW_DEPARTMENT", "REPORT_EXPORT", "SETTINGS_VIEW", "VIEW_BILLING");
-        Set<TenantPermission> adminPermissions = allPermissions.stream()
-                .filter(p -> adminPermissionNames.contains(p.getPermissionName()))
-                .collect(java.util.stream.Collectors.toSet());
+        // 1. Admin
         TenantRole adminRole = TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Admin")
-                .description("Administrator with limited management access")
-                .isDefault(false)
+                .description("Administrator with full access to all tenant features")
+                .isDefault(true)
                 .active(true)
-                .priority(80)
-                .category("ADMINISTRATION")
-                .permissions(adminPermissions)
+                .permissions(new HashSet<>(allPermissions))
                 .build();
-        roleRepository.save(adminRole);
+        TenantRole savedAdmin = roleRepository.save(adminRole);
 
-        // 3. Employee
+        // 2. Employee
         Set<String> employeePermissionNames = Set.of(
                 "EMPLOYEE_VIEW_SELF", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_CANCEL_OWN",
                 "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN");
@@ -337,13 +312,11 @@ public class TenantRegistrationService {
                 .description("Basic employee access - default role for new employees")
                 .isDefault(false)
                 .active(true)
-                .priority(40)
-                .category("EMPLOYMENT")
                 .permissions(employeePermissions)
                 .build();
         roleRepository.save(employeeRole);
 
-        // 4. Manager
+        // 3. Manager
         Set<String> managerPermissionNames = Set.of(
                 "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
                 "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN", "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
@@ -357,43 +330,41 @@ public class TenantRegistrationService {
                 .description("Team manager with people management access")
                 .isDefault(false)
                 .active(true)
-                .priority(60)
-                .category("MANAGEMENT")
                 .permissions(managerPermissions)
                 .build();
         roleRepository.save(managerRole);
 
-        log.info("Created default roles for tenant {}: Super Admin, Admin, Employee, Manager", tenantId);
-        return savedSuperAdmin;
+        log.info("Created default roles for tenant {}: Admin, Employee, Manager", tenantId);
+        return savedAdmin;
     }
 
     // =====================================================
-    // EMPLOYEE CREATION (Super Admin)
+    // EMPLOYEE CREATION (Admin)
     // =====================================================
 
     private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request,
-            TenantRole superAdminRole) {
+            TenantRole adminRole) {
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
 
         String firstName = getFirstNameFromFullName(request.getAdminName());
         String lastName = getLastNameFromFullName(request.getAdminName());
 
-        if (superAdminRole.getId() == null) {
-            superAdminRole = roleRepository.save(superAdminRole);
+        if (adminRole.getId() == null) {
+            adminRole = roleRepository.save(adminRole);
         }
 
         EmployeeStatus employeeStatus = EmployeeStatus.ACTIVE;
         boolean employeeActive = true;
         String passwordHash = passwordEncoder.encode("Admin@123");
 
-        Employee superAdmin = Employee.builder()
+        Employee adminEmployee = Employee.builder()
                 .tenant(tenant)
                 .employeeCode(employeeCode)
                 .firstName(firstName)
                 .lastName(lastName)
                 .email(request.getAdminEmail())
                 .phone(request.getAdminPhone())
-                .position("Super Admin")
+                .position("Admin")
                 .employmentType(EmploymentType.FULL_TIME)
                 .hireDate(LocalDate.now())
                 .status(employeeStatus)
@@ -407,10 +378,10 @@ public class TenantRegistrationService {
                         tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
                 .passwordHash(passwordHash)
                 .createdBy(null)
-                .roles(new HashSet<>(Set.of(superAdminRole)))
+                .roles(new HashSet<>(Set.of(adminRole)))
                 .build();
 
-        return employeeRepository.save(superAdmin);
+        return employeeRepository.save(adminEmployee);
     }
 
     private String getFirstNameFromFullName(String fullName) {

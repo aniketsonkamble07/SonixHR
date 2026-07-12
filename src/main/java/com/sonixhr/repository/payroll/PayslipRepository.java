@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,20 +22,30 @@ public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
     @Query("SELECT p FROM Payslip p WHERE p.payrunId = :payrunId")
     List<Payslip> findByPayrunId(@Param("payrunId") UUID payrunId);
 
-    @Query("SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND p.employee.id = :employeeId ORDER BY pr.year DESC, pr.month DESC")
+    @Query("SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND p.employee.id = :employeeId AND pr.status <> 'SUPERSEDED' ORDER BY pr.year DESC, pr.month DESC")
     List<Payslip> findByEmployeeId(@Param("tenantId") Long tenantId, @Param("employeeId") Long employeeId);
 
-    @Query("SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year")
+    @Query("SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year AND pr.status <> 'SUPERSEDED'")
     List<Payslip> findByTenantAndMonthAndYear(
             @Param("tenantId") Long tenantId,
             @Param("month") Integer month,
             @Param("year") Integer year);
 
-    @Query(value = "SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year",
-           countQuery = "SELECT COUNT(p) FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year")
+    @Query(value = "SELECT p FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year AND pr.status <> 'SUPERSEDED'",
+           countQuery = "SELECT COUNT(p) FROM Payslip p, Payrun pr WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND pr.month = :month AND pr.year = :year AND pr.status <> 'SUPERSEDED'")
     Page<Payslip> findByTenantAndMonthAndYearPaged(
             @Param("tenantId") Long tenantId,
             @Param("month") Integer month,
             @Param("year") Integer year,
             Pageable pageable);
+
+    @Query("SELECT SUM(p.taxableGrossEarnings) FROM Payslip p, Payrun pr " +
+           "WHERE p.payrunId = pr.id AND p.tenant.id = :tenantId AND p.employee.id = :employeeId " +
+           "AND pr.status <> 'SUPERSEDED' " +
+           "AND (pr.year * 12 + pr.month) BETWEEN :startVal AND :endVal")
+    BigDecimal sumTaxableGrossForEmployeeInFinancialYear(
+            @Param("tenantId") Long tenantId,
+            @Param("employeeId") Long employeeId,
+            @Param("startVal") Integer startVal,
+            @Param("endVal") Integer endVal);
 }

@@ -36,6 +36,19 @@ public class PayrunConfig {
     @Column(name = "pt_slabs_json", nullable = false, columnDefinition = "TEXT")
     private String ptSlabsJson; // Frozen StateProfessionalTaxConfig list
 
+    @Column(name = "engine_version", nullable = false)
+    private String engineVersion;
+
+    @Column(name = "formula_engine_version", nullable = false)
+    private String formulaEngineVersion;
+
+    @Column(name = "snapshot_schema_version", nullable = false)
+    private Integer snapshotSchemaVersion;
+
+    @Lob
+    @Column(name = "tax_slab_config_json", columnDefinition = "TEXT")
+    private String taxSlabConfigJson;
+
     @Column(name = "snapshot_created_at", nullable = false)
     private LocalDateTime snapshotCreatedAt;
 }

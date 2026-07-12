@@ -2,7 +2,7 @@ package com.sonixhr.controller.tenant;
  
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
-// Force re-indexing of imports
+// Force re-indexing of imports - triggered save to resolve IDE editor caching issues
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;

@@ -9,13 +9,12 @@ import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Map;
 
 @Service
 public class SandboxedSpELEngine {
     private final ExpressionParser parser = new SpelExpressionParser();
+    
     private static Method minMethod;
     private static Method maxMethod;
     private static Method roundMethod;
@@ -30,7 +29,7 @@ public class SandboxedSpELEngine {
         }
     }
 
-    // Static Math wrappers for SpEL injection
+    // Static Math wrappers for SpEL injection using double
     public static double min(double a, double b) {
         return Math.min(a, b);
     }
@@ -43,9 +42,16 @@ public class SandboxedSpELEngine {
         return Math.round(a);
     }
 
-    public BigDecimal evaluate(String formula, Map<String, Object> variables) {
-        if (formula == null || formula.trim().isEmpty()) {
-            return BigDecimal.ZERO;
+    public Expression parse(String formula) {
+        if (formula == null) {
+            return null;
+        }
+        return parser.parseExpression(formula);
+    }
+
+    public Double evaluate(Expression expression, Map<String, Object> variables) {
+        if (expression == null) {
+            return 0.0;
         }
 
         // Setup the secure, sandboxed read-only evaluation context
@@ -58,25 +64,17 @@ public class SandboxedSpELEngine {
         context.setVariable("max", maxMethod);
         context.setVariable("round", roundMethod);
 
-        // Populate context variables (e.g. BASIC, CTC, etc.)
+        // Populate context variables
         if (variables != null) {
             variables.forEach(context::setVariable);
         }
 
         try {
-            Expression expression = parser.parseExpression(formula);
             Double result = expression.getValue(context, variables, Double.class);
-            if (result == null) {
-                return BigDecimal.ZERO;
-            }
-            return BigDecimal.valueOf(result).setScale(2, RoundingMode.HALF_UP);
+            return result != null ? result : 0.0;
         } catch (Exception e) {
-            throw new TechnicalException("TECH_FORMULA", "Salary formula evaluation failed", "Invalid formula expression: " + formula, e);
+            throw new TechnicalException("TECH_FORMULA", "Salary formula evaluation failed", 
+                    "Invalid formula expression: " + expression.getExpressionString(), e);
         }
-    }
-
-
-    public void validateFormula(String formula, Map<String, Object> testVariables) {
-        evaluate(formula, testVariables);
     }
 }

@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "payruns", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_payrun_month_year_tenant", columnNames = {"tenant_id", "month", "year"})
+        @UniqueConstraint(name = "uk_payrun_month_year_tenant_version", columnNames = {"tenant_id", "month", "year", "version"})
 })
 @Getter
 @Setter
@@ -32,7 +32,10 @@ public class Payrun {
     private Integer year;
 
     @Column(name = "status", nullable = false)
-    private String status; // DRAFT, APPROVED, PAID
+    private String status; // DRAFT, APPROVED, PAID, SUPERSEDED
+
+    @Column(name = "version", nullable = false)
+    private Integer version;
 
     @Column(name = "processed_at")
     private LocalDateTime processedAt;

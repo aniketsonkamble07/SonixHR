@@ -113,6 +113,18 @@ SonixHR is divided into modular feature suites supporting both platform-level ad
 * **Super Admin Email**: `admin@sonixhr.com`
 * **Super Admin Password**: `Admin@123`
 
+### Redis Production Persistence
+For production deployments, it is critical that the Redis server is configured with persistence (RDB/AOF) enabled. Without this, restarting Redis will clear the token blacklist and allow logged-out/invalidated JWTs to be accepted until their original expiration time.
+
+Configure your production `redis.conf` with:
+```ini
+appendonly yes
+appendfsync everysec
+save 900 1
+save 300 10
+```
+This ensures token blacklist and session records survive Redis service restarts.
+
 ### Build and Run
 Use the Maven wrappers to compile and run the application:
 

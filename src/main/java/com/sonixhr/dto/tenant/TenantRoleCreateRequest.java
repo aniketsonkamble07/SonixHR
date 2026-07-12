@@ -22,9 +22,6 @@ public class TenantRoleCreateRequest {
     @Size(max = 200, message = "Description cannot exceed 200 characters")
     private String description;
 
-    private Boolean isDefault;
 
     private Set<Long> permissionIds;
-    private String category;
-    private Integer priority;
 }

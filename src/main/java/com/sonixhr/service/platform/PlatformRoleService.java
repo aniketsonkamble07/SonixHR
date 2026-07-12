@@ -66,15 +66,9 @@ public class PlatformRoleService {
 
         Set<PlatformPermission> permissions = fetchPermissions(request.getPermissionIds());
 
-        // Determine category and priority from request or derive
-        String category = determineCategory(request);
-        Integer priority = determinePriority(request, category);
-
         PlatformRole role = PlatformRole.builder()
                 .name(request.getName())
                 .description(request.getDescription())
-                .category(category)
-                .priority(priority)
                 .systemRole(false)
                 .active(true)
                 .permissions(permissions)
@@ -116,39 +110,6 @@ public class PlatformRoleService {
                 .collect(Collectors.toSet());
     }
 
-    private String determineCategory(PlatformRoleCreateRequest request) {
-        if (request.getCategory() != null && !request.getCategory().isEmpty()) {
-            return request.getCategory();
-        }
-
-        String name = request.getName().toUpperCase();
-
-        // Dynamic category detection
-        if (name.contains("SUPER_ADMIN")) return "SYSTEM_ADMINISTRATION";
-        if (name.contains("ADMIN")) return "ADMINISTRATION";
-        if (name.contains("HR")) return "HUMAN_RESOURCES";
-        if (name.contains("MANAGER")) return "MANAGEMENT";
-        if (name.contains("EMPLOYEE")) return "EMPLOYMENT";
-
-        return "CUSTOM";
-    }
-
-    private Integer determinePriority(PlatformRoleCreateRequest request, String category) {
-        if (request.getPriority() != null) {
-            return request.getPriority();
-        }
-
-        // Dynamic priority based on category
-        switch (category) {
-            case "SYSTEM_ADMINISTRATION": return 100;
-            case "ADMINISTRATION": return 80;
-            case "MANAGEMENT": return 70;
-            case "HUMAN_RESOURCES": return 60;
-            case "EMPLOYMENT": return 40;
-            default: return 50;
-        }
-    }
-
     // =====================================================
     // UPDATE METHODS
     // =====================================================
@@ -180,15 +141,7 @@ public class PlatformRoleService {
             changed = true;
         }
 
-        if (request.getCategory() != null && !request.getCategory().equals(role.getCategory())) {
-            role.setCategory(request.getCategory());
-            changed = true;
-        }
 
-        if (request.getPriority() != null && !request.getPriority().equals(role.getPriority())) {
-            role.setPriority(request.getPriority());
-            changed = true;
-        }
 
         if (request.getPermissionIds() != null) {
             Set<PlatformPermission> permissions = fetchPermissions(request.getPermissionIds());
@@ -380,13 +333,7 @@ public class PlatformRoleService {
                 .build();
     }
 
-    /**
-     * Get roles by category
-     */
-    public List<PlatformRole> getRolesByCategory(String category) {
-        log.debug("Fetching platform roles by category: {}", category);
-        return roleRepository.findByCategory(category);
-    }
+
 
 
 
@@ -684,13 +631,7 @@ public class PlatformRoleService {
 
         stats.put("activeRoles", roleRepository.countByActiveTrue());
 
-        // Roles by category
-        List<Object[]> rolesByCategory = roleRepository.countRolesByCategory();
-        Map<String, Long> categoryMap = new HashMap<>();
-        for (Object[] row : rolesByCategory) {
-            categoryMap.put((String) row[0], (Long) row[1]);
-        }
-        stats.put("rolesByCategory", categoryMap);
+
 
         // Cache stats
         stats.put("cachedRoles", roleCache.size());

@@ -2,7 +2,9 @@ package com.sonixhr.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.sonixhr.exceptions.TokenValidationException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 @SuppressWarnings({"unused", "null"})
 public class PlatformTokenBlacklistService {
+
+    private static final String BLACKLIST_VALUE = "true";
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final JwtService jwtService;
@@ -158,8 +162,11 @@ public class PlatformTokenBlacklistService {
             log.info("Token blacklisted - JTI: {}, User: {}, TTL: {}ms, Duration: {}μs",
                     jti, username, ttl, duration);
 
+        } catch (ExpiredJwtException e) {
+            log.debug("Token already expired, no need to blacklist: {}", e.getMessage());
         } catch (Exception e) {
             log.error("Failed to blacklist token: {}", e.getMessage());
+            throw new TokenValidationException("Token validation failed for blacklisting: " + e.getMessage(), e);
         }
     }
 
@@ -389,9 +396,6 @@ public class PlatformTokenBlacklistService {
         }
     }
 
-    /**
-     * Blacklist all tokens for a specific tenant
-     */
     public void blacklistAllTenantTokens(Long tenantId) {
         if (!blacklistEnabled || tenantId == null) {
             return;
@@ -401,7 +405,7 @@ public class PlatformTokenBlacklistService {
         try {
             if (redisEnabled && redisTemplate != null) {
                 String key = "tenant:blacklist:" + tenantId;
-                redisTemplate.opsForValue().set(key, "true", 365, TimeUnit.DAYS);
+                redisTemplate.opsForValue().set(key, BLACKLIST_VALUE, 365, TimeUnit.DAYS);
             }
         } catch (Exception e) {
             log.error("Failed to blacklist tenant tokens in Redis: {}", e.getMessage());
