@@ -1,6 +1,7 @@
 package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
+import com.sonixhr.dto.tenant.TenantRoleUpdateRequest;
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
@@ -139,7 +140,7 @@ public class TenantRoleService {
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
-    public TenantRoleResponse updateRole(Long roleId, TenantRoleCreateRequest request, Long tenantId) {
+    public TenantRoleResponse updateRole(Long roleId, TenantRoleUpdateRequest request, Long tenantId) {
         log.info("Updating tenant role: {} for tenant: {}", roleId, tenantId);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);

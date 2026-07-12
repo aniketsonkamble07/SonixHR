@@ -2,6 +2,7 @@ package com.sonixhr.controller.tenant;
  
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleCreateRequest;
+import com.sonixhr.dto.tenant.TenantRoleUpdateRequest;
 // Force re-indexing of imports - triggered save to resolve IDE editor caching issues
 import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
@@ -141,7 +142,7 @@ public class TenantRoleController {
     @PreAuthorize("hasAuthority('ROLE_EDIT')")
     public ResponseEntity<TenantRoleResponse> updateRole(
             @PathVariable Long roleId,
-            @Valid @RequestBody TenantRoleCreateRequest request,
+            @Valid @RequestBody TenantRoleUpdateRequest request,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = getCurrentTenantId(currentEmployee);

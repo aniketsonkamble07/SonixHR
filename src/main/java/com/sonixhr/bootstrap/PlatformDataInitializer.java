@@ -254,11 +254,11 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .description("Custom pricing, unlimited employees, dedicated support")
                                         .build());
 
-                        log.info("✅ Successfully seeded default subscription plans");
+                        log.info(" Successfully seeded default subscription plans");
                 }
         }
 
-        // ✅ KEEP ONLY ONE of these methods
+        // KEEP ONLY ONE of these methods
         private void createAllPermissions() {
                 log.info("Creating all permissions...");
                 int createdCount = 0;
@@ -278,7 +278,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                 log.debug("Created permission: {}", permEnum.name());
                         }
                 }
-                log.info("✅ Created {} new permissions. Total: {}", createdCount, permissionRepository.count());
+                log.info("Created {} new permissions. Total: {}", createdCount, permissionRepository.count());
         }
 
         private PlatformRole createAdminRole() {
@@ -291,78 +291,78 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         if (existing.getPermissions().size() < allPermissions.size()) {
                                                 existing.setPermissions(allPermissions);
                                                 PlatformRole updated = roleRepository.save(existing);
-                                                log.info("✅ Updated Admin role: {} permissions",
-                                                                 allPermissions.size());
+                                                log.info(" Updated Admin role: {} permissions",
+                                                                allPermissions.size());
                                                 return updated;
                                         }
                                         log.debug("Admin role up to date: {} permissions",
-                                                         existing.getPermissions().size());
+                                                        existing.getPermissions().size());
                                         return existing;
                                 })
                                 .orElseGet(() -> {
                                         PlatformRole role = PlatformRole.builder()
-                                                         .name("Admin")
-                                                         .description("Full platform access - has ALL permissions")
-                                                         .systemRole(true)
-                                                         .active(true)
-                                                         .permissions(allPermissions)
-                                                         .build();
-                                         PlatformRole saved = roleRepository.save(role);
-                                         log.info("✅ Created Admin role with {} permissions",
-                                                         allPermissions.size());
-                                         return saved;
-                                 });
-         }
+                                                        .name("Admin")
+                                                        .description("Full platform access - has ALL permissions")
+                                                        .systemRole(true)
+                                                        .active(true)
+                                                        .permissions(allPermissions)
+                                                        .build();
+                                        PlatformRole saved = roleRepository.save(role);
+                                        log.info(" Created Admin role with {} permissions",
+                                                        allPermissions.size());
+                                        return saved;
+                                });
+        }
 
-         private void createAdminUser(PlatformRole adminRole) {
-                 log.info("Creating Admin user...");
+        private void createAdminUser(PlatformRole adminRole) {
+                log.info("Creating Admin user...");
 
-                 if (userRepository.findByEmail(SUPER_ADMIN_EMAIL).isPresent()) {
-                         log.info("Admin user already exists: {}", SUPER_ADMIN_EMAIL);
-                         PlatformUser existing = userRepository.findByEmail(SUPER_ADMIN_EMAIL).get();
-                         String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
-                         String password = (envPassword != null && !envPassword.isBlank()) ? envPassword : "Admin@123";
-                         existing.setPassword(passwordEncoder.encode(password));
-                         userRepository.save(existing);
-                         log.info("Admin password updated to match current configuration.");
-                         return;
-                 }
+                if (userRepository.findByEmail(SUPER_ADMIN_EMAIL).isPresent()) {
+                        log.info("Admin user already exists: {}", SUPER_ADMIN_EMAIL);
+                        PlatformUser existing = userRepository.findByEmail(SUPER_ADMIN_EMAIL).get();
+                        String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
+                        String password = (envPassword != null && !envPassword.isBlank()) ? envPassword : "Admin@123";
+                        existing.setPassword(passwordEncoder.encode(password));
+                        userRepository.save(existing);
+                        log.info("Admin password updated to match current configuration.");
+                        return;
+                }
 
-                 String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
-                 final String password;
-                 if (envPassword != null && !envPassword.isBlank()) {
-                         password = envPassword;
-                 } else {
-                         password = "Admin@123";
-                         log.warn("=========================================");
-                         log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set. Defaulting to Admin@123.");
-                         log.warn("=========================================");
-                 }
+                String envPassword = System.getenv("SONIXHR_SUPER_ADMIN_PASSWORD");
+                final String password;
+                if (envPassword != null && !envPassword.isBlank()) {
+                        password = envPassword;
+                } else {
+                        password = "Admin@123";
+                        log.warn("=========================================");
+                        log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set. Defaulting to Admin@123.");
+                        log.warn("=========================================");
+                }
 
-                 PlatformUser adminUser = PlatformUser.builder()
-                                 .email(SUPER_ADMIN_EMAIL)
-                                 .password(passwordEncoder.encode(password))
-                                 .fullName("Administrator")
-                                 .designation("Administrator")
-                                 .status(UserStatus.ACTIVE)
-                                 .rolesVersion(1)
-                                 .build();
+                PlatformUser adminUser = PlatformUser.builder()
+                                .email(SUPER_ADMIN_EMAIL)
+                                .password(passwordEncoder.encode(password))
+                                .fullName("Administrator")
+                                .designation("Administrator")
+                                .status(UserStatus.ACTIVE)
+                                .rolesVersion(1)
+                                .build();
 
-                 adminUser.getRoles().add(adminRole);
-                 userRepository.save(adminUser);
+                adminUser.getRoles().add(adminRole);
+                userRepository.save(adminUser);
 
-                 log.info("=========================================");
-                 log.info("✅ ADMIN CREATED WITH ALL PERMISSIONS!");
-                 log.info("   Email: {}", SUPER_ADMIN_EMAIL);
-                 log.info("   Name: Administrator");
-                 log.info("   Role: Admin (ALL permissions)");
-                 log.info("   Authorities: {}", adminUser.getAuthorities().size());
-                 log.info("=========================================");
-         }
+                log.info("=========================================");
+                log.info(" ADMIN CREATED WITH ALL PERMISSIONS!");
+                log.info("   Email: {}", SUPER_ADMIN_EMAIL);
+                log.info("   Name: Administrator");
+                log.info("   Role: Admin (ALL permissions)");
+                log.info("   Authorities: {}", adminUser.getAuthorities().size());
+                log.info("=========================================");
+        }
 
-         private void createOtherDefaultRoles() {
-                 // No additional platform roles — only Admin is seeded.
-                 log.info("✅ Platform roles: only Admin is seeded.");
+        private void createOtherDefaultRoles() {
+                // No additional platform roles — only Admin is seeded.
+                log.info(" Platform roles: only Admin is seeded.");
         }
 
         private void seedStatutoryRatesAndPtConfigs() {
@@ -419,7 +419,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .ceilingAmount(BigDecimal.valueOf(21000.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ Statutory rate configurations seeded successfully.");
+                        log.info(" Statutory rate configurations seeded successfully.");
                 }
 
                 LocalDate epoch = LocalDate.of(2020, 1, 1);
@@ -442,7 +442,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for KA seeded successfully.");
+                        log.info(" State Professional Tax configurations for KA seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.MAHARASHTRA)) {
@@ -483,7 +483,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for MH seeded successfully.");
+                        log.info(" State Professional Tax configurations for MH seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.GUJARAT)) {
@@ -505,7 +505,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for GJ seeded successfully.");
+                        log.info(" State Professional Tax configurations for GJ seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.TELANGANA)) {
@@ -535,7 +535,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for TS seeded successfully.");
+                        log.info(" State Professional Tax configurations for TS seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.ANDHRA_PRADESH)) {
@@ -565,7 +565,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for AP seeded successfully.");
+                        log.info(" State Professional Tax configurations for AP seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.WEST_BENGAL)) {
@@ -611,7 +611,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for WB seeded successfully.");
+                        log.info(" State Professional Tax configurations for WB seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.MADHYA_PRADESH)) {
@@ -641,7 +641,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(208.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for MP seeded successfully.");
+                        log.info(" State Professional Tax configurations for MP seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.TAMIL_NADU)) {
@@ -695,7 +695,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for TN seeded successfully.");
+                        log.info(" State Professional Tax configurations for TN seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.KERALA)) {
@@ -773,7 +773,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(208.33))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for KL seeded successfully.");
+                        log.info(" State Professional Tax configurations for KL seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.ODISHA)) {
@@ -795,7 +795,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for OD seeded successfully.");
+                        log.info(" State Professional Tax configurations for OD seeded successfully.");
                 }
 
                 if (!statePtConfigRepo.existsByStateCode(IndianState.CHHATTISGARH)) {
@@ -817,7 +817,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .amount(BigDecimal.valueOf(200.00))
                                         .effectiveFrom(epoch)
                                         .build());
-                        log.info("✅ State Professional Tax configurations for CG seeded successfully.");
+                        log.info(" State Professional Tax configurations for CG seeded successfully.");
                 }
 
                 seedTaxRegimeSlabConfigs();
@@ -827,15 +827,20 @@ public class PlatformDataInitializer implements ApplicationRunner {
         private void seedTaxRegimeSlabConfigs() {
                 log.info("Checking/seeding platform tax slab configurations...");
 
-                // FY 2025-26 NEW_REGIME (₹7L threshold, ₹25k rebate, ₹50k standard deduction, slabs at 3L intervals)
+                // FY 2025-26 NEW_REGIME (₹7L threshold, ₹25k rebate, ₹50k standard deduction,
+                // slabs at 3L intervals)
                 if (taxSlabConfigRepo.findByFinancialYearAndRegime("2025-26", TaxRegime.NEW_REGIME).isEmpty()) {
                         log.info("Seeding NEW_REGIME slab config for FY 2025-26...");
                         List<TaxSlabRow> slabs = List.of(
                                         new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(300000.0), BigDecimal.ZERO),
-                                        new TaxSlabRow(BigDecimal.valueOf(300000.0), BigDecimal.valueOf(600000.0), BigDecimal.valueOf(5.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(600000.0), BigDecimal.valueOf(900000.0), BigDecimal.valueOf(10.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(900000.0), BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(15.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(1500000.0), BigDecimal.valueOf(20.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(300000.0), BigDecimal.valueOf(600000.0),
+                                                        BigDecimal.valueOf(5.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(600000.0), BigDecimal.valueOf(900000.0),
+                                                        BigDecimal.valueOf(10.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(900000.0), BigDecimal.valueOf(1200000.0),
+                                                        BigDecimal.valueOf(15.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(1500000.0),
+                                                        BigDecimal.valueOf(20.0)),
                                         new TaxSlabRow(BigDecimal.valueOf(1500000.0), null, BigDecimal.valueOf(30.0)));
 
                         List<SurchargeSlab> surchargeSlabs = List.of(
@@ -855,15 +860,20 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         .build());
                 }
 
-                // FY 2026-27 NEW_REGIME (₹12L threshold, ₹60k rebate, ₹75k standard deduction, slabs at 4L intervals)
+                // FY 2026-27 NEW_REGIME (₹12L threshold, ₹60k rebate, ₹75k standard deduction,
+                // slabs at 4L intervals)
                 if (taxSlabConfigRepo.findByFinancialYearAndRegime("2026-27", TaxRegime.NEW_REGIME).isEmpty()) {
                         log.info("Seeding NEW_REGIME slab config for FY 2026-27...");
                         List<TaxSlabRow> slabs = List.of(
                                         new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(400000.0), BigDecimal.ZERO),
-                                        new TaxSlabRow(BigDecimal.valueOf(400000.0), BigDecimal.valueOf(800000.0), BigDecimal.valueOf(5.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(800000.0), BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(10.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(1600000.0), BigDecimal.valueOf(15.0)),
-                                        new TaxSlabRow(BigDecimal.valueOf(1600000.0), BigDecimal.valueOf(2000000.0), BigDecimal.valueOf(20.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(400000.0), BigDecimal.valueOf(800000.0),
+                                                        BigDecimal.valueOf(5.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(800000.0), BigDecimal.valueOf(1200000.0),
+                                                        BigDecimal.valueOf(10.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(1200000.0), BigDecimal.valueOf(1600000.0),
+                                                        BigDecimal.valueOf(15.0)),
+                                        new TaxSlabRow(BigDecimal.valueOf(1600000.0), BigDecimal.valueOf(2000000.0),
+                                                        BigDecimal.valueOf(20.0)),
                                         new TaxSlabRow(BigDecimal.valueOf(2000000.0), null, BigDecimal.valueOf(30.0)));
 
                         List<SurchargeSlab> surchargeSlabs = List.of(
@@ -889,15 +899,23 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         if (taxSlabConfigRepo.findByFinancialYearAndRegime(fy, TaxRegime.OLD_REGIME).isEmpty()) {
                                 log.info("Seeding OLD_REGIME slab config for FY {}...", fy);
                                 List<TaxSlabRow> slabs = List.of(
-                                                new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(250000.0), BigDecimal.ZERO),
-                                                new TaxSlabRow(BigDecimal.valueOf(250000.0), BigDecimal.valueOf(500000.0), BigDecimal.valueOf(5.0)),
-                                                new TaxSlabRow(BigDecimal.valueOf(500000.0), BigDecimal.valueOf(1000000.0), BigDecimal.valueOf(20.0)),
-                                                new TaxSlabRow(BigDecimal.valueOf(1000000.0), null, BigDecimal.valueOf(30.0)));
+                                                new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(250000.0),
+                                                                BigDecimal.ZERO),
+                                                new TaxSlabRow(BigDecimal.valueOf(250000.0),
+                                                                BigDecimal.valueOf(500000.0), BigDecimal.valueOf(5.0)),
+                                                new TaxSlabRow(BigDecimal.valueOf(500000.0),
+                                                                BigDecimal.valueOf(1000000.0),
+                                                                BigDecimal.valueOf(20.0)),
+                                                new TaxSlabRow(BigDecimal.valueOf(1000000.0), null,
+                                                                BigDecimal.valueOf(30.0)));
 
                                 List<SurchargeSlab> surchargeSlabs = List.of(
-                                                new SurchargeSlab(BigDecimal.valueOf(5000000.0), BigDecimal.valueOf(10.0)),
-                                                new SurchargeSlab(BigDecimal.valueOf(10000000.0), BigDecimal.valueOf(15.0)),
-                                                new SurchargeSlab(BigDecimal.valueOf(20000000.0), BigDecimal.valueOf(25.0)));
+                                                new SurchargeSlab(BigDecimal.valueOf(5000000.0),
+                                                                BigDecimal.valueOf(10.0)),
+                                                new SurchargeSlab(BigDecimal.valueOf(10000000.0),
+                                                                BigDecimal.valueOf(15.0)),
+                                                new SurchargeSlab(BigDecimal.valueOf(20000000.0),
+                                                                BigDecimal.valueOf(25.0)));
 
                                 taxSlabConfigRepo.save(TaxRegimeSlabConfig.builder()
                                                 .financialYear(fy)

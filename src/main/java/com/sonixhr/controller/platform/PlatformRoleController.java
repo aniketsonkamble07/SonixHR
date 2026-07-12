@@ -1,6 +1,7 @@
 package com.sonixhr.controller.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
+import com.sonixhr.dto.platform.PlatformRoleUpdateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
@@ -88,7 +89,7 @@ public class PlatformRoleController {
     @PreAuthorize("hasAuthority('EDIT_PLATFORM_ROLE')")
     public ResponseEntity<PlatformRoleResponse> updateRole(
             @PathVariable Long roleId,
-            @Valid @RequestBody PlatformRoleCreateRequest request,
+            @Valid @RequestBody PlatformRoleUpdateRequest request,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
         log.info("Platform admin {} updating role: {}", currentAdmin.getEmail(), roleId);

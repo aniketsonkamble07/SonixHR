@@ -1,6 +1,7 @@
 package com.sonixhr.service.platform;
 
 import com.sonixhr.dto.platform.PlatformRoleCreateRequest;
+import com.sonixhr.dto.platform.PlatformRoleUpdateRequest;
 import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
@@ -116,7 +117,7 @@ public class PlatformRoleService {
 
     @Transactional
     @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
-    public PlatformRole updateRole(Long roleId, PlatformRoleCreateRequest request) {
+    public PlatformRole updateRole(Long roleId, PlatformRoleUpdateRequest request) {
         log.info("Updating platform role: {}", roleId);
 
         PlatformRole role = getRoleById(roleId);
