@@ -46,17 +46,37 @@ public class TenantSubscriptionService {
     @Transactional
     public TenantSubscriptionResponseDTO renewSubscription(Long tenantId) {
         log.info("Renewing subscription for tenant ID: {}", tenantId);
-        TenantSubscription currentSub = subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant"));
+        
+        // Find the most recent subscription regardless of whether it's active (handles expired states)
+        TenantSubscription currentSub = subscriptionRepository.findByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription details not found for tenant"));
 
-        // Extend endsAt date by plan validity months, adjusting for yearly billing cycle
+        if (currentSub.getPlanStatus() == PlanStatus.CANCELLED) {
+            throw new BusinessException("Cannot renew a cancelled subscription. Please upgrade or purchase a new plan.");
+        }
+
+        // Extend endsAt date from current expiry (if in future) or from now (if already expired)
         int validityMonths = currentSub.getSubscriptionPlan() != null && currentSub.getSubscriptionPlan().getValidityMonths() > 0 
                 ? currentSub.getSubscriptionPlan().getValidityMonths() : 1;
         long monthsToAdd = currentSub.getBillingCycle() == BillingCycle.YEARLY ? 12L : validityMonths;
-        LocalDateTime newEndsAt = currentSub.getEndsAt() != null ? currentSub.getEndsAt().plusMonths(monthsToAdd) : LocalDateTime.now().plusMonths(monthsToAdd);
+        
+        LocalDateTime baseDate = (currentSub.getEndsAt() != null && currentSub.getEndsAt().isAfter(LocalDateTime.now()))
+                ? currentSub.getEndsAt()
+                : LocalDateTime.now();
+        LocalDateTime newEndsAt = baseDate.plusMonths(monthsToAdd);
+        
         currentSub.setEndsAt(newEndsAt);
         currentSub.setPlanStatus(PlanStatus.ACTIVE);
         currentSub.setIsActive(true);
+
+        // Reactivate the tenant if they were suspended/expired
+        Tenant tenant = currentSub.getTenant();
+        if (tenant != null) {
+            tenant.setPlanStatus(PlanStatus.ACTIVE);
+            tenant.activate(); // Sets status = UserStatus.ACTIVE and isActive = true
+            tenantRepository.save(tenant);
+        }
 
         TenantSubscription savedSub = subscriptionRepository.save(currentSub);
         
