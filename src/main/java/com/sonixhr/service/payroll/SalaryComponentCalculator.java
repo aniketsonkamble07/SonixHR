@@ -5,6 +5,7 @@ import com.sonixhr.entity.payroll.*;
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.payroll.PayrollComponent;
 import com.sonixhr.repository.payroll.EmployeeSalaryComponentRepository;
+import com.sonixhr.repository.payroll.SalaryComponentDefinitionRepository;
 import com.sonixhr.exceptions.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -23,6 +25,9 @@ public class SalaryComponentCalculator {
     private final EmployeeSalaryComponentRepository employeeSalaryComponentRepo;
     private final FormulaService formulaService;
     private final StatutoryCalculator statutoryCalculator;
+    private final SalaryComponentDefinitionRepository componentDefinitionRepo;
+
+    private static final BigDecimal SPECIAL_ALLOWANCE_PERCENTAGE = new BigDecimal("0.10");
 
     public PeriodPayData computePeriodPayData(
             EmployeeSalaryProfile profile,
@@ -44,21 +49,17 @@ public class SalaryComponentCalculator {
         int activeDays = (int) java.time.temporal.ChronoUnit.DAYS.between(periodStart, periodEnd) + 1;
         if (activeDays < 0) activeDays = 0;
 
-        // 2. Proration Factor (active days / total calendar days in month)
+        // 2. Proration Factor (active days / total calendar days in month) using banker's rounding
         BigDecimal prorationFactor = BigDecimal.valueOf(activeDays)
-                .divide(BigDecimal.valueOf(totalDaysInMonth), 6, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(totalDaysInMonth), 6, RoundingMode.HALF_EVEN);
 
-        // LOP daily wage denominator
-        BigDecimal workingDays = BigDecimal.valueOf(totalDaysInMonth);
-        if (LopBasis.WORKING_DAYS.equals(tenantConfig.getLopBasis())
-                && tenantConfig.getWorkingDaysPerMonth() != null) {
-            workingDays = BigDecimal.valueOf(tenantConfig.getWorkingDaysPerMonth());
-        }
+        // Standard LOP days basis (26 days) as per industry guidelines
+        BigDecimal workingDays = BigDecimal.valueOf(26);
 
         // 3. Setup evaluation variables with BigDecimal
         Map<String, Object> variables = new HashMap<>();
         BigDecimal monthlyCtc = profile.getMonthlyCtc();
-        BigDecimal activeCtc  = monthlyCtc.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal activeCtc  = monthlyCtc.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
 
         variables.put("CTC", monthlyCtc);
         variables.put("LOP_DAYS", lopDays);
@@ -79,92 +80,62 @@ public class SalaryComponentCalculator {
         List<EmployeeSalaryComponent> overrides =
                 employeeSalaryComponentRepo.findBySalaryProfileId(profile.getId());
 
-        // Check which employer contributions are present in the structure
-        boolean hasEpfEr = orderedStructure.stream().anyMatch(s -> "EPF_ER".equalsIgnoreCase(s.getComponentCode()));
-        boolean hasEpsEr = orderedStructure.stream().anyMatch(s -> "EPS_ER".equalsIgnoreCase(s.getComponentCode()));
-        boolean hasEdli  = orderedStructure.stream().anyMatch(s -> "EDLI".equalsIgnoreCase(s.getComponentCode()));
-        boolean hasEsiEr = orderedStructure.stream().anyMatch(s -> "ESI_ER".equalsIgnoreCase(s.getComponentCode()));
-
         // 4. First pass: Calculate Base Allowances (before proration and LOP)
+        Map<String, Boolean> lopApplicabilityMap = buildLopApplicabilityMap(tenantConfig.getTenant().getId());
+
         Map<String, BigDecimal> baseAllowances = new LinkedHashMap<>();
-        BigDecimal otherBaseAllowancesSum = BigDecimal.ZERO;
+        BigDecimal sumOfOtherAllowances = BigDecimal.ZERO;
 
         for (TenantSalaryStructure item : orderedStructure) {
-            if ("ALLOWANCE".equalsIgnoreCase(getComponentType(item.getComponentCode(), customComponentTypes))) {
-                BigDecimal baseVal = BigDecimal.ZERO;
-                if ("SPECIAL_ALLOWANCE".equalsIgnoreCase(item.getComponentCode())) {
-                    // Compute employer contributions to determine SPECIAL_ALLOWANCE remainder
-                    BigDecimal basicVal    = baseAllowances.getOrDefault("BASIC", BigDecimal.ZERO);
-                    BigDecimal wagesBaseVal = basicVal;
-                    if (tenantConfig.isEnforceNewLabourCodes()) {
-                        BigDecimal floorVal = monthlyCtc.multiply(BigDecimal.valueOf(0.50))
-                                .setScale(2, RoundingMode.HALF_UP);
-                        wagesBaseVal = basicVal.max(floorVal);
-                    }
-
-                    double epfErRate   = variables.containsKey("EPF_ER_RATE") ? ((BigDecimal) variables.get("EPF_ER_RATE")).doubleValue() : 0.12;
-                    double epsErRate   = variables.containsKey("EPS_ER_RATE") ? ((BigDecimal) variables.get("EPS_ER_RATE")).doubleValue() : 0.0833;
-                    double epsErCap    = variables.containsKey("EPS_ER_CAP") ? ((BigDecimal) variables.get("EPS_ER_CAP")).doubleValue() : 1250.0;
-                    double edliRate    = variables.containsKey("EDLI_RATE") ? ((BigDecimal) variables.get("EDLI_RATE")).doubleValue() : 0.005;
-                    double edliCeiling = variables.containsKey("EDLI_CEILING") ? ((BigDecimal) variables.get("EDLI_CEILING")).doubleValue() : 15000.0;
-
-                    BigDecimal epsEr = BigDecimal.ZERO;
-                    if (hasEpsEr) {
-                        BigDecimal epsErVal = wagesBaseVal.multiply(BigDecimal.valueOf(epsErRate));
-                        epsEr = BigDecimal.valueOf(Math.min(Math.round(epsErVal.doubleValue()), epsErCap))
-                                .setScale(2, RoundingMode.HALF_UP);
-                    }
-
-                    BigDecimal epfEr = BigDecimal.ZERO;
-                    if (hasEpfEr) {
-                        BigDecimal epfErVal = wagesBaseVal.multiply(BigDecimal.valueOf(epfErRate))
-                                .setScale(2, RoundingMode.HALF_UP);
-                        epfEr = epfErVal.subtract(epsEr).max(BigDecimal.ZERO);
-                    }
-
-                    BigDecimal edli = BigDecimal.ZERO;
-                    if (hasEdli) {
-                        BigDecimal edliLimit = wagesBaseVal.min(BigDecimal.valueOf(edliCeiling));
-                        edli = edliLimit.multiply(BigDecimal.valueOf(edliRate)).setScale(2, RoundingMode.HALF_UP);
-                    }
-
-                    BigDecimal esiEr = BigDecimal.ZERO;
-                    if (hasEsiEr && tenantConfig.isEnableEsi()) {
-                        BigDecimal cpGross = statutoryCalculator.getContributionPeriodStartGross(
-                                tenantConfig.getTenant().getId(), employee.getId(), year, month, monthlyCtc);
-                        if (cpGross.compareTo(BigDecimal.valueOf(21000)) <= 0) {
-                            double esiErRate = variables.containsKey("ESI_ER_RATE") ? ((BigDecimal) variables.get("ESI_ER_RATE")).doubleValue() : 0.0325;
-                            esiEr = wagesBaseVal.multiply(BigDecimal.valueOf(esiErRate))
-                                    .setScale(2, RoundingMode.HALF_UP);
-                        }
-                    }
-
-                    BigDecimal employerContributionsSum = epfEr.add(epsEr).add(edli).add(esiEr);
-                    baseVal = monthlyCtc.subtract(otherBaseAllowancesSum).subtract(employerContributionsSum)
-                            .max(BigDecimal.ZERO);
-                } else {
-                    baseVal = calculateComponentValue(item, overrides, variables);
-                    otherBaseAllowancesSum = otherBaseAllowancesSum.add(baseVal);
-                }
-                baseAllowances.put(item.getComponentCode(), baseVal);
-                variables.put(item.getComponentCode(), baseVal);
+            String code = item.getComponentCode();
+            if ("SPECIAL_ALLOWANCE".equalsIgnoreCase(code)) {
+                continue; // Skip - calculate in second stage
+            }
+            if ("ALLOWANCE".equalsIgnoreCase(getComponentType(code, customComponentTypes))) {
+                BigDecimal val = calculateComponentValue(item, overrides, variables);
+                baseAllowances.put(code, val);
+                sumOfOtherAllowances = sumOfOtherAllowances.add(val);
+                variables.put(code, val);
             }
         }
+
+        BigDecimal specialAllowance = BigDecimal.ZERO;
+        for (TenantSalaryStructure item : orderedStructure) {
+            if ("SPECIAL_ALLOWANCE".equalsIgnoreCase(item.getComponentCode())) {
+                // Calculate SPECIAL_ALLOWANCE as 10% of CTC using banker's rounding
+                specialAllowance = monthlyCtc.multiply(SPECIAL_ALLOWANCE_PERCENTAGE)
+                    .setScale(2, RoundingMode.HALF_EVEN);
+
+                // CRITICAL: Ensure CTC = sum of all components
+                BigDecimal sumOfAllComponents = baseAllowances.values().stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .add(specialAllowance);
+
+                // If there's a mismatch, adjust special allowance to balance
+                if (sumOfAllComponents.compareTo(monthlyCtc) != 0) {
+                    BigDecimal adjustment = monthlyCtc.subtract(sumOfAllComponents);
+                    specialAllowance = specialAllowance.add(adjustment).max(BigDecimal.ZERO);
+                    log.warn("Adjusted SPECIAL_ALLOWANCE by {} to balance CTC", adjustment);
+                }
+            }
+        }
+        baseAllowances.put("SPECIAL_ALLOWANCE", specialAllowance);
+        variables.put("SPECIAL_ALLOWANCE", specialAllowance);
 
         // 5. Second pass: Apply Proration and LOP deductions to base values
         for (TenantSalaryStructure item : orderedStructure) {
             if ("ALLOWANCE".equalsIgnoreCase(getComponentType(item.getComponentCode(), customComponentTypes))) {
                 BigDecimal baseVal    = baseAllowances.getOrDefault(item.getComponentCode(), BigDecimal.ZERO);
-                BigDecimal proratedVal = baseVal.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal proratedVal = baseVal.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
 
-                if (lopDays.compareTo(BigDecimal.ZERO) > 0 && isLopApplicable(item.getComponentCode(), customComponentTypes)) {
-                    BigDecimal dailyWage    = baseVal.divide(workingDays, 6, RoundingMode.HALF_UP);
-                    BigDecimal lopDeduction = dailyWage.multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+                if (lopDays.compareTo(BigDecimal.ZERO) > 0 && isLopApplicable(item.getComponentCode(), lopApplicabilityMap)) {
+                    BigDecimal dailyWage    = baseVal.divide(workingDays, 6, RoundingMode.HALF_EVEN);
+                    BigDecimal lopDeduction = dailyWage.multiply(lopDays).setScale(2, RoundingMode.HALF_EVEN);
                     proratedVal = proratedVal.subtract(lopDeduction).max(BigDecimal.ZERO);
                 }
 
-                data.getComponentValues().put(item.getComponentCode(), proratedVal);
-                data.getExpressions().put(item.getComponentCode(), getFormulaExpression(item, overrides));
+                data.putComponentValue(item.getComponentCode(), proratedVal);
+                data.putExpression(item.getComponentCode(), getFormulaExpression(item, overrides));
                 variables.put(item.getComponentCode(), proratedVal);
                 data.setGrossEarnings(data.getGrossEarnings().add(proratedVal));
                 if (item.isTaxable()) {
@@ -180,7 +151,7 @@ public class SalaryComponentCalculator {
         BigDecimal basic = data.getComponentValues().getOrDefault("BASIC", BigDecimal.ZERO);
         data.setWagesBase(basic);
         if (tenantConfig.isEnforceNewLabourCodes()) {
-            BigDecimal floor = activeCtc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal floor = activeCtc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_EVEN);
             data.setWagesBase(basic.max(floor));
         }
         variables.put("WAGES_BASE", data.getWagesBase());
@@ -190,6 +161,17 @@ public class SalaryComponentCalculator {
                 tenantConfig.getTenant().getId(), employee.getId(), year, month, monthlyCtc));
         variables.put("CONTRIBUTION_PERIOD_GROSS", data.getContributionPeriodGross());
 
+        // Get ESI ceiling from statutory rates with dynamic configuration
+        BigDecimal esiCeiling = BigDecimal.valueOf(21000); // Default fallback
+        for (StatutoryRateConfig rateConfig : statutoryRates) {
+            if ("ESI_ER".equalsIgnoreCase(rateConfig.getComponentCode())) {
+                if (rateConfig.getCeilingAmount() != null) {
+                    esiCeiling = rateConfig.getCeilingAmount();
+                    break;
+                }
+            }
+        }
+
         // 7. Deductions pass
         for (TenantSalaryStructure item : orderedStructure) {
             if ("DEDUCTION".equalsIgnoreCase(getComponentType(item.getComponentCode(), customComponentTypes))) {
@@ -198,7 +180,7 @@ public class SalaryComponentCalculator {
 
                 if ("ESI_EE".equalsIgnoreCase(code) || "ESI_ER".equalsIgnoreCase(code)) {
                     if (tenantConfig.isEnableEsi()
-                            && data.getContributionPeriodGross().compareTo(BigDecimal.valueOf(21000)) <= 0) {
+                            && data.getContributionPeriodGross().compareTo(esiCeiling) <= 0) {
                         val = calculateComponentValue(item, overrides, variables);
                     }
                 } else if ("PT_DEDUCTION".equalsIgnoreCase(code) || "PT".equalsIgnoreCase(code)) {
@@ -228,14 +210,13 @@ public class SalaryComponentCalculator {
                     } else {
                         double epfEeRate = variables.containsKey("EPF_EE_RATE") ? ((BigDecimal) variables.get("EPF_EE_RATE")).doubleValue() : 0.12;
                         val = data.getWagesBase().multiply(BigDecimal.valueOf(epfEeRate))
-                                .setScale(2, RoundingMode.HALF_UP);
+                                .setScale(2, RoundingMode.HALF_EVEN);
                     }
                 } else {
                     val = calculateComponentValue(item, overrides, variables);
                 }
-
-                data.getComponentValues().put(code, val);
-                data.getExpressions().put(code, getFormulaExpression(item, overrides));
+                data.putComponentValue(code, val);
+                data.putExpression(code, getFormulaExpression(item, overrides));
                 variables.put(code, val);
                 if (!isEmployerContribution(code)) {
                     data.setTotalDeductions(data.getTotalDeductions().add(val));
@@ -244,6 +225,18 @@ public class SalaryComponentCalculator {
         }
 
         return data;
+    }
+
+    private Map<String, Boolean> buildLopApplicabilityMap(Long tenantId) {
+        List<SalaryComponentDefinition> definitions = componentDefinitionRepo
+                .findAllowedByTenantAndDate(tenantId, LocalDate.now());
+        
+        return definitions.stream()
+                .collect(Collectors.toMap(
+                        d -> d.getComponentCode().toUpperCase(),
+                        SalaryComponentDefinition::isLopApplicable,
+                        (a, b) -> a
+                ));
     }
 
     public BigDecimal calculateComponentValue(TenantSalaryStructure structure,
@@ -261,12 +254,12 @@ public class SalaryComponentCalculator {
                         : BigDecimal.ZERO;
                 if ("PERCENTAGE_OF_CTC".equalsIgnoreCase(structure.getCalculationType())) {
                     BigDecimal ctc = (BigDecimal) variables.getOrDefault("CTC", BigDecimal.ZERO);
-                    return ctc.multiply(pct.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP))
-                            .setScale(2, RoundingMode.HALF_UP);
+                    return ctc.multiply(pct.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
+                            .setScale(2, RoundingMode.HALF_EVEN);
                 } else if ("PERCENTAGE_OF_BASIC".equalsIgnoreCase(structure.getCalculationType())) {
                     BigDecimal basic = (BigDecimal) variables.getOrDefault("BASIC", BigDecimal.ZERO);
-                    return basic.multiply(pct.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP))
-                            .setScale(2, RoundingMode.HALF_UP);
+                    return basic.multiply(pct.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
+                            .setScale(2, RoundingMode.HALF_EVEN);
                 }
             }
             if (compOverride.getOverrideFormula() != null && !compOverride.getOverrideFormula().isEmpty()) {
@@ -275,17 +268,23 @@ public class SalaryComponentCalculator {
             return compOverride.getOverrideValue();
         }
 
+        // Guard against null values
+        if (structure.getValue() == null) {
+            log.warn("Structure value is null for component: {}", structure.getComponentCode());
+            return BigDecimal.ZERO;
+        }
+
         // Otherwise evaluate tenant salary structure rules
         if ("FIXED".equalsIgnoreCase(structure.getCalculationType())) {
             return structure.getValue();
         } else if ("PERCENTAGE_OF_CTC".equalsIgnoreCase(structure.getCalculationType())) {
             BigDecimal ctc = (BigDecimal) variables.getOrDefault("CTC", BigDecimal.ZERO);
-            return ctc.multiply(structure.getValue().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP))
-                    .setScale(2, RoundingMode.HALF_UP);
+            return ctc.multiply(structure.getValue().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
+                    .setScale(2, RoundingMode.HALF_EVEN);
         } else if ("PERCENTAGE_OF_BASIC".equalsIgnoreCase(structure.getCalculationType())) {
             BigDecimal basic = (BigDecimal) variables.getOrDefault("BASIC", BigDecimal.ZERO);
-            return basic.multiply(structure.getValue().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP))
-                    .setScale(2, RoundingMode.HALF_UP);
+            return basic.multiply(structure.getValue().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
+                    .setScale(2, RoundingMode.HALF_EVEN);
         } else if ("FORMULA".equalsIgnoreCase(structure.getCalculationType())) {
             return formulaService.evaluate(getFormulaForComponent(structure.getComponentCode()), variables);
         }
@@ -340,8 +339,12 @@ public class SalaryComponentCalculator {
         return componentCode;
     }
 
-    public boolean isLopApplicable(String componentCode, Map<String, String> customComponentTypes) {
-        return "ALLOWANCE".equals(getComponentType(componentCode, customComponentTypes));
+    public boolean isLopApplicable(String componentCode, Map<String, Boolean> lopApplicabilityMap) {
+        if (lopApplicabilityMap == null) {
+            // Fallback to type-based check
+            return "ALLOWANCE".equals(getComponentType(componentCode, null));
+        }
+        return lopApplicabilityMap.getOrDefault(componentCode.toUpperCase(), false);
     }
 
     public boolean isEmployerContribution(String componentCode) {

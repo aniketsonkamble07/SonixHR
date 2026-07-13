@@ -13,6 +13,7 @@ import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -23,29 +24,68 @@ public class FormulaService {
     private final SandboxedSpELEngine spelEngine;
     private final Map<String, Expression> expressionCache = new ConcurrentHashMap<>();
 
+    // Whitelist of allowed AST node class names
+    private static final Set<String> ALLOWED_NODE_CLASSES = Set.of(
+            "CompoundExpression",
+            "Literal",
+            "IntLiteral",
+            "LongLiteral",
+            "FloatLiteral",
+            "DoubleLiteral",
+            "RealLiteral",
+            "StringLiteral",
+            "BooleanLiteral",
+            "NullLiteral",
+            "VariableReference",
+            "PropertyOrFieldReference",
+            "OpPlus", "OperatorPlus",
+            "OpMinus", "OperatorMinus",
+            "OpMultiply", "OperatorMultiply",
+            "OpDivide", "OperatorDivide",
+            "OpPower", "OperatorPower",
+            "OpModulus", "OperatorModulus",
+            "OpEQ", "OperatorEquals",
+            "OpNE", "OperatorNotEquals",
+            "OpLT", "OperatorLessThan",
+            "OpLE", "OperatorLessThanOrEqual",
+            "OpGT", "OperatorGreaterThan",
+            "OpGE", "OperatorGreaterThanOrEqual",
+            "OpAnd", "OperatorAnd",
+            "OpOr", "OperatorOr",
+            "OpNot", "OperatorNot",
+            "OperatorBetween",
+            "OperatorInstanceof",
+            "OperatorMatches",
+            "MethodReference", // Only for whitelisted methods
+            "FunctionReference",
+            "Ternary",
+            "Elvis"
+    );
+
+    // Whitelist of allowed method names
+    private static final Set<String> ALLOWED_METHOD_NAMES = Set.of(
+            "min", "max", "round"
+    );
+
+    // Whitelist of allowed variable name patterns
+    private static final String ALLOWED_VAR_PATTERN = "^[A-Z][A-Z0-9_]*$";
+
     public BigDecimal evaluate(String formula, Map<String, Object> variables) {
         if (formula == null || formula.trim().isEmpty()) {
             return BigDecimal.ZERO;
         }
 
         try {
-            // Retrieve or parse expression from cache
             Expression expression = expressionCache.computeIfAbsent(formula, spelEngine::parse);
-
-            // AST-based validation check before evaluation
             validateExpressionAst(expression);
-
-            // Convert BigDecimal / Numeric inputs to Double for standard SpEL math
+            
             Map<String, Object> doubleVars = convertToDoubleVariables(variables);
-
-            // Evaluate dynamically via low-level SandboxedSpELEngine
             Double rawResult = spelEngine.evaluate(expression, doubleVars);
 
             if (rawResult == null) {
                 return BigDecimal.ZERO;
             }
 
-            // Convert Double output back to BigDecimal with 2 decimal places rounding
             return BigDecimal.valueOf(rawResult).setScale(2, RoundingMode.HALF_UP);
         } catch (Exception e) {
             throw new TechnicalException("TECH_FORMULA", "Salary formula evaluation failed", 
@@ -75,7 +115,7 @@ public class FormulaService {
     }
 
     /**
-     * Inspects SpEL AST nodes for security, expression length, and syntax validation.
+     * Validates SpEL AST with strict whitelist to prevent code injection.
      */
     private void validateExpressionAst(Expression expression) {
         if (!(expression instanceof SpelExpression)) {
@@ -85,40 +125,70 @@ public class FormulaService {
         SpelExpression spelExpression = (SpelExpression) expression;
         String originalExpression = spelExpression.getExpressionString();
         
-        // 1. Check max expression length
+        // Check max expression length
         if (originalExpression != null && originalExpression.length() > 500) {
             throw new IllegalArgumentException("Formula expression exceeds maximum allowed length of 500 characters.");
         }
         
-        // 2. Validate AST nodes recursively
-        verifyAstNode(spelExpression.getAST());
+        // Validate AST nodes recursively
+        validateAstNode(spelExpression.getAST());
     }
 
-    private void verifyAstNode(SpelNode node) {
+    private void validateAstNode(SpelNode node) {
         if (node == null) return;
 
         String nodeClass = node.getClass().getSimpleName();
+        
+        // Check if node class is whitelisted
+        if (!ALLOWED_NODE_CLASSES.contains(nodeClass)) {
+            throw new IllegalArgumentException("Disallowed expression element: " + nodeClass);
+        }
+
+        // Special validation for VariableReference
         if ("VariableReference".equals(nodeClass)) {
-            String varName = node.toStringAST(); // e.g. "#BASIC" or "#min"
+            String varName = node.toStringAST();
             if (varName.startsWith("#")) {
                 String name = varName.substring(1);
-                // Allow our registered functions
-                if (!name.equals("min") && !name.equals("max") && !name.equals("round")) {
-                    // Variable must follow uppercase alphanumeric component/rate code pattern
-                    if (!name.matches("^[A-Z][A-Z0-9_]*$")) {
+                // Check if it's a function call
+                if (ALLOWED_METHOD_NAMES.contains(name)) {
+                    // Allowed function
+                } else {
+                    // Variable must follow uppercase alphanumeric pattern
+                    if (!name.matches(ALLOWED_VAR_PATTERN)) {
                         throw new IllegalArgumentException("Unauthorized variable name: " + varName);
                     }
                 }
             }
-        } else if ("PropertyOrFieldReference".equals(nodeClass)) {
+        }
+
+        // Special validation for MethodReference
+        if ("MethodReference".equals(nodeClass)) {
+            String methodName = node.toStringAST();
+            // Extract method name from the AST string representation
+            // The format is typically "methodName" or "methodName()"
+            String cleanName = methodName.replaceAll("\\s*\\(.*\\)\\s*$", "").trim();
+            
+            // Check if it's a whitelisted method
+            boolean isWhitelisted = ALLOWED_METHOD_NAMES.stream()
+                    .anyMatch(cleanName::equalsIgnoreCase);
+                    
+            if (!isWhitelisted) {
+                throw new IllegalArgumentException("Unauthorized method reference: " + methodName);
+            }
+        }
+
+        // Special validation for PropertyOrFieldReference
+        if ("PropertyOrFieldReference".equals(nodeClass)) {
             String propName = node.toStringAST();
-            if (!propName.matches("^[A-Z][A-Z0-9_]*$")) {
+            // Only allow uppercase alphanumeric with underscore
+            if (!propName.matches(ALLOWED_VAR_PATTERN)) {
                 throw new IllegalArgumentException("Unauthorized property reference: " + propName);
             }
         }
 
+        // Recursively validate children
         for (int i = 0; i < node.getChildCount(); i++) {
-            verifyAstNode(node.getChild(i));
+            validateAstNode(node.getChild(i));
         }
     }
 }

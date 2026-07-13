@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -115,7 +116,7 @@ public class FnfSettlementService {
                 employee.getHireDate().plusYears(fullYears), terminationDate);
         int yearsOfService = (int) (fullYears + (remainingMonths >= 6 ? 1 : 0));
 
-        BigDecimal perDayRate = lastDrawnBasic.divide(BigDecimal.valueOf(30), 6, RoundingMode.HALF_UP);
+        BigDecimal perDayRate = lastDrawnBasic.divide(BigDecimal.valueOf(30), 6, RoundingMode.HALF_EVEN);
         BigDecimal avgBasic = getAvgMonthlySalaryLast10Months(employeeId, tenantId, lastDrawnBasic, terminationDate);
 
         LeaveEncashmentCalculator.LeaveEncashmentResult leaveEncashmentResult = leaveEncashmentCalculator.calculateEncashment(
@@ -129,16 +130,18 @@ public class FnfSettlementService {
                 customComponentTypes, customComponentNames);
 
         // 4. Sum outstanding loan balances and close them
-        List<LoanAdvance> activeLoans = loanAdvanceRepository.findActiveByEmployeeIdAndTenantId(employeeId, tenantId);
+        List<Object[]> loanRecoveryData = loanAdvanceRepository.findActiveLoansWithRecoverySum(
+                employeeId, tenantId);
+        
         BigDecimal totalLoanOutstanding = BigDecimal.ZERO;
-        for (LoanAdvance loan : activeLoans) {
-            BigDecimal recoveredSoFar = payslipItemRepo.sumRecoveredForLoan(loan.getId().toString());
-            if (recoveredSoFar == null) {
-                recoveredSoFar = BigDecimal.ZERO;
-            }
+        for (Object[] row : loanRecoveryData) {
+            LoanAdvance loan = (LoanAdvance) row[0];
+            BigDecimal recoveredSoFar = (BigDecimal) row[1];
+            if (recoveredSoFar == null) recoveredSoFar = BigDecimal.ZERO;
+            
             BigDecimal outstanding = loan.getPrincipalAmount().subtract(recoveredSoFar).max(BigDecimal.ZERO);
             totalLoanOutstanding = totalLoanOutstanding.add(outstanding);
-
+            
             loan.setStatus(LoanStatus.CLOSED);
             loanAdvanceRepository.save(loan);
         }
@@ -169,7 +172,7 @@ public class FnfSettlementService {
                 .subtract(deductionsProrated)
                 .subtract(totalLoanOutstanding)
                 .subtract(fnfTds)
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(2, RoundingMode.HALF_EVEN);
 
         FnfSettlement settlement = FnfSettlement.builder()
                 .tenant(activeProfile.getTenant())
@@ -273,8 +276,28 @@ public class FnfSettlementService {
         return settlement;
     }
 
-    private BigDecimal getAvgMonthlySalaryLast10Months(Long employeeId, Long tenantId, BigDecimal currentBasic, LocalDate terminationDate) {
-        // Fallback to currentBasic if no payslips or history found
-        return currentBasic;
+    BigDecimal getAvgMonthlySalaryLast10Months(Long employeeId, Long tenantId, 
+            BigDecimal currentBasic, LocalDate terminationDate) {
+        
+        // Calculate FY start
+        int month = terminationDate.getMonthValue();
+        int year = terminationDate.getYear();
+        int fyStartYear = (month >= 4) ? year : year - 1;
+        LocalDate fyStart = LocalDate.of(fyStartYear, 4, 1);
+        
+        // Query last 10 months of basic salary from payslips
+        List<BigDecimal> last10Basics = payslipItemRepo.findLastBasicSalaries(
+                tenantId, employeeId, fyStart, terminationDate, PageRequest.of(0, 10));
+        
+        if (last10Basics.isEmpty()) {
+            log.warn("No payslip history found for employee {}, using current basic: {}", 
+                    employeeId, currentBasic);
+            return currentBasic;
+        }
+        
+        // Calculate average of available months (could be less than 10)
+        BigDecimal sum = last10Basics.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        int count = last10Basics.size();
+        return sum.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_EVEN);
     }
 }

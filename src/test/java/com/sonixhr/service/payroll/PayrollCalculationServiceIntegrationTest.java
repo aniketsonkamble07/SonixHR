@@ -159,7 +159,7 @@ public class PayrollCalculationServiceIntegrationTest {
                 .thenReturn(seg2Data);
 
         // Setup mock TDS returns
-        BigDecimal expectedTds = BigDecimal.valueOf(1250);
+        BigDecimal expectedTds = BigDecimal.valueOf(1250).setScale(2);
         when(tdsCalculator.calculateMonthlyTds(
                 eq(employee), eq(tenantId), eq(TaxRegime.NEW_REGIME), eq(BigDecimal.valueOf(45000)), eq(month), eq(year)))
                 .thenReturn(expectedTds);

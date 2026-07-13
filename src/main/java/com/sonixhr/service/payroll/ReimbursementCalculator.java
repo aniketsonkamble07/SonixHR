@@ -26,7 +26,7 @@ public class ReimbursementCalculator {
         for (ReimbursementClaim claim : claims) {
             String categoryCode = "REIMB_" + claim.getCategory().name();
             BigDecimal categorySum = data.getReimbursementBreakdown().getOrDefault(categoryCode, BigDecimal.ZERO);
-            data.getReimbursementBreakdown().put(categoryCode, categorySum.add(claim.getClaimAmount()));
+            data.putReimbursement(categoryCode, categorySum.add(claim.getClaimAmount()));
             total = total.add(claim.getClaimAmount());
         }
         data.setReimbursementTotal(total);

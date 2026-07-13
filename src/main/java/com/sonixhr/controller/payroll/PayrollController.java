@@ -82,79 +82,88 @@ public class PayrollController {
         double esiEeRate = getRate(activeRates, "ESI_EE", 0.0075);
 
         // Step 1: Base allowances split (Pass 1)
-        BigDecimal basicBase = ctc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal hraBase = basicBase.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal basicBase = ctc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal hraBase = basicBase.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_EVEN);
 
         BigDecimal wagesBaseBase = basicBase;
         if (compliantMode) {
-            wagesBaseBase = basicBase.max(ctc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_UP));
+            wagesBaseBase = basicBase.max(ctc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_EVEN));
         }
 
         // Compute base employer contributions
         BigDecimal epsErBaseVal = wagesBaseBase.multiply(BigDecimal.valueOf(epsErRate));
-        BigDecimal epsErBase = BigDecimal.valueOf(Math.min(Math.round(epsErBaseVal.doubleValue()), epsErCap)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal epfErBase = wagesBaseBase.multiply(BigDecimal.valueOf(epfErRate)).setScale(2, RoundingMode.HALF_UP).subtract(epsErBase);
+        BigDecimal epsErBase = BigDecimal.valueOf(Math.min(Math.round(epsErBaseVal.doubleValue()), epsErCap)).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal epfErBase = wagesBaseBase.multiply(BigDecimal.valueOf(epfErRate)).setScale(2, RoundingMode.HALF_EVEN).subtract(epsErBase);
         if (epfErBase.compareTo(BigDecimal.ZERO) < 0) {
             epfErBase = BigDecimal.ZERO;
         }
-        BigDecimal edliBase = wagesBaseBase.min(BigDecimal.valueOf(edliCeiling)).multiply(BigDecimal.valueOf(edliRate)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal edliBase = wagesBaseBase.min(BigDecimal.valueOf(edliCeiling)).multiply(BigDecimal.valueOf(edliRate)).setScale(2, RoundingMode.HALF_EVEN);
+        
+        // ESI dynamic ceiling lookup
+        double esiCeiling = getCeiling(activeRates, "ESI_ER", 21000.0);
         BigDecimal esiErBase = BigDecimal.ZERO;
-        if (esiPeriodStartGross.compareTo(BigDecimal.valueOf(21000)) <= 0) {
-            esiErBase = wagesBaseBase.multiply(BigDecimal.valueOf(esiErRate)).setScale(2, RoundingMode.HALF_UP);
+        if (esiPeriodStartGross.compareTo(BigDecimal.valueOf(esiCeiling)) <= 0) {
+            esiErBase = wagesBaseBase.multiply(BigDecimal.valueOf(esiErRate)).setScale(2, RoundingMode.HALF_EVEN);
         }
 
         BigDecimal employerContributionsBase = epfErBase.add(epsErBase).add(edliBase).add(esiErBase);
-        BigDecimal specialAllowanceBase = ctc.subtract(basicBase).subtract(hraBase).subtract(employerContributionsBase);
-        if (specialAllowanceBase.compareTo(BigDecimal.ZERO) < 0) {
-            specialAllowanceBase = BigDecimal.ZERO;
+        
+        // Calculate SPECIAL_ALLOWANCE as 10% of CTC
+        BigDecimal specialAllowanceBase = ctc.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_EVEN);
+        
+        // Balance components
+        BigDecimal sumOfAllComponentsBase = basicBase.add(hraBase).add(specialAllowanceBase).add(employerContributionsBase);
+        if (sumOfAllComponentsBase.compareTo(ctc) != 0) {
+            BigDecimal adjustment = ctc.subtract(sumOfAllComponentsBase);
+            specialAllowanceBase = specialAllowanceBase.add(adjustment).max(BigDecimal.ZERO);
         }
 
         // Step 2: Apply Proration and LOP (Pass 2)
         BigDecimal prorationFactor = BigDecimal.ONE;
 
-        BigDecimal basic = basicBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal basicLop = basic.divide(BigDecimal.valueOf(totalDays), 6, RoundingMode.HALF_UP).multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal basic = basicBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal basicLop = basic.divide(BigDecimal.valueOf(26), 6, RoundingMode.HALF_EVEN).multiply(lopDays).setScale(2, RoundingMode.HALF_EVEN);
         basic = basic.subtract(basicLop).max(BigDecimal.ZERO);
 
-        BigDecimal hra = hraBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal hraLop = hra.divide(BigDecimal.valueOf(totalDays), 6, RoundingMode.HALF_UP).multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal hra = hraBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal hraLop = hra.divide(BigDecimal.valueOf(26), 6, RoundingMode.HALF_EVEN).multiply(lopDays).setScale(2, RoundingMode.HALF_EVEN);
         hra = hra.subtract(hraLop).max(BigDecimal.ZERO);
 
-        BigDecimal specialAllowance = specialAllowanceBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal specialAllowanceLop = specialAllowance.divide(BigDecimal.valueOf(totalDays), 6, RoundingMode.HALF_UP).multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal specialAllowance = specialAllowanceBase.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal specialAllowanceLop = specialAllowance.divide(BigDecimal.valueOf(26), 6, RoundingMode.HALF_EVEN).multiply(lopDays).setScale(2, RoundingMode.HALF_EVEN);
         specialAllowance = specialAllowance.subtract(specialAllowanceLop).max(BigDecimal.ZERO);
 
         BigDecimal grossEarnings = basic.add(hra).add(specialAllowance);
 
         // Recalculate active statutory calculations
-        BigDecimal activeCtc = ctc.multiply(prorationFactor).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal activeCtc = ctc.multiply(prorationFactor).setScale(2, RoundingMode.HALF_EVEN);
         BigDecimal wagesBase = basic;
         if (compliantMode) {
-            wagesBase = basic.max(activeCtc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_UP));
+            wagesBase = basic.max(activeCtc.multiply(BigDecimal.valueOf(0.50)).setScale(2, RoundingMode.HALF_EVEN));
         }
 
         // Deductions
         BigDecimal epfEe = BigDecimal.ZERO;
         if (pfCapping) {
-            epfEe = wagesBase.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP).min(BigDecimal.valueOf(1800.00));
+            epfEe = wagesBase.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_EVEN).min(BigDecimal.valueOf(1800.00));
         } else {
-            epfEe = wagesBase.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
+            epfEe = wagesBase.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_EVEN);
         }
 
         BigDecimal esiEe = BigDecimal.ZERO;
         BigDecimal esiEr = BigDecimal.ZERO;
-        if (esiPeriodStartGross.compareTo(BigDecimal.valueOf(21000)) <= 0) {
-            esiEe = wagesBase.multiply(BigDecimal.valueOf(esiEeRate)).setScale(2, RoundingMode.HALF_UP);
-            esiEr = wagesBase.multiply(BigDecimal.valueOf(esiErRate)).setScale(2, RoundingMode.HALF_UP);
+        if (esiPeriodStartGross.compareTo(BigDecimal.valueOf(esiCeiling)) <= 0) {
+            esiEe = wagesBase.multiply(BigDecimal.valueOf(esiEeRate)).setScale(2, RoundingMode.HALF_EVEN);
+            esiEr = wagesBase.multiply(BigDecimal.valueOf(esiErRate)).setScale(2, RoundingMode.HALF_EVEN);
         }
 
         BigDecimal epsErVal = wagesBase.multiply(BigDecimal.valueOf(epsErRate));
-        BigDecimal epsEr = BigDecimal.valueOf(Math.min(Math.round(epsErVal.doubleValue()), epsErCap)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal epfEr = wagesBase.multiply(BigDecimal.valueOf(epfErRate)).setScale(2, RoundingMode.HALF_UP).subtract(epsEr);
+        BigDecimal epsEr = BigDecimal.valueOf(Math.min(Math.round(epsErVal.doubleValue()), epsErCap)).setScale(2, RoundingMode.HALF_EVEN);
+        BigDecimal epfEr = wagesBase.multiply(BigDecimal.valueOf(epfErRate)).setScale(2, RoundingMode.HALF_EVEN).subtract(epsEr);
         if (epfEr.compareTo(BigDecimal.ZERO) < 0) {
             epfEr = BigDecimal.ZERO;
         }
-        BigDecimal edli = wagesBase.min(BigDecimal.valueOf(edliCeiling)).multiply(BigDecimal.valueOf(edliRate)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal edli = wagesBase.min(BigDecimal.valueOf(edliCeiling)).multiply(BigDecimal.valueOf(edliRate)).setScale(2, RoundingMode.HALF_EVEN);
 
         // Professional Tax Slab Evaluation
         List<StateProfessionalTaxConfig> slabs = statePtConfigRepo.findAll();

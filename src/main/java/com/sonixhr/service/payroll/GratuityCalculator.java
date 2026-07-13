@@ -41,7 +41,7 @@ public class GratuityCalculator {
         BigDecimal gratuityAmount = lastDrawnBasic
                 .multiply(BigDecimal.valueOf(15))
                 .multiply(BigDecimal.valueOf(yearsOfService))
-                .divide(BigDecimal.valueOf(26), 2, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(26), 2, RoundingMode.HALF_EVEN);
 
         BigDecimal exemptionCap = BigDecimal.valueOf(2000000); // Sec 10(10)
         BigDecimal exemptAmount = gratuityAmount.min(exemptionCap);

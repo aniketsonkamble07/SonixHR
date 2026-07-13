@@ -264,4 +264,90 @@ public class TdsCalculatorTest {
         assertNotNull(tds);
         assertEquals(new BigDecimal("3750.00"), tds);
     }
+
+    @Test
+    public void testCalculateTaxOnNonRecurringIncome() {
+        List<TaxSlabRow> slabs = List.of(
+                new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(300000.0), BigDecimal.ZERO),
+                new TaxSlabRow(BigDecimal.valueOf(300000.0), null, BigDecimal.valueOf(10.0))
+        );
+
+        TaxRegimeSlabConfig config = TaxRegimeSlabConfig.builder()
+                .financialYear("2026-27")
+                .regime(TaxRegime.NEW_REGIME)
+                .slabs(slabs)
+                .standardDeduction(BigDecimal.ZERO)
+                .rebateLimit(BigDecimal.ZERO)
+                .rebateMaxAmount(BigDecimal.ZERO)
+                .cessPercent(BigDecimal.ZERO)
+                .build();
+
+        BigDecimal nonRecurring = BigDecimal.valueOf(50000.0);
+        BigDecimal projectedTotal = BigDecimal.valueOf(400000.0);
+
+        BigDecimal marginalTax = tdsCalculator.calculateTaxOnNonRecurringIncome(nonRecurring, projectedTotal, config);
+
+        assertNotNull(marginalTax);
+        // Base income = 400,000 - 50,000 = 350,000.
+        // Tax on 400,000 = (400,000 - 300,000) * 10% = 10,000.
+        // Tax on 350,000 = (350,000 - 300,000) * 10% = 5,000.
+        // Marginal tax = 10,000 - 5,000 = 5,000.
+        assertEquals(new BigDecimal("5000.00"), marginalTax);
+    }
+
+    @Test
+    public void testCalculateMonthlyTds_StatutorySectionLimitsFallback() {
+        Employee employee = new Employee();
+        employee.setId(2L);
+
+        List<TaxSlabRow> slabs = List.of(
+                new TaxSlabRow(BigDecimal.ZERO, null, BigDecimal.valueOf(10.0))
+        );
+
+        TaxRegimeSlabConfig config = TaxRegimeSlabConfig.builder()
+                .financialYear("2026-27")
+                .regime(TaxRegime.OLD_REGIME)
+                .slabs(slabs)
+                .standardDeduction(BigDecimal.ZERO)
+                .rebateLimit(BigDecimal.ZERO)
+                .rebateMaxAmount(BigDecimal.ZERO)
+                .cessPercent(BigDecimal.ZERO)
+                .build();
+
+        when(taxSlabConfigRepo.findByFinancialYearAndRegime("2026-27", TaxRegime.OLD_REGIME))
+                .thenReturn(Optional.of(config));
+
+        TaxDeclarationLineItem item80c = TaxDeclarationLineItem.builder()
+                .section("80C")
+                .declaredAmount(BigDecimal.valueOf(200000.0))
+                .approvedAmount(BigDecimal.valueOf(200000.0))
+                .build();
+
+        TaxDeclaration declaration = TaxDeclaration.builder()
+                .employeeId(2L)
+                .financialYear("2026-27")
+                .status(DeclarationStatus.VERIFIED)
+                .lineItems(List.of(item80c))
+                .build();
+
+        when(taxDeclarationRepo.findByEmployeeIdAndFinancialYearAndStatus(2L, "2026-27", DeclarationStatus.VERIFIED))
+                .thenReturn(Optional.of(declaration));
+
+        // Let the rule repo return empty cap, so we fallback to statutory limit of 150000.0
+        when(sectionRuleRepo.findCap("80C", TaxRegime.OLD_REGIME, "2026-27"))
+                .thenReturn(Optional.empty());
+
+        BigDecimal monthlyTaxableGross = BigDecimal.valueOf(50000.0);
+
+        BigDecimal tds = tdsCalculator.calculateMonthlyTds(
+                employee, 1L, TaxRegime.OLD_REGIME, monthlyTaxableGross, 4, 2026);
+
+        // Projected gross = 50,000 * 12 = 600,000.
+        // Fallback cap applied: min(200,000, 150,000) = 150,000.
+        // Taxable income = 600,000 - 150,000 = 450,000.
+        // Slab tax = 450,000 * 10% = 45,000.
+        // Monthly TDS = 45,000 / 12 = 3750.
+        assertNotNull(tds);
+        assertEquals(new BigDecimal("3750.00"), tds);
+    }
 }

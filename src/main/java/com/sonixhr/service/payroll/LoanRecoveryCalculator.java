@@ -35,7 +35,7 @@ public class LoanRecoveryCalculator {
             }
 
             BigDecimal thisMonth = loan.getMonthlyInstallment().min(outstanding); // final installment may be smaller
-            data.getLoanRecoveryBreakdown().put(loan.getId().toString(), thisMonth);
+            data.putLoanRecovery(loan.getId().toString(), thisMonth);
             totalRecovery = totalRecovery.add(thisMonth);
         }
         return totalRecovery;

@@ -179,13 +179,16 @@ public class PayrollCalculationService {
 
                 if (segments.isEmpty()) continue;
 
-                // Compute each profile segment's pay.
+                // Distribute LOP days starting from the first segment
+                BigDecimal remainingLopDays = empLopDays;
                 PeriodPayData merged = null;
                 for (ProfileSegment seg : segments) {
-                    BigDecimal segLopDays = (totalActiveDays > 0 && empLopDays.compareTo(BigDecimal.ZERO) > 0)
-                            ? empLopDays.multiply(BigDecimal.valueOf(seg.activeDays()))
-                                        .divide(BigDecimal.valueOf(totalActiveDays), 6, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
+                    BigDecimal segLopDays = BigDecimal.ZERO;
+                    if (remainingLopDays.compareTo(BigDecimal.ZERO) > 0) {
+                        // Apply LOP to this segment, but not exceeding segment days
+                        segLopDays = remainingLopDays.min(BigDecimal.valueOf(seg.activeDays()));
+                        remainingLopDays = remainingLopDays.subtract(segLopDays);
+                    }
 
                     PeriodPayData segData = salaryComponentCalculator.computePeriodPayData(
                             seg.profile(), seg.start(), seg.end(), totalDaysInMonth,
@@ -193,6 +196,28 @@ public class PayrollCalculationService {
                             customComponentTypes, customComponentNames);
 
                     merged = (merged == null) ? segData : mergePeriodData(merged, segData);
+                }
+
+                // Compute arrears
+                BigDecimal arrearsVal = calculateArrears(employee.getId(), tenantConfig.getTenant().getId(), monthStart);
+                merged.setArrears(arrearsVal);
+                if (arrearsVal.compareTo(BigDecimal.ZERO) > 0) {
+                    merged.putComponentValue("ARREARS", arrearsVal);
+                    merged.putExpression("ARREARS", "Retrospective salary revision arrears");
+                    merged.setGrossEarnings(merged.getGrossEarnings().add(arrearsVal));
+                    merged.setTaxableGrossEarnings(merged.getTaxableGrossEarnings().add(arrearsVal));
+                }
+
+                // Compute bonus (Payment of Bonus Act, 1965)
+                int monthsWorkedInFY = getMonthsWorkedInFY(employee.getHireDate(), monthStart);
+                BigDecimal basic = merged.getComponentValues().getOrDefault("BASIC", BigDecimal.ZERO);
+                BigDecimal bonusVal = calculateMonthlyBonus(basic, merged.getGrossEarnings(), monthsWorkedInFY, null);
+                merged.setBonus(bonusVal);
+                if (bonusVal.compareTo(BigDecimal.ZERO) > 0) {
+                    merged.putComponentValue("BONUS", bonusVal);
+                    merged.putExpression("BONUS", "Statutory bonus (Payment of Bonus Act, 1965)");
+                    merged.setGrossEarnings(merged.getGrossEarnings().add(bonusVal));
+                    merged.setTaxableGrossEarnings(merged.getTaxableGrossEarnings().add(bonusVal));
                 }
 
                 // Compute overtime once per employee using OvertimeCalculator
@@ -212,8 +237,8 @@ public class PayrollCalculationService {
                 BigDecimal tds = tdsCalculator.calculateMonthlyTds(
                         employee, tenantConfig.getTenant().getId(), regime, merged.getTaxableGrossEarnings(), month, year);
 
-                merged.getComponentValues().put("TDS", tds);
-                merged.getExpressions().put("TDS", "Projected annual tax / remaining months");
+                merged.putComponentValue("TDS", tds);
+                merged.putExpression("TDS", "Projected annual tax / remaining months");
                 merged.setTotalDeductions(merged.getTotalDeductions().add(tds));
 
                 // Post-merge loan recovery deduction (once per employee-month, post-segment-merge)
@@ -221,8 +246,8 @@ public class PayrollCalculationService {
                 if (loanRecovery == null) {
                     loanRecovery = BigDecimal.ZERO;
                 }
-                merged.getComponentValues().put("LOAN_EMI", loanRecovery);
-                merged.getExpressions().put("LOAN_EMI", "Derived balance recovery");
+                merged.putComponentValue("LOAN_EMI", loanRecovery);
+                merged.putExpression("LOAN_EMI", "Derived balance recovery");
                 merged.setTotalDeductions(merged.getTotalDeductions().add(loanRecovery));
 
                 // Post-merge reimbursements calculation (does not affect gross earnings or deductions base)
@@ -258,26 +283,108 @@ public class PayrollCalculationService {
      * Merges two PeriodPayData objects (from consecutive salary profile segments).
      */
     private PeriodPayData mergePeriodData(PeriodPayData a, PeriodPayData b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        
         PeriodPayData merged = new PeriodPayData();
-
-        // Component values: sum per component code across both segments
-        merged.getComponentValues().putAll(a.getComponentValues());
-        b.getComponentValues().forEach((code, val) ->
-            merged.getComponentValues().merge(code, val, BigDecimal::add));
-
-        // Expressions: last segment wins for the same key
-        merged.getExpressions().putAll(a.getExpressions());
-        merged.getExpressions().putAll(b.getExpressions());
-
-        merged.setGrossEarnings(a.getGrossEarnings().add(b.getGrossEarnings()));
-        merged.setTotalDeductions(a.getTotalDeductions().add(b.getTotalDeductions()));
-        merged.setLopDays(a.getLopDays().add(b.getLopDays()));
-        merged.setTaxableGrossEarnings(a.getTaxableGrossEarnings().add(b.getTaxableGrossEarnings()));
-
-        // Most-recent segment wins for point-in-time fields
-        merged.setWagesBase(b.getWagesBase());
-        merged.setContributionPeriodGross(b.getContributionPeriodGross());
-
+        merged.merge(a);
+        merged.merge(b);
+        
         return merged;
+    }
+
+    /**
+     * Calculate arrears from retrospective salary revisions
+     */
+    private BigDecimal calculateArrears(Long employeeId, Long tenantId, LocalDate monthStart) {
+        // Get all salary profile changes ordered by effective date
+        List<EmployeeSalaryProfile> allProfiles = employeeSalaryProfileRepo
+                .findByEmployeeIdOrderByEffectiveFromAsc(employeeId);
+        
+        List<EmployeeSalaryProfile> profiles = allProfiles.stream()
+                .filter(p -> p.getEffectiveFrom().isBefore(monthStart) || p.getEffectiveFrom().isEqual(monthStart))
+                .collect(Collectors.toList());
+        
+        if (profiles.size() < 2) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Find the most recent change that was retrospective
+        EmployeeSalaryProfile latest = profiles.get(profiles.size() - 1);
+        EmployeeSalaryProfile previous = profiles.get(profiles.size() - 2);
+        
+        // Check if it's retrospective (effective date < current month start)
+        if (latest.getEffectiveFrom().isAfter(monthStart)) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Calculate difference for the months from effective date to current
+        LocalDate effectiveDate = latest.getEffectiveFrom();
+        BigDecimal ctcDiff = latest.getMonthlyCtc().subtract(previous.getMonthlyCtc());
+        
+        // Only positive arrears (increments)
+        if (ctcDiff.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Calculate months between effective date and current month
+        long monthsDiff = java.time.temporal.ChronoUnit.MONTHS.between(
+            effectiveDate.withDayOfMonth(1), 
+            monthStart.withDayOfMonth(1)
+        );
+        
+        return ctcDiff.multiply(BigDecimal.valueOf(monthsDiff))
+            .setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    /**
+     * Calculate statutory bonus under Payment of Bonus Act, 1965
+     */
+    private BigDecimal calculateMonthlyBonus(BigDecimal basicSalary, BigDecimal grossSalary, 
+            int monthsWorkedInFY, BigDecimal bonusPercentage) {
+        
+        // Check eligibility
+        if (basicSalary == null || basicSalary.compareTo(new BigDecimal("21000")) > 0) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Monthly service eligibility: needs 30 days in FY
+        if (monthsWorkedInFY < 1) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Bonus calculation base is capped at ₹7,000 per month
+        BigDecimal bonusBase = basicSalary.min(new BigDecimal("7000"));
+        
+        // Default minimum rate: 8.33% (1/12th of 100%)
+        BigDecimal rate = bonusPercentage != null ? bonusPercentage : new BigDecimal("8.33");
+        BigDecimal bonusMonthly = bonusBase
+            .multiply(rate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_EVEN))
+            .setScale(2, RoundingMode.HALF_EVEN);
+        
+        // For monthly proration
+        return bonusMonthly.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_EVEN);
+    }
+
+    private int getMonthsWorkedInFY(LocalDate hireDate, LocalDate monthStart) {
+        if (hireDate == null) {
+            return 12;
+        }
+        int month = monthStart.getMonthValue();
+        int year = monthStart.getYear();
+        int fyStartYear = (month >= 4) ? year : year - 1;
+        LocalDate fyStart = LocalDate.of(fyStartYear, 4, 1);
+        
+        LocalDate start = hireDate.isBefore(fyStart) ? fyStart : hireDate;
+        if (start.isAfter(monthStart)) {
+            return 0;
+        }
+        
+        long months = java.time.temporal.ChronoUnit.MONTHS.between(
+            start.withDayOfMonth(1),
+            monthStart.withDayOfMonth(1)
+        ) + 1; // include current month
+        
+        return (int) months;
     }
 }

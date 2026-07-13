@@ -54,6 +54,6 @@ public class LoanRecoveryCalculatorTest {
         BigDecimal recovery = calculator.calculateMonthlyRecovery(employee, tenantId, data);
 
         assertEquals(BigDecimal.valueOf(1000), recovery);
-        assertEquals(BigDecimal.valueOf(1000), data.getLoanRecoveryBreakdown().get(loanId.toString()));
+        assertEquals(BigDecimal.valueOf(1000).setScale(2), data.getLoanRecoveryBreakdown().get(loanId.toString()));
     }
 }

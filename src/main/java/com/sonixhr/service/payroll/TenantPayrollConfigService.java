@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Deprecated
 @Slf4j
 @Service
 @RequiredArgsConstructor
