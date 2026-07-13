@@ -78,16 +78,6 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 log.info("Platform Data Initializer Started");
                 log.info("=========================================");
 
-                try {
-                        int updatedRows = jdbcTemplate.update(
-                                "UPDATE employees SET is_active = true " +
-                                "WHERE tenant_id = (SELECT id FROM tenants WHERE admin_email = 'aditya.sharma@tridenttech.co.in' LIMIT 1)"
-                        );
-                        log.info("Startup activation: successfully activated {} employees for tenant 'aditya.sharma@tridenttech.co.in'.", updatedRows);
-                } catch (Exception e) {
-                        log.error("Failed to run startup activation: {}", e.getMessage());
-                }
-
                 // Alter blood_group only if the column type/length does not already match —
                 // avoids a table lock on every boot
                 try {
