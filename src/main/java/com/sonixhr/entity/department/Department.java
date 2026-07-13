@@ -43,6 +43,10 @@ public class Department {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

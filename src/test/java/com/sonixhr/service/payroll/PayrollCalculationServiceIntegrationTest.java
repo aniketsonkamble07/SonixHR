@@ -41,6 +41,8 @@ public class PayrollCalculationServiceIntegrationTest {
     @Mock private SalaryComponentCalculator salaryComponentCalculator;
     @Mock private PayslipGenerator payslipGenerator;
     @Mock private TdsCalculator tdsCalculator;
+    @Mock private LoanRecoveryCalculator loanRecoveryCalculator;
+    @Mock private ReimbursementCalculator reimbursementCalculator;
     @Mock private AuditLogService auditLogService;
     @Mock private JdbcTemplate jdbcTemplate;
 
@@ -67,8 +69,11 @@ public class PayrollCalculationServiceIntegrationTest {
                 salaryComponentCalculator,
                 payslipGenerator,
                 tdsCalculator,
+                loanRecoveryCalculator,
+                reimbursementCalculator,
                 auditLogService
         );
+        when(loanRecoveryCalculator.calculateMonthlyRecovery(any(), any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
     @Test

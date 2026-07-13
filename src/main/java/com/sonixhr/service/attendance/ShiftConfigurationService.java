@@ -34,14 +34,14 @@ public class ShiftConfigurationService {
 
         log.info("Creating shift configuration for tenant: {} by employee: {}", tenantId, employeeId);
 
-        if (shiftConfigurationRepository.existsByTenantId(tenantId)) {
+        if (shiftConfigurationRepository.existsByTenantIdAndIsDeletedFalse(tenantId)) {
             throw new BusinessException("Shift configuration already exists for this tenant");
         }
 
         validateShiftTimings(request.getStartTime(), request.getEndTime());
 
         if (request.getShiftCode() != null && !request.getShiftCode().isEmpty()) {
-            if (shiftConfigurationRepository.existsByShiftCodeAndTenantId(request.getShiftCode(), tenantId)) {
+            if (shiftConfigurationRepository.existsByShiftCodeAndTenantIdAndIsDeletedFalse(request.getShiftCode(), tenantId)) {
                 throw new BusinessException("Shift code already exists for this tenant: " + request.getShiftCode());
             }
         }
@@ -76,7 +76,7 @@ public class ShiftConfigurationService {
                 .effectiveFrom(request.getEffectiveFrom() != null ? request.getEffectiveFrom() : LocalDate.now())
                 .effectiveTo(request.getEffectiveTo())
                 .isActive(true)
-                .isDefault(!shiftConfigurationRepository.existsByTenantId(tenantId))
+                .isDefault(!shiftConfigurationRepository.existsByTenantIdAndIsDeletedFalse(tenantId))
                 .createdBy(employeeId)
                 .build();
 
@@ -95,7 +95,7 @@ public class ShiftConfigurationService {
 
         log.info("Updating shift configuration: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
 
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
 
         validateShiftTimings(request.getStartTime(), request.getEndTime());
@@ -103,7 +103,7 @@ public class ShiftConfigurationService {
         validateBreakDurations(request.getBreakDurationMinutes(), request.getMinBreakMinutes(), request.getMaxBreakMinutes());
 
         if (request.getShiftCode() != null && !request.getShiftCode().equals(shift.getShiftCode())) {
-            if (shiftConfigurationRepository.existsByShiftCodeAndTenantId(request.getShiftCode(), tenantId)) {
+            if (shiftConfigurationRepository.existsByShiftCodeAndTenantIdAndIsDeletedFalse(request.getShiftCode(), tenantId)) {
                 throw new BusinessException("Shift code already exists for this tenant: " + request.getShiftCode());
             }
         }
@@ -146,7 +146,7 @@ public class ShiftConfigurationService {
 
     @Transactional
     public void activateShift(Long id, Long tenantId, Long employeeId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
 
         shift.setIsActive(true);
@@ -158,7 +158,7 @@ public class ShiftConfigurationService {
 
     @Transactional
     public void deactivateShift(Long id, Long tenantId, Long employeeId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
 
         shift.setIsActive(false);
@@ -170,7 +170,7 @@ public class ShiftConfigurationService {
 
     @Transactional
     public void setDefaultShift(Long id, Long tenantId, Long employeeId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found"));
 
         shiftConfigurationRepository.resetAllDefaultForTenant(tenantId);
@@ -184,7 +184,7 @@ public class ShiftConfigurationService {
 
     @Transactional
     public void softDeleteShiftConfiguration(Long id, Long tenantId, Long employeeId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
 
         shift.setIsActive(false);
@@ -197,7 +197,7 @@ public class ShiftConfigurationService {
 
     @Transactional
     public void hardDeleteShiftConfiguration(Long id, Long tenantId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
 
         shiftConfigurationRepository.delete(shift);
@@ -212,13 +212,13 @@ public class ShiftConfigurationService {
     }
 
     public ShiftConfigurationDTO getShiftConfigurationById(Long id, Long tenantId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantId(id, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByIdAndTenantIdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with id: " + id));
         return convertToDTO(shift);
     }
 
     public ShiftConfigurationDTO getShiftByCode(String shiftCode, Long tenantId) {
-        ShiftConfiguration shift = shiftConfigurationRepository.findByShiftCodeAndTenantId(shiftCode, tenantId)
+        ShiftConfiguration shift = shiftConfigurationRepository.findByShiftCodeAndTenantIdAndIsDeletedFalse(shiftCode, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shift configuration not found with code: " + shiftCode));
         return convertToDTO(shift);
     }
@@ -230,7 +230,7 @@ public class ShiftConfigurationService {
     }
 
     public List<ShiftConfigurationDTO> getAllShiftConfigurations(Long tenantId) {
-        return shiftConfigurationRepository.findAllByTenantIdOrderByEffectiveFromDesc(tenantId).stream()
+        return shiftConfigurationRepository.findAllByTenantIdAndIsDeletedFalseOrderByEffectiveFromDesc(tenantId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }

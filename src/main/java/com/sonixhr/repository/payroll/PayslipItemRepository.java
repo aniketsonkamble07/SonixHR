@@ -26,4 +26,10 @@ public interface PayslipItemRepository extends JpaRepository<PayslipItem, UUID> 
             @Param("employeeId") Long employeeId,
             @Param("startVal") Integer startVal,
             @Param("endVal") Integer endVal);
+
+    @Query("SELECT SUM(pi.amount) FROM PayslipItem pi, Payslip p, Payrun pr " +
+           "WHERE pi.payslipId = p.id AND p.payrunId = pr.id " +
+           "AND pi.componentCode = 'LOAN_EMI' AND pi.resolvedVariables LIKE %:loanIdMarker% " +
+           "AND pr.status <> 'SUPERSEDED'")
+    BigDecimal sumRecoveredForLoan(@Param("loanIdMarker") String loanIdMarker);
 }

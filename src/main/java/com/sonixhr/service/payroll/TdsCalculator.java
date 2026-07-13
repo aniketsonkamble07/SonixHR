@@ -37,6 +37,24 @@ public class TdsCalculator {
             TaxRegime regime,
             BigDecimal currentMonthTaxableGross,
             int month, int year) {
+        return calculateMonthlyTds(employee, tenantId, regime, currentMonthTaxableGross, BigDecimal.ZERO, month, year);
+    }
+
+    /**
+     * Computes the TDS to deduct for the current month using the projected-annual-tax method,
+     * separating regular and non-recurring gross.
+     */
+    public BigDecimal calculateMonthlyTds(
+            Employee employee,
+            Long tenantId,
+            TaxRegime regime,
+            BigDecimal currentMonthTaxableGross,
+            BigDecimal nonRecurringGross,
+            int month, int year) {
+
+        if (nonRecurringGross == null) {
+            nonRecurringGross = BigDecimal.ZERO;
+        }
 
         String financialYear = resolveFinancialYear(month, year);
         LocalDate fyStart = fyStartDate(month, year);
@@ -63,8 +81,11 @@ public class TdsCalculator {
         int remainingMonths = MONTHS_IN_FY - monthsElapsed; // includes current month
         if (remainingMonths <= 0) remainingMonths = 1;
 
+        BigDecimal regularCurrentMonthGross = currentMonthTaxableGross.subtract(nonRecurringGross).max(BigDecimal.ZERO);
+
         BigDecimal projectedAnnualGross = ytdTaxableGross
-                .add(currentMonthTaxableGross.multiply(BigDecimal.valueOf(remainingMonths)));
+                .add(regularCurrentMonthGross.multiply(BigDecimal.valueOf(remainingMonths)))
+                .add(nonRecurringGross);
 
         BigDecimal deductions = resolveDeductions(employee, financialYear, regime, slabConfig);
 

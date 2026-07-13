@@ -42,6 +42,8 @@ public class PayrollCalculationService {
     private final SalaryComponentCalculator salaryComponentCalculator;
     private final PayslipGenerator payslipGenerator;
     private final TdsCalculator tdsCalculator;
+    private final LoanRecoveryCalculator loanRecoveryCalculator;
+    private final ReimbursementCalculator reimbursementCalculator;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
 
     /** Pairs a salary profile with its effective date segment within the payrun month. */
@@ -213,6 +215,18 @@ public class PayrollCalculationService {
                 merged.getComponentValues().put("TDS", tds);
                 merged.getExpressions().put("TDS", "Projected annual tax / remaining months");
                 merged.setTotalDeductions(merged.getTotalDeductions().add(tds));
+
+                // Post-merge loan recovery deduction (once per employee-month, post-segment-merge)
+                BigDecimal loanRecovery = loanRecoveryCalculator.calculateMonthlyRecovery(employee, tenantConfig.getTenant().getId(), merged);
+                if (loanRecovery == null) {
+                    loanRecovery = BigDecimal.ZERO;
+                }
+                merged.getComponentValues().put("LOAN_EMI", loanRecovery);
+                merged.getExpressions().put("LOAN_EMI", "Derived balance recovery");
+                merged.setTotalDeductions(merged.getTotalDeductions().add(loanRecovery));
+
+                // Post-merge reimbursements calculation (does not affect gross earnings or deductions base)
+                reimbursementCalculator.calculateReimbursements(employee, tenantConfig.getTenant().getId(), month, year, merged);
 
                 // Persist the payslip and items
                 payslipGenerator.persistPayslip(payrun, employee, tenantConfig, merged, orderedStructure, customComponentTypes, customComponentNames);

@@ -14,10 +14,12 @@ import java.util.UUID;
 @Repository
 public interface StateProfessionalTaxConfigRepository extends JpaRepository<StateProfessionalTaxConfig, UUID> {
 
-    @Query("SELECT s FROM StateProfessionalTaxConfig s WHERE s.stateCode = :stateCode AND s.effectiveFrom <= :date AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date)")
+    @Query("SELECT s FROM StateProfessionalTaxConfig s WHERE s.isDeleted = false AND s.stateCode = :stateCode AND s.effectiveFrom <= :date AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date)")
     List<StateProfessionalTaxConfig> findActiveByStateAndDate(@Param("stateCode") IndianState stateCode, @Param("date") LocalDate date);
 
     boolean existsByEffectiveFrom(LocalDate effectiveFrom);
 
     boolean existsByStateCode(IndianState stateCode);
+
+    List<StateProfessionalTaxConfig> findAllByIsDeletedFalse();
 }

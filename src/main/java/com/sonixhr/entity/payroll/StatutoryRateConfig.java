@@ -38,4 +38,8 @@ public class StatutoryRateConfig {
 
     @Column(name = "effective_to")
     private LocalDate effectiveTo; // Null indicates active current rate
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
 }

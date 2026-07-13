@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
         indexes = {
                 @Index(name = "idx_role_system", columnList = "is_system_role"),
                 @Index(name = "idx_role_name", columnList = "name"),
-                @Index(name = "idx_role_category", columnList = "category"),
                 @Index(name = "idx_role_active", columnList = "is_active"),
                 @Index(name = "idx_role_priority", columnList = "priority"),
                 @Index(name = "idx_role_created_at", columnList = "created_at")

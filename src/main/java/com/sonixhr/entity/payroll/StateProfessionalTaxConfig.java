@@ -40,4 +40,8 @@ public class StateProfessionalTaxConfig {
 
     @Column(name = "effective_to")
     private LocalDate effectiveTo;
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
 }

@@ -101,15 +101,16 @@ public class PlatformSubscriptionPlanController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_PRICING_PLANS')")
     public ResponseEntity<Void> deletePlan(@PathVariable Long id) {
-        log.info("REST request to delete subscription plan ID: {}", id);
+        log.info("REST request to deactivate subscription plan ID: {}", id);
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found"));
         
         if (plan.isTrial()) {
-            throw new IllegalArgumentException("Cannot delete the default Trial plan");
+            throw new IllegalArgumentException("Cannot delete/deactivate the default Trial plan");
         }
         
-        subscriptionPlanRepository.delete(plan);
+        plan.setActive(false);
+        subscriptionPlanRepository.save(plan);
         return ResponseEntity.noContent().build();
     }
 

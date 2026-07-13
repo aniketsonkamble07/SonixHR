@@ -47,12 +47,12 @@ public class DepartmentService {
         log.info("Creating department for tenant: {}", tenantId);
 
         // Validate unique name
-        if (departmentRepository.existsByTenant_IdAndName(tenantId, request.getName())) {
+        if (departmentRepository.existsByTenant_IdAndNameAndIsDeletedFalse(tenantId, request.getName())) {
             throw new ValidationException("name", "Department name already exists for this tenant");
         }
 
         // Validate unique code
-        if (departmentRepository.existsByTenant_IdAndCode(tenantId, request.getCode())) {
+        if (departmentRepository.existsByTenant_IdAndCodeAndIsDeletedFalse(tenantId, request.getCode())) {
             throw new ValidationException("code", "Department code already exists for this tenant");
         }
 
@@ -65,6 +65,7 @@ public class DepartmentService {
                 .code(request.getCode().toUpperCase())
                 .description(request.getDescription())
                 .isActive(true)
+                .isDeleted(false)
                 .build();
 
         Department savedDepartment = departmentRepository.save(department);
@@ -82,18 +83,18 @@ public class DepartmentService {
     public DepartmentResponse updateDepartment(Long id, Long tenantId, DepartmentRequest request) {
         log.info("Updating department: {} for tenant: {}", id, tenantId);
 
-        Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
+        Department department = departmentRepository.findByIdAndTenant_IdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
         // Check name uniqueness (if changed)
         if (!department.getName().equals(request.getName()) &&
-                departmentRepository.existsByTenant_IdAndName(tenantId, request.getName())) {
+                departmentRepository.existsByTenant_IdAndNameAndIsDeletedFalse(tenantId, request.getName())) {
             throw new ValidationException("name", "Department name already exists for this tenant");
         }
 
         // Check code uniqueness (if changed)
         if (!department.getCode().equals(request.getCode()) &&
-                departmentRepository.existsByTenant_IdAndCode(tenantId, request.getCode())) {
+                departmentRepository.existsByTenant_IdAndCodeAndIsDeletedFalse(tenantId, request.getCode())) {
             throw new ValidationException("code", "Department code already exists for this tenant");
         }
 
@@ -112,7 +113,7 @@ public class DepartmentService {
     // =====================================================
 
     public DepartmentResponse getDepartmentById(Long id, Long tenantId) {
-        Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
+        Department department = departmentRepository.findByIdAndTenant_IdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
         return convertToResponse(department);
     }
@@ -122,13 +123,13 @@ public class DepartmentService {
     // =====================================================
 
     public Page<DepartmentResponse> getAllDepartments(Long tenantId, Pageable pageable) {
-        Page<Department> departments = departmentRepository.findByTenant_Id(tenantId, pageable);
+        Page<Department> departments = departmentRepository.findByTenant_IdAndIsDeletedFalse(tenantId, pageable);
         Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
         return departments.map(dept -> convertToResponseUsingAllCountsMap(dept, countsMap));
     }
 
     public List<DepartmentResponse> getAllDepartmentsList(Long tenantId) {
-        List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        List<Department> departments = departmentRepository.findByTenant_IdAndIsDeletedFalse(tenantId);
         Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
         return departments.stream()
                 .map(dept -> convertToResponseUsingAllCountsMap(dept, countsMap))
@@ -155,7 +156,7 @@ public class DepartmentService {
     // =====================================================
 
     public DepartmentResponse getDepartmentWithStats(Long id, Long tenantId) {
-        Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
+        Department department = departmentRepository.findByIdAndTenant_IdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
         return convertToResponse(department);
     }
@@ -165,7 +166,7 @@ public class DepartmentService {
     // =====================================================
 
     public List<DepartmentResponse> getAllDepartmentsWithBulkCounts(Long tenantId) {
-        List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        List<Department> departments = departmentRepository.findByTenant_IdAndIsDeletedFalse(tenantId);
         Map<Long, Map<EmployeeStatus, Long>> countsMap = getDepartmentCountsMap(tenantId);
 
         return departments.stream()
@@ -179,26 +180,27 @@ public class DepartmentService {
     }
 
     // =====================================================
-    // DELETE DEPARTMENT (WITH VALIDATION)
+    // DELETE DEPARTMENT (SOFT DELETE WITH VALIDATION)
     // =====================================================
 
     @Transactional
     @CacheEvict(value = "departmentsLookup", key = "#tenantId")
     public void deleteDepartment(Long id, Long tenantId) {
-        log.info("Deleting department: {} for tenant: {}", id, tenantId);
+        log.info("Soft deleting department: {} for tenant: {}", id, tenantId);
 
-        Department department = departmentRepository.findByIdAndTenant_Id(id, tenantId)
+        Department department = departmentRepository.findByIdAndTenant_IdAndIsDeletedFalse(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
 
-        // Check if department has employees
-        Long employeeCount = employeeRepository.countByDepartmentIdAndTenantId(department.getId(), tenantId);
-        if (employeeCount > 0) {
-            throw new BusinessException("Cannot delete department with " + employeeCount +
-                    " employees. Reassign or remove employees first.");
-        }
+        // Soft delete: deactivate, set flag, and rename code/name to release unique constraints
+        department.setIsActive(false);
+        department.setIsDeleted(true);
+        
+        long timestamp = System.currentTimeMillis();
+        department.setName(department.getName() + " (Deleted " + timestamp + ")");
+        department.setCode(department.getCode() + "-DEL-" + timestamp);
 
-        departmentRepository.delete(department);
-        log.info("Department deleted: {}", id);
+        departmentRepository.save(department);
+        log.info("Department soft deleted successfully: {}", id);
     }
 
     // =====================================================
@@ -224,7 +226,7 @@ public class DepartmentService {
     public Map<String, Object> getDepartmentDashboard(Long tenantId) {
         Map<String, Object> dashboard = new HashMap<>();
 
-        List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        List<Department> departments = departmentRepository.findByTenant_IdAndIsDeletedFalse(tenantId);
 
         long totalDepartments = departments.size();
         long totalEmployees = 0;
@@ -348,7 +350,7 @@ public class DepartmentService {
     @Cacheable(value = "departmentsLookup", key = "#tenantId", unless = "#result == null")
     public List<DepartmentLookupResponse> getDepartmentLookup(Long tenantId) {
         log.debug("Fetching department lookup for tenant: {}", tenantId);
-        List<Department> departments = departmentRepository.findByTenant_Id(tenantId);
+        List<Department> departments = departmentRepository.findByTenant_IdAndIsDeletedFalse(tenantId);
         return departments.stream()
                 .map(this::toLookupResponse)
                 .collect(Collectors.toList());

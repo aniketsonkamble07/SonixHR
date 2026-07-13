@@ -15,7 +15,8 @@ public enum PayrollComponent {
     PT_DEDUCTION("Professional Tax", "DEDUCTION", null),
     PT("Professional Tax", "DEDUCTION", null),
     TDS("Tax Deducted at Source", "DEDUCTION", null),
-    OVERTIME("Overtime Payment", "ALLOWANCE", null);
+    OVERTIME("Overtime Payment", "ALLOWANCE", null),
+    LOAN_EMI("Loan/Advance Recovery", "DEDUCTION", null);
 
     private final String name;
     private final String type;

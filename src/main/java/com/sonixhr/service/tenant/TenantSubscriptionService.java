@@ -49,10 +49,11 @@ public class TenantSubscriptionService {
         TenantSubscription currentSub = subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant"));
 
-        // Extend endsAt date by plan validity months
+        // Extend endsAt date by plan validity months, adjusting for yearly billing cycle
         int validityMonths = currentSub.getSubscriptionPlan() != null && currentSub.getSubscriptionPlan().getValidityMonths() > 0 
                 ? currentSub.getSubscriptionPlan().getValidityMonths() : 1;
-        LocalDateTime newEndsAt = currentSub.getEndsAt() != null ? currentSub.getEndsAt().plusMonths(validityMonths) : LocalDateTime.now().plusMonths(validityMonths);
+        long monthsToAdd = currentSub.getBillingCycle() == BillingCycle.YEARLY ? 12L : validityMonths;
+        LocalDateTime newEndsAt = currentSub.getEndsAt() != null ? currentSub.getEndsAt().plusMonths(monthsToAdd) : LocalDateTime.now().plusMonths(monthsToAdd);
         currentSub.setEndsAt(newEndsAt);
         currentSub.setPlanStatus(PlanStatus.ACTIVE);
         currentSub.setIsActive(true);
@@ -72,6 +73,9 @@ public class TenantSubscriptionService {
 
         SubscriptionPlan newPlan = subscriptionPlanRepository.findByCodeIgnoreCase(planTypeCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planTypeCode));
+        if (!newPlan.isActive()) {
+            throw new BusinessException("Cannot change to a deactivated subscription plan: " + planTypeCode);
+        }
         BillingCycle billingCycle = BillingCycle.valueOf(billingCycleStr.toUpperCase());
 
         // Validate limits if downgrading
@@ -94,11 +98,11 @@ public class TenantSubscriptionService {
         tenantRepository.save(tenant);
 
         int validityMonths = newPlan.getValidityMonths() > 0 ? newPlan.getValidityMonths() : 1;
-        long monthsToAdd = billingCycle == BillingCycle.YEARLY ? validityMonths * 12L : validityMonths;
+        long monthsToAdd = billingCycle == BillingCycle.YEARLY ? 12L : validityMonths;
         LocalDateTime endsAt = LocalDateTime.now().plusMonths(monthsToAdd);
 
         // Determine price: 10% discount for yearly billing cycle
-        double price = billingCycle == BillingCycle.YEARLY ? newPlan.getMonthlyPrice() * 12 * 0.9 : newPlan.getMonthlyPrice();
+        double price = billingCycle == BillingCycle.YEARLY ? newPlan.getMonthlyPrice() * 12 * 0.9 : newPlan.getMonthlyPrice() * validityMonths;
 
         // Create a new subscription record
         TenantSubscription newSub = TenantSubscription.builder()
@@ -110,7 +114,7 @@ public class TenantSubscriptionService {
                 .maxStorageMb(newPlan.getMaxStorageMb())
                 .startedAt(LocalDateTime.now())
                 .endsAt(endsAt)
-                .amount(BigDecimal.valueOf(price * validityMonths))
+                .amount(BigDecimal.valueOf(price))
                 .currency("INR")
                 .billingCycle(billingCycle)
                 .isActive(true)
@@ -130,6 +134,12 @@ public class TenantSubscriptionService {
 
         currentSub.cancel();
         TenantSubscription savedSub = subscriptionRepository.save(currentSub);
+
+        Tenant tenant = currentSub.getTenant();
+        if (tenant != null) {
+            tenant.setPlanStatus(PlanStatus.CANCELLED);
+            tenantRepository.save(tenant);
+        }
         
         tenantRLSService.invalidateTenantCache(tenantId);
         return convertToDTO(savedSub);

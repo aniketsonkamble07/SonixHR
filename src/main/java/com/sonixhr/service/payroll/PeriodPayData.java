@@ -20,4 +20,8 @@ public class PeriodPayData {
     private BigDecimal overtimeRate = BigDecimal.ZERO;
     private BigDecimal overtimePay = BigDecimal.ZERO;
     private BigDecimal taxableGrossEarnings = BigDecimal.ZERO;
+
+    private final Map<String, BigDecimal> loanRecoveryBreakdown = new LinkedHashMap<>();
+    private BigDecimal reimbursementTotal = BigDecimal.ZERO;
+    private final Map<String, BigDecimal> reimbursementBreakdown = new LinkedHashMap<>();
 }

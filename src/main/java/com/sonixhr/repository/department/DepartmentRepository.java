@@ -20,31 +20,31 @@ public interface DepartmentRepository extends TenantAwareRepository<Department, 
     // BASIC QUERIES
     // =====================================================
 
-    Optional<Department> findByIdAndTenant_Id(Long id, Long tenantId);
+    Optional<Department> findByIdAndTenant_IdAndIsDeletedFalse(Long id, Long tenantId);
 
-    List<Department> findByTenant_Id(Long tenantId);
+    List<Department> findByTenant_IdAndIsDeletedFalse(Long tenantId);
 
-    Page<Department> findByTenant_Id(Long tenantId, Pageable pageable);
+    Page<Department> findByTenant_IdAndIsDeletedFalse(Long tenantId, Pageable pageable);
 
-    List<Department> findByTenant_IdAndIsActiveTrue(Long tenantId);
+    List<Department> findByTenant_IdAndIsActiveTrueAndIsDeletedFalse(Long tenantId);
 
     // =====================================================
     // UNIQUE VALIDATION QUERIES
     // =====================================================
 
-    Optional<Department> findByTenant_IdAndCode(Long tenantId, String code);
+    Optional<Department> findByTenant_IdAndCodeAndIsDeletedFalse(Long tenantId, String code);
 
-    Optional<Department> findByTenant_IdAndName(Long tenantId, String name);
+    Optional<Department> findByTenant_IdAndNameAndIsDeletedFalse(Long tenantId, String name);
 
-    boolean existsByTenant_IdAndName(Long tenantId, String name);
+    boolean existsByTenant_IdAndNameAndIsDeletedFalse(Long tenantId, String name);
 
-    boolean existsByTenant_IdAndCode(Long tenantId, String code);
+    boolean existsByTenant_IdAndCodeAndIsDeletedFalse(Long tenantId, String code);
 
     // =====================================================
     // SORTED QUERIES
     // =====================================================
 
-    @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId ORDER BY d.name ASC")
+    @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId AND d.isDeleted = false ORDER BY d.name ASC")
     List<Department> findAllByTenantIdOrderByName(@Param("tenantId") Long tenantId);
 
     // =====================================================
@@ -53,7 +53,7 @@ public interface DepartmentRepository extends TenantAwareRepository<Department, 
 
     @Query("SELECT d, COUNT(e) FROM Department d " +
             "LEFT JOIN Employee e ON e.department.id = d.id " +
-            "WHERE d.tenant.id = :tenantId " +
+            "WHERE d.tenant.id = :tenantId AND d.isDeleted = false " +
             "GROUP BY d.id ORDER BY d.name ASC")
     List<Object[]> findAllWithEmployeeCount(@Param("tenantId") Long tenantId);
 
@@ -61,7 +61,7 @@ public interface DepartmentRepository extends TenantAwareRepository<Department, 
     // SEARCH QUERIES
     // =====================================================
 
-    @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId " +
+    @Query("SELECT d FROM Department d WHERE d.tenant.id = :tenantId AND d.isDeleted = false " +
             "AND (LOWER(d.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(d.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<Department> searchDepartments(@Param("tenantId") Long tenantId,
@@ -74,21 +74,21 @@ public interface DepartmentRepository extends TenantAwareRepository<Department, 
 
     @Modifying
     @Transactional
-    @Query("UPDATE Department d SET d.isActive = :isActive WHERE d.id = :id AND d.tenant.id = :tenantId")
+    @Query("UPDATE Department d SET d.isActive = :isActive WHERE d.id = :id AND d.tenant.id = :tenantId AND d.isDeleted = false")
     int updateDepartmentStatus(@Param("id") Long id,
                                @Param("tenantId") Long tenantId,
                                @Param("isActive") Boolean isActive);
 
     @Modifying
     @Transactional
-    @Query("UPDATE Department d SET d.isActive = false WHERE d.tenant.id = :tenantId")
+    @Query("UPDATE Department d SET d.isActive = false WHERE d.tenant.id = :tenantId AND d.isDeleted = false")
     void deactivateAllDepartmentsForTenant(@Param("tenantId") Long tenantId);
 
     // =====================================================
     // COUNT QUERIES
     // =====================================================
 
-    long countByTenant_Id(Long tenantId);
+    long countByTenant_IdAndIsDeletedFalse(Long tenantId);
 
-    long countByTenant_IdAndIsActiveTrue(Long tenantId);
+    long countByTenant_IdAndIsActiveTrueAndIsDeletedFalse(Long tenantId);
 }

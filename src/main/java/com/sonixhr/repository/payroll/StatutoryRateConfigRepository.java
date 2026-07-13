@@ -13,9 +13,11 @@ import java.util.UUID;
 @Repository
 public interface StatutoryRateConfigRepository extends JpaRepository<StatutoryRateConfig, UUID> {
 
-    @Query("SELECT s FROM StatutoryRateConfig s WHERE s.effectiveFrom <= :date AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date)")
+    @Query("SELECT s FROM StatutoryRateConfig s WHERE s.isDeleted = false AND s.effectiveFrom <= :date AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date)")
     List<StatutoryRateConfig> findActiveByDate(@Param("date") LocalDate date);
 
     boolean existsByEffectiveFrom(LocalDate effectiveFrom);
+
+    List<StatutoryRateConfig> findAllByIsDeletedFalse();
 }
 

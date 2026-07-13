@@ -32,7 +32,7 @@ public class PlatformPayrollController {
     @PreAuthorize("hasAuthority('VIEW_SYSTEM_SETTINGS')")
     public ResponseEntity<List<StatutoryRateConfig>> getAllStatutoryRates() {
         log.info("REST request to list all platform statutory rates");
-        return ResponseEntity.ok(statutoryRateConfigRepository.findAll());
+        return ResponseEntity.ok(statutoryRateConfigRepository.findAllByIsDeletedFalse());
     }
 
     @PostMapping("/statutory-rates")
@@ -51,6 +51,9 @@ public class PlatformPayrollController {
         log.info("REST request to update statutory rate config ID: {}", id);
         StatutoryRateConfig existing = statutoryRateConfigRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Statutory rate config not found"));
+        if (existing.isDeleted()) {
+            throw new ResourceNotFoundException("Statutory rate config not found");
+        }
 
         existing.setComponentCode(config.getComponentCode());
         existing.setRate(config.getRate());
@@ -70,7 +73,11 @@ public class PlatformPayrollController {
         log.info("REST request to delete statutory rate config ID: {}", id);
         StatutoryRateConfig existing = statutoryRateConfigRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Statutory rate config not found"));
-        statutoryRateConfigRepository.delete(existing);
+        if (existing.isDeleted()) {
+            throw new ResourceNotFoundException("Statutory rate config not found");
+        }
+        existing.setDeleted(true);
+        statutoryRateConfigRepository.save(existing);
         return ResponseEntity.noContent().build();
     }
 
@@ -80,7 +87,7 @@ public class PlatformPayrollController {
     @PreAuthorize("hasAuthority('VIEW_SYSTEM_SETTINGS')")
     public ResponseEntity<List<StateProfessionalTaxConfig>> getAllPtConfigs() {
         log.info("REST request to list all platform state PT configs");
-        return ResponseEntity.ok(statePtConfigRepository.findAll());
+        return ResponseEntity.ok(statePtConfigRepository.findAllByIsDeletedFalse());
     }
 
     @PostMapping("/pt-configs")
@@ -99,6 +106,9 @@ public class PlatformPayrollController {
         log.info("REST request to update state PT config ID: {}", id);
         StateProfessionalTaxConfig existing = statePtConfigRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("State PT config not found"));
+        if (existing.isDeleted()) {
+            throw new ResourceNotFoundException("State PT config not found");
+        }
 
         existing.setStateCode(config.getStateCode());
         existing.setSalaryRangeMin(config.getSalaryRangeMin());
@@ -118,7 +128,11 @@ public class PlatformPayrollController {
         log.info("REST request to delete state PT config ID: {}", id);
         StateProfessionalTaxConfig existing = statePtConfigRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("State PT config not found"));
-        statePtConfigRepository.delete(existing);
+        if (existing.isDeleted()) {
+            throw new ResourceNotFoundException("State PT config not found");
+        }
+        existing.setDeleted(true);
+        statePtConfigRepository.save(existing);
         return ResponseEntity.noContent().build();
     }
 }

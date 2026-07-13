@@ -34,7 +34,10 @@ public class PayslipGenerator {
             Map<String, String> customComponentTypes,
             Map<String, String> customComponentNames) {
 
-        BigDecimal netPay = data.getGrossEarnings().subtract(data.getTotalDeductions()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal netPay = data.getGrossEarnings()
+                .subtract(data.getTotalDeductions())
+                .add(data.getReimbursementTotal())
+                .setScale(2, RoundingMode.HALF_UP);
 
         Payslip payslip = Payslip.builder()
                 .tenant(tenantConfig.getTenant())
@@ -99,6 +102,47 @@ public class PayslipGenerator {
                     .expressionUsed(data.getOvertimeHours() + " hrs * " + data.getOvertimeRate() + "/hr")
                     .resolvedVariables(resolvedVarsJson)
                     .build());
+        }
+
+        // Persist loan EMI items
+        for (Map.Entry<String, BigDecimal> entry : data.getLoanRecoveryBreakdown().entrySet()) {
+            if (entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                Map<String, Object> auditVars = new HashMap<>();
+                auditVars.put("loanId", entry.getKey());
+                auditVars.put("value", entry.getValue());
+
+                String resolvedVarsJson = "";
+                try {
+                    resolvedVarsJson = objectMapper.writeValueAsString(auditVars);
+                } catch (Exception ignored) {}
+
+                payslipItemRepo.save(PayslipItem.builder()
+                        .tenant(tenantConfig.getTenant())
+                        .payslipId(payslip.getId())
+                        .componentCode("LOAN_EMI")
+                        .componentName("Loan/Advance Recovery")
+                        .type("DEDUCTION")
+                        .amount(entry.getValue())
+                        .expressionUsed("Derived balance recovery")
+                        .resolvedVariables(resolvedVarsJson)
+                        .build());
+            }
+        }
+
+        // Persist reimbursement items
+        for (Map.Entry<String, BigDecimal> entry : data.getReimbursementBreakdown().entrySet()) {
+            if (entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                payslipItemRepo.save(PayslipItem.builder()
+                        .tenant(tenantConfig.getTenant())
+                        .payslipId(payslip.getId())
+                        .componentCode(entry.getKey())
+                        .componentName(entry.getKey().replace("_", " "))
+                        .type("REIMBURSEMENT")
+                        .amount(entry.getValue())
+                        .expressionUsed("Approved reimbursement claim")
+                        .resolvedVariables("{}")
+                        .build());
+            }
         }
     }
 }
