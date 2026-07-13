@@ -69,10 +69,33 @@ public class FormulaServiceTest {
         Map<String, Object> variables = new HashMap<>();
         variables.put("STR", "hello");
         
-        // Blocking calling method on object (wrapped in TechnicalException)
         TechnicalException exception = assertThrows(TechnicalException.class, () -> {
             formulaService.evaluate("#STR.toUpperCase()", variables);
         });
         assertTrue(exception.getCause() instanceof IllegalArgumentException);
+    }
+
+    @Test
+    public void testFunctionReferenceValidation() {
+        Map<String, Object> variables = new HashMap<>();
+        
+        // Assert that a non-whitelisted function reference is blocked
+        TechnicalException exception = assertThrows(TechnicalException.class, () -> {
+            formulaService.evaluate("#unauthorizedFunction(1, 2)", variables);
+        });
+        assertTrue(exception.getCause().getMessage().contains("Unauthorized function reference"));
+    }
+
+    @Test
+    public void testExpressionCacheLRUBound() {
+        Map<String, Object> variables = new HashMap<>();
+        
+        // Load expressions up to cache cap + 50
+        for (int i = 0; i < 1050; i++) {
+            formulaService.evaluate("1 + " + i, variables);
+        }
+        
+        // Since capacity is capped at 1000, cache size must not exceed 1000
+        assertTrue(formulaService.getExpressionCache().size() <= 1000);
     }
 }

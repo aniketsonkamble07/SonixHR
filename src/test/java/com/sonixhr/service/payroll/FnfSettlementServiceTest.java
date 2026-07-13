@@ -1,5 +1,9 @@
 package com.sonixhr.service.payroll;
 
+import com.sonixhr.entity.payroll.FnfSettlement;
+import com.sonixhr.exceptions.BusinessException;
+import com.sonixhr.repository.employee.EmployeeRepository;
+import com.sonixhr.repository.payroll.FnfSettlementRepository;
 import com.sonixhr.repository.payroll.PayslipItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -21,6 +26,12 @@ public class FnfSettlementServiceTest {
 
     @Mock
     private PayslipItemRepository payslipItemRepo;
+
+    @Mock
+    private FnfSettlementRepository fnfSettlementRepository;
+
+    @Mock
+    private EmployeeRepository employeeRepository;
 
     @InjectMocks
     private FnfSettlementService fnfSettlementService;
@@ -72,5 +83,25 @@ public class FnfSettlementServiceTest {
 
         // Fallback to currentBasic
         assertEquals(currentBasic, avgBasic);
+    }
+
+    @Test
+    public void testProcessFnfSettlement_DuplicateSettlement_ThrowsBusinessException() {
+        Long employeeId = 1L;
+        Long tenantId = 10L;
+        LocalDate terminationDate = LocalDate.of(2026, 10, 15);
+
+        FnfSettlement existing = FnfSettlement.builder()
+                .status("APPROVED")
+                .build();
+
+        when(fnfSettlementRepository.findByEmployeeIdAndTenantId(employeeId, tenantId))
+                .thenReturn(Optional.of(existing));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            fnfSettlementService.processFnfSettlement(employeeId, tenantId, terminationDate);
+        });
+
+        assertEquals("DUPLICATE_SETTLEMENT", ex.getErrorCode());
     }
 }

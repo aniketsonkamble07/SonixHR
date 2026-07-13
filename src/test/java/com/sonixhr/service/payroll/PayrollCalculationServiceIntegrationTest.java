@@ -51,6 +51,16 @@ public class PayrollCalculationServiceIntegrationTest {
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        EmployeePayrunProcessor employeePayrunProcessor = new EmployeePayrunProcessor(
+                employeeSalaryProfileRepo,
+                salaryComponentCalculator,
+                overtimeCalculator,
+                tdsCalculator,
+                loanRecoveryCalculator,
+                reimbursementCalculator,
+                payslipGenerator
+        );
+
         payrollCalculationService = new PayrollCalculationService(
                 statutoryRateConfigRepo,
                 statePtConfigRepo,
@@ -59,18 +69,10 @@ public class PayrollCalculationServiceIntegrationTest {
                 employeeSalaryProfileRepo,
                 payrunRepo,
                 payrunConfigRepo,
-                payslipRepo,
-                payslipItemRepo,
                 componentDefinitionRepo,
                 leaveCalculator,
-                overtimeCalculator,
                 snapshotService,
-                statutoryCalculator,
-                salaryComponentCalculator,
-                payslipGenerator,
-                tdsCalculator,
-                loanRecoveryCalculator,
-                reimbursementCalculator,
+                employeePayrunProcessor,
                 auditLogService
         );
         when(loanRecoveryCalculator.calculateMonthlyRecovery(any(), any(), any())).thenReturn(BigDecimal.ZERO);

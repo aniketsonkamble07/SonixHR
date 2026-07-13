@@ -6,6 +6,7 @@ import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.payroll.LoanStatus;
 import com.sonixhr.enums.payroll.TaxRegime;
 import com.sonixhr.exceptions.ResourceNotFoundException;
+import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.payroll.*;
 import com.sonixhr.service.leave.LeaveService;
@@ -48,6 +49,15 @@ public class FnfSettlementService {
 
     @Transactional
     public FnfSettlement processFnfSettlement(Long employeeId, Long tenantId, LocalDate terminationDate) {
+        // Idempotency check: prevent duplicate non-cancelled settlements
+        Optional<FnfSettlement> existingOpt = fnfSettlementRepository.findByEmployeeIdAndTenantId(employeeId, tenantId);
+        if (existingOpt.isPresent()) {
+            FnfSettlement existing = existingOpt.get();
+            if (!"CANCELLED".equalsIgnoreCase(existing.getStatus())) {
+                throw new BusinessException("DUPLICATE_SETTLEMENT", "An active F&F settlement already exists for this employee.");
+            }
+        }
+
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
 

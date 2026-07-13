@@ -29,9 +29,11 @@ public class OvertimeCalculator {
                 BigDecimal normalHourlyRate = data.getGrossEarnings()
                     .divide(BigDecimal.valueOf(26 * 8), 6, RoundingMode.HALF_EVEN);
                 
-                // Overtime rate = 2x normal rate (Factories Act)
-                BigDecimal overtimeRate = normalHourlyRate.multiply(BigDecimal.valueOf(2))
-                    .setScale(2, RoundingMode.HALF_EVEN);
+                // Overtime rate: check if tenant-configured rate exists, else fall back to 2x normal rate
+                BigDecimal overtimeRate = (tenantConfig.getOvertimeRatePerHour() != null 
+                        && tenantConfig.getOvertimeRatePerHour().compareTo(BigDecimal.ZERO) > 0)
+                        ? tenantConfig.getOvertimeRatePerHour().setScale(2, RoundingMode.HALF_EVEN)
+                        : normalHourlyRate.multiply(BigDecimal.valueOf(2)).setScale(2, RoundingMode.HALF_EVEN);
                 
                 data.setOvertimeRate(overtimeRate);
                 

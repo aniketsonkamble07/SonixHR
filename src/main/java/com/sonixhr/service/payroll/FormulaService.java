@@ -12,9 +12,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -22,7 +22,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FormulaService {
 
     private final SandboxedSpELEngine spelEngine;
-    private final Map<String, Expression> expressionCache = new ConcurrentHashMap<>();
+    
+    // Thread-safe bounded LRU cache (capped at 1000 entries) to prevent unbounded memory growth
+    private final Map<String, Expression> expressionCache = Collections.synchronizedMap(
+        new LinkedHashMap<String, Expression>(128, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Expression> eldest) {
+                return size() > 1000;
+            }
+        }
+    );
 
     // Whitelist of allowed AST node class names
     private static final Set<String> ALLOWED_NODE_CLASSES = Set.of(
@@ -57,7 +66,7 @@ public class FormulaService {
             "OperatorInstanceof",
             "OperatorMatches",
             "MethodReference", // Only for whitelisted methods
-            "FunctionReference",
+            "FunctionReference", // Only for whitelisted functions
             "Ternary",
             "Elvis"
     );
@@ -69,6 +78,10 @@ public class FormulaService {
 
     // Whitelist of allowed variable name patterns
     private static final String ALLOWED_VAR_PATTERN = "^[A-Z][A-Z0-9_]*$";
+
+    public Map<String, Expression> getExpressionCache() {
+        return expressionCache;
+    }
 
     public BigDecimal evaluate(String formula, Map<String, Object> variables) {
         if (formula == null || formula.trim().isEmpty()) {
@@ -174,6 +187,23 @@ public class FormulaService {
                     
             if (!isWhitelisted) {
                 throw new IllegalArgumentException("Unauthorized method reference: " + methodName);
+            }
+        }
+
+        // Special validation for FunctionReference
+        if ("FunctionReference".equals(nodeClass)) {
+            String functionName = node.toStringAST();
+            if (functionName.startsWith("#")) {
+                int endIdx = 1;
+                while (endIdx < functionName.length() && Character.isLetterOrDigit(functionName.charAt(endIdx))) {
+                    endIdx++;
+                }
+                String cleanName = functionName.substring(1, endIdx).trim();
+                boolean isWhitelisted = ALLOWED_METHOD_NAMES.stream()
+                        .anyMatch(cleanName::equalsIgnoreCase);
+                if (!isWhitelisted) {
+                    throw new IllegalArgumentException("Unauthorized function reference: " + functionName);
+                }
             }
         }
 

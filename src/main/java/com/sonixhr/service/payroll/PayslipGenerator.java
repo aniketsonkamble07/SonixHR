@@ -66,7 +66,9 @@ public class PayslipGenerator {
             String resolvedVarsJson = "";
             try {
                 resolvedVarsJson = objectMapper.writeValueAsString(auditVars);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Failed to serialize resolved variables for salary structure item: {}", e.getMessage());
+            }
 
             payslipItemRepo.save(PayslipItem.builder()
                     .tenant(tenantConfig.getTenant())
@@ -90,7 +92,9 @@ public class PayslipGenerator {
             String resolvedVarsJson = "";
             try {
                 resolvedVarsJson = objectMapper.writeValueAsString(auditVars);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Failed to serialize resolved variables for overtime item: {}", e.getMessage());
+            }
 
             payslipItemRepo.save(PayslipItem.builder()
                     .tenant(tenantConfig.getTenant())
@@ -114,7 +118,9 @@ public class PayslipGenerator {
                 String resolvedVarsJson = "";
                 try {
                     resolvedVarsJson = objectMapper.writeValueAsString(auditVars);
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    log.warn("Failed to serialize resolved variables for loan item: {}", e.getMessage());
+                }
 
                 payslipItemRepo.save(PayslipItem.builder()
                         .tenant(tenantConfig.getTenant())
