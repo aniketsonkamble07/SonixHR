@@ -73,53 +73,53 @@ public class SonixhrApplication {
 				System.out.println("[Pre-Startup] subscription_plans table does not exist yet.");
 			}
 
-			long planId = 1;
+			long planId = -1;
 			if (plansTableExists) {
-				ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM subscription_plans");
-				rs.next();
-				int plansCount = rs.getInt(1);
-				if (plansCount == 0) {
-					System.out.println("[Pre-Startup] Inserting default trial plan into subscription_plans...");
-					stmt.execute(
-							"INSERT INTO subscription_plans(code, name, monthly_price, max_employees, max_storage_mb, trial_days, is_trial, validity_months, is_active) "
-									+
-									"VALUES('trial', 'Trial Plan', 0.0, 10, 512, 14, true, 1, true)");
-				}
-
-				rs = stmt.executeQuery("SELECT id FROM subscription_plans ORDER BY id LIMIT 1");
+				ResultSet rs = stmt.executeQuery("SELECT id FROM subscription_plans ORDER BY id LIMIT 1");
 				if (rs.next()) {
 					planId = rs.getLong(1);
+				}
+				// Ensure all columns exist in the existing table to match entity definition
+				try {
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS code varchar(50)");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS currency varchar(3) DEFAULT 'USD'");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS max_users integer");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS max_employees integer");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS features jsonb");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS is_custom boolean DEFAULT false NOT NULL");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT true NOT NULL");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS display_order integer DEFAULT 0");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS deleted_at timestamp");
+				} catch (Exception e) {
+					System.out.println("[Pre-Startup] Could not alter subscription_plans table: " + e.getMessage());
 				}
 			} else {
 				System.out.println("[Pre-Startup] Creating subscription_plans table...");
 				stmt.execute("CREATE TABLE IF NOT EXISTS subscription_plans (" +
 						"id bigserial primary key, " +
-						"code varchar(50) unique not null, " +
 						"name varchar(100) not null, " +
-						"monthly_price double precision not null, " +
-						"max_employees integer not null, " +
-						"max_storage_mb integer not null, " +
-						"trial_days integer not null, " +
-						"is_trial boolean not null, " +
+						"code varchar(50), " +
+						"price numeric(10, 2) default 0.00 not null, " +
 						"validity_months integer default 1 not null, " +
-						"is_active boolean default true not null," +
-						"description varchar(500)," +
-						"created_at timestamp," +
-						"updated_at timestamp)");
-
-				System.out.println("[Pre-Startup] Inserting default trial plan...");
-				stmt.execute(
-						"INSERT INTO subscription_plans(code, name, monthly_price, max_employees, max_storage_mb, trial_days, is_trial, validity_months, is_active) "
-								+
-								"VALUES('trial', 'Trial Plan', 0.0, 10, 512, 14, true, 1, true)");
-
-				ResultSet rs = stmt.executeQuery("SELECT id FROM subscription_plans ORDER BY id LIMIT 1");
-				if (rs.next()) {
-					planId = rs.getLong(1);
-				}
+						"currency varchar(3) default 'USD', " +
+						"max_users integer, " +
+						"max_employees integer, " +
+						"features jsonb, " +
+						"is_custom boolean default false not null, " +
+						"is_active boolean default true not null, " +
+						"is_public boolean default true not null, " +
+						"display_order integer default 0, " +
+						"description varchar(500), " +
+						"created_at timestamp, " +
+						"updated_at timestamp, " +
+						"deleted_at timestamp)");
 			}
 
-			System.out.println("[Pre-Startup] Default plan ID is: " + planId);
+			if (planId != -1) {
+				System.out.println("[Pre-Startup] Default plan ID is: " + planId);
+			} else {
+				System.out.println("[Pre-Startup] No default plan found in subscription_plans.");
+			}
 
 			// Check if tenant_subscriptions table exists
 			boolean subsTableExists = false;
@@ -140,10 +140,68 @@ public class SonixhrApplication {
 					System.out.println("[Pre-Startup] Could not add column: " + e.getMessage());
 				}
 
-				System.out.println("[Pre-Startup] Populating null subscription_plan_id with default plan ID...");
-				int updated = stmt.executeUpdate("UPDATE tenant_subscriptions SET subscription_plan_id = " + planId
-						+ " WHERE subscription_plan_id IS NULL");
-				System.out.println("[Pre-Startup] Updated " + updated + " records in tenant_subscriptions.");
+				try {
+					stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_tenant_current_subscription " +
+							"ON tenant_subscriptions (tenant_id) " +
+							"WHERE (is_current = true)");
+					System.out.println("[Pre-Startup] Ensuring unique index uk_tenant_current_subscription exists on tenant_subscriptions...");
+				} catch (Exception e) {
+					System.out.println("[Pre-Startup] Could not create unique index on tenant_subscriptions: " + e.getMessage());
+				}
+
+				if (planId != -1) {
+					System.out.println("[Pre-Startup] Populating null subscription_plan_id with default plan ID...");
+					int updated = stmt.executeUpdate("UPDATE tenant_subscriptions SET subscription_plan_id = " + planId
+							+ " WHERE subscription_plan_id IS NULL");
+					System.out.println("[Pre-Startup] Updated " + updated + " records in tenant_subscriptions.");
+				} else {
+					System.out.println("[Pre-Startup] Skipping populating null subscription_plan_id since no plans exist.");
+				}
+			}
+
+			// Check if platform_statutory_rate_configs table exists and ensure is_deleted has no nulls
+			boolean statutoryTableExists = false;
+			try {
+				stmt.executeQuery("SELECT 1 FROM platform_statutory_rate_configs LIMIT 1");
+				statutoryTableExists = true;
+			} catch (Exception e) {
+				System.out.println("[Pre-Startup] platform_statutory_rate_configs table does not exist yet.");
+			}
+
+			if (statutoryTableExists) {
+				System.out.println("[Pre-Startup] Ensuring is_deleted column exists in platform_statutory_rate_configs...");
+				try {
+					stmt.execute("ALTER TABLE platform_statutory_rate_configs ADD COLUMN IF NOT EXISTS is_deleted boolean DEFAULT false");
+					stmt.execute("UPDATE platform_statutory_rate_configs SET is_deleted = false WHERE is_deleted IS NULL");
+					stmt.execute("ALTER TABLE platform_statutory_rate_configs ALTER COLUMN is_deleted SET NOT NULL");
+				} catch (Exception e) {
+					System.out.println("[Pre-Startup] Could not adjust is_deleted column in platform_statutory_rate_configs: " + e.getMessage());
+				}
+			}
+
+			// Check if tenants table exists and add fields
+			boolean tenantsTableExists = false;
+			try {
+				stmt.executeQuery("SELECT 1 FROM tenants LIMIT 1");
+				tenantsTableExists = true;
+			} catch (Exception e) {
+				System.out.println("[Pre-Startup] tenants table does not exist yet.");
+			}
+
+			if (tenantsTableExists) {
+				System.out.println("[Pre-Startup] Ensuring lifecycle columns exist in tenants table...");
+				try {
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS data_status varchar(50) DEFAULT 'RETAINED' NOT NULL");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expired_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS archived_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS archive_warning_notified_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS final_reminder_sent_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expiration_notified_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deleted_at timestamp");
+					stmt.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deleted_by_admin_id bigint");
+				} catch (Exception e) {
+					System.out.println("[Pre-Startup] Could not alter tenants table: " + e.getMessage());
+				}
 			}
 
 			System.out.println("[Pre-Startup] Pre-startup database migration checks completed successfully.");

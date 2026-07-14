@@ -49,6 +49,4 @@ public class TenantRegistrationRequest {
 
     @JsonAlias("planType")
     private String planCode;
-
-    private String billingCycle;
 }

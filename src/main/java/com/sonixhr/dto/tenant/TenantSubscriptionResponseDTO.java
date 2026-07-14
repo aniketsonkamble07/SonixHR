@@ -1,6 +1,5 @@
 package com.sonixhr.dto.tenant;
 
-import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,7 +24,13 @@ public class TenantSubscriptionResponseDTO {
     private LocalDateTime endsAt;
     private BigDecimal amount;
     private String currency;
-    private BillingCycle billingCycle;
     private boolean isActive;
     private LocalDateTime createdAt;
+    
+    // Lifecycle additions
+    private LocalDateTime billingPeriodStart;
+    private LocalDateTime billingPeriodEnd;
+    private LocalDateTime gracePeriodEnd;
+    private String cancellationReason;
+    private Boolean cancelledAtEndOfPeriod;
 }

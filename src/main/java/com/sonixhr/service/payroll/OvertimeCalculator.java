@@ -24,12 +24,17 @@ public class OvertimeCalculator {
             if (otHoursVal != null && otHoursVal > 0) {
                 data.setOvertimeHours(BigDecimal.valueOf(otHoursVal));
                 
-                // Calculate normal hourly rate: Gross / (26 days * 8 hours)
-                // As per Factories Act, 1948
-                BigDecimal normalHourlyRate = data.getGrossEarnings()
+                // Calculate normal hourly rate per Factories Act, 1948
+                // Base should be wages (basic + dearness + other statutory elements)
+                // NOT gross earnings minus deductions
+                BigDecimal wagesBase = data.getWagesBase();
+                if (wagesBase == null) {
+                    wagesBase = data.getGrossEarnings();
+                }
+                BigDecimal normalHourlyRate = wagesBase
                     .divide(BigDecimal.valueOf(26 * 8), 6, RoundingMode.HALF_EVEN);
                 
-                // Overtime rate: check if tenant-configured rate exists, else fall back to 2x normal rate
+                // Overtime rate: tenant-configured rate or 2x normal rate (1.5x minimum per law, but 2x is standard)
                 BigDecimal overtimeRate = (tenantConfig.getOvertimeRatePerHour() != null 
                         && tenantConfig.getOvertimeRatePerHour().compareTo(BigDecimal.ZERO) > 0)
                         ? tenantConfig.getOvertimeRatePerHour().setScale(2, RoundingMode.HALF_EVEN)

@@ -14,7 +14,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
         },
         indexes = {
                 @Index(name = "idx_permission_type", columnList = "permission"),
-                @Index(name = "idx_permission_category", columnList = "category"),
                 @Index(name = "idx_permission_active", columnList = "is_active"),
                 @Index(name = "idx_permission_display_order", columnList = "display_order")
         })

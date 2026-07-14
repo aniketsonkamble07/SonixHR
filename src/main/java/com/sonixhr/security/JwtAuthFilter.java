@@ -17,6 +17,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
  
+import com.sonixhr.service.tenant.TenantSubscriptionValidationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +37,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final PlatformUserDetailsService platformUserDetailsService;
     private final EmployeeDetailsService employeeDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final TenantSubscriptionValidationService tenantSubscriptionValidationService;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.jwt.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -55,12 +60,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @Lazy TenantRLSService tenantRLSService,
             PlatformUserDetailsService platformUserDetailsService,
             EmployeeDetailsService employeeDetailsService,
-            TokenBlacklistService tokenBlacklistService) {
+            TokenBlacklistService tokenBlacklistService,
+            @Lazy TenantSubscriptionValidationService tenantSubscriptionValidationService,
+            ObjectMapper objectMapper) {
         this.jwtService = jwtService;
         this.tenantRLSService = tenantRLSService;
         this.platformUserDetailsService = platformUserDetailsService;
         this.employeeDetailsService = employeeDetailsService;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.tenantSubscriptionValidationService = tenantSubscriptionValidationService;
+        this.objectMapper = objectMapper;
     }
 
     @jakarta.annotation.PostConstruct
@@ -201,6 +210,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         filterChain.doFilter(request, response);
                         return;
                     }
+                    
+                    
+                    
                     TenantContext.setCurrentTenant(tenantId);
                     tenantRLSService.setCurrentTenantInDB(tenantId);
 
@@ -224,6 +236,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 if (userDetails != null) {
                     // Get authorities from token or user details (prioritize token for performance)
                     Collection<? extends GrantedAuthority> authorities = extractAuthorities(claims, userDetails);
+
+                    // Validate tenant subscription status in real-time
+                    if ("EMPLOYEE".equals(userType) && !isReadOnlyAllowedSuspendedRequest(request)) {
+                        Long tenantId = Long.parseLong(claims.get("tenantId", String.class));
+                        tenantSubscriptionValidationService.validateSubscription(tenantId, path, method, authorities, request);
+                    }
 
                     // Create authentication token
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userDetails,
@@ -250,6 +268,21 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                 userType, username, authorities.size());
                     }
                 }
+            } catch (com.sonixhr.exceptions.BusinessException | com.sonixhr.exceptions.ResourceNotFoundException ex) {
+                log.warn("Tenant subscription validation failed for user {}: {}", username, ex.getMessage());
+                SecurityContextHolder.clearContext();
+                cleanupTenantContext();
+                
+                response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                
+                Map<String, Object> body = new HashMap<>();
+                body.put("success", false);
+                body.put("message", ex.getMessage());
+                body.put("timestamp", java.time.LocalDateTime.now().toString());
+                
+                objectMapper.writeValue(response.getOutputStream(), body);
+                return;
             } catch (Exception e) {
                 log.error("Authentication error for user: {} - {}", username, e.getMessage());
                 SecurityContextHolder.clearContext();
@@ -410,5 +443,29 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 "userDetailsCacheSize", (int) userDetailsCache.estimatedSize(),
                 "authCacheSize", (int) authCache.estimatedSize(),
                 "publicPathCacheSize", publicPathCache.size());
+    }
+
+    private boolean isReadOnlyAllowedSuspendedRequest(jakarta.servlet.http.HttpServletRequest request) {
+        String method = request.getMethod();
+        if (!"GET".equalsIgnoreCase(method)) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        
+        // Exact matches
+        if ("/api/tenants/current/subscription".equals(path) || 
+            "/api/tenants/my-tenant".equals(path)) {
+            return true;
+        }
+        
+        // Prefix matches
+        if (path.startsWith("/api/billing/") || 
+            path.startsWith("/api/subscriptions/") || 
+            path.startsWith("/api/export/") || 
+            path.startsWith("/api/employees/export/")) {
+            return true;
+        }
+        
+        return false;
     }
 }

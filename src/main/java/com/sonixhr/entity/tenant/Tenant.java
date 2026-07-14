@@ -4,6 +4,7 @@ import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.IndianState;
+import com.sonixhr.enums.TenantDataStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -78,7 +79,7 @@ public class Tenant {
     private SubscriptionPlan subscriptionPlan;
 
     public String getPlanType() {
-        return this.subscriptionPlan != null ? this.subscriptionPlan.getCode() : null;
+        return this.subscriptionPlan != null ? this.subscriptionPlan.getName().toLowerCase() : null;
     }
 
     @Column(name = "max_employees")
@@ -110,6 +111,34 @@ public class Tenant {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "expired_at")
+    private LocalDateTime expiredAt;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
+    @Column(name = "archive_warning_notified_at")
+    private LocalDateTime archiveWarningNotifiedAt;
+
+    @Column(name = "final_reminder_sent_at")
+    private LocalDateTime finalReminderSentAt;
+
+    @Column(name = "expiration_notified_at")
+    private LocalDateTime expirationNotifiedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_status", nullable = false, length = 50)
+    @Builder.Default
+    private TenantDataStatus dataStatus = TenantDataStatus.RETAINED;
+
+    @Column(name = "deleted_by_admin_id")
+    private Long deletedByAdminId;
+
+    @Transient
+    public LocalDateTime getDeletionEligibleAt() {
+        return expiredAt != null ? expiredAt.plusYears(1) : null;
+    }
+
     @Column(name = "created_by")
     private Long createdBy;
 
@@ -133,6 +162,32 @@ public class Tenant {
         this.isActive = false;
         this.suspendedAt = LocalDateTime.now();
         this.suspensionReason = reason;
+    }
+
+    public void expire(String reason) {
+        this.status = UserStatus.SUSPENDED;
+        this.isActive = false;
+        this.planStatus = PlanStatus.EXPIRED;
+        this.suspendedAt = LocalDateTime.now();
+        this.suspensionReason = reason;
+        if (this.expiredAt == null) {
+            this.expiredAt = LocalDateTime.now();
+            this.dataStatus = TenantDataStatus.RETAINED;
+            this.archivedAt = null;
+        }
+    }
+
+    public void resetSubscriptionLifecycle() {
+        this.expiredAt = null;
+        this.archivedAt = null;
+        this.archiveWarningNotifiedAt = null;
+        this.finalReminderSentAt = null;
+        this.expirationNotifiedAt = null;
+        this.dataStatus = TenantDataStatus.RETAINED;
+        this.suspendedAt = null;
+        this.suspensionReason = null;
+        this.status = UserStatus.ACTIVE;
+        this.isActive = true;
     }
 
     public void activate() {

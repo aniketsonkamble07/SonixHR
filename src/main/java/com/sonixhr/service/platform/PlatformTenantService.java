@@ -14,9 +14,15 @@ import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
+import com.sonixhr.repository.platform.PlatformUserRepository;
+import com.sonixhr.repository.platform.TenantDeletionLogRepository;
+import com.sonixhr.entity.platform.TenantDeletionLog;
+import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.employee.EmployeeDetailsService;
 import com.sonixhr.service.tenant.TenantRegistrationService;
 import com.sonixhr.security.TenantRLSService;
+import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,9 +44,15 @@ public class PlatformTenantService {
     private final TenantRLSService tenantRLSService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
+    private final com.sonixhr.service.common.CacheEvictionService cacheEvictionService;
+    private final PlatformUserRepository platformUserRepository;
+    private final TenantDeletionLogRepository tenantDeletionLogRepository;
+    private final EntityManager entityManager;
 
-    public Page<PlatformTenantResponseDTO> getAllTenants(String companyName, String status, Boolean isActive, Pageable pageable) {
-        log.info("Fetching all tenants with filter - name: {}, status: {}, isActive: {}", companyName, status, isActive);
+    public Page<PlatformTenantResponseDTO> getAllTenants(String companyName, String status, Boolean isActive,
+            Pageable pageable) {
+        log.info("Fetching all tenants with filter - name: {}, status: {}, isActive: {}", companyName, status,
+                isActive);
         Page<Tenant> tenants = tenantRepository.searchTenants(companyName, status, isActive, pageable);
         return tenants.map(this::convertToDTO);
     }
@@ -70,15 +82,16 @@ public class PlatformTenantService {
 
         // Invalidate employee caches to force logout
         employeeDetailsService.invalidateAllCaches();
+        tenantRLSService.invalidateTenantCache(id);
+        cacheEvictionService.evictTenantCaches(id);
 
         auditLogService.log(
-            savedTenant,
-            "TENANT_SUSPENDED",
-            "status",
-            oldStatus,
-            savedTenant.getStatus() != null ? savedTenant.getStatus().name() : null,
-            "{\"reason\":\"" + reason + "\"}"
-        );
+                savedTenant,
+                "TENANT_SUSPENDED",
+                "status",
+                oldStatus,
+                savedTenant.getStatus() != null ? savedTenant.getStatus().name() : null,
+                "{\"reason\":\"" + reason + "\"}");
 
         return convertToDTO(savedTenant);
     }
@@ -102,6 +115,8 @@ public class PlatformTenantService {
 
         // Invalidate employee caches to allow re-login
         employeeDetailsService.invalidateAllCaches();
+        tenantRLSService.invalidateTenantCache(id);
+        cacheEvictionService.evictTenantCaches(id);
 
         return convertToDTO(savedTenant);
     }
@@ -112,16 +127,17 @@ public class PlatformTenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(dto.getPlanType())
-                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found with code: " + dto.getPlanType()));
+        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(dto.getPlanType())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Subscription plan not found with code: " + dto.getPlanType()));
 
         tenant.setSubscriptionPlan(plan);
         tenant.setMaxEmployees(dto.getMaxEmployees());
         tenant.setPlanStatus(PlanStatus.ACTIVE);
-        if (tenant.getEndsAt() == null) {
-            int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
-            tenant.setEndsAt(java.time.LocalDateTime.now().plusMonths(validityMonths));
-        }
+
+        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+        java.time.LocalDateTime newEndsAt = java.time.LocalDateTime.now().plusMonths(validityMonths);
+        tenant.setEndsAt(newEndsAt);
         Tenant savedTenant = tenantRepository.save(tenant);
 
         // Update current active subscription settings
@@ -130,29 +146,30 @@ public class PlatformTenantService {
                         .tenant(savedTenant)
                         .planName(plan.getName())
                         .currency("INR")
-                        .billingCycle(com.sonixhr.enums.BillingCycle.MONTHLY)
                         .build());
-        
+
         sub.setSubscriptionPlan(plan);
         sub.setPlanName(plan.getName());
-        sub.setMaxEmployees(dto.getMaxEmployees());
         sub.setIsActive(true);
-        sub.setMaxStorageMb(dto.getMaxStorageMb());
         sub.setPlanStatus(PlanStatus.ACTIVE);
-        
+
         if (sub.getStartedAt() == null) {
             sub.setStartedAt(java.time.LocalDateTime.now());
         }
-        if (sub.getEndsAt() == null) {
-            sub.setEndsAt(tenant.getEndsAt());
+        if (sub.getBillingPeriodStart() == null) {
+            sub.setBillingPeriodStart(sub.getStartedAt());
         }
+        sub.setEndsAt(newEndsAt);
+        sub.setBillingPeriodEnd(newEndsAt);
         if (sub.getAmount() == null) {
-            sub.setAmount(java.math.BigDecimal.valueOf(plan.getMonthlyPrice()));
+            sub.setAmount(plan.getPrice());
         }
         subscriptionRepository.save(sub);
 
         // Invalidate employee caches
         employeeDetailsService.invalidateAllCaches();
+        tenantRLSService.invalidateTenantCache(id);
+        cacheEvictionService.evictTenantCaches(id);
 
         return convertToDTO(savedTenant);
     }
@@ -211,10 +228,11 @@ public class PlatformTenantService {
         }
 
         Tenant savedTenant = tenantRepository.save(tenant);
-        
+
         // Invalidate tenant configuration cache
         tenantRLSService.invalidateTenantCache(id);
-        
+        cacheEvictionService.evictTenantCaches(id);
+
         return convertToDTO(savedTenant);
     }
 
@@ -236,6 +254,7 @@ public class PlatformTenantService {
         // Invalidate employee caches to force logout
         employeeDetailsService.invalidateAllCaches();
         tenantRLSService.invalidateTenantCache(id);
+        cacheEvictionService.evictTenantCaches(id);
 
         return convertToDTO(savedTenant);
     }
@@ -246,22 +265,219 @@ public class PlatformTenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        tenant.softDelete();
-        tenantRepository.save(tenant);
+        // 1. Gather data counts for manifest proof
+        long employeeCount = countEntityRows("Employee", id);
+        long departmentCount = countEntityRows("Department", id);
+        long attendanceCount = countEntityRows("AttendanceRecord", id);
+        long leaveCount = countEntityRows("LeaveRequest", id);
+        long payrunCount = countEntityRows("Payrun", id);
+        long payslipCount = countEntityRows("Payslip", id);
 
-        // Deactivate active subscriptions as well
-        subscriptionRepository.findByTenantIdAndIsActiveTrue(id).ifPresent(sub -> {
-            sub.setIsActive(false);
-            subscriptionRepository.save(sub);
-        });
+        // 2. Generate JSON manifest
+        LocalDateTime now = LocalDateTime.now();
+        String manifestJson = String.format(
+                "{\"tenantId\":%d,\"tenantCode\":%s,\"companyName\":%s,\"deletedAt\":\"%s\"," +
+                        "\"employeesCount\":%d,\"departmentsCount\":%d,\"attendanceRecordsCount\":%d," +
+                        "\"leaveRequestsCount\":%d,\"payrunsCount\":%d,\"payslipsCount\":%d}",
+                id,
+                escapeJson(tenant.getTenantCode()),
+                escapeJson(tenant.getCompanyName()),
+                now.toString(),
+                employeeCount,
+                departmentCount,
+                attendanceCount,
+                leaveCount,
+                payrunCount,
+                payslipCount);
+
+        // 3. Compute SHA-256 Hash
+        String manifestHash = calculateSha256(manifestJson);
+
+        // 4. Retrieve current performing administrator
+        Long adminId = auditLogService.getCurrentUserId();
+        String adminEmail = "System/Unknown Admin";
+        if (adminId != null) {
+            adminEmail = platformUserRepository.findById(adminId)
+                    .map(PlatformUser::getEmail)
+                    .orElse("Unknown Admin");
+        }
+
+        // 5. Create compliance audit log
+        TenantDeletionLog deletionLog = TenantDeletionLog.builder()
+                .tenantId(id)
+                .tenantCode(tenant.getTenantCode())
+                .companyName(tenant.getCompanyName())
+                .deletedAt(now)
+                .deletedByAdminId(adminId)
+                .deletedByAdminEmail(adminEmail)
+                .dataManifestHash(manifestHash)
+                .dataManifestJson(manifestJson)
+                .build();
+
+        tenantDeletionLogRepository.save(deletionLog);
+
+        // 6. Permanently erase all tenant data across all child tables
+        permanentlyEraseTenantData(id);
+
+        // 7. Delete the tenant row itself
+        tenantRepository.delete(tenant);
 
         // Invalidate employee caches and tenant config cache
         employeeDetailsService.invalidateAllCaches();
         tenantRLSService.invalidateTenantCache(id);
+        cacheEvictionService.evictTenantCaches(id);
+    }
+
+    @Transactional
+    public void permanentlyEraseTenantData(Long tenantId) {
+        log.info("Permanently erasing all data for tenant ID: {}", tenantId);
+
+        // Delete from join tables first
+        entityManager.createNativeQuery(
+                "DELETE FROM employee_roles WHERE employee_id IN (SELECT id FROM employees WHERE tenant_id = :tenantId)")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createNativeQuery(
+                "DELETE FROM role_tenant_permissions WHERE role_id IN (SELECT id FROM tenant_roles WHERE tenant_id = :tenantId)")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM PayslipItem x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM Payslip x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM FnfSettlementItem x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM FnfSettlement x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM EmployeeSalaryComponent x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM EmployeeSalaryProfile x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM LoanAdvance x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM ReimbursementClaim x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM LeaveRequest x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM AttendanceRecord x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM EmployeeTask x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM EmployeeAddress x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM EmployeeBankAccount x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        // Remove manager self-references in Employee
+        entityManager.createQuery("UPDATE Employee x SET x.manager = null WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM Employee x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM Department x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM SalaryComponentDefinition x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantSalaryStructure x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantPayrollConfig x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM TenantLeaveSettings x WHERE x.tenantId = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM PublicHoliday x WHERE x.tenantId = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM ShiftConfiguration x WHERE x.tenantId = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM TenantSetupToken x WHERE x.tenantId = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantRole x WHERE x.tenantId = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        entityManager.createQuery("DELETE FROM TenantUsageStat x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantSetting x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantFeature x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantBranding x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantBillingInfo x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantAuditLog x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM SupportTicket x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+        entityManager.createQuery("DELETE FROM TenantSubscription x WHERE x.tenant.id = :tenantId")
+                .setParameter("tenantId", tenantId).executeUpdate();
+
+        log.info("Finished deleting all entities for tenant ID: {}", tenantId);
+    }
+
+    private long countEntityRows(String entityName, Long tenantId) {
+        try {
+            return entityManager.createQuery(
+                    "SELECT COUNT(x) FROM " + entityName + " x WHERE x.tenant.id = :tenantId", Long.class)
+                    .setParameter("tenantId", tenantId)
+                    .getSingleResult();
+        } catch (Exception e) {
+            log.warn("Failed to count rows for entity {}: {}", entityName, e.getMessage());
+            return 0;
+        }
+    }
+
+    private String calculateSha256(String input) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1)
+                    hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to calculate SHA-256 hash", e);
+        }
+    }
+
+    private String escapeJson(String input) {
+        if (input == null)
+            return "null";
+        StringBuilder sb = new StringBuilder();
+        sb.append("\"");
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '"')
+                sb.append("\\\"");
+            else if (c == '\\')
+                sb.append("\\\\");
+            else if (c == '\n')
+                sb.append("\\n");
+            else if (c == '\r')
+                sb.append("\\r");
+            else if (c == '\t')
+                sb.append("\\t");
+            else if (c < 32)
+                sb.append(String.format("\\u%04x", (int) c));
+            else
+                sb.append(c);
+        }
+        sb.append("\"");
+        return sb.toString();
     }
 
     private PlatformTenantResponseDTO convertToDTO(Tenant tenant) {
-        if (tenant == null) return null;
+        if (tenant == null)
+            return null;
         return PlatformTenantResponseDTO.builder()
                 .id(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
@@ -284,6 +500,11 @@ public class PlatformTenantService {
                 .suspensionReason(tenant.getSuspensionReason())
                 .createdAt(tenant.getCreatedAt())
                 .updatedAt(tenant.getUpdatedAt())
+                .dataStatus(tenant.getDataStatus() != null ? tenant.getDataStatus().name() : null)
+                .expiredAt(tenant.getExpiredAt())
+                .archivedAt(tenant.getArchivedAt())
+                .deletedAt(tenant.getDeletedAt())
+                .deletedByAdminId(tenant.getDeletedByAdminId())
                 .build();
     }
 }

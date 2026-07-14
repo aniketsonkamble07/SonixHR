@@ -12,12 +12,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SubscriptionDashboardDTO {
-    private long freeTrialCount;
-    private long basicPlanCount;
-    private long moderatePlanCount;
-    private long premiumPlanCount;
-    private long enterprisePlanCount;
-    
     private List<ChartPoint> monthlyRevenue;
     private List<ChartPoint> subscriptionGrowth;
     private List<ChartPoint> planDistribution;

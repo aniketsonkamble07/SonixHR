@@ -1,12 +1,20 @@
 package com.sonixhr.enums;
 
+import lombok.Getter;
+
+@Getter
 public enum PlanStatus {
     ACTIVE("active", "Active", "success"),
+    TRIAL("trial", "Trial", "info"),
+    PAST_DUE("past_due", "Past Due", "warning"),
+    EXPIRED("expired", "Expired", "danger"),
     SUSPENDED("suspended", "Suspended", "danger"),
     CANCELLED("cancelled", "Cancelled", "secondary"),
-    NOT_ACTIVATED("not_activated", "Not Activated", "secondary"),
-    TRIAL("trial", "Trial", "info"),
-    trial("trial", "Trial", "info");
+    TERMINATED("terminated", "Terminated", "danger"),
+    FROZEN("frozen", "Frozen", "warning"),
+    PAUSED("paused", "Paused", "warning"),
+    NOT_ACTIVATED("not_activated", "Not Activated", "secondary");
+
     private final String code;
     private final String displayName;
     private final String badgeColor;
@@ -17,29 +25,31 @@ public enum PlanStatus {
         this.badgeColor = badgeColor;
     }
 
-    public String getCode() {
-        return code;
+    @com.fasterxml.jackson.annotation.JsonCreator
+    public static PlanStatus fromLegacy(String value) {
+        if (value == null) return null;
+        for (PlanStatus status : PlanStatus.values()) {
+            if (status.name().equalsIgnoreCase(value) || status.code.equalsIgnoreCase(value)) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("Unknown plan status: " + value);
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public String getBadgeColor() {
-        return badgeColor;
+    @com.fasterxml.jackson.annotation.JsonValue
+    public String toLegacy() {
+        return this.code;
     }
 
     public static PlanStatus fromCode(String code) {
         if (code == null) {
             throw new IllegalArgumentException("Code cannot be null");
         }
-
         for (PlanStatus status : values()) {
             if (status.code.equalsIgnoreCase(code)) {
                 return status;
             }
         }
-
         throw new IllegalArgumentException("Unknown plan status: " + code);
     }
 
@@ -47,12 +57,15 @@ public enum PlanStatus {
         return this == ACTIVE;
     }
 
-
     public boolean isSuspended() {
         return this == SUSPENDED;
     }
 
     public boolean isCancelled() {
         return this == CANCELLED;
+    }
+
+    public boolean isExpired() {
+        return this == EXPIRED;
     }
 }

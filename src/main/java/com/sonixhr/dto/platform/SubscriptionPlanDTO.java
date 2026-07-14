@@ -25,19 +25,8 @@ public class SubscriptionPlanDTO {
     @Size(min = 2, max = 100, message = "Plan name must be between 2 and 100 characters")
     private String name;
 
-    @PositiveOrZero(message = "Monthly price must be zero or positive")
-    private double monthlyPrice;
-
-    @Positive(message = "Max employees must be a positive number")
-    private int maxEmployees;
-
-    @Positive(message = "Max storage (MB) must be a positive number")
-    private int maxStorageMb;
-
-    @PositiveOrZero(message = "Trial days must be zero or positive")
-    private int trialDays;
-
-    private boolean isTrial;
+    @PositiveOrZero(message = "Price must be zero or positive")
+    private java.math.BigDecimal price;
 
     @Positive(message = "Validity months must be a positive number")
     private int validityMonths;

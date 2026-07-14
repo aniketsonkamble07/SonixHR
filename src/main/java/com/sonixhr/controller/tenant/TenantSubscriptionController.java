@@ -36,7 +36,7 @@ public class TenantSubscriptionController {
             @AuthenticationPrincipal Employee currentEmployee) {
         log.info("REST request to renew subscription");
         Long tenantId = currentEmployee.getTenantId();
-        TenantSubscriptionResponseDTO response = subscriptionService.renewSubscription(tenantId);
+        TenantSubscriptionResponseDTO response = subscriptionService.renewSubscriptionForTenant(tenantId);
         return ResponseEntity.ok(response);
     }
 
@@ -44,11 +44,10 @@ public class TenantSubscriptionController {
     @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTION')")
     public ResponseEntity<TenantSubscriptionResponseDTO> upgradeSubscription(
             @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam String planType,
-            @RequestParam String billingCycle) {
-        log.info("REST request to upgrade/change subscription to plan: {}, cycle: {}", planType, billingCycle);
+            @RequestParam String planType) {
+        log.info("REST request to upgrade/change subscription to plan: {}", planType);
         Long tenantId = currentEmployee.getTenantId();
-        TenantSubscriptionResponseDTO response = subscriptionService.upgradeSubscription(tenantId, planType, billingCycle);
+        TenantSubscriptionResponseDTO response = subscriptionService.upgradeSubscription(tenantId, planType);
         return ResponseEntity.ok(response);
     }
 

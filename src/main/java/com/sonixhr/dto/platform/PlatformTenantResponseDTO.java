@@ -36,4 +36,10 @@ public class PlatformTenantResponseDTO {
     private String suspensionReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String dataStatus;
+    private LocalDateTime expiredAt;
+    private LocalDateTime archivedAt;
+    private LocalDateTime deletedAt;
+    private Long deletedByAdminId;
 }

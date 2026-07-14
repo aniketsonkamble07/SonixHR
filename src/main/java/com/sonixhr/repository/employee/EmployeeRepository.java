@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,7 +31,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT e.id, e.email, e.firstName, e.lastName, e.employeeCode FROM Employee e WHERE e.tenant.id = :tenantId")
     List<Object[]> findEmployeeSummariesByTenantId(@Param("tenantId") Long tenantId);
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     List<Employee> findByTenant_Id(Long tenantId);
+
+    @EntityGraph(attributePaths = {"department", "manager"})
     Page<Employee> findByTenant_Id(Long tenantId, Pageable pageable);
     Optional<Employee> findByEmail(String email);
 
@@ -42,9 +46,13 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // STATUS-BASED QUERIES
     // =====================================================
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     List<Employee> findByTenant_IdAndStatus(Long tenantId, EmployeeStatus status);
+
+    @EntityGraph(attributePaths = {"department", "manager"})
     Page<Employee> findByTenant_IdAndStatus(Long tenantId, EmployeeStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e WHERE e.manager IS NULL AND e.tenant.id = :tenantId")
     List<Employee> findEmployeesWithNoManager(@Param("tenantId") Long tenantId);
 
@@ -61,11 +69,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // MANAGER QUERIES
     // =====================================================
 
-    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.manager WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.manager LEFT JOIN FETCH e.department WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
     List<Employee> findByManagerIdAndTenantId(@Param("managerId") Long managerId,
                                               @Param("tenantId") Long tenantId);
 
-    @Query("SELECT e FROM Employee e WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.manager LEFT JOIN FETCH e.department WHERE e.manager.id = :managerId AND e.tenant.id = :tenantId")
     Page<Employee> findByManagerIdAndTenantId(@Param("managerId") Long managerId,
                                               @Param("tenantId") Long tenantId,
                                               Pageable pageable);
@@ -80,7 +88,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // DEPARTMENT QUERIES
     // =====================================================
 
-    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.department.name = :departmentName")
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.department LEFT JOIN FETCH e.manager WHERE e.tenant.id = :tenantId AND e.department.name = :departmentName")
     List<Employee> findByTenantIdAndDepartmentName(@Param("tenantId") Long tenantId,
                                                    @Param("departmentName") String departmentName);
 
@@ -105,6 +113,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // SEARCH QUERIES
     // =====================================================
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e LEFT JOIN e.department d WHERE e.tenant.id = :tenantId AND " +
             "(LOWER(e.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
@@ -116,6 +125,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                    @Param("searchTerm") String searchTerm,
                                    Pageable pageable);
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND " +
             "(LOWER(e.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(e.lastName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
@@ -390,6 +400,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // BATCH QUERIES FOR PERFORMANCE
     // =====================================================
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e WHERE e.id IN :ids AND e.tenant.id = :tenantId")
     List<Employee> findAllByIdsAndTenantId(@Param("ids") List<Long> ids,
                                            @Param("tenantId") Long tenantId);
@@ -419,15 +430,18 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     /**
      * Find top active employees with pagination
      */
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT DISTINCT e FROM Employee e " +
            "LEFT JOIN FETCH e.roles r " +
            "LEFT JOIN FETCH r.permissions " +
            "WHERE e.isActive = true ORDER BY e.lastLoginAt DESC")
     List<Employee> findTop100ByIsActiveTrue(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e WHERE e.email = :email AND e.tenant.id = :tenantId")
     Optional<Employee> findByEmailAndTenantId(@Param("email") String email, @Param("tenantId") Long tenantId);
 
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e WHERE e.employeeCode = :employeeCode AND e.tenant.id = :tenantId")
     Optional<Employee> findByEmployeeCodeAndTenantId(@Param("employeeCode") String employeeCode,
                                                      @Param("tenantId") Long tenantId);
@@ -437,6 +451,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // =====================================================
 
     /** All active employees in the tenant, excluding the caller, matching optional query. */
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
             "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
             "(:query = '' OR LOWER(e.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
@@ -449,6 +464,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                              Pageable pageable);
 
     /** Active employees in the given department OR reporting to managerId, excluding the caller. */
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
             "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
             "(e.department.id = :departmentId OR e.manager.id = :managerId) AND " +
@@ -464,6 +480,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                                        Pageable pageable);
 
     /** Active direct reports of the given manager, excluding the caller. */
+    @EntityGraph(attributePaths = {"department", "manager"})
     @Query("SELECT e FROM Employee e LEFT JOIN e.department d " +
             "WHERE e.tenant.id = :tenantId AND e.isActive = true AND e.id <> :excludeId AND " +
             "e.manager.id = :managerId AND " +

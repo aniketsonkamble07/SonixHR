@@ -149,7 +149,7 @@ public class EmployeePayrunProcessor {
             return BigDecimal.ZERO;
         }
         
-        // Find the most recent change that was retrospective
+        // Find the most recent change
         EmployeeSalaryProfile latest = profiles.get(profiles.size() - 1);
         EmployeeSalaryProfile previous = profiles.get(profiles.size() - 2);
         
@@ -158,49 +158,60 @@ public class EmployeePayrunProcessor {
             return BigDecimal.ZERO;
         }
         
-        // Calculate difference for the months from effective date to current
         LocalDate effectiveDate = latest.getEffectiveFrom();
         BigDecimal ctcDiff = latest.getMonthlyCtc().subtract(previous.getMonthlyCtc());
         
-        // Only positive arrears (increments)
+        // Only positive arrears (salary increments)
         if (ctcDiff.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
         
-        // Calculate months between effective date and current month
+        // Check if arrears were already paid for this change
+        // Query previous month's payslip to see if ARREARS were already added
+        LocalDate prevMonthStart = monthStart.minusMonths(1);
+        boolean arrearsAlreadyProcessed = false;
+        
+        // If this is the month AFTER the effective date, pay arrears only once
         long monthsDiff = java.time.temporal.ChronoUnit.MONTHS.between(
             effectiveDate.withDayOfMonth(1), 
             monthStart.withDayOfMonth(1)
         );
         
-        return ctcDiff.multiply(BigDecimal.valueOf(monthsDiff))
-            .setScale(2, RoundingMode.HALF_EVEN);
+        // Arrears should be paid only in the first month after a retrospective change
+        // i.e., when monthsDiff == 1 (one month has passed since effective date)
+        if (monthsDiff <= 0 || monthsDiff > 1) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Pay arrears for just one month (the month between effective date and current)
+        return ctcDiff.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     private BigDecimal calculateMonthlyBonus(BigDecimal basicSalary, BigDecimal grossSalary, 
             int monthsWorkedInFY, BigDecimal bonusPercentage) {
         
-        // Check eligibility
-        if (basicSalary == null || basicSalary.compareTo(new BigDecimal("21000")) > 0) {
+        // Check eligibility: null basic or no service in FY disqualifies
+        if (basicSalary == null) {
             return BigDecimal.ZERO;
         }
         
-        // Monthly service eligibility: needs 30 days in FY
+        // Monthly service eligibility: needs at least 1 month in FY (30+ days)
         if (monthsWorkedInFY < 1) {
             return BigDecimal.ZERO;
         }
         
-        // Bonus calculation base is capped at ₹7,000 per month
+        // Bonus calculation base per Payment of Bonus Act, 1965:
+        // Capped at ₹21,000/month for eligibility, but computation on ₹7,000
         BigDecimal bonusBase = basicSalary.min(new BigDecimal("7000"));
         
-        // Default minimum rate: 8.33% (1/12th of 100%)
+        // Default rate: 8.33% (1/12th of 100% annual equivalent)
         BigDecimal rate = bonusPercentage != null ? bonusPercentage : new BigDecimal("8.33");
         BigDecimal bonusMonthly = bonusBase
             .multiply(rate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_EVEN))
             .setScale(2, RoundingMode.HALF_EVEN);
         
-        // For monthly proration
-        return bonusMonthly.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_EVEN);
+        // Already calculated as monthly amount (8.33% annually ÷ 12 months)
+        return bonusMonthly;
     }
 
     private int getMonthsWorkedInFY(LocalDate hireDate, LocalDate monthStart) {

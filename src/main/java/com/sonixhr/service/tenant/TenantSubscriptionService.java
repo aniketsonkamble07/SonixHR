@@ -5,18 +5,33 @@ import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
-import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
+import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.CancellationType;
+import com.sonixhr.enums.CancellationReason;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
+import com.sonixhr.repository.platform.PlatformUserRepository;
+import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.security.TenantRLSService;
+import com.sonixhr.service.common.CacheEvictionService;
+import com.sonixhr.service.common.AuditLogService;
+import com.sonixhr.service.EmailService;
+import com.sonixhr.event.subscription.*;
+import com.sonixhr.enums.TenantDataStatus;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronization;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,137 +47,529 @@ public class TenantSubscriptionService {
 
     private final TenantSubscriptionRepository subscriptionRepository;
     private final TenantRepository tenantRepository;
-    private final EmployeeRepository employeeRepository;
-    private final TenantRLSService tenantRLSService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final TenantRLSService tenantRLSService;
+    private final CacheEvictionService cacheEvictionService;
+    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AuditLogService auditLogService;
+    private final PlatformUserRepository platformUserRepository;
+
+    @Value("${app.subscription.reactivation-window-days:30}")
+    private int reactivationWindowDays;
 
     public TenantSubscriptionResponseDTO currentSubscription(Long tenantId) {
         log.info("Fetching current active subscription for tenant ID: {}", tenantId);
-        TenantSubscription subscription = subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant"));
+        TenantSubscription subscription = subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)
+                .or(() -> subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId))
+                .orElseThrow(() -> new ResourceNotFoundException("Current subscription not found for tenant"));
         return convertToDTO(subscription);
     }
 
+    // ===== CREATE NEW SUBSCRIPTION =====
     @Transactional
-    public TenantSubscriptionResponseDTO renewSubscription(Long tenantId) {
-        log.info("Renewing subscription for tenant ID: {}", tenantId);
+    public TenantSubscriptionResponseDTO activateSubscription(Long tenantId, Long planId) {
+        log.info("Activating subscription for tenant ID: {} and plan ID: {}", tenantId, planId);
+        Tenant tenant = tenantRepository.findById(tenantId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+            
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
         
-        // Find the most recent subscription regardless of whether it's active (handles expired states)
-        TenantSubscription currentSub = subscriptionRepository.findByTenantIdOrderByCreatedAtDesc(tenantId)
-                .stream().findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Subscription details not found for tenant"));
-
-        if (currentSub.getPlanStatus() == PlanStatus.CANCELLED) {
-            throw new BusinessException("Cannot renew a cancelled subscription. Please upgrade or purchase a new plan.");
-        }
-
-        // Extend endsAt date from current expiry (if in future) or from now (if already expired)
-        int validityMonths = currentSub.getSubscriptionPlan() != null && currentSub.getSubscriptionPlan().getValidityMonths() > 0 
-                ? currentSub.getSubscriptionPlan().getValidityMonths() : 1;
-        long monthsToAdd = currentSub.getBillingCycle() == BillingCycle.YEARLY ? 12L : validityMonths;
+        // Close any existing active subscriptions
+        closeActiveSubscription(tenantId, "Upgraded to new plan");
         
-        LocalDateTime baseDate = (currentSub.getEndsAt() != null && currentSub.getEndsAt().isAfter(LocalDateTime.now()))
-                ? currentSub.getEndsAt()
-                : LocalDateTime.now();
-        LocalDateTime newEndsAt = baseDate.plusMonths(monthsToAdd);
+        // Create new subscription
+        LocalDateTime now = LocalDateTime.now();
+        int validityMonths = plan.getValidityMonths() != null && plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
         
-        currentSub.setEndsAt(newEndsAt);
-        currentSub.setPlanStatus(PlanStatus.ACTIVE);
-        currentSub.setIsActive(true);
-
-        // Reactivate the tenant if they were suspended/expired
-        Tenant tenant = currentSub.getTenant();
-        if (tenant != null) {
-            tenant.setPlanStatus(PlanStatus.ACTIVE);
-            tenant.activate(); // Sets status = UserStatus.ACTIVE and isActive = true
-            tenantRepository.save(tenant);
-        }
-
-        TenantSubscription savedSub = subscriptionRepository.save(currentSub);
+        TenantSubscription subscription = TenantSubscription.builder()
+            .tenant(tenant)
+            .subscriptionPlan(plan)
+            .planName(plan.getName())
+            .planStatus(PlanStatus.ACTIVE)
+            .isCurrent(true)
+            .startedAt(now)
+            .billingPeriodStart(now)
+            .billingPeriodEnd(now.plusMonths(validityMonths))
+            .lastPaymentAmount(plan.getPrice())
+            .lastPaymentDate(now)
+            .nextPaymentDate(now.plusMonths(validityMonths))
+            .amount(plan.getPrice())
+            .currency(plan.getCurrency() != null ? plan.getCurrency() : "INR")
+            .build();
+        
+        TenantSubscription saved = subscriptionRepository.save(subscription);
+        
+        // Update tenant
+        tenant.setSubscriptionPlan(plan);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(now.plusMonths(validityMonths));
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenantRepository.save(tenant);
+        
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionActivatedEvent(saved));
         
         tenantRLSService.invalidateTenantCache(tenantId);
-        return convertToDTO(savedSub);
+        cacheEvictionService.evictTenantCaches(tenantId);
+
+        return convertToDTO(saved);
+    }
+    
+    // ===== RENEW SUBSCRIPTION =====
+    @Transactional
+    public TenantSubscriptionResponseDTO renewSubscription(Long subscriptionId) {
+        log.info("Renewing subscription ID: {}", subscriptionId);
+        TenantSubscription renewed = renewSubscriptionInternal(subscriptionId);
+        return convertToDTO(renewed);
     }
 
     @Transactional
-    public TenantSubscriptionResponseDTO upgradeSubscription(Long tenantId, String planTypeCode, String billingCycleStr) {
-        log.info("Changing subscription for tenant ID: {} to plan: {} (billing cycle: {})", tenantId, planTypeCode, billingCycleStr);
+    public TenantSubscriptionResponseDTO renewSubscriptionForTenant(Long tenantId) {
+        log.info("Renewing subscription for tenant ID: {}", tenantId);
+        TenantSubscription current = subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)
+                .or(() -> subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId))
+                .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant: " + tenantId));
+        TenantSubscription renewed = renewSubscriptionInternal(current.getId());
+        return convertToDTO(renewed);
+    }
+
+    /**
+     * Isolated renewal transaction mapping, ensuring failures do not rollback scheduler batches.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public TenantSubscription renewSubscriptionIsolation(Long subscriptionId) {
+        log.info("Renewing subscription ID: {} with propagation REQUIRES_NEW", subscriptionId);
+        return renewSubscriptionInternal(subscriptionId);
+    }
+
+    private TenantSubscription renewSubscriptionInternal(Long subscriptionId) {
+        TenantSubscription current = subscriptionRepository.findById(subscriptionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
+            
+        // Validate subscription can be renewed
+        if (current.getStatus() == PlanStatus.TERMINATED) {
+            throw new BusinessException("Cannot renew a terminated subscription. Create a new one.");
+        }
         
+        if (current.getStatus() == PlanStatus.CANCELLED && Boolean.TRUE.equals(current.getCancelledAtEndOfPeriod())) {
+            throw new BusinessException("This subscription was cancelled at end of period. Create a new one.");
+        }
+        
+        // Check if it's already active and not near expiry
+        if (current.getStatus() == PlanStatus.ACTIVE && 
+            current.getBillingPeriodEnd().isAfter(LocalDateTime.now().plusDays(7))) {
+            throw new BusinessException("Subscription is already active and not expiring soon");
+        }
+        
+        // For expired subscriptions, reactivate
+        if (current.getStatus() == PlanStatus.EXPIRED) {
+            return reactivateExpiredSubscription(current);
+        }
+        
+        // Normal renewal
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime newBillingEnd;
+        
+        // Determine if we should extend from end date or from now
+        if (current.getBillingPeriodEnd() != null && current.getBillingPeriodEnd().isBefore(now)) {
+            // Expired - start from now
+            newBillingEnd = now.plusMonths(current.getSubscriptionPlan().getValidityMonths());
+        } else if (current.getBillingPeriodEnd() != null) {
+            // Still active - extend from end
+            newBillingEnd = current.getBillingPeriodEnd()
+                .plusMonths(current.getSubscriptionPlan().getValidityMonths());
+        } else {
+            newBillingEnd = now.plusMonths(1);
+        }
+        
+        // Create renewal record (new subscription)
+        TenantSubscription renewed = TenantSubscription.builder()
+            .tenant(current.getTenant())
+            .subscriptionPlan(current.getSubscriptionPlan())
+            .planName(current.getPlanName())
+            .planStatus(PlanStatus.ACTIVE)
+            .isCurrent(true)
+            .startedAt(current.getStartedAt())
+            .billingPeriodStart(current.getBillingPeriodEnd() != null ? current.getBillingPeriodEnd() : now)  // Start from previous end
+            .billingPeriodEnd(newBillingEnd)
+            .lastPaymentAmount(current.getSubscriptionPlan().getPrice())
+            .lastPaymentDate(now)
+            .nextPaymentDate(newBillingEnd)
+            .amount(current.getSubscriptionPlan().getPrice())
+            .currency(current.getCurrency())
+            .originalSubscriptionId(current.getOriginalSubscriptionId() != null ? 
+                current.getOriginalSubscriptionId() : current.getId())
+            .previousSubscriptionId(current.getId())
+            .build();
+        
+        // Mark old as not current
+        current.setIsCurrent(false);
+        current.setIsActive(false);
+        subscriptionRepository.save(current);
+        
+        TenantSubscription saved = subscriptionRepository.save(renewed);
+        
+        // Update tenant
+        Tenant tenant = current.getTenant();
+        if (tenant != null) {
+            tenant.setSubscriptionPlan(current.getSubscriptionPlan());
+            tenant.setPlanStatus(PlanStatus.ACTIVE);
+            tenant.setEndsAt(newBillingEnd);
+            tenant.setStatus(UserStatus.ACTIVE);
+            tenantRepository.save(tenant);
+        }
+        
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionRenewedEvent(saved, current));
+        
+        if (tenant != null) {
+            tenantRLSService.invalidateTenantCache(tenant.getId());
+            cacheEvictionService.evictTenantCaches(tenant.getId());
+        }
+
+        return saved;
+    }
+    
+    // ===== REACTIVATE EXPIRED SUBSCRIPTION =====
+    @Transactional
+    public TenantSubscription reactivateExpiredSubscription(TenantSubscription expired) {
+        Tenant tenant = expired.getTenant();
+        if (tenant != null && (tenant.getDataStatus() == TenantDataStatus.ARCHIVED || tenant.getDataStatus() == TenantDataStatus.ELIGIBLE_FOR_DELETION)) {
+            throw new BusinessException("Subscription has been archived. Self-serve reactivation is disabled. Please contact support.");
+        }
+
+        if (expired.getStatus() != PlanStatus.EXPIRED) {
+            throw new BusinessException("Only expired subscriptions can be reactivated");
+        }
+
+        if (expired.getSubscriptionPlan() == null) {
+            throw new BusinessException("Cannot reactivate: subscription plan is missing");
+        }
+        
+        // Check if we should allow reactivation (configurable reactivation window)
+        if (expired.getEndedAt() != null && 
+            expired.getEndedAt().isBefore(LocalDateTime.now().minusDays(reactivationWindowDays))) {
+            throw new BusinessException(
+                String.format("Subscription expired more than %d days ago. Please create a new subscription.", 
+                    reactivationWindowDays)
+            );
+        }
+        
+        SubscriptionPlan plan = expired.getSubscriptionPlan();
+        LocalDateTime now = LocalDateTime.now();
+        int months = (plan.getValidityMonths() == null || plan.getValidityMonths() <= 0) ? 1 : plan.getValidityMonths();
+        LocalDateTime newEnd = now.plusMonths(months);
+        
+        // Create reactivated subscription
+        TenantSubscription reactivated = TenantSubscription.builder()
+            .tenant(tenant)
+            .subscriptionPlan(plan)
+            .planName(plan.getName())
+            .planStatus(PlanStatus.ACTIVE)
+            .isCurrent(true)
+            .startedAt(expired.getStartedAt())
+            .billingPeriodStart(now)
+            .billingPeriodEnd(newEnd)
+            .lastPaymentAmount(plan.getPrice())
+            .lastPaymentDate(now)
+            .nextPaymentDate(newEnd)
+            .amount(plan.getPrice())
+            .currency(expired.getCurrency())
+            .originalSubscriptionId(expired.getOriginalSubscriptionId() != null ? 
+                expired.getOriginalSubscriptionId() : expired.getId())
+            .previousSubscriptionId(expired.getId())
+            .reactivationDate(now)
+            .build();
+        
+        // Mark old as not current and save and flush first to prevent constraint violations
+        expired.setIsCurrent(false);
+        expired.setIsActive(false);
+        subscriptionRepository.saveAndFlush(expired);
+        
+        TenantSubscription saved = subscriptionRepository.save(reactivated);
+        
+        // Update tenant
+        if (tenant != null) {
+            tenant.setSubscriptionPlan(plan);
+            tenant.setPlanStatus(PlanStatus.ACTIVE);
+            tenant.setEndsAt(newEnd);
+            tenant.resetSubscriptionLifecycle();
+            tenantRepository.save(tenant);
+        }
+        
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionReactivatedEvent(saved, expired));
+        
+        if (tenant != null) {
+            invalidateTenantCachesPostCommit(tenant.getId());
+        }
+
+        return saved;
+    }
+
+    @Transactional
+    public TenantSubscriptionResponseDTO restoreArchivedTenant(Long tenantId, Long planId, String notes) {
+        log.info("Restoring archived tenant ID: {} with plan ID: {}", tenantId, planId);
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        SubscriptionPlan newPlan = subscriptionPlanRepository.findByCodeIgnoreCase(planTypeCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planTypeCode));
-        if (!newPlan.isActive()) {
-            throw new BusinessException("Cannot change to a deactivated subscription plan: " + planTypeCode);
-        }
-        BillingCycle billingCycle = BillingCycle.valueOf(billingCycleStr.toUpperCase());
-
-        // Validate limits if downgrading
-        long employeeCount = employeeRepository.countByTenantId(tenantId);
-        if (newPlan.getMaxEmployees() > 0 && employeeCount > newPlan.getMaxEmployees()) {
-            throw new BusinessException("Cannot change plan: current employee count (" + employeeCount 
-                    + ") exceeds the new plan limit (" + newPlan.getMaxEmployees() + ")");
+        if (tenant.getStatus() == UserStatus.DELETED) {
+            throw new BusinessException("Tenant has been deleted and cannot be restored");
         }
 
-        // Deactivate existing active subscription
-        subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId).ifPresent(sub -> {
+        if (tenant.getDataStatus() == TenantDataStatus.DELETED) {
+            throw new BusinessException("Tenant has been permanently deleted and cannot be restored");
+        }
+
+        if (tenant.getDataStatus() != TenantDataStatus.ARCHIVED && tenant.getDataStatus() != TenantDataStatus.ELIGIBLE_FOR_DELETION) {
+            throw new BusinessException("Tenant is not in ARCHIVED or ELIGIBLE_FOR_DELETION state and cannot be restored.");
+        }
+
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
+
+        TenantDataStatus oldDataStatus = tenant.getDataStatus();
+
+        // Deactivate/clear old current subscription to avoid index constraint violation
+        subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId).ifPresent(sub -> {
+            sub.setIsCurrent(false);
             sub.setIsActive(false);
-            subscriptionRepository.save(sub);
+            subscriptionRepository.saveAndFlush(sub);
         });
 
-        // Update tenant settings
-        tenant.setSubscriptionPlan(newPlan);
-        tenant.setMaxEmployees(newPlan.getMaxEmployees());
+        LocalDateTime now = LocalDateTime.now();
+        int months = (plan.getValidityMonths() == null || plan.getValidityMonths() <= 0) ? 1 : plan.getValidityMonths();
+        LocalDateTime newEnd = now.plusMonths(months);
+
+        // Create new active subscription
+        TenantSubscription subscription = TenantSubscription.builder()
+            .tenant(tenant)
+            .subscriptionPlan(plan)
+            .planName(plan.getName())
+            .planStatus(PlanStatus.ACTIVE)
+            .isCurrent(true)
+            .startedAt(now)
+            .billingPeriodStart(now)
+            .billingPeriodEnd(newEnd)
+            .lastPaymentAmount(plan.getPrice())
+            .lastPaymentDate(now)
+            .nextPaymentDate(newEnd)
+            .amount(plan.getPrice())
+            .currency(plan.getCurrency() != null ? plan.getCurrency() : "INR")
+            .build();
+
+        TenantSubscription saved = subscriptionRepository.save(subscription);
+
+        // Update tenant
+        tenant.setSubscriptionPlan(plan);
         tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(newEnd);
+        tenant.resetSubscriptionLifecycle();
         tenantRepository.save(tenant);
 
-        int validityMonths = newPlan.getValidityMonths() > 0 ? newPlan.getValidityMonths() : 1;
-        long monthsToAdd = billingCycle == BillingCycle.YEARLY ? 12L : validityMonths;
-        LocalDateTime endsAt = LocalDateTime.now().plusMonths(monthsToAdd);
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionReactivatedEvent(saved, saved));
 
-        // Determine price: 10% discount for yearly billing cycle
-        double price = billingCycle == BillingCycle.YEARLY ? newPlan.getMonthlyPrice() * 12 * 0.9 : newPlan.getMonthlyPrice() * validityMonths;
-
-        // Create a new subscription record
-        TenantSubscription newSub = TenantSubscription.builder()
-                .tenant(tenant)
-                .subscriptionPlan(newPlan)
-                .planName(newPlan.getName())
-                .planStatus(PlanStatus.ACTIVE)
-                .maxEmployees(newPlan.getMaxEmployees())
-                .maxStorageMb(newPlan.getMaxStorageMb())
-                .startedAt(LocalDateTime.now())
-                .endsAt(endsAt)
-                .amount(BigDecimal.valueOf(price))
-                .currency("INR")
-                .billingCycle(billingCycle)
-                .isActive(true)
-                .build();
-
-        TenantSubscription savedSub = subscriptionRepository.save(newSub);
+        // Audit Trail
+        String performedByEmail = "Unknown Admin";
+        Long currentUserId = auditLogService.getCurrentUserId();
+        if (currentUserId != null) {
+            performedByEmail = platformUserRepository.findById(currentUserId)
+                .map(PlatformUser::getEmail)
+                .orElse("Unknown Admin");
+        }
         
-        tenantRLSService.invalidateTenantCache(tenantId);
-        return convertToDTO(savedSub);
+        String metadataJson = String.format(
+            "{\"notes\":%s,\"planId\":%d,\"planName\":%s,\"performedByEmail\":%s}",
+            escapeJson(notes),
+            plan.getId(),
+            escapeJson(plan.getName()),
+            escapeJson(performedByEmail)
+        );
+
+        auditLogService.log(
+            tenant,
+            "TENANT_RESTORE",
+            "dataStatus",
+            oldDataStatus.name(),
+            TenantDataStatus.RETAINED.name(),
+            currentUserId,
+            metadataJson
+        );
+
+        invalidateTenantCachesPostCommit(tenantId);
+
+        return convertToDTO(saved);
+    }
+
+    private String escapeJson(String input) {
+        if (input == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        sb.append("\"");
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '"') sb.append("\\\"");
+            else if (c == '\\') sb.append("\\\\");
+            else if (c == '\n') sb.append("\\n");
+            else if (c == '\r') sb.append("\\r");
+            else if (c == '\t') sb.append("\\t");
+            else if (c < 32) sb.append(String.format("\\u%04x", (int) c));
+            else sb.append(c);
+        }
+        sb.append("\"");
+        return sb.toString();
+    }
+
+    /**
+     * Helper to perform cache invalidations safely after database commit.
+     */
+    public void invalidateTenantCachesPostCommit(final Long tenantId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    tenantRLSService.invalidateTenantCache(tenantId);
+                    cacheEvictionService.evictTenantCaches(tenantId);
+                }
+            });
+        } else {
+            tenantRLSService.invalidateTenantCache(tenantId);
+            cacheEvictionService.evictTenantCaches(tenantId);
+        }
+    }
+    
+    // ===== HANDLE EXPIRATION =====
+    @Transactional
+    public void handleSubscriptionExpiration(Long subscriptionId) {
+        log.info("Handling expiration for subscription ID: {}", subscriptionId);
+        TenantSubscription subscription = subscriptionRepository.findById(subscriptionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
+            
+        if (subscription.getStatus() != PlanStatus.ACTIVE && subscription.getStatus() != PlanStatus.PAST_DUE) {
+            return; // Already handled
+        }
+        
+        // Check if we're in grace period
+        if (subscription.getGracePeriodEnd() != null && 
+            subscription.getGracePeriodEnd().isAfter(LocalDateTime.now())) {
+            log.info("Subscription {} is in grace period until {}", 
+                subscriptionId, subscription.getGracePeriodEnd());
+            return;
+        }
+        
+        // Expire the subscription
+        subscription.setStatus(PlanStatus.EXPIRED);
+        subscription.setIsCurrent(false);
+        subscription.setIsActive(false);
+        subscription.setEndedAt(LocalDateTime.now());
+        subscriptionRepository.save(subscription);
+        
+        // Update tenant
+        Tenant tenant = subscription.getTenant();
+        if (tenant != null) {
+            tenant.setPlanStatus(PlanStatus.EXPIRED);
+            tenant.setStatus(UserStatus.SUSPENDED);
+            if (tenant.getExpiredAt() == null) {
+                tenant.setExpiredAt(LocalDateTime.now());
+            }
+            tenant.setDataStatus(TenantDataStatus.RETAINED);
+            tenant.setArchivedAt(null);
+
+            // Send expiration email
+            if (tenant.getExpirationNotifiedAt() == null) {
+                try {
+                    emailService.sendSubscriptionExpiredEmail(
+                        tenant.getAdminEmail(),
+                        tenant.getCompanyName(),
+                        subscription.getPlanName()
+                    );
+                    tenant.setExpirationNotifiedAt(LocalDateTime.now());
+                } catch (Exception e) {
+                    log.warn("Failed to send subscription expiration email: {}", e.getMessage());
+                }
+            }
+            tenantRepository.save(tenant);
+            
+            // Invalidate caches
+            cacheEvictionService.evictTenantCaches(tenant.getId());
+            tenantRLSService.invalidateTenantCache(tenant.getId());
+        }
+        
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionExpiredEvent(subscription));
+    }
+    
+    // ===== CANCEL SUBSCRIPTION =====
+    @Transactional
+    public TenantSubscriptionResponseDTO cancelSubscription(Long subscriptionId, CancellationType type, String reason) {
+        log.info("Cancelling subscription ID: {} with type: {} and reason: {}", subscriptionId, type, reason);
+        TenantSubscription subscription = subscriptionRepository.findById(subscriptionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
+            
+        if (subscription.getStatus() != PlanStatus.ACTIVE) {
+            throw new BusinessException("Only active subscriptions can be cancelled");
+        }
+        
+        CancellationReason cancelReason = CancellationReason.OTHER;
+        if (reason != null) {
+            try {
+                cancelReason = CancellationReason.valueOf(reason.toUpperCase().trim());
+            } catch (IllegalArgumentException e) {
+                cancelReason = CancellationReason.OTHER;
+            }
+        }
+
+        if (type == CancellationType.IMMEDIATE) {
+            // Immediate cancellation
+            subscription.setStatus(PlanStatus.TERMINATED);
+            subscription.setIsCurrent(false);
+            subscription.setIsActive(false);
+            subscription.setEndedAt(LocalDateTime.now());
+            subscription.setCancellationDate(LocalDateTime.now());
+            subscription.setCancellationReason(cancelReason);
+            
+            Tenant tenant = subscription.getTenant();
+            if (tenant != null) {
+                tenant.setPlanStatus(PlanStatus.TERMINATED);
+                tenant.setStatus(UserStatus.INACTIVE);
+                tenantRepository.save(tenant);
+                
+                tenantRLSService.invalidateTenantCache(tenant.getId());
+                cacheEvictionService.evictTenantCaches(tenant.getId());
+            }
+        } else {
+            // Cancel at end of period (downgrade/stop renewal)
+            subscription.setCancelledAtEndOfPeriod(true);
+            subscription.setStatus(PlanStatus.CANCELLED);
+            subscription.setCancellationDate(LocalDateTime.now());
+            subscription.setCancellationReason(cancelReason);
+        }
+        
+        TenantSubscription saved = subscriptionRepository.save(subscription);
+        
+        // Publish event
+        eventPublisher.publishEvent(new SubscriptionCancelledEvent(saved, type, reason));
+        
+        return convertToDTO(saved);
+    }
+
+    @Transactional
+    public TenantSubscriptionResponseDTO upgradeSubscription(Long tenantId, String planTypeCode) {
+        log.info("Upgrading tenant ID: {} to plan code: {}", tenantId, planTypeCode);
+        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(planTypeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planTypeCode));
+        return activateSubscription(tenantId, plan.getId());
     }
 
     @Transactional
     public TenantSubscriptionResponseDTO cancelSubscription(Long tenantId) {
-        log.info("Cancelling subscription for tenant ID: {}", tenantId);
-        TenantSubscription currentSub = subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant"));
-
-        currentSub.cancel();
-        TenantSubscription savedSub = subscriptionRepository.save(currentSub);
-
-        Tenant tenant = currentSub.getTenant();
-        if (tenant != null) {
-            tenant.setPlanStatus(PlanStatus.CANCELLED);
-            tenantRepository.save(tenant);
-        }
-        
-        tenantRLSService.invalidateTenantCache(tenantId);
-        return convertToDTO(savedSub);
+        log.info("Cancelling current active subscription for tenant ID: {}", tenantId);
+        TenantSubscription sub = subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)
+                .or(() -> subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId))
+                .orElseThrow(() -> new ResourceNotFoundException("Active subscription not found for tenant: " + tenantId));
+        return cancelSubscription(sub.getId(), CancellationType.IMMEDIATE, "CUSTOMER_REQUEST");
     }
 
     public List<TenantSubscriptionResponseDTO> getSubscriptionHistory(Long tenantId) {
@@ -171,22 +578,43 @@ public class TenantSubscriptionService {
         return list.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
+    // ===== HELPER: Close Active Subscription =====
+    private void closeActiveSubscription(Long tenantId, String reason) {
+        subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)
+            .ifPresent(sub -> {
+                sub.setIsCurrent(false);
+                sub.setIsActive(false);
+                sub.setEndedAt(LocalDateTime.now());
+                sub.setStatus(PlanStatus.TERMINATED);
+                subscriptionRepository.save(sub);
+            });
+    }
+
+    private static final int DEFAULT_MAX_EMPLOYEES = 100;
+
     private TenantSubscriptionResponseDTO convertToDTO(TenantSubscription sub) {
         if (sub == null) return null;
+
+        SubscriptionPlan plan = sub.getSubscriptionPlan();
+        int maxEmployees = plan != null && plan.getMaxEmployees() != null ? plan.getMaxEmployees() : DEFAULT_MAX_EMPLOYEES;
+
         return TenantSubscriptionResponseDTO.builder()
                 .id(sub.getId())
                 .planType(sub.getPlanType())
                 .planName(sub.getPlanName())
-                .planStatus(sub.getPlanStatus())
-                .maxEmployees(sub.getMaxEmployees() != null ? sub.getMaxEmployees() : 0)
-                .maxStorageMb(sub.getMaxStorageMb() != null ? sub.getMaxStorageMb() : 0)
+                .planStatus(sub.getStatus())
+                .maxEmployees(maxEmployees)
                 .startedAt(sub.getStartedAt())
                 .endsAt(sub.getEndsAt())
                 .amount(sub.getAmount())
                 .currency(sub.getCurrency())
-                .billingCycle(sub.getBillingCycle())
                 .isActive(sub.getIsActive() != null ? sub.getIsActive() : false)
                 .createdAt(sub.getCreatedAt())
+                .billingPeriodStart(sub.getBillingPeriodStart())
+                .billingPeriodEnd(sub.getBillingPeriodEnd())
+                .gracePeriodEnd(sub.getGracePeriodEnd())
+                .cancellationReason(sub.getCancellationReason() != null ? sub.getCancellationReason().name() : null)
+                .cancelledAtEndOfPeriod(sub.getCancelledAtEndOfPeriod())
                 .build();
     }
 }

@@ -26,6 +26,7 @@ public enum PlatformPermissionEnum {
     SUSPEND_TENANT("Suspend tenant", "Tenant Management", 6),
     VIEW_TENANT_DETAILS("View tenant details", "Tenant Management", 7),
     MANAGE_TENANT_PLANS("Manage tenant subscription plans", "Tenant Management", 8),
+    TENANT_RESTORE("Restore archived/expired tenant", "Tenant Management", 9),
 
     // =====================================================
     // PLATFORM ADMIN MANAGEMENT

@@ -25,26 +25,6 @@ public class PlatformSubscriptionService {
         log.info("Generating platform subscription dashboard analytics");
         List<TenantSubscription> allSubs = subscriptionRepository.findAll();
 
-        long freeTrialCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "trial".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
-                .count();
-
-        long basicPlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "basic".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
-                .count();
-
-        long moderatePlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "moderate".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
-                .count();
-
-        long premiumPlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "premium".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
-                .count();
-
-        long enterprisePlanCount = allSubs.stream()
-                .filter(sub -> sub.getIsActive() && "enterprise".equalsIgnoreCase(sub.getPlanType()) && !sub.isExpired())
-                .count();
-
         // 1. Monthly Revenue (MRR over the last 6 months)
         List<SubscriptionDashboardDTO.ChartPoint> monthlyRevenue = new java.util.ArrayList<>();
         // 2. Subscription Growth (Cumulative active subscriptions)
@@ -52,25 +32,17 @@ public class PlatformSubscriptionService {
         // 3. Plan Distribution
         List<SubscriptionDashboardDTO.ChartPoint> planDistribution = new java.util.ArrayList<>();
 
-        // Populate Plan Distribution Chart data dynamically based on actual plan names/types
+        // Populate Plan Distribution Chart data dynamically based on actual plan
+        // names/types
         java.util.Map<String, Long> distributionMap = new java.util.LinkedHashMap<>();
-        distributionMap.put("Free Trial", 0L);
-        distributionMap.put("Basic Plan", 0L);
-        distributionMap.put("Moderate Plan", 0L);
-        distributionMap.put("Premium Plan", 0L);
-        distributionMap.put("Enterprise Plan", 0L);
 
         allSubs.stream()
                 .filter(sub -> sub.getIsActive() && !sub.isExpired())
                 .forEach(sub -> {
                     String name = sub.getPlanName() != null ? sub.getPlanName() : sub.getPlanType();
-                    if ("trial".equalsIgnoreCase(name) || "trial".equalsIgnoreCase(sub.getPlanType())) name = "Free Trial";
-                    else if ("basic".equalsIgnoreCase(name) || "basic".equalsIgnoreCase(sub.getPlanType())) name = "Basic Plan";
-                    else if ("moderate".equalsIgnoreCase(name) || "moderate".equalsIgnoreCase(sub.getPlanType())) name = "Moderate Plan";
-                    else if ("premium".equalsIgnoreCase(name) || "premium".equalsIgnoreCase(sub.getPlanType())) name = "Premium Plan";
-                    else if ("enterprise".equalsIgnoreCase(name) || "enterprise".equalsIgnoreCase(sub.getPlanType())) name = "Enterprise Plan";
-                    
-                    distributionMap.put(name, distributionMap.getOrDefault(name, 0L) + 1);
+                    if (name != null) {
+                        distributionMap.put(name, distributionMap.getOrDefault(name, 0L) + 1);
+                    }
                 });
 
         distributionMap.forEach((name, count) -> {
@@ -87,18 +59,23 @@ public class PlatformSubscriptionService {
 
             // Calculate MRR for targetMonth
             BigDecimal mrrSum = allSubs.stream()
-                    .filter(sub -> sub.getIsActive() && !"trial".equalsIgnoreCase(sub.getPlanType()) && sub.getAmount() != null)
+                    .filter(sub -> {
+                        return sub.getIsActive() != null && sub.getIsActive() && sub.getAmount() != null;
+                    })
                     .filter(sub -> {
                         LocalDateTime start = sub.getStartedAt() != null ? sub.getStartedAt() : sub.getCreatedAt();
                         LocalDateTime end = sub.getEndsAt();
-                        if (start == null) return false;
+                        if (start == null)
+                            return false;
                         boolean startedBeforeOrDuring = !start.isAfter(monthEnd);
                         boolean notEndedYet = end == null || !end.isBefore(monthStart);
                         return startedBeforeOrDuring && notEndedYet;
                     })
                     .map(sub -> {
                         BigDecimal amt = sub.getAmount();
-                        if (sub.getBillingCycle() == com.sonixhr.enums.BillingCycle.YEARLY) {
+                        int validity = sub.getSubscriptionPlan() != null ? sub.getSubscriptionPlan().getValidityMonths()
+                                : 1;
+                        if (validity >= 12) {
                             return amt.divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
                         }
                         return amt;
@@ -118,7 +95,8 @@ public class PlatformSubscriptionService {
                     .filter(sub -> {
                         LocalDateTime start = sub.getStartedAt() != null ? sub.getStartedAt() : sub.getCreatedAt();
                         LocalDateTime end = sub.getEndsAt();
-                        if (start == null) return false;
+                        if (start == null)
+                            return false;
                         boolean startedBeforeOrDuring = !start.isAfter(monthEnd);
                         boolean notEndedYet = end == null || !end.isBefore(monthStart);
                         return startedBeforeOrDuring && notEndedYet;
@@ -134,11 +112,6 @@ public class PlatformSubscriptionService {
         }
 
         return SubscriptionDashboardDTO.builder()
-                .freeTrialCount(freeTrialCount)
-                .basicPlanCount(basicPlanCount)
-                .moderatePlanCount(moderatePlanCount)
-                .premiumPlanCount(premiumPlanCount)
-                .enterprisePlanCount(enterprisePlanCount)
                 .monthlyRevenue(monthlyRevenue)
                 .subscriptionGrowth(subscriptionGrowth)
                 .planDistribution(planDistribution)

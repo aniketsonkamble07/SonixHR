@@ -212,11 +212,18 @@ public class TdsCalculator {
 
     private BigDecimal addCessAndSurcharge(BigDecimal tax, BigDecimal taxableIncome, TaxRegimeSlabConfig config) {
         BigDecimal surchargeRate = BigDecimal.ZERO;
-        if (config.getSurchargeSlabs() != null) {
+        if (config.getSurchargeSlabs() != null && !config.getSurchargeSlabs().isEmpty()) {
+            // Find the highest threshold that taxableIncome exceeds
+            SurchargeSlab applicableSlab = null;
             for (SurchargeSlab s : config.getSurchargeSlabs()) {
                 if (taxableIncome.compareTo(s.getThreshold()) > 0) {
-                    surchargeRate = s.getRatePercent().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+                    if (applicableSlab == null || s.getThreshold().compareTo(applicableSlab.getThreshold()) > 0) {
+                        applicableSlab = s;
+                    }
                 }
+            }
+            if (applicableSlab != null) {
+                surchargeRate = applicableSlab.getRatePercent().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
             }
         }
         BigDecimal surcharge = tax.multiply(surchargeRate);

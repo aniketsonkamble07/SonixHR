@@ -85,6 +85,12 @@ public class EmployeeService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + tenantId));
 
+        // Enforce active employee subscription limit
+        long activeEmployeeCount = employeeRepository.countActiveByTenantId(tenantId);
+        if (tenant.getMaxEmployees() != null && tenant.getMaxEmployees() > 0 && activeEmployeeCount >= tenant.getMaxEmployees()) {
+            throw new BusinessException("Active employee limit of " + tenant.getMaxEmployees() + " reached for your subscription. Please upgrade your plan.");
+        }
+
         // Check if employee with this email already exists
         if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
             throw new com.sonixhr.exceptions.ValidationException("email",

@@ -16,7 +16,6 @@ import java.util.Objects;
         },
         indexes = {
                 @Index(name = "idx_tenant_permission_type", columnList = "permission"),
-                @Index(name = "idx_tenant_permission_category", columnList = "category"),
                 @Index(name = "idx_tenant_permission_active", columnList = "is_active"),
                 @Index(name = "idx_tenant_permission_display_order", columnList = "display_order")
         })

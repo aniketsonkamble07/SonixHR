@@ -169,6 +169,46 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendPaymentFailedEmail(String to, String companyName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send payment failed email to: {}", to);
+            return;
+        }
+
+        log.info("Sending payment failed email to: {} for company: {}", to, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Payment Failed - Action Required - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #EF4444;">Payment Failed</h2>
+                        <p>We were unable to process the payment for your subscription for <strong>%s</strong>.</p>
+                        <p>Your subscription is now in a 3-day grace period. Please update your billing details or renew your plan to prevent service disruption.</p>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, companyName);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Payment failed email sent successfully to: {}", to);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send payment failed email to: {}", to, e);
+        }
+    }
+
     // =====================================================
     // PLATFORM USER EMAILS
     // =====================================================
@@ -309,7 +349,7 @@ public class EmailService {
     @Async
     public void sendTenantWelcomeEmail(String to, String name, String companyName,
                                        String activationLink,
-                                       String planType, int trialDays) {
+                                       String planType) {
         if (!emailEnabled) {
             log.info("Email sending disabled. Would send tenant welcome email to: {}", to);
             return;
@@ -332,7 +372,6 @@ public class EmailService {
                         <h2 style="color: #4F46E5;">Welcome %s!</h2>
                         <p>Thank you for choosing SonixHR for <strong>%s</strong>.</p>
                         <p>Your account has been created with the <strong>%s</strong> plan.</p>
-                        <p><strong>Trial Period: %d days</strong></p>
                         <p>Click the button below to activate your account:</p>
                         <p style="text-align: center;">
                             <a href="%s" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
@@ -344,7 +383,7 @@ public class EmailService {
                     </div>
                 </body>
                 </html>
-                """, name, companyName, planType, trialDays, activationLink);
+                """, name, companyName, planType, activationLink);
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
@@ -648,6 +687,92 @@ public class EmailService {
             log.info("Support ticket alert email sent successfully to: {}", to);
         } catch (MessagingException | MailException e) {
             log.error("Failed to send support ticket alert email to: {}", to, e);
+        }
+    }
+
+    @Async
+    public void sendArchiveWarningEmail(String to, String companyName, String planName, int daysUntilArchive) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send archive warning email to: {}", to);
+            return;
+        }
+
+        log.info("Sending archive warning email to: {} for company: {}", to, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("ACTION REQUIRED: Your data is scheduled for archiving - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #F59E0B;">Action Required: Data Archiving Notice</h2>
+                        <p>This is to inform you that your workspace for <strong>%s</strong> is scheduled to be archived in <strong>%d days</strong>.</p>
+                        <p>If your workspace is archived, you will no longer be able to log in or self-serve renewal, and unarchiving will require contacting support.</p>
+                        <p><strong>To retain full self-serve access and keep your workspace active, please renew or upgrade your plan from the billing dashboard.</strong></p>
+                        <p>If you wish to download your records before archiving, you can log in and visit the Export Dashboard to download your employee and payroll histories.</p>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, companyName, daysUntilArchive);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Archive warning email sent successfully to: {}", to);
+        } catch (MessagingException | MailException e) {
+            log.error("Failed to send archive warning email to: {}", to, e);
+        }
+    }
+
+    @Async
+    public void sendFinalDataReminderEmail(String to, String companyName, String planName, boolean isArchived) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send final data reminder email to: {}", to);
+            return;
+        }
+
+        log.info("Sending final data reminder email to: {} for company: {}", to, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("Final Notice: Platform Data Review Approaching - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String statusExplanation = isArchived 
+                ? "Your workspace is currently in an ARCHIVED state. To restore your data, you must contact support."
+                : "Your workspace is currently EXPIRED. You can log in and visit the Billing or Export Dashboard to manage your data.";
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #EF4444;">Final Notice: Subscription Data Review</h2>
+                        <p>We are writing to notify you that your subscription data for <strong>%s</strong> (Plan: %s) is approaching its one-year expiration mark.</p>
+                        <p>%s</p>
+                        <p>Please note that a member of our platform operations team will shortly review your account status to make a data-retention decision. Data is never deleted automatically, but we encourage you to retrieve any necessary payroll or employee history.</p>
+                        <p>For support or data recovery assistance, please contact our support desk.</p>
+                        <hr/>
+                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, companyName, planName, statusExplanation);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Final data reminder email sent successfully to: {}", to);
+        } catch (MessagingException | MailException e) {
+            log.error("Failed to send final data reminder email to: {}", to, e);
         }
     }
 }

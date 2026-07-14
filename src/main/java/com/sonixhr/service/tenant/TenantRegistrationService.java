@@ -10,7 +10,6 @@ import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
-import com.sonixhr.enums.BillingCycle;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.employee.EmployeeStatus;
@@ -78,15 +77,12 @@ public class TenantRegistrationService {
         validateUniqueness(request);
 
         // 2. Get active plan details from DB
-        SubscriptionPlan plan;
-        if (request.getPlanCode() != null && !request.getPlanCode().trim().isEmpty()) {
-            plan = subscriptionPlanRepository.findByCodeIgnoreCase(request.getPlanCode().trim())
-                    .orElseThrow(() -> new BusinessException(
-                            "Subscription plan not found with code: " + request.getPlanCode()));
-        } else {
-            plan = subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue()
-                    .orElseThrow(() -> new BusinessException("No active trial subscription plan found in the system."));
+        if (request.getPlanCode() == null || request.getPlanCode().trim().isEmpty()) {
+            throw new BusinessException("Subscription plan selection is required.");
         }
+        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(request.getPlanCode().trim())
+                .orElseThrow(() -> new BusinessException(
+                        "Subscription plan not found with name: " + request.getPlanCode()));
 
         if (!plan.isActive()) {
             throw new BusinessException("The selected subscription plan is currently inactive.");
@@ -256,7 +252,6 @@ public class TenantRegistrationService {
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
                 .subscriptionPlan(plan)
-                .maxEmployees(plan.getMaxEmployees())
                 .adminName(request.getAdminName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
@@ -416,13 +411,12 @@ public class TenantRegistrationService {
                 .subscriptionPlan(plan)
                 .planName(plan.getName())
                 .planStatus(initialPlanStatus)
-                .maxEmployees(plan.getMaxEmployees())
-                .maxStorageMb(plan.getMaxStorageMb())
                 .startedAt(startedAt)
                 .endsAt(endsAt)
-                .amount(BigDecimal.valueOf(plan.getMonthlyPrice() * validityMonths))
+                .billingPeriodStart(startedAt)
+                .billingPeriodEnd(endsAt)
+                .amount(plan.getPrice())
                 .currency("INR")
-                .billingCycle(validityMonths >= 12 ? BillingCycle.YEARLY : BillingCycle.MONTHLY)
                 .isActive(true)
                 .build();
         subscriptionRepository.save(subscription);

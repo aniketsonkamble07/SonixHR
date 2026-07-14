@@ -25,10 +25,9 @@ public class PlatformSubscriptionPlanController {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('VIEW_SUBSCRIPTIONS')")
     public ResponseEntity<List<SubscriptionPlanDTO>> getAllPlans() {
-        log.info("REST request to list all subscription plans");
-        List<SubscriptionPlan> plans = subscriptionPlanRepository.findAll();
+        log.info("REST request to list all active subscription plans");
+        List<SubscriptionPlan> plans = subscriptionPlanRepository.findAllActivePlans();
         List<SubscriptionPlanDTO> dtos = plans.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -41,6 +40,9 @@ public class PlatformSubscriptionPlanController {
         log.info("REST request to get subscription plan for ID: {}", id);
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found"));
+        if (plan.isDeleted()) {
+            throw new ResourceNotFoundException("Subscription plan not found");
+        }
         return ResponseEntity.ok(convertToDTO(plan));
     }
 
@@ -49,16 +51,8 @@ public class PlatformSubscriptionPlanController {
     public ResponseEntity<SubscriptionPlanDTO> createPlan(@RequestBody @Valid SubscriptionPlanDTO dto) {
         log.info("REST request to create subscription plan: {}", dto.getCode());
         
-        if (subscriptionPlanRepository.findByCodeIgnoreCase(dto.getCode()).isPresent()) {
-            throw new IllegalArgumentException("Plan with code '" + dto.getCode() + "' already exists");
-        }
-
-        if (dto.isTrial()) {
-            // Ensure only one trial plan is active
-            subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue().ifPresent(existingTrial -> {
-                existingTrial.setTrial(false);
-                subscriptionPlanRepository.save(existingTrial);
-            });
+        if (subscriptionPlanRepository.findByNameIgnoreCase(dto.getName()).isPresent()) {
+            throw new IllegalArgumentException("Plan with name '" + dto.getName() + "' already exists");
         }
 
         SubscriptionPlan plan = convertToEntity(dto);
@@ -75,21 +69,13 @@ public class PlatformSubscriptionPlanController {
         
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found"));
-
-        if (dto.isTrial() && !plan.isTrial()) {
-            // Ensure only one trial plan is active
-            subscriptionPlanRepository.findFirstByIsTrialTrueAndIsActiveTrue().ifPresent(existingTrial -> {
-                existingTrial.setTrial(false);
-                subscriptionPlanRepository.save(existingTrial);
-            });
+        
+        if (plan.isDeleted()) {
+            throw new ResourceNotFoundException("Subscription plan not found");
         }
 
         plan.setName(dto.getName());
-        plan.setMonthlyPrice(dto.getMonthlyPrice());
-        plan.setMaxEmployees(dto.getMaxEmployees());
-        plan.setMaxStorageMb(dto.getMaxStorageMb());
-        plan.setTrialDays(dto.getTrialDays());
-        plan.setTrial(dto.isTrial());
+        plan.setPrice(dto.getPrice());
         plan.setValidityMonths(dto.getValidityMonths());
         plan.setActive(dto.isActive());
         plan.setDescription(dto.getDescription());
@@ -101,15 +87,15 @@ public class PlatformSubscriptionPlanController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_PRICING_PLANS')")
     public ResponseEntity<Void> deletePlan(@PathVariable Long id) {
-        log.info("REST request to deactivate subscription plan ID: {}", id);
+        log.info("REST request to soft delete subscription plan ID: {}", id);
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found"));
         
-        if (plan.isTrial()) {
-            throw new IllegalArgumentException("Cannot delete/deactivate the default Trial plan");
+        if (plan.isDeleted()) {
+            throw new ResourceNotFoundException("Subscription plan not found");
         }
         
-        plan.setActive(false);
+        plan.softDelete();
         subscriptionPlanRepository.save(plan);
         return ResponseEntity.noContent().build();
     }
@@ -120,11 +106,7 @@ public class PlatformSubscriptionPlanController {
                 .id(plan.getId())
                 .code(plan.getCode())
                 .name(plan.getName())
-                .monthlyPrice(plan.getMonthlyPrice())
-                .maxEmployees(plan.getMaxEmployees())
-                .maxStorageMb(plan.getMaxStorageMb())
-                .trialDays(plan.getTrialDays())
-                .isTrial(plan.isTrial())
+                .price(plan.getPrice())
                 .validityMonths(plan.getValidityMonths())
                 .isActive(plan.isActive())
                 .description(plan.getDescription())
@@ -134,13 +116,9 @@ public class PlatformSubscriptionPlanController {
     private SubscriptionPlan convertToEntity(SubscriptionPlanDTO dto) {
         if (dto == null) return null;
         return SubscriptionPlan.builder()
-                .code(dto.getCode().toLowerCase().trim())
+                .code(dto.getCode())
                 .name(dto.getName())
-                .monthlyPrice(dto.getMonthlyPrice())
-                .maxEmployees(dto.getMaxEmployees())
-                .maxStorageMb(dto.getMaxStorageMb())
-                .trialDays(dto.getTrialDays())
-                .isTrial(dto.isTrial())
+                .price(dto.getPrice())
                 .validityMonths(dto.getValidityMonths())
                 .isActive(dto.isActive())
                 .description(dto.getDescription())

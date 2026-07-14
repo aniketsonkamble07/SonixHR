@@ -111,13 +111,24 @@ public class SalaryComponentCalculator {
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .add(specialAllowance);
 
-                // If there's a mismatch, adjust special allowance to balance
+               // If there's a mismatch, log warning and adjust only if mismatch is minimal (rounding issues)
                 if (sumOfAllComponents.compareTo(monthlyCtc) != 0) {
                     BigDecimal adjustment = monthlyCtc.subtract(sumOfAllComponents);
-                    specialAllowance = specialAllowance.add(adjustment).max(BigDecimal.ZERO);
-                    log.warn("Adjusted SPECIAL_ALLOWANCE by {} to balance CTC", adjustment);
-                }
-            }
+                   BigDecimal adjustmentAbs = adjustment.abs();
+                    
+                   // Allow adjustment only if due to rounding (less than ₹1)
+                   if (adjustmentAbs.compareTo(BigDecimal.ONE) < 0) {
+                       specialAllowance = specialAllowance.add(adjustment);
+                       log.debug("Adjusted SPECIAL_ALLOWANCE by {} to balance CTC (rounding correction)", adjustment);
+                   } else {
+                       // Significant mismatch indicates configuration error
+                       log.error("CTC mismatch for employee profile: configured components sum={}, expected CTC={}. Difference: {}", 
+                           sumOfAllComponents, monthlyCtc, adjustment);
+                       throw new BusinessException("CTC_MISMATCH", 
+                           String.format("Salary structure components do not reconcile to CTC. Difference: ₹%.2f. Review salary structure configuration.", adjustment.doubleValue()));
+                   }
+               }
+           }
         }
         baseAllowances.put("SPECIAL_ALLOWANCE", specialAllowance);
         variables.put("SPECIAL_ALLOWANCE", specialAllowance);
@@ -189,25 +200,29 @@ public class SalaryComponentCalculator {
                         if (workCountry != null && !"IN".equalsIgnoreCase(workCountry)) {
                             val = BigDecimal.ZERO;
                         } else {
+                            // PT is levied based on work location (state where work is performed)
+                            // Primary: employee's work state (most accurate)
+                            // Fallback: tenant's configured state (for organizational uniformity)
                             IndianState ptState = employee.getWorkState();
                             if (ptState == null && employee.getTenant() != null) {
                                 ptState = employee.getTenant().getState();
                             }
+                            
                             if (ptState == null) {
-                                ptState = employee.getState();
-                            }
-                            if (ptState == null) {
-                                log.warn("Employee ID {} missing state — PT skipped", employee.getId());
+                                log.error("Employee ID {} has no work state configured; PT calculation cannot proceed", employee.getId());
                                 throw new BusinessException("PT_STATE_MISSING",
-                                        "Employee is missing a valid work state or personal state configuration for Professional Tax calculation");
+                                        "Employee must have a work state configured (work location). PT is calculated based on work location, not residence.");
                             }
                             val = statutoryCalculator.calculatePTAmount(ptState, data.getGrossEarnings(), month, ptSlabsByState);
                         }
                     }
                 } else if ("EPF_EE".equalsIgnoreCase(code)) {
+                    // When capping is enabled, apply formula-based calculation from structure
+                    // When capping is disabled, apply simple rate calculation
                     if (tenantConfig.isEnablePfCapping()) {
                         val = calculateComponentValue(item, overrides, variables);
                     } else {
+                        // Uncapped: simple EPF_EE rate * wages base
                         double epfEeRate = variables.containsKey("EPF_EE_RATE") ? ((BigDecimal) variables.get("EPF_EE_RATE")).doubleValue() : 0.12;
                         val = data.getWagesBase().multiply(BigDecimal.valueOf(epfEeRate))
                                 .setScale(2, RoundingMode.HALF_EVEN);

@@ -51,7 +51,7 @@ public class PlatformDashboardService {
         long activeTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.ACTIVE).count();
         long suspendedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.SUSPENDED).count();
         long deletedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.DELETED).count();
-        long trialTenants = allTenants.stream().filter(t -> "trial".equalsIgnoreCase(t.getPlanType())).count();
+        long trialTenants = 0L;
 
         Map<String, Long> planDistribution = allTenants.stream()
                 .filter(t -> t.getStatus() != UserStatus.DELETED && t.getPlanType() != null)
@@ -68,11 +68,9 @@ public class PlatformDashboardService {
 
         // 2. Subscription Summary
         long activePaidSubscriptions = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isTrial() && !sub.isExpired())
+                .filter(sub -> sub.getIsActive() && !sub.isExpired())
                 .count();
-        long activeTrials = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && sub.isTrial() && !sub.isExpired())
-                .count();
+        long activeTrials = 0L;
 
         // Expired Subscriptions
         long expiredSubscriptions = allSubscriptions.stream()
@@ -84,7 +82,8 @@ public class PlatformDashboardService {
                 .filter(sub -> sub.getIsActive() && sub.getAmount() != null)
                 .map(sub -> {
                     BigDecimal amt = sub.getAmount();
-                    if (sub.getBillingCycle() == com.sonixhr.enums.BillingCycle.YEARLY) {
+                    int validity = sub.getSubscriptionPlan() != null ? sub.getSubscriptionPlan().getValidityMonths() : 1;
+                    if (validity >= 12) {
                         return amt.divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
                     }
                     return amt;

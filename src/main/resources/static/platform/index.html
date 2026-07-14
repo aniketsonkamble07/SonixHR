@@ -491,101 +491,8 @@
              ========================================== -->
         <section id="tab-subscriptions" class="view-panel">
           <!-- Small Plan Cards Grid -->
-          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
-            <div class="metric-card info">
-              <div class="metric-content">
-                <div class="metric-info">
-                  <h3>Free Trial Accounts</h3>
-                  <div class="metric-value" id="sub-trial-count">0</div>
-                </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+5%</span>
-                </div>
-              </div>
-              <div class="metric-visual">
-                <div class="metric-icon"><i class="fa-solid fa-hourglass-start"></i></div>
-                <div class="sparkline-container">
-                  <canvas id="sparkline-sub-trial" width="80" height="30"></canvas>
-                </div>
-              </div>
-            </div>
-            
-            <div class="metric-card indigo">
-              <div class="metric-content">
-                <div class="metric-info">
-                  <h3>Basic Plan Accounts</h3>
-                  <div class="metric-value" id="sub-basic-count">0</div>
-                </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+12%</span>
-                </div>
-              </div>
-              <div class="metric-visual">
-                <div class="metric-icon"><i class="fa-solid fa-cubes"></i></div>
-                <div class="sparkline-container">
-                  <canvas id="sparkline-sub-basic" width="80" height="30"></canvas>
-                </div>
-              </div>
-            </div>
-            
-            <div class="metric-card warning">
-              <div class="metric-content">
-                <div class="metric-info">
-                  <h3>Moderate Plan Accounts</h3>
-                  <div class="metric-value" id="sub-moderate-count">0</div>
-                </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+8%</span>
-                </div>
-              </div>
-              <div class="metric-visual">
-                <div class="metric-icon"><i class="fa-solid fa-layer-group"></i></div>
-                <div class="sparkline-container">
-                  <canvas id="sparkline-sub-moderate" width="80" height="30"></canvas>
-                </div>
-              </div>
-            </div>
-            
-            <div class="metric-card purple">
-              <div class="metric-content">
-                <div class="metric-info">
-                  <h3>Premium Plan Accounts</h3>
-                  <div class="metric-value" id="sub-premium-count">0</div>
-                </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+15%</span>
-                </div>
-              </div>
-              <div class="metric-visual">
-                <div class="metric-icon"><i class="fa-solid fa-crown"></i></div>
-                <div class="sparkline-container">
-                  <canvas id="sparkline-sub-premium" width="80" height="30"></canvas>
-                </div>
-              </div>
-            </div>
-            
-            <div class="metric-card success">
-              <div class="metric-content">
-                <div class="metric-info">
-                  <h3>Enterprise Plan Accounts</h3>
-                  <div class="metric-value" id="sub-enterprise-count">0</div>
-                </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+20%</span>
-                </div>
-              </div>
-              <div class="metric-visual">
-                <div class="metric-icon"><i class="fa-solid fa-circle-nodes"></i></div>
-                <div class="sparkline-container">
-                  <canvas id="sparkline-sub-enterprise" width="80" height="30"></canvas>
-                </div>
-              </div>
-            </div>
+          <div class="metrics-grid" id="subscription-cards-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
+            <!-- Dynamic plan cards will be generated here -->
           </div>
 
           <!-- Charts Row -->
@@ -2119,6 +2026,77 @@
           const t = await res.json();
           const detailsDiv = document.getElementById('view-tenant-details-body');
           
+          let plansDropdown = '';
+          const isRestoreEligible = (t.dataStatus === 'ARCHIVED' || t.dataStatus === 'ELIGIBLE_FOR_DELETION') && t.status !== 'DELETED';
+          
+          if (isRestoreEligible) {
+            try {
+              const plansRes = await fetch(`${API_BASE}/platform/subscription-plans`, { headers: getHeaders() });
+              if (plansRes.ok) {
+                const plans = await plansRes.json();
+                plansDropdown = plans.map(p => `<option value="${p.id}">${p.name} (₹${p.price}/${p.validityMonths}m)</option>`).join('');
+              }
+            } catch (plansErr) {
+              console.error("Failed to load plans", plansErr);
+            }
+          }
+
+          let historyHtml = '';
+          if (isRestoreEligible) {
+            try {
+              const historyRes = await fetch(`${API_BASE}/admin/tenants/${id}/restore-history`, { headers: getHeaders() });
+              if (historyRes.ok) {
+                const history = await historyRes.json();
+                if (history && history.length > 0) {
+                  historyHtml = `
+                    <div style="margin-top:20px;">
+                      <h4 style="margin-bottom:10px; font-size:14px; font-weight:bold; color:var(--color-text-secondary);">Restore History Log</h4>
+                      <table class="responsive-table" style="font-size:12px; width:100%;">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Plan</th>
+                            <th>By</th>
+                            <th>Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${history.map(h => `
+                            <tr>
+                              <td>${new Date(h.createdAt).toLocaleDateString()}</td>
+                              <td>${h.planName || 'N/A'}</td>
+                              <td>${h.performedByEmail}</td>
+                              <td>${h.notes || 'None'}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                  `;
+                }
+              }
+            } catch (historyErr) {
+              console.error("Failed to load restore history", historyErr);
+            }
+          }
+
+          const restorePanel = isRestoreEligible ? `
+            <div style="margin-top:25px; padding:15px; border:1px dashed #d1d5db; border-radius:6px; background:#f9fafb;">
+              <h4 style="margin-bottom:12px; font-size:14px; font-weight:bold; color:var(--color-primary);">Restore Organization Workspace</h4>
+              <div class="form-group" style="margin-bottom:10px;">
+                <label class="form-label" style="font-size:12px;" for="restore-plan-select">Select Pricing Plan</label>
+                <select id="restore-plan-select" class="form-input" style="padding:6px 10px; font-size:13px; height:auto; background: white;">
+                  ${plansDropdown}
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:12px;" for="restore-notes-input">Restore Notes / Justification</label>
+                <textarea id="restore-notes-input" class="form-input" style="padding:6px 10px; font-size:13px; height:60px; background: white;" placeholder="Provide reason for bypassing payment flow..."></textarea>
+              </div>
+              <button class="btn btn-primary" style="padding:6px 12px; font-size:13px;" onclick="executeTenantRestore(${t.id})">Execute Restore</button>
+            </div>
+          ` : '';
+
           detailsDiv.innerHTML = `
             <table class="responsive-table" style="box-shadow:none; border:none; width:100%;">
               <tr>
@@ -2161,6 +2139,20 @@
                 <td style="font-weight:bold;">Organization Status</td>
                 <td><span class="badge ${t.status.toLowerCase()}">${t.status}</span></td>
               </tr>
+              <tr>
+                <td style="font-weight:bold;">Data Status</td>
+                <td><span class="badge ${t.dataStatus ? t.dataStatus.toLowerCase() : 'retained'}">${t.dataStatus || 'RETAINED'}</span></td>
+              </tr>
+              ${t.expiredAt ? `
+              <tr>
+                <td style="font-weight:bold;">Expired At</td>
+                <td>${new Date(t.expiredAt).toLocaleString()}</td>
+              </tr>` : ''}
+              ${t.archivedAt ? `
+              <tr>
+                <td style="font-weight:bold;">Archived At</td>
+                <td>${new Date(t.archivedAt).toLocaleString()}</td>
+              </tr>` : ''}
               ${t.status === 'SUSPENDED' ? `
               <tr style="background:rgba(239,68,68,0.02)">
                 <td style="font-weight:bold; color:var(--color-danger)">Suspension Reason</td>
@@ -2175,11 +2167,50 @@
                 <td>${new Date(t.updatedAt).toLocaleString()}</td>
               </tr>
             </table>
+            ${restorePanel}
+            ${historyHtml}
           `;
           openModal('view-tenant-modal');
         }
       } catch (err) {
         showToast('Error', 'Failed to retrieve organization details.', 'error');
+      }
+    }
+
+    async function executeTenantRestore(id) {
+      const planSelect = document.getElementById('restore-plan-select');
+      const planId = planSelect ? planSelect.value : null;
+      const notesInput = document.getElementById('restore-notes-input');
+      const notes = notesInput ? notesInput.value : '';
+      
+      if (!planId) {
+        showToast('Required', 'Please select a pricing plan.', 'warning');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to restore this organization workspace? This will bypass self-serve payment flows and recreate active access.')) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/admin/tenants/${id}/restore`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ planId: parseInt(planId), notes: notes })
+        });
+        
+        checkResponseStatus(res);
+        const data = await res.json();
+        
+        if (res.ok) {
+          showToast('Success', 'Organization workspace restored successfully!', 'success');
+          closeModal('view-tenant-modal');
+          fetchTenantsList();
+        } else {
+          showToast('Failed', data.message || 'Restoration failed.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API error restoring workspace.', 'error');
       }
     }
 
@@ -2332,7 +2363,7 @@
 
     // Delete Tenant
     async function deleteTenant(id) {
-      if (confirm('Are you absolutely sure you want to delete this organization? This performs a soft-delete, disabling its subscription and marking it as Deleted.')) {
+      if (confirm('DANGER: Are you absolutely sure you want to permanently delete this organization? This will cascade-delete all organization data (employees, payroll, attendance, settings) across all database tables. This action is irreversible.')) {
         try {
           const res = await fetch(`${API_BASE}/platform/tenants/${id}`, {
             method: 'DELETE',
@@ -2550,18 +2581,60 @@
         if (res.ok) {
           const data = await res.json();
           
-          document.getElementById('sub-trial-count').textContent = data.freeTrialCount;
-          document.getElementById('sub-basic-count').textContent = data.basicPlanCount;
-          document.getElementById('sub-moderate-count').textContent = data.moderatePlanCount;
-          document.getElementById('sub-premium-count').textContent = data.premiumPlanCount;
-          document.getElementById('sub-enterprise-count').textContent = data.enterprisePlanCount;
-
-          // Draw Sparklines for Subscription cards
-          drawSparkline('sparkline-sub-trial', generateSparklineData(data.freeTrialCount, 8, 0.18), '#0ea5e9');
-          drawSparkline('sparkline-sub-basic', generateSparklineData(data.basicPlanCount, 8, 0.12), '#6366f1');
-          drawSparkline('sparkline-sub-moderate', generateSparklineData(data.moderatePlanCount, 8, 0.15), '#f59e0b');
-          drawSparkline('sparkline-sub-premium', generateSparklineData(data.premiumPlanCount, 8, 0.20), '#a855f7');
-          drawSparkline('sparkline-sub-enterprise', generateSparklineData(data.enterprisePlanCount, 8, 0.10), '#10b981');
+          const grid = document.getElementById('subscription-cards-grid');
+          if (grid) {
+            grid.innerHTML = '';
+            
+            const colors = ['info', 'indigo', 'warning', 'purple', 'success', 'pink', 'teal'];
+            const icons = ['fa-hourglass-start', 'fa-cubes', 'fa-layer-group', 'fa-crown', 'fa-circle-nodes', 'fa-gem', 'fa-rocket'];
+            const colorHexes = {
+              'info': '#0ea5e9',
+              'indigo': '#6366f1',
+              'warning': '#f59e0b',
+              'purple': '#a855f7',
+              'success': '#10b981',
+              'pink': '#ec4899',
+              'teal': '#14b8a6'
+            };
+            
+            if (data.planDistribution && data.planDistribution.length > 0) {
+              data.planDistribution.forEach((plan, index) => {
+                const color = colors[index % colors.length];
+                const icon = icons[index % icons.length];
+                const trendVal = Math.floor(Math.random() * 15) + 5;
+                const canvasId = `sparkline-sub-${index}`;
+                
+                const card = document.createElement('div');
+                card.className = `metric-card ${color}`;
+                card.innerHTML = `
+                  <div class="metric-content">
+                    <div class="metric-info">
+                      <h3>${plan.label} Accounts</h3>
+                      <div class="metric-value">${Math.round(plan.value)}</div>
+                    </div>
+                    <div class="metric-trend text-success">
+                      <i class="fa-solid fa-arrow-trend-up"></i>
+                      <span>+${trendVal}%</span>
+                    </div>
+                  </div>
+                  <div class="metric-visual">
+                    <div class="metric-icon"><i class="fa-solid ${icon}"></i></div>
+                    <div class="sparkline-container">
+                      <canvas id="${canvasId}" width="80" height="30"></canvas>
+                    </div>
+                  </div>
+                `;
+                grid.appendChild(card);
+                
+                // Draw sparkline after rendering
+                setTimeout(() => {
+                  drawSparkline(canvasId, generateSparklineData(plan.value, 8, 0.15), colorHexes[color]);
+                }, 50);
+              });
+            } else {
+              grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 24px;">No active subscriptions found</div>';
+            }
+          }
 
           renderSubscriptionCharts(data);
           

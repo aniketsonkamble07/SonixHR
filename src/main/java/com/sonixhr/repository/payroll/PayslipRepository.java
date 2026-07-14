@@ -48,4 +48,6 @@ public interface PayslipRepository extends JpaRepository<Payslip, UUID> {
             @Param("employeeId") Long employeeId,
             @Param("startVal") Integer startVal,
             @Param("endVal") Integer endVal);
+
+    List<Payslip> findByTenant_Id(Long tenantId);
 }
