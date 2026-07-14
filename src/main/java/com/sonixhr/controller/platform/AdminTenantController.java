@@ -85,4 +85,12 @@ public class AdminTenantController {
 
         return ResponseEntity.ok(dtos);
     }
+
+    @GetMapping("/{id}/subscription-history")
+    @PreAuthorize("hasAuthority('VIEW_SUBSCRIPTIONS') or hasAuthority('TENANT_RESTORE')")
+    public ResponseEntity<List<TenantSubscriptionResponseDTO>> getSubscriptionHistory(@PathVariable Long id) {
+        log.info("REST admin request to get subscription history for tenant ID: {}", id);
+        List<TenantSubscriptionResponseDTO> history = subscriptionService.getSubscriptionHistory(id);
+        return ResponseEntity.ok(history);
+    }
 }

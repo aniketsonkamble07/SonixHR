@@ -2080,6 +2080,52 @@
             }
           }
 
+          let subHistoryHtml = '';
+          try {
+            const subHistoryRes = await fetch(`${API_BASE}/admin/tenants/${id}/subscription-history`, { headers: getHeaders() });
+            if (subHistoryRes.ok) {
+              const subHistory = await subHistoryRes.json();
+              if (subHistory && subHistory.length > 0) {
+                subHistoryHtml = `
+                  <div style="margin-top:20px;">
+                    <h4 style="margin-bottom:10px; font-size:14px; font-weight:bold; color:var(--color-text-secondary);">Subscription History Log</h4>
+                    <table class="responsive-table" style="font-size:12px; width:100%;">
+                      <thead>
+                        <tr>
+                          <th>Plan Name</th>
+                          <th>Billing Period</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          <th>Cancelled?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${subHistory.map(sub => {
+                          const startStr = sub.startedAt ? new Date(sub.startedAt).toLocaleDateString() : '-';
+                          const endStr = (sub.endsAt || sub.billingPeriodEnd) ? new Date(sub.endsAt || sub.billingPeriodEnd).toLocaleDateString() : '-';
+                          const badgeClass = sub.planStatus === 'ACTIVE' ? 'badge success' :
+                                             sub.planStatus === 'EXPIRED' ? 'badge danger' : 'badge warning';
+                          const amountDisp = sub.amount !== undefined ? `₹${parseFloat(sub.amount).toFixed(2)}` : 'Free';
+                          return `
+                            <tr>
+                              <td><strong>${sub.planName || sub.planType || 'Plan'}</strong></td>
+                              <td>${startStr} - ${endStr}</td>
+                              <td>${amountDisp}</td>
+                              <td><span class="${badgeClass}" style="padding:2px 6px; font-size:10px;">${sub.planStatus}</span></td>
+                              <td>${sub.cancelledAtEndOfPeriod ? 'Yes' : 'No'}</td>
+                            </tr>
+                          `;
+                        }).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `;
+              }
+            }
+          } catch (subHistoryErr) {
+            console.error("Failed to load subscription history", subHistoryErr);
+          }
+
           const restorePanel = isRestoreEligible ? `
             <div style="margin-top:25px; padding:15px; border:1px dashed #d1d5db; border-radius:6px; background:#f9fafb;">
               <h4 style="margin-bottom:12px; font-size:14px; font-weight:bold; color:var(--color-primary);">Restore Organization Workspace</h4>
@@ -2169,6 +2215,7 @@
             </table>
             ${restorePanel}
             ${historyHtml}
+            ${subHistoryHtml}
           `;
           openModal('view-tenant-modal');
         }
