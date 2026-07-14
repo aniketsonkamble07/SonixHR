@@ -83,6 +83,8 @@ public class SonixhrApplication {
 				try {
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS code varchar(50)");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS currency varchar(3) DEFAULT 'USD'");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS price numeric(10,2) DEFAULT 0.00 NOT NULL");
+					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS validity_months integer DEFAULT 1 NOT NULL");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS max_users integer");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS max_employees integer");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS features jsonb");
@@ -90,6 +92,13 @@ public class SonixhrApplication {
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT true NOT NULL");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS display_order integer DEFAULT 0");
 					stmt.execute("ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS deleted_at timestamp");
+
+					// Migrate monthly_price to price if old column exists
+					try {
+						stmt.execute("UPDATE subscription_plans SET price = monthly_price WHERE price = 0.00");
+					} catch (Exception e) {
+						// monthly_price column may not exist, which is fine
+					}
 				} catch (Exception e) {
 					System.out.println("[Pre-Startup] Could not alter subscription_plans table: " + e.getMessage());
 				}
