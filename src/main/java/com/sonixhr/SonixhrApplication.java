@@ -132,10 +132,14 @@ public class SonixhrApplication {
 
 			if (subsTableExists) {
 				System.out.println(
-						"[Pre-Startup] Ensuring subscription_plan_id column exists in tenant_subscriptions...");
+						"[Pre-Startup] Ensuring subscription_plan_id, is_current and is_active columns exist in tenant_subscriptions...");
 				try {
 					stmt.execute(
 							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS subscription_plan_id bigint");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS is_current boolean DEFAULT true NOT NULL");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true NOT NULL");
 				} catch (Exception e) {
 					System.out.println("[Pre-Startup] Could not add column: " + e.getMessage());
 				}
