@@ -132,7 +132,7 @@ public class SonixhrApplication {
 
 			if (subsTableExists) {
 				System.out.println(
-						"[Pre-Startup] Ensuring subscription_plan_id, is_current and is_active columns exist in tenant_subscriptions...");
+						"[Pre-Startup] Ensuring subscription_plan_id, is_current, is_active, auto_renew, cancelled_at_end_of_period, billing_period_start and billing_period_end columns exist in tenant_subscriptions...");
 				try {
 					stmt.execute(
 							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS subscription_plan_id bigint");
@@ -140,6 +140,14 @@ public class SonixhrApplication {
 							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS is_current boolean DEFAULT true NOT NULL");
 					stmt.execute(
 							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true NOT NULL");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS auto_renew boolean DEFAULT true NOT NULL");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS cancelled_at_end_of_period boolean DEFAULT false NOT NULL");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS billing_period_start date DEFAULT CURRENT_DATE NOT NULL");
+					stmt.execute(
+							"ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS billing_period_end date DEFAULT CURRENT_DATE NOT NULL");
 				} catch (Exception e) {
 					System.out.println("[Pre-Startup] Could not add column: " + e.getMessage());
 				}
