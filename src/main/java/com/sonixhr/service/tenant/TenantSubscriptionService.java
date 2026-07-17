@@ -508,8 +508,10 @@ public class TenantSubscriptionService {
         TenantSubscription subscription = subscriptionRepository.findById(subscriptionId)
             .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
             
-        if (subscription.getStatus() != PlanStatus.ACTIVE) {
-            throw new BusinessException("Only active subscriptions can be cancelled");
+        if (subscription.getStatus() != PlanStatus.ACTIVE 
+                && subscription.getStatus() != PlanStatus.TRIAL 
+                && subscription.getStatus() != PlanStatus.PAST_DUE) {
+            throw new BusinessException("Only active, trial, or past due subscriptions can be cancelled");
         }
         
         CancellationReason cancelReason = CancellationReason.OTHER;
@@ -533,7 +535,7 @@ public class TenantSubscriptionService {
             Tenant tenant = subscription.getTenant();
             if (tenant != null) {
                 tenant.setPlanStatus(PlanStatus.TERMINATED);
-                tenant.setStatus(UserStatus.INACTIVE);
+                tenant.deactivate();
                 tenantRepository.save(tenant);
                 
                 tenantRLSService.invalidateTenantCache(tenant.getId());

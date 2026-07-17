@@ -224,4 +224,34 @@ public class TenantSubscriptionServiceTest {
             subscriptionService.restoreArchivedTenant(tenantId, planId, "Restore attempt");
         });
     }
+
+    @Test
+    public void testCancelSubscription() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setActive(true);
+        
+        TenantSubscription sub = new TenantSubscription();
+        sub.setId(10L);
+        sub.setTenant(tenant);
+        sub.setStatus(PlanStatus.ACTIVE);
+        sub.setIsActive(true);
+        sub.setIsCurrent(true);
+        
+        when(subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findById(10L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.save(any(TenantSubscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
+        TenantSubscriptionResponseDTO result = subscriptionService.cancelSubscription(tenantId);
+        
+        assertNotNull(result);
+        assertEquals(PlanStatus.TERMINATED, result.getPlanStatus());
+        assertEquals(UserStatus.INACTIVE, tenant.getStatus());
+        assertFalse(tenant.getIsActive());
+        
+        verify(subscriptionRepository, times(1)).save(sub);
+        verify(tenantRepository, times(1)).save(tenant);
+    }
 }
