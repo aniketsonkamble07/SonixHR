@@ -27,7 +27,7 @@ public class ShiftConfigurationController {
     private final ShiftConfigurationService shiftConfigurationService;
 
     @PostMapping
-    @PreAuthorize("hasPermission('SHIFT_CREATE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_CREATE')")
     public ResponseEntity<ShiftConfigurationDTO> createShift(
             @Valid @RequestBody ShiftConfigurationRequestDTO request,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -44,7 +44,7 @@ public class ShiftConfigurationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasPermission('SHIFT_UPDATE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_UPDATE')")
     public ResponseEntity<ShiftConfigurationDTO> updateShift(
             @PathVariable Long id,
             @Valid @RequestBody ShiftConfigurationRequestDTO request,
@@ -62,7 +62,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasPermission('SHIFT_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> activateShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -76,7 +76,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasPermission('SHIFT_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> deactivateShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -90,7 +90,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/set-default")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasPermission('SHIFT_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> setDefaultShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -104,7 +104,7 @@ public class ShiftConfigurationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasPermission('SHIFT_DELETE')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_DELETE')")
     public ResponseEntity<Void> softDeleteShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -132,7 +132,7 @@ public class ShiftConfigurationController {
 
     // GET endpoints
     @GetMapping("/my-shift")
-    @PreAuthorize("hasPermission('SHIFT_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW')")
     public ResponseEntity<ShiftConfigurationDTO> getMyShift(
             @AuthenticationPrincipal Employee currentEmployee) {
 
@@ -142,7 +142,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasPermission('SHIFT_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW')")
     public ResponseEntity<ShiftConfigurationDTO> getShiftById(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -153,7 +153,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/code/{shiftCode}")
-    @PreAuthorize("hasPermission('SHIFT_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW')")
     public ResponseEntity<ShiftConfigurationDTO> getShiftByCode(
             @PathVariable String shiftCode,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -164,7 +164,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasPermission('SHIFT_VIEW_ALL')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW_ALL')")
     public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllShifts(
             @AuthenticationPrincipal Employee currentEmployee) {
 
@@ -174,7 +174,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/effective")
-    @PreAuthorize("hasPermission('SHIFT_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW')")
     public ResponseEntity<ShiftConfigurationDTO> getEffectiveShift(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -185,7 +185,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasPermission('SHIFT_VIEW_ALL')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_VIEW_ALL')")
     public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts(
             @AuthenticationPrincipal Employee currentEmployee) {
         List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllActiveShiftsSummary(currentEmployee.getTenantId());
@@ -194,7 +194,7 @@ public class ShiftConfigurationController {
 
     // Utility endpoints
     @GetMapping("/validate-checkin")
-    @PreAuthorize("hasPermission('ATTENDANCE_MARK')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_MARK')")
     public ResponseEntity<Boolean> isValidCheckinTime(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam LocalTime checkinTime,
@@ -206,7 +206,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/late-minutes")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Integer> calculateLateMinutes(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam LocalTime checkinTime,
@@ -218,7 +218,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/early-exit-minutes")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Integer> calculateEarlyExitMinutes(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam LocalTime checkoutTime,
@@ -230,7 +230,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/is-weekoff")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Boolean> isWeekOff(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -241,7 +241,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/expected-hours")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Double> getExpectedWorkingHours(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -252,7 +252,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/working-hours")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Double> calculateWorkingHours(
             @RequestParam LocalTime checkIn,
             @RequestParam LocalTime checkOut,
@@ -263,7 +263,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/overtime")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<Double> calculateOvertime(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam LocalTime checkoutTime,
@@ -275,7 +275,7 @@ public class ShiftConfigurationController {
     }
 
     @GetMapping("/attendance-status")
-    @PreAuthorize("hasPermission('ATTENDANCE_VIEW')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW')")
     public ResponseEntity<String> getAttendanceStatus(
             @AuthenticationPrincipal Employee currentEmployee,
             @RequestParam(required = false) LocalTime checkinTime,
