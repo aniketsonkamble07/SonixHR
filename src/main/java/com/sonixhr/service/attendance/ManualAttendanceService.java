@@ -9,6 +9,8 @@ import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.attendance.ManualAttendanceRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
+import com.sonixhr.repository.leave.LeaveRequestRepository;
+import com.sonixhr.entity.leave.LeaveRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -34,6 +36,7 @@ public class ManualAttendanceService {
 
     private final ManualAttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     // =====================================================
     // CONFIGURATION
@@ -58,16 +61,14 @@ public class ManualAttendanceService {
         // RULE 1: Cannot mark future dates
         if (attendanceDate.isAfter(today)) {
             throw new BusinessException(
-                    String.format("Cannot mark attendance for future dates. Today is %s", today)
-            );
+                    String.format("Cannot mark attendance for future dates. Today is %s", today));
         }
 
         // RULE 2: Cannot mark before hire date
         if (employee.getHireDate() != null && attendanceDate.isBefore(employee.getHireDate())) {
             throw new BusinessException(
                     String.format("Cannot mark attendance before hire date: %s. Hire date is %s",
-                            attendanceDate, employee.getHireDate())
-            );
+                            attendanceDate, employee.getHireDate()));
         }
 
         // RULE 3: Cannot mark older than 90 days
@@ -75,18 +76,17 @@ public class ManualAttendanceService {
         if (attendanceDate.isBefore(maxPastDate)) {
             throw new BusinessException(
                     String.format("Cannot mark attendance older than %d days. Date %s is too old",
-                            MAX_PAST_DAYS, attendanceDate)
-            );
+                            MAX_PAST_DAYS, attendanceDate));
         }
 
         // RULE 4: Cannot mark after resignation/last working day
         if (employee.getLastWorkingDate() != null && attendanceDate.isAfter(employee.getLastWorkingDate())) {
             throw new BusinessException(
-                    String.format("Cannot mark attendance after last working date: %s", employee.getLastWorkingDate())
-            );
+                    String.format("Cannot mark attendance after last working date: %s", employee.getLastWorkingDate()));
         }
 
-        // RULE 5: Cannot mark attendance for resigned (if last working date has passed), terminated, suspended, or invited employees
+        // RULE 5: Cannot mark attendance for resigned (if last working date has
+        // passed), terminated, suspended, or invited employees
         boolean isResignedAndLeft = employee.getStatus() == EmployeeStatus.RESIGNED &&
                 (employee.getLastWorkingDate() == null || attendanceDate.isAfter(employee.getLastWorkingDate()));
 
@@ -95,8 +95,8 @@ public class ManualAttendanceService {
                 employee.getStatus() == EmployeeStatus.SUSPENDED ||
                 employee.getStatus() == EmployeeStatus.INVITED) {
             throw new BusinessException(
-                    String.format("Cannot mark attendance for an employee with status: %s", employee.getStatus().getDisplayName())
-            );
+                    String.format("Cannot mark attendance for an employee with status: %s",
+                            employee.getStatus().getDisplayName()));
         }
     }
 
@@ -118,7 +118,8 @@ public class ManualAttendanceService {
      * Validate overtime hours
      */
     private void validateOvertime(Double overtimeHours) {
-        if (overtimeHours == null) return;
+        if (overtimeHours == null)
+            return;
 
         if (overtimeHours > MAX_OVERTIME_PER_DAY) {
             throw new BusinessException("Overtime cannot exceed " + MAX_OVERTIME_PER_DAY + " hours per day");
@@ -166,12 +167,12 @@ public class ManualAttendanceService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "attendance", allEntries = true),
-        @CacheEvict(value = "calendar", allEntries = true)
+            @CacheEvict(value = "attendance", allEntries = true),
+            @CacheEvict(value = "calendar", allEntries = true)
     })
     public AttendanceRecord markAttendance(Long targetEmployeeId, AttendanceStatus status,
-                                           String reason, Double overtimeHours,
-                                           Employee currentUser) {
+            String reason, Double overtimeHours,
+            Employee currentUser) {
 
         log.info("User {} marking attendance for employee: {} as: {}",
                 currentUser.getEmail(), targetEmployeeId, status);
@@ -189,12 +190,12 @@ public class ManualAttendanceService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "attendance", allEntries = true),
-        @CacheEvict(value = "calendar", allEntries = true)
+            @CacheEvict(value = "attendance", allEntries = true),
+            @CacheEvict(value = "calendar", allEntries = true)
     })
     public AttendanceRecord markAttendanceForDate(Long targetEmployeeId, LocalDate date,
-                                                  AttendanceStatus status, String reason,
-                                                  Double overtimeHours, Employee currentUser) {
+            AttendanceStatus status, String reason,
+            Double overtimeHours, Employee currentUser) {
 
         log.info("User {} marking attendance for employee: {} on date: {} as: {}",
                 currentUser.getEmail(), targetEmployeeId, date, status);
@@ -211,8 +212,8 @@ public class ManualAttendanceService {
 
         if (targetEmployee.getStatus() == EmployeeStatus.ON_LEAVE && status != AttendanceStatus.ON_LEAVE) {
             throw new BusinessException(
-                    String.format("Cannot mark employee as %s because their employee status is ON LEAVE", status.getDisplayName())
-            );
+                    String.format("Cannot mark employee as %s because their employee status is ON LEAVE",
+                            status.getDisplayName()));
         }
 
         Long tenantId = targetEmployee.getTenant().getId();
@@ -232,8 +233,10 @@ public class ManualAttendanceService {
             }
 
             record.setStatus(status);
-            if (reason != null) record.setReason(reason);
-            if (overtimeHours != null) record.setOvertimeHours(overtimeHours);
+            if (reason != null)
+                record.setReason(reason);
+            if (overtimeHours != null)
+                record.setOvertimeHours(overtimeHours);
             record.setMarkedBy(currentUser.getId());
             record.setMarkedByName(currentUser.getFullName());
             record.setMarkedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER");
@@ -271,13 +274,13 @@ public class ManualAttendanceService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "attendance", allEntries = true),
-        @CacheEvict(value = "calendar", allEntries = true)
+            @CacheEvict(value = "attendance", allEntries = true),
+            @CacheEvict(value = "calendar", allEntries = true)
     })
     public List<AttendanceRecord> markTeamAttendance(Long managerId, LocalDate date,
-                                                     Map<Long, AttendanceStatus> attendanceMap,
-                                                     Map<Long, String> reasonMap,
-                                                     Map<Long, Double> overtimeMap) {
+            Map<Long, AttendanceStatus> attendanceMap,
+            Map<Long, String> reasonMap,
+            Map<Long, Double> overtimeMap) {
 
         log.info("Manager {} marking attendance for {} team members on date: {}",
                 managerId, attendanceMap.size(), date);
@@ -319,8 +322,8 @@ public class ManualAttendanceService {
      */
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "attendance", allEntries = true),
-        @CacheEvict(value = "calendar", allEntries = true)
+            @CacheEvict(value = "attendance", allEntries = true),
+            @CacheEvict(value = "calendar", allEntries = true)
     })
     public List<AttendanceRecord> quickMarkTeamAttendance(Long managerId, AttendanceStatus defaultStatus) {
         log.info("Manager {} quick marking all team members as: {}", managerId, defaultStatus);
@@ -342,11 +345,11 @@ public class ManualAttendanceService {
 
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "attendance", allEntries = true),
-        @CacheEvict(value = "calendar", allEntries = true)
+            @CacheEvict(value = "attendance", allEntries = true),
+            @CacheEvict(value = "calendar", allEntries = true)
     })
     public AttendanceRecord addOvertime(Long employeeId, LocalDate date, Double overtimeHours,
-                                        String reason, Employee currentUser) {
+            String reason, Employee currentUser) {
 
         log.info("User {} adding {} overtime hours for employee: {} on date: {}",
                 currentUser.getEmail(), overtimeHours, employeeId, date);
@@ -374,9 +377,8 @@ public class ManualAttendanceService {
             Double currentOvertime = record.getOvertimeHours() != null ? record.getOvertimeHours() : 0;
             record.setOvertimeHours(currentOvertime + overtimeHours);
 
-            String overtimeReason = record.getReason() != null ?
-                    record.getReason() + " | Overtime: " + reason :
-                    "Overtime: " + reason;
+            String overtimeReason = record.getReason() != null ? record.getReason() + " | Overtime: " + reason
+                    : "Overtime: " + reason;
             record.setReason(overtimeReason);
             record.setUpdatedAt(LocalDateTime.now());
         } else {
@@ -412,7 +414,8 @@ public class ManualAttendanceService {
         Employee manager = employeeRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
 
-        List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId, manager.getTenant().getId());
+        List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId,
+                manager.getTenant().getId());
 
         log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
         return teamMembers;
@@ -425,8 +428,8 @@ public class ManualAttendanceService {
         return employeeRepository.findByManagerIdAndTenantId(managerId, manager.getTenant().getId(), pageable);
     }
 
-    public List<ManualTeamMemberAttendanceDTO> getTeamWithTodayAttendance(Long managerId) {
-        log.info("Getting team with today's attendance for manager: {}", managerId);
+    public List<ManualTeamMemberAttendanceDTO> getTeamWithTodayAttendance(Long managerId, LocalDate date) {
+        log.info("Getting team with attendance for manager: {} on date: {}", managerId, date);
 
         Employee manager = employeeRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
@@ -435,7 +438,7 @@ public class ManualAttendanceService {
         List<Employee> teamMembers = employeeRepository.findByManagerIdAndTenantId(managerId, tenantId);
         log.info("Found {} team members for manager: {}", teamMembers.size(), manager.getEmail());
 
-        return buildTeamAttendanceDTOs(teamMembers, tenantId, LocalDate.now(Clock.systemUTC()));
+        return buildTeamAttendanceDTOs(teamMembers, tenantId, date);
     }
 
     public List<Employee> searchTeamMembers(Long managerId, String searchTerm) {
@@ -452,8 +455,10 @@ public class ManualAttendanceService {
         return employeeRepository.searchTeamMembers(managerId, tenantId, searchTerm.toLowerCase());
     }
 
-    public List<ManualTeamMemberAttendanceDTO> searchTeamWithTodayAttendance(Long managerId, String searchTerm) {
-        log.info("Searching team with today's attendance for manager: {} with term: {}", managerId, searchTerm);
+    public List<ManualTeamMemberAttendanceDTO> searchTeamWithTodayAttendance(Long managerId, String searchTerm,
+            LocalDate date) {
+        log.info("Searching team with attendance for manager: {} on date: {} with term: {}", managerId, date,
+                searchTerm);
 
         List<Employee> teamMembers = searchTeamMembers(managerId, searchTerm);
         if (teamMembers.isEmpty()) {
@@ -463,16 +468,15 @@ public class ManualAttendanceService {
         Employee manager = employeeRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
         Long tenantId = manager.getTenant().getId();
-        return buildTeamAttendanceDTOs(teamMembers, tenantId, LocalDate.now(Clock.systemUTC()));
+        return buildTeamAttendanceDTOs(teamMembers, tenantId, date);
     }
-
 
     // =====================================================
     // VIEW ATTENDANCE
     // =====================================================
 
     public Page<AttendanceRecord> getTeamAttendance(Employee currentUser, LocalDate startDate,
-                                                    LocalDate endDate, Pageable pageable) {
+            LocalDate endDate, Pageable pageable) {
 
         log.info("Getting team attendance for user: {}", currentUser.getEmail());
         validateDateRange(startDate, endDate);
@@ -503,8 +507,8 @@ public class ManualAttendanceService {
     }
 
     public Page<AttendanceRecord> getEmployeeAttendance(Long employeeId, LocalDate startDate,
-                                                        LocalDate endDate, Employee currentUser,
-                                                        Pageable pageable) {
+            LocalDate endDate, Employee currentUser,
+            Pageable pageable) {
 
         log.info("Getting attendance for employee: {} from {} to {}", employeeId, startDate, endDate);
         validateDateRange(startDate, endDate);
@@ -603,9 +607,9 @@ public class ManualAttendanceService {
 
         return summary;
     }
-// =====================================================
-// TEAM ATTENDANCE SUMMARY
-// =====================================================
+    // =====================================================
+    // TEAM ATTENDANCE SUMMARY
+    // =====================================================
 
     /**
      * Get team attendance summary for a manager
@@ -657,7 +661,8 @@ public class ManualAttendanceService {
         teamTotals.put("totalOvertime", 0.0);
 
         for (Employee employee : teamMembers) {
-            List<AttendanceRecord> employeeRecords = recordsByEmployee.getOrDefault(employee.getId(), Collections.emptyList());
+            List<AttendanceRecord> employeeRecords = recordsByEmployee.getOrDefault(employee.getId(),
+                    Collections.emptyList());
 
             long present = employeeRecords.stream()
                     .filter(r -> r.getStatus() == AttendanceStatus.PRESENT).count();
@@ -708,15 +713,16 @@ public class ManualAttendanceService {
     }
 
     // =====================================================
-// ATTENDANCE CALENDAR
-// =====================================================
+    // ATTENDANCE CALENDAR
+    // =====================================================
 
     /**
      * Get attendance calendar view for an employee
      * Returns a map of dates with attendance status for the entire month
      */
     @Cacheable(value = "attendance", key = "'calendar:' + #tenantId + ':' + #employeeId + ':' + #year + ':' + #month", unless = "#result == null || #result.isEmpty()")
-    public Map<LocalDate, Map<String, Object>> getAttendanceCalendar(Long employeeId, int year, int month, Long tenantId) {
+    public Map<LocalDate, Map<String, Object>> getAttendanceCalendar(Long employeeId, int year, int month,
+            Long tenantId) {
         log.info("Getting attendance calendar for employee: {} for {}-{}", employeeId, year, month);
 
         // Get employee to verify existence and hire date
@@ -784,16 +790,20 @@ public class ManualAttendanceService {
      */
     private String getStatusCode(AttendanceStatus status) {
         switch (status) {
-            case PRESENT: return "P";
-            case ABSENT: return "A";
-            case HALF_DAY: return "H";
-            case LATE: return "L";
-            case ON_LEAVE: return "LV";
-            default: return "N/A";
+            case PRESENT:
+                return "P";
+            case ABSENT:
+                return "A";
+            case HALF_DAY:
+                return "H";
+            case LATE:
+                return "L";
+            case ON_LEAVE:
+                return "LV";
+            default:
+                return "N/A";
         }
     }
-
-
 
     @Cacheable(value = "attendance", key = "'stats:' + #currentUser.tenantId + ':' + #currentUser.id", unless = "#result == null")
     public Map<String, Object> getDashboardStats(Employee currentUser) {
@@ -843,6 +853,7 @@ public class ManualAttendanceService {
 
         return stats;
     }
+
     public List<AttendanceRecord> getEmployeeAttendance(Long employeeId, LocalDate startDate, LocalDate endDate) {
         log.info("Getting attendance for employee: {} from {} to {}", employeeId, startDate, endDate);
 
@@ -868,11 +879,23 @@ public class ManualAttendanceService {
                 .collect(Collectors.toList());
 
         Map<Long, AttendanceRecord> attendanceMap = new HashMap<>();
+        Set<Long> onLeaveEmployeeIds = new HashSet<>();
+
         if (!employeeIds.isEmpty()) {
             List<AttendanceRecord> records = attendanceRepository
                     .findByTenantIdAndEmployeeIdInAndAttendanceDateBetween(tenantId, employeeIds, today, today);
-            for (AttendanceRecord record : records) {
-                attendanceMap.put(record.getEmployee().getId(), record);
+            if (records != null) {
+                for (AttendanceRecord record : records) {
+                    attendanceMap.put(record.getEmployee().getId(), record);
+                }
+            }
+
+            // Load approved leaves for the tenant on this date
+            List<LeaveRequest> leaves = leaveRequestRepository.findAllApprovedLeavesInDateRange(tenantId, today, today);
+            for (LeaveRequest leave : leaves) {
+                if (leave.getEmployee() != null && employeeIds.contains(leave.getEmployee().getId())) {
+                    onLeaveEmployeeIds.add(leave.getEmployee().getId());
+                }
             }
         }
 
@@ -882,6 +905,26 @@ public class ManualAttendanceService {
                 continue;
             }
             Optional<AttendanceRecord> attendance = Optional.ofNullable(attendanceMap.get(employee.getId()));
+
+            AttendanceStatus status = null;
+            Double overtime = null;
+            String reason = null;
+            boolean marked = false;
+            Long markedBy = null;
+            String markedByName = null;
+
+            if (attendance.isPresent()) {
+                status = attendance.get().getStatus();
+                overtime = attendance.get().getOvertimeHours();
+                reason = attendance.get().getReason();
+                markedBy = attendance.get().getMarkedBy();
+                markedByName = attendance.get().getMarkedByName();
+                marked = true;
+            } else if (onLeaveEmployeeIds.contains(employee.getId())) {
+                status = AttendanceStatus.ON_LEAVE;
+                reason = "Approved Leave";
+            }
+
             teamAttendance.add(ManualTeamMemberAttendanceDTO.builder()
                     .employeeId(employee.getId())
                     .employeeCode(employee.getEmployeeCode())
@@ -890,10 +933,15 @@ public class ManualAttendanceService {
                     .position(employee.getPosition())
                     .profilePicture(employee.getProfilePictureUrl())
                     .hireDate(employee.getHireDate())
-                    .todayStatus(attendance.map(AttendanceRecord::getStatus).orElse(null))
-                    .todayOvertime(attendance.map(AttendanceRecord::getOvertimeHours).orElse(null))
-                    .todayReason(attendance.map(AttendanceRecord::getReason).orElse(null))
-                    .isMarked(attendance.isPresent())
+                    .todayStatus(status)
+                    .todayOvertime(overtime)
+                    .todayReason(reason)
+                    .status(status)
+                    .overtime(overtime)
+                    .reason(reason)
+                    .isMarked(marked)
+                    .markedBy(markedBy)
+                    .markedByName(markedByName)
                     .build());
         }
         return teamAttendance;

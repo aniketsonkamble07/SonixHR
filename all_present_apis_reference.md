@@ -66,6 +66,38 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+### GET `/api/admin/tenants/{id}/subscription-history`
+- **Handler Method**: `getSubscriptionHistory`
+- **Description**: Get subscription history for a specific organization/tenant.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `TenantSubscriptionResponseDTO[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "planType": "",
+  "planName": "",
+  "planStatus": "PlanStatus",
+  "maxEmployees": 0,
+  "maxStorageMb": 0,
+  "startedAt": "2026-06-17",
+  "endsAt": "2026-06-17",
+  "amount": 0,
+  "currency": "",
+  "isActive": false,
+  "createdAt": "2026-06-17",
+  "billingPeriodStart": "2026-06-17",
+  "billingPeriodEnd": "2026-06-17",
+  "gracePeriodEnd": "2026-06-17",
+  "cancellationReason": "",
+  "cancelledAtEndOfPeriod": false
+}
+]
+```
+
+---
+
 ## CalendarController
 
 ### GET `/api/calendar/employee/{employeeId}`

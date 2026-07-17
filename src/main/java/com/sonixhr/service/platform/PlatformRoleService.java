@@ -6,6 +6,7 @@ import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.dto.platform.PlatformRoleDeletePreviewResponse;
+import com.sonixhr.dto.platform.PlatformRoleDeleteResponse;
 import com.sonixhr.entity.platform.PlatformPermission;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
@@ -354,8 +355,8 @@ public class PlatformRoleService {
 
     @Transactional
     @CacheEvict(value = {"platformRoles", "platformRolesList", "platformRolesLookup"}, allEntries = true)
-    public void deleteRole(Long roleId) {
-        log.info("Deleting platform role: {}", roleId);
+    public PlatformRoleDeleteResponse deleteRole(Long roleId, boolean confirm) {
+        log.info("Processing delete request for platform role: {} with confirm={}", roleId, confirm);
 
         PlatformRole role = getRoleById(roleId);
 
@@ -363,22 +364,56 @@ public class PlatformRoleService {
             throw new BusinessException("Cannot delete system role: " + role.getName());
         }
 
-        long userCount = userRepository.countUsersByRoleId(roleId);
-        if (userCount > 0) {
-            throw new BusinessException("Cannot delete platform role that is assigned to " + userCount +
-                    " user(s). You must manually reassign these users to another role first.");
+        List<PlatformUser> affectedUsers = userRepository.findByRolesId(roleId);
+        int userCount = affectedUsers.size();
+
+        if (userCount > 1) {
+            throw new BusinessException("Cannot delete platform role. It is assigned to " + userCount + " users. Please update it first.");
         }
 
-        // Soft delete - deactivate instead of hard delete
-        role.setActive(false);
-        roleRepository.save(role);
+        if (userCount == 1) {
+            PlatformUser user = affectedUsers.get(0);
+            String userName = user.getFullName();
+
+            if (!confirm) {
+                return PlatformRoleDeleteResponse.builder()
+                        .deleted(false)
+                        .requiresConfirmation(true)
+                        .userName(userName)
+                        .message("Platform role is assigned to " + userName + ". Please confirm deletion.")
+                        .build();
+            }
+
+            // Remove role from user
+            user.getRoles().remove(role);
+            user.incrementRolesVersion();
+            user.clearAuthoritiesCache();
+            userRepository.save(user);
+
+            // Invalidate user's authority cache immediately
+            platformUserDetailsService.invalidateCache(user.getEmail());
+            org.springframework.cache.Cache authCache = cacheManager != null ? cacheManager.getCache("platform_user_authorities") : null;
+            if (authCache != null) {
+                authCache.evict(user.getEmail());
+            }
+            usersByRoleCache.remove(roleId);
+        }
+
+        // Hard delete the role
+        roleRepository.delete(role);
 
         if (cacheEnabled) {
             roleCache.remove(roleId);
             allRolesCache.clear();
         }
 
-        log.info("Platform role deactivated: {}", role.getName());
+        log.info("Platform role hard deleted successfully: {}", role.getName());
+
+        return PlatformRoleDeleteResponse.builder()
+                .deleted(true)
+                .requiresConfirmation(false)
+                .message("Platform role deleted successfully" + (userCount == 1 ? " and removed from user " + affectedUsers.get(0).getFullName() : ""))
+                .build();
     }
 
     public PlatformRoleDeletePreviewResponse getRoleDeletePreview(Long roleId) {

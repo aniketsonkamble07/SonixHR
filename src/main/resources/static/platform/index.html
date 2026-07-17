@@ -103,6 +103,12 @@
             <span>Payroll Configs</span>
           </a>
         </li>
+        <li class="sidebar-item" data-tab="tab-platform-api-logs">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-terminal"></i>
+            <span>Global API Logs</span>
+          </a>
+        </li>
       </ul>
       
       <div class="sidebar-footer">
@@ -589,11 +595,8 @@
                   <tr>
                     <th>Code</th>
                     <th>Name</th>
-                    <th>Monthly Price</th>
-                    <th>Max Employees</th>
-                    <th>Max Storage</th>
-                    <th>Trial Days</th>
-                    <th>Trial?</th>
+                    <th>Price (INR)</th>
+                    <th>Validity Period</th>
                     <th>Status</th>
                     <th style="width: 180px; text-align: right;">Actions</th>
                   </tr>
@@ -841,6 +844,65 @@
           </div>
         </section>
 
+        <!-- ==========================================
+             TAB: GLOBAL API HIT LOGS
+             ========================================== -->
+        <section id="tab-platform-api-logs" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <h3 class="card-title"><i class="fa-solid fa-terminal" style="color: var(--accent-violet);"></i> Platform API Hit Logs Analysis</h3>
+            <p class="card-subtitle">Analyze API request history, traffic, client IPs, and device details across all tenant organizations</p>
+          </div>
+
+          <div class="card">
+            <div class="filter-bar">
+              <div class="filter-inputs">
+                <div class="search-input-wrapper" style="opacity: 0.7;">
+                  <i class="fa-solid fa-server"></i>
+                  <span style="margin-left: 20px; font-size: 0.85rem; color: var(--text-secondary);">Platform-wide logging aggregates across all organizations</span>
+                </div>
+              </div>
+              
+              <button class="btn btn-secondary" onclick="fetchPlatformApiLogs()">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Refresh Global Logs</span>
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Tenant ID</th>
+                    <th>Method</th>
+                    <th>Request URI</th>
+                    <th>IP Address</th>
+                    <th>Device Details</th>
+                    <th>User Contact</th>
+                  </tr>
+                </thead>
+                <tbody id="platform-api-logs-tbody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+                      Click Refresh to load platform-wide API hit logs.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+              <div class="pagination-info">
+                Page <span id="platform-api-logs-page-info">1 of 1</span>
+              </div>
+              <div class="pagination-controls">
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-prev" onclick="changePlatformApiLogsPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-next" onclick="changePlatformApiLogsPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -889,6 +951,35 @@
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="reg-admin-phone">Admin Mobile / Phone</label>
             <input type="text" id="reg-admin-phone" class="form-input" placeholder="9876543210" required>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="reg-country">Country</label>
+              <select id="reg-country" class="select-input" style="width: 100%; height: 42px;" onchange="toggleRegStateField()">
+                <option value="IN">India</option>
+                <option value="US">United States</option>
+                <option value="GB">United Kingdom</option>
+                <option value="CA">Canada</option>
+                <option value="AU">Australia</option>
+              </select>
+            </div>
+            <div class="form-group" id="reg-state-india-group">
+              <label class="form-label" for="reg-state-india">State (India)</label>
+              <select id="reg-state-india" class="select-input" style="width: 100%; height: 42px;">
+                <option value="MAHARASHTRA">Maharashtra</option>
+                <option value="DELHI">Delhi</option>
+                <option value="KARNATAKA">Karnataka</option>
+                <option value="TAMIL_NADU">Tamil Nadu</option>
+                <option value="TELANGANA">Telangana</option>
+                <option value="GUJARAT">Gujarat</option>
+                <option value="WEST_BENGAL">West Bengal</option>
+              </select>
+            </div>
+            <div class="form-group" id="reg-state-other-group" style="display: none;">
+              <label class="form-label" for="reg-state-other">State/Region</label>
+              <input type="text" id="reg-state-other" class="form-input" placeholder="e.g. California">
+            </div>
           </div>
           
           <div class="modal-footer" style="padding-bottom: 0; padding-right: 0;">
@@ -1520,6 +1611,9 @@
         tabTitle.textContent = 'Statutory Payroll Configuration';
         fetchPlatformPayrollRates();
         fetchPlatformPtConfigs();
+      } else if (tabId === 'tab-platform-api-logs') {
+        tabTitle.textContent = 'Platform Global API Hit Logs';
+        fetchPlatformApiLogs(0);
       }
     }
 
@@ -1987,12 +2081,17 @@
     document.getElementById('register-tenant-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      const countryVal = document.getElementById('reg-country').value;
       const payload = {
         companyName: document.getElementById('reg-company-name').value,
         adminEmail: document.getElementById('reg-admin-email').value,
         adminName: document.getElementById('reg-admin-name').value,
         adminPhone: document.getElementById('reg-admin-phone').value,
-        planType: document.getElementById('reg-plan-type').value
+        planType: document.getElementById('reg-plan-type').value,
+        planCode: document.getElementById('reg-plan-type').value,
+        country: countryVal,
+        state: countryVal === 'IN' ? document.getElementById('reg-state-india').value : null,
+        stateText: countryVal !== 'IN' ? document.getElementById('reg-state-other').value : null
       };
 
       try {
@@ -2453,7 +2552,7 @@
       if (!tbody) return;
 
       if (!plans || plans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
         return;
       }
 
@@ -2461,23 +2560,18 @@
         <tr>
           <td><code>${p.code}</code></td>
           <td style="font-weight: 600;">${p.name}</td>
-          <td>INR ${p.monthlyPrice.toFixed(2)}</td>
-          <td>${p.maxEmployees === -1 ? 'Unlimited' : p.maxEmployees}</td>
-          <td>${p.maxStorageMb} MB</td>
-          <td>${p.trialDays} days</td>
+          <td>INR ${(p.price || 0).toFixed(2)}</td>
+          <td>${p.validityMonths || 1} months</td>
           <td>
-            <span class="badge ${p.trial ? 'trial' : 'active'}">${p.trial ? 'Yes' : 'No'}</span>
-          </td>
-          <td>
-            <span class="status-indicator ${p.isActive ? 'active' : 'inactive'}"></span>
-            <span style="font-size: 0.85rem;">${p.isActive ? 'Active' : 'Disabled'}</span>
+            <span class="status-indicator ${p.active ? 'active' : 'inactive'}"></span>
+            <span style="font-size: 0.85rem;">${p.active ? 'Active' : 'Disabled'}</span>
           </td>
           <td style="text-align: right;">
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
               <button class="btn btn-secondary btn-icon" title="Edit Plan" onclick="openEditPlanModal(${p.id})">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button class="btn btn-secondary btn-icon text-danger" title="Delete Plan" onclick="deleteSubscriptionPlan(${p.id}, '${p.name}', ${p.trial})" ${p.trial ? 'disabled' : ''}>
+              <button class="btn btn-secondary btn-icon text-danger" title="Delete Plan" onclick="deleteSubscriptionPlan(${p.id}, '${p.name}')">
                 <i class="fa-solid fa-trash"></i>
               </button>
             </div>
@@ -2490,8 +2584,8 @@
       // 1. Create Organization Modal
       const regSelect = document.getElementById('reg-plan-type');
       if (regSelect) {
-        regSelect.innerHTML = plans.filter(p => p.isActive).map(p => `
-          <option value="${p.code}">${p.name} (${p.trial ? 'Trial, ' : 'INR ' + p.monthlyPrice + '/mo, '} ${p.maxEmployees} employees)</option>
+        regSelect.innerHTML = plans.filter(p => p.active).map(p => `
+          <option value="${p.name}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
         `).join('');
       }
 
@@ -2499,15 +2593,15 @@
       const overrideSelect = document.getElementById('override-plan-type');
       if (overrideSelect) {
         overrideSelect.innerHTML = plans.map(p => `
-          <option value="${p.code}">${p.name} (${p.code})</option>
+          <option value="${p.name}">${p.name} (${p.code})</option>
         `).join('');
       }
 
       // 3. Sandbox simulator select
       const sandboxSelect = document.getElementById('sandbox-plan-select');
       if (sandboxSelect) {
-        sandboxSelect.innerHTML = plans.filter(p => !p.trial && p.isActive).map(p => `
-          <option value="${p.code}">${p.name}</option>
+        sandboxSelect.innerHTML = plans.filter(p => p.active).map(p => `
+          <option value="${p.name}">${p.name}</option>
         `).join('');
       }
     }
@@ -2519,10 +2613,7 @@
       document.getElementById('plan-code').disabled = false;
       document.getElementById('plan-name').value = '';
       document.getElementById('plan-monthly-price').value = '0.00';
-      document.getElementById('plan-trial-days').value = '0';
-      document.getElementById('plan-max-employees').value = '100';
-      document.getElementById('plan-max-storage').value = '1024';
-      document.getElementById('plan-is-trial').checked = false;
+      document.getElementById('plan-trial-days').value = '1';
       document.getElementById('plan-is-active').checked = true;
       document.getElementById('plan-description').value = '';
       
@@ -2538,12 +2629,9 @@
       document.getElementById('plan-code').value = plan.code;
       document.getElementById('plan-code').disabled = true; // Code cannot be edited
       document.getElementById('plan-name').value = plan.name;
-      document.getElementById('plan-monthly-price').value = plan.monthlyPrice;
-      document.getElementById('plan-trial-days').value = plan.trialDays;
-      document.getElementById('plan-max-employees').value = plan.maxEmployees;
-      document.getElementById('plan-max-storage').value = plan.maxStorageMb;
-      document.getElementById('plan-is-trial').checked = plan.trial;
-      document.getElementById('plan-is-active').checked = plan.isActive;
+      document.getElementById('plan-monthly-price').value = plan.price || 0;
+      document.getElementById('plan-trial-days').value = plan.validityMonths || 1;
+      document.getElementById('plan-is-active').checked = plan.active;
       document.getElementById('plan-description').value = plan.description || '';
       
       openModal('subscription-plan-modal');
@@ -2560,11 +2648,8 @@
       const payload = {
         code: document.getElementById('plan-code').value,
         name: document.getElementById('plan-name').value,
-        monthlyPrice: parseFloat(document.getElementById('plan-monthly-price').value),
-        trialDays: parseInt(document.getElementById('plan-trial-days').value),
-        maxEmployees: parseInt(document.getElementById('plan-max-employees').value),
-        maxStorageMb: parseInt(document.getElementById('plan-max-storage').value),
-        trial: document.getElementById('plan-is-trial').checked,
+        price: parseFloat(document.getElementById('plan-monthly-price').value),
+        validityMonths: parseInt(document.getElementById('plan-trial-days').value),
         isActive: document.getElementById('plan-is-active').checked,
         description: document.getElementById('plan-description').value
       };
@@ -2591,12 +2676,7 @@
       }
     });
 
-    async function deleteSubscriptionPlan(id, name, isTrial) {
-      if (isTrial) {
-        showToast('Error', 'Cannot delete the default Trial plan.', 'error');
-        return;
-      }
-
+    async function deleteSubscriptionPlan(id, name) {
       if (confirm(`Are you sure you want to delete the pricing plan "${name}"? This action cannot be undone.`)) {
         try {
           const res = await fetch(`${API_BASE}/platform/subscription-plans/${id}`, {
@@ -3444,6 +3524,91 @@
       markNotificationRead(id);
       document.querySelector('[data-tab=tab-tickets]').click();
     }
+
+    // ==========================================
+    // PLATFORM GLOBAL API HIT LOGS
+    // ==========================================
+    let platformApiLogsPage = 0;
+    let platformApiLogsTotalPages = 1;
+
+    async function fetchPlatformApiLogs(page = 0) {
+      platformApiLogsPage = page;
+      const tbody = document.getElementById('platform-api-logs-tbody');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;"><span class="loading-spinner"></span> Loading Platform API logs...</td></tr>';
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/api-logs?page=${page}&size=15&sort=hitTime,desc`, {
+          headers: getHeaders()
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          tbody.innerHTML = '';
+          platformApiLogsTotalPages = data.totalPages || 1;
+          document.getElementById('platform-api-logs-page-info').textContent = `${platformApiLogsPage + 1} of ${platformApiLogsTotalPages}`;
+
+          document.getElementById('btn-platform-api-logs-prev').disabled = platformApiLogsPage <= 0;
+          document.getElementById('btn-platform-api-logs-next').disabled = platformApiLogsPage >= platformApiLogsTotalPages - 1;
+
+          const logs = data.content || [];
+          if (logs.length > 0) {
+            logs.forEach(log => {
+              const row = document.createElement('tr');
+              const timeStr = log.hitTime ? new Date(log.hitTime).toLocaleString() : '-';
+              
+              row.innerHTML = `
+                <td>${timeStr}</td>
+                <td><span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; font-family: monospace;">Tenant #${log.tenantId || 'Platform'}</span></td>
+                <td><span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; text-transform: uppercase;">${log.httpMethod}</span></td>
+                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${log.requestUri}</code></td>
+                <td>${log.ipAddress || '-'}</td>
+                <td>
+                  <div style="font-weight:600;"><i class="fa-solid fa-laptop-code" style="color: #a78bfa; margin-right: 6px;"></i> ${log.deviceName || 'Unknown'}</div>
+                  <div style="font-size:0.75rem; opacity:0.6; word-break:break-all; max-width: 250px;">${log.deviceDetails || '-'}</div>
+                </td>
+                <td><strong>${log.employeeEmail || 'anonymous'}</strong></td>
+              `;
+              tbody.appendChild(row);
+            });
+          } else {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No global API logs found.</td></tr>';
+          }
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-danger);">Failed to load platform API logs. Check authorization.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-danger);">Error connecting to API log service.</td></tr>';
+      }
+    }
+
+    function changePlatformApiLogsPage(direction) {
+      const targetPage = platformApiLogsPage + direction;
+      if (targetPage >= 0 && targetPage < platformApiLogsTotalPages) {
+        fetchPlatformApiLogs(targetPage);
+      }
+    }
+
+    window.fetchPlatformApiLogs = fetchPlatformApiLogs;
+    window.changePlatformApiLogsPage = changePlatformApiLogsPage;
+
+    function toggleRegStateField() {
+      const country = document.getElementById('reg-country').value;
+      const indiaGroup = document.getElementById('reg-state-india-group');
+      const otherGroup = document.getElementById('reg-state-other-group');
+      
+      if (country === 'IN') {
+        indiaGroup.style.display = '';
+        otherGroup.style.display = 'none';
+        document.getElementById('reg-state-india').required = true;
+        document.getElementById('reg-state-other').required = false;
+      } else {
+        indiaGroup.style.display = 'none';
+        otherGroup.style.display = '';
+        document.getElementById('reg-state-india').required = false;
+        document.getElementById('reg-state-other').required = true;
+      }
+    }
+    window.toggleRegStateField = toggleRegStateField;
 
     // Boot App
     window.addEventListener('DOMContentLoaded', initApp);

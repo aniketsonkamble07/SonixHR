@@ -24,5 +24,10 @@ public class ManualTeamMemberAttendanceDTO {
     private AttendanceStatus todayStatus;
     private Double todayOvertime;
     private String todayReason;
+    private AttendanceStatus status;
+    private Double overtime;
+    private String reason;
     private boolean isMarked;
+    private Long markedBy;
+    private String markedByName;
 }

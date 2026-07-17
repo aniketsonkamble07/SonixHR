@@ -8,6 +8,7 @@ import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
 import com.sonixhr.dto.tenant.TenantRoleDeletePreviewResponse;
+import com.sonixhr.dto.tenant.TenantRoleDeleteResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.service.employee.EmployeeService;
@@ -158,16 +159,17 @@ public class TenantRoleController {
      */
     @DeleteMapping("/{roleId}")
     @PreAuthorize("hasAuthority('ROLE_DELETE')")
-    public ResponseEntity<Void> deleteRole(
+    public ResponseEntity<TenantRoleDeleteResponse> deleteRole(
             @PathVariable Long roleId,
+            @RequestParam(required = false, defaultValue = "false") boolean confirm,
             @AuthenticationPrincipal Employee currentEmployee) {
 
         Long tenantId = getCurrentTenantId(currentEmployee);
-        log.info("Employee {} deleting role: {} for tenant: {}",
-                currentEmployee.getEmail(), roleId, tenantId);
+        log.info("Employee {} deleting role: {} for tenant: {} with confirm={}",
+                currentEmployee.getEmail(), roleId, tenantId, confirm);
 
-        roleService.deleteRole(roleId, tenantId);
-        return ResponseEntity.noContent().build();
+        TenantRoleDeleteResponse response = roleService.deleteRole(roleId, tenantId, confirm);
+        return ResponseEntity.ok(response);
     }
 
     /**

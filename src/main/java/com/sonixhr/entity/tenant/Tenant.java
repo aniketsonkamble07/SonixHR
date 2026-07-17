@@ -149,6 +149,14 @@ public class Tenant {
     @Builder.Default
     private Long version = 0L;
 
+    @Column(name = "api_logging_enabled")
+    @Builder.Default
+    private Boolean apiLoggingEnabled = true;
+
+    public boolean isApiLoggingEnabled() {
+        return apiLoggingEnabled == null || apiLoggingEnabled;
+    }
+
     // ==================== Helper Methods ====================
 
     public void softDelete() {

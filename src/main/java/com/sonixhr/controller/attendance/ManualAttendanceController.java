@@ -106,19 +106,23 @@ public class ManualAttendanceController {
     @GetMapping("/team/members")
     @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'SUPER_ADMIN')")  // ✅ Updated
     public ResponseEntity<List<ManualTeamMemberAttendanceDTO>> getTeamWithTodayAttendance(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Employee currentUser) {
 
-        return ResponseEntity.ok(attendanceService.getTeamWithTodayAttendance(currentUser.getId()));
+        LocalDate targetDate = date != null ? date : LocalDate.now(java.time.Clock.systemUTC());
+        return ResponseEntity.ok(attendanceService.getTeamWithTodayAttendance(currentUser.getId(), targetDate));
     }
 
     @GetMapping("/team/search")
     @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'SUPER_ADMIN')")
     public ResponseEntity<List<ManualTeamMemberAttendanceDTO>> searchTeamWithTodayAttendance(
             @RequestParam String searchTerm,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Employee currentUser) {
 
-        log.info("REST request to search team members with term: {} by manager: {}", searchTerm, currentUser.getId());
-        List<ManualTeamMemberAttendanceDTO> results = attendanceService.searchTeamWithTodayAttendance(currentUser.getId(), searchTerm);
+        log.info("REST request to search team members with term: {} by manager: {} for date: {}", searchTerm, currentUser.getId(), date);
+        LocalDate targetDate = date != null ? date : LocalDate.now(java.time.Clock.systemUTC());
+        List<ManualTeamMemberAttendanceDTO> results = attendanceService.searchTeamWithTodayAttendance(currentUser.getId(), searchTerm, targetDate);
         return ResponseEntity.ok(results);
     }
 

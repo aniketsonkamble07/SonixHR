@@ -6,6 +6,7 @@ import com.sonixhr.dto.platform.PlatformRoleResponse;
 import com.sonixhr.dto.platform.PlatformRoleLookupResponse;
 import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.dto.platform.PlatformRoleDeletePreviewResponse;
+import com.sonixhr.dto.platform.PlatformRoleDeleteResponse;
 import com.sonixhr.entity.platform.PlatformRole;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.service.platform.PlatformRoleService;
@@ -100,14 +101,15 @@ public class PlatformRoleController {
 
     @DeleteMapping("/{roleId}")
     @PreAuthorize("hasAuthority('DELETE_PLATFORM_ROLE')")
-    public ResponseEntity<Void> deleteRole(
+    public ResponseEntity<PlatformRoleDeleteResponse> deleteRole(
             @PathVariable Long roleId,
+            @RequestParam(required = false, defaultValue = "false") boolean confirm,
             @AuthenticationPrincipal PlatformUser currentAdmin) {
 
-        log.info("Platform admin {} deleting role: {}", currentAdmin.getEmail(), roleId);
+        log.info("Platform admin {} deleting role: {} with confirm={}", currentAdmin.getEmail(), roleId, confirm);
 
-        roleService.deleteRole(roleId);
-        return ResponseEntity.noContent().build();
+        PlatformRoleDeleteResponse response = roleService.deleteRole(roleId, confirm);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{roleId}/delete-preview")

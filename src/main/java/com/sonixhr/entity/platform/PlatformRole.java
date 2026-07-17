@@ -14,24 +14,21 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Entity
-@Table(name = "platform_roles",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_role_name", columnNames = {"name"})
-        },
-        indexes = {
-                @Index(name = "idx_role_system", columnList = "is_system_role"),
-                @Index(name = "idx_role_name", columnList = "name"),
-                @Index(name = "idx_role_active", columnList = "is_active"),
-                @Index(name = "idx_role_priority", columnList = "priority"),
-                @Index(name = "idx_role_created_at", columnList = "created_at")
-        })
+@Table(name = "platform_roles", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_role_name", columnNames = { "name" })
+}, indexes = {
+        @Index(name = "idx_role_system", columnList = "is_system_role"),
+        @Index(name = "idx_role_name", columnList = "name"),
+        @Index(name = "idx_role_active", columnList = "is_active"),
+        @Index(name = "idx_role_created_at", columnList = "created_at")
+})
 @Getter
 @Setter
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @SuppressWarnings("null")
 public class PlatformRole extends BaseRole {
 
@@ -44,16 +41,11 @@ public class PlatformRole extends BaseRole {
     private Integer priority = 0;
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "platform_role_permissions",
-            joinColumns = @JoinColumn(name = "role_id"),
-            inverseJoinColumns = @JoinColumn(name = "permission_id"),
-            uniqueConstraints = @UniqueConstraint(columnNames = {"role_id", "permission_id"}),
-            indexes = {
+    @JoinTable(name = "platform_role_permissions", joinColumns = @JoinColumn(name = "role_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"), uniqueConstraints = @UniqueConstraint(columnNames = {
+            "role_id", "permission_id" }), indexes = {
                     @Index(name = "idx_role_perm_role", columnList = "role_id"),
                     @Index(name = "idx_role_perm_permission", columnList = "permission_id")
-            }
-    )
+            })
     @Builder.Default
     private Set<PlatformPermission> permissions = new HashSet<>();
 
@@ -138,7 +130,7 @@ public class PlatformRole extends BaseRole {
         Set<String> permissionSet = Set.of(permissionNames);
         return this.permissions.stream()
                 .filter(p -> p.getPermission() != null)
-                .map(PlatformPermission::getPermission)  // This returns String
+                .map(PlatformPermission::getPermission) // This returns String
                 .anyMatch(permissionSet::contains);
     }
 
@@ -166,7 +158,7 @@ public class PlatformRole extends BaseRole {
         // FIXED: getPermission() returns String directly
         return this.permissions.stream()
                 .filter(p -> p.getPermission() != null)
-                .map(PlatformPermission::getPermission)  // Returns String
+                .map(PlatformPermission::getPermission) // Returns String
                 .collect(Collectors.toSet());
     }
 
@@ -217,7 +209,8 @@ public class PlatformRole extends BaseRole {
      * Check if role has higher priority than another role
      */
     public boolean isHigherPriorityThan(PlatformRole other) {
-        if (other == null) return true;
+        if (other == null)
+            return true;
         return this.priority > other.priority;
     }
 
@@ -225,11 +218,16 @@ public class PlatformRole extends BaseRole {
      * Get role hierarchy level
      */
     public String getHierarchyLevel() {
-        if (priority >= 100) return "SYSTEM";
-        if (priority >= 80) return "ADMIN";
-        if (priority >= 70) return "MANAGEMENT";
-        if (priority >= 60) return "HR";
-        if (priority >= 40) return "EMPLOYEE";
+        if (priority >= 100)
+            return "SYSTEM";
+        if (priority >= 80)
+            return "ADMIN";
+        if (priority >= 70)
+            return "MANAGEMENT";
+        if (priority >= 60)
+            return "HR";
+        if (priority >= 40)
+            return "EMPLOYEE";
         return "BASIC";
     }
 
@@ -253,8 +251,10 @@ public class PlatformRole extends BaseRole {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         PlatformRole that = (PlatformRole) o;
         return getId() != null && java.util.Objects.equals(getId(), that.getId());
     }

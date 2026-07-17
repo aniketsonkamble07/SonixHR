@@ -6,6 +6,7 @@ import com.sonixhr.dto.tenant.TenantRoleResponse;
 import com.sonixhr.dto.tenant.TenantRoleSummaryResponse;
 import com.sonixhr.dto.tenant.TenantRoleLookupResponse;
 import com.sonixhr.dto.tenant.TenantRoleDeletePreviewResponse;
+import com.sonixhr.dto.tenant.TenantRoleDeleteResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.TenantPermission;
@@ -509,8 +510,8 @@ public class TenantRoleService {
         @CacheEvict(value = "tenantRolesList", key = "#tenantId"),
         @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
-    public void deleteRole(Long roleId, Long tenantId) {
-        log.info("Deleting tenant role: {} for tenant: {}", roleId, tenantId);
+    public TenantRoleDeleteResponse deleteRole(Long roleId, Long tenantId, boolean confirm) {
+        log.info("Processing delete request for tenant role: {} in tenant: {} with confirm={}", roleId, tenantId, confirm);
 
         TenantRole role = getRoleByIdAndTenant(roleId, tenantId);
 
@@ -518,29 +519,60 @@ public class TenantRoleService {
             throw new BusinessException("Cannot delete the default role. Set another role as default first.");
         }
 
-        long userCount = employeeRepository.countUsersByRoleIdAndTenantId(roleId, tenantId);
-        if (userCount > 0) {
-            throw new BusinessException("Cannot delete role that is assigned to " + userCount +
-                    " employee(s). You must manually reassign these employees to another role first.");
-        }
-
         long totalRoles = roleRepository.countByTenantId(tenantId);
         if (totalRoles <= 1) {
             throw new BusinessException("Cannot delete the last role in tenant. At least one role must exist.");
         }
 
-        // Soft delete - deactivate instead of hard delete
-        role.setActive(false);
-        roleRepository.save(role);
+        List<Employee> affectedEmployees = employeeRepository.findByRolesIdAndTenantId(roleId, tenantId);
+        int employeeCount = affectedEmployees.size();
 
-        // Remove from caches
+        if (employeeCount > 1) {
+            throw new BusinessException("Cannot delete role. It is assigned to " + employeeCount + " employees. Please update it first.");
+        }
+
+        if (employeeCount == 1) {
+            Employee employee = affectedEmployees.get(0);
+            String employeeName = employee.getFirstName() + " " + employee.getLastName();
+
+            if (!confirm) {
+                return TenantRoleDeleteResponse.builder()
+                        .deleted(false)
+                        .requiresConfirmation(true)
+                        .employeeName(employeeName)
+                        .message("Role is assigned to " + employeeName + ". Please confirm deletion.")
+                        .build();
+            }
+
+            // Remove role from employee
+            employee.getRoles().remove(role);
+            employee.incrementRolesVersion();
+            employee.clearAuthoritiesCache();
+            employeeRepository.save(employee);
+
+            // Invalidate employee-related authority/role caches
+            dynamicRoleService.invalidateEmployeeAuthorityCache(employee.getEmail(), tenantId);
+            userRoleAssignmentCache.remove(employee.getId());
+            usersByRoleCache.remove(roleId);
+        }
+
+        // Hard delete the role
+        roleRepository.delete(role);
+
+        // Remove from local caches
         if (cacheEnabled) {
             String cacheKey = buildCacheKey(tenantId, roleId);
             roleCache.remove(cacheKey);
             tenantRolesCache.remove(tenantId);
         }
 
-        log.info("Role deactivated successfully: {}", roleId);
+        log.info("Role hard deleted successfully: {}", roleId);
+
+        return TenantRoleDeleteResponse.builder()
+                .deleted(true)
+                .requiresConfirmation(false)
+                .message("Role deleted successfully" + (employeeCount == 1 ? " and removed from employee " + affectedEmployees.get(0).getFirstName() + " " + affectedEmployees.get(0).getLastName() : ""))
+                .build();
     }
 
     /**
