@@ -57,6 +57,7 @@ public enum PlatformPermissionEnum {
     MANAGE_BACKUP("Manage system backup", "System Management", 4),
     VIEW_AUDIT_LOGS("View audit logs", "System Management", 5),
     EXPORT_AUDIT_LOGS("Export audit logs", "System Management", 6),
+    API_LOG_VIEW("View platform API hit logs", "System Management", 7),
 
     // =====================================================
     // BILLING & SUBSCRIPTION

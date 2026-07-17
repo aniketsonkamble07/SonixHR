@@ -112,6 +112,12 @@ public class TenantRoleSeeder implements ApplicationRunner {
         Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Admin");
         if (existingRole.isPresent()) {
             log.debug("Admin role already exists for tenant: {}", tenantId);
+            TenantRole adminRole = existingRole.get();
+            if (adminRole.getPermissions() == null || adminRole.getPermissions().size() < allPermissions.size()) {
+                adminRole.setPermissions(new HashSet<>(allPermissions));
+                roleRepository.save(adminRole);
+                log.info("Synced permissions for existing Admin role for tenant: {} to total {}", tenantId, allPermissions.size());
+            }
             return;
         }
 

@@ -6,6 +6,7 @@ import com.sonixhr.enums.payroll.TaxRegime;
 import com.sonixhr.repository.payroll.*;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.attendance.ManualAttendanceRepository;
+import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.common.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,7 @@ public class PayrollCalculationServiceIntegrationTest {
     @Mock private ReimbursementCalculator reimbursementCalculator;
     @Mock private AuditLogService auditLogService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private EmployeeRepository employeeRepository;
 
     private PayrollCalculationService payrollCalculationService;
 
@@ -67,6 +69,7 @@ public class PayrollCalculationServiceIntegrationTest {
                 tenantPayrollConfigRepo,
                 tenantSalaryStructureRepo,
                 employeeSalaryProfileRepo,
+                employeeRepository,
                 payrunRepo,
                 payrunConfigRepo,
                 componentDefinitionRepo,

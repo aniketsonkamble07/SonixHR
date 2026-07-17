@@ -15,4 +15,7 @@ public interface TenantSalaryStructureRepository extends JpaRepository<TenantSal
 
     @Query("SELECT t FROM TenantSalaryStructure t WHERE t.tenant.id = :tenantId AND t.effectiveFrom <= :date AND (t.effectiveTo IS NULL OR t.effectiveTo >= :date) ORDER BY t.evaluationOrder ASC")
     List<TenantSalaryStructure> findActiveByTenantAndDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
+    @Query("SELECT t FROM TenantSalaryStructure t WHERE t.tenantPayrollConfigId = :configId ORDER BY t.evaluationOrder ASC")
+    List<TenantSalaryStructure> findByTenantPayrollConfigId(@Param("configId") UUID configId);
 }

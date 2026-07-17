@@ -4,6 +4,7 @@ import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.payroll.*;
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.repository.payroll.*;
+import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.exceptions.PayrunLockedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PayrollCalculationService {
 
@@ -28,6 +28,7 @@ public class PayrollCalculationService {
     private final TenantPayrollConfigRepository tenantPayrollConfigRepo;
     private final TenantSalaryStructureRepository tenantSalaryStructureRepo;
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepo;
+    private final EmployeeRepository employeeRepository;
     private final PayrunRepository payrunRepo;
     private final PayrunConfigRepository payrunConfigRepo;
     private final SalaryComponentDefinitionRepository componentDefinitionRepo;
@@ -36,6 +37,35 @@ public class PayrollCalculationService {
     private final SnapshotService snapshotService;
     private final EmployeePayrunProcessor employeePayrunProcessor;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
+
+    public PayrollCalculationService(
+            StatutoryRateConfigRepository statutoryRateConfigRepo,
+            StateProfessionalTaxConfigRepository statePtConfigRepo,
+            TenantPayrollConfigRepository tenantPayrollConfigRepo,
+            TenantSalaryStructureRepository tenantSalaryStructureRepo,
+            EmployeeSalaryProfileRepository employeeSalaryProfileRepo,
+            EmployeeRepository employeeRepository,
+            PayrunRepository payrunRepo,
+            PayrunConfigRepository payrunConfigRepo,
+            SalaryComponentDefinitionRepository componentDefinitionRepo,
+            LeaveCalculator leaveCalculator,
+            SnapshotService snapshotService,
+            EmployeePayrunProcessor employeePayrunProcessor,
+            com.sonixhr.service.common.AuditLogService auditLogService) {
+        this.statutoryRateConfigRepo = statutoryRateConfigRepo;
+        this.statePtConfigRepo = statePtConfigRepo;
+        this.tenantPayrollConfigRepo = tenantPayrollConfigRepo;
+        this.tenantSalaryStructureRepo = tenantSalaryStructureRepo;
+        this.employeeSalaryProfileRepo = employeeSalaryProfileRepo;
+        this.employeeRepository = employeeRepository;
+        this.payrunRepo = payrunRepo;
+        this.payrunConfigRepo = payrunConfigRepo;
+        this.componentDefinitionRepo = componentDefinitionRepo;
+        this.leaveCalculator = leaveCalculator;
+        this.snapshotService = snapshotService;
+        this.employeePayrunProcessor = employeePayrunProcessor;
+        this.auditLogService = auditLogService;
+    }
 
     /**
      * Executes a full payrun calculation for a tenant in a specific month and year.
@@ -63,12 +93,17 @@ public class PayrollCalculationService {
         LocalDate monthStart = LocalDate.of(year, month, 1);
         LocalDate monthEnd   = YearMonth.of(year, month).atEndOfMonth();
 
-        // 2. Fetch tenant payroll config
+        // 2. Fetch tenant payroll config (with fallback to earliest config if none found for date)
         TenantPayrollConfig tenantConfig = tenantPayrollConfigRepo.findActiveByTenantAndDate(tenantId, monthStart)
-                .orElseThrow(() -> new IllegalArgumentException("Tenant payroll configuration not found"));
+                .orElseGet(() -> tenantPayrollConfigRepo.findActiveByTenant(tenantId).stream()
+                        .min(Comparator.comparing(TenantPayrollConfig::getEffectiveFrom))
+                        .orElseThrow(() -> new IllegalArgumentException("Tenant payroll configuration not found")));
 
         // 3. Fetch active salary structure and statutory rates
         List<TenantSalaryStructure> salaryStructure = tenantSalaryStructureRepo.findActiveByTenantAndDate(tenantId, monthStart);
+        if (salaryStructure.isEmpty()) {
+            salaryStructure = tenantSalaryStructureRepo.findByTenantPayrollConfigId(tenantConfig.getId());
+        }
         List<TenantSalaryStructure> orderedStructure = new ArrayList<>(salaryStructure);
         orderedStructure.sort(Comparator.comparingInt(TenantSalaryStructure::getEvaluationOrder));
 
@@ -95,8 +130,23 @@ public class PayrollCalculationService {
         snapshotService.createPayrunSnapshot(payrun, statutoryRates, tenantConfig, salaryStructure, ptSlabs);
 
         // 6. Fetch active profiles overlapping this month.
-        List<EmployeeSalaryProfile> allProfiles = employeeSalaryProfileRepo
-                .findActiveProfilesByTenantInPeriod(tenantId, monthStart, monthEnd);
+        List<EmployeeSalaryProfile> allProfiles = new ArrayList<>(employeeSalaryProfileRepo
+                .findActiveProfilesByTenantInPeriod(tenantId, monthStart, monthEnd));
+
+        // Fallback for employees who don't have a profile in the period but have a future profile
+        List<Employee> activeEmployees = employeeRepository.findActiveEmployeesByTenantId(tenantId);
+        Set<Long> employeesWithProfile = allProfiles.stream()
+                .map(p -> p.getEmployee().getId())
+                .collect(Collectors.toSet());
+
+        for (Employee emp : activeEmployees) {
+            if (!employeesWithProfile.contains(emp.getId())) {
+                List<EmployeeSalaryProfile> empProfiles = employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(emp.getId());
+                if (!empProfiles.isEmpty()) {
+                    allProfiles.add(empProfiles.get(0));
+                }
+            }
+        }
 
         Map<Long, List<EmployeeSalaryProfile>> profilesByEmployee = allProfiles.stream()
                 .collect(Collectors.groupingBy(p -> p.getEmployee().getId()));
@@ -139,6 +189,9 @@ public class PayrollCalculationService {
                     EmployeeSalaryProfile prof = profiles.get(i);
                     LocalDate segStart = prof.getEffectiveFrom().isBefore(monthStart)
                             ? monthStart : prof.getEffectiveFrom();
+                    if (i == 0 && segStart.isAfter(monthEnd)) {
+                        segStart = monthStart;
+                    }
                     LocalDate segEnd;
                     if (i < profiles.size() - 1) {
                         segEnd = profiles.get(i + 1).getEffectiveFrom().minusDays(1);

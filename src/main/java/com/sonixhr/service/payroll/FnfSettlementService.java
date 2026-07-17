@@ -65,11 +65,16 @@ public class FnfSettlementService {
         LocalDate monthEnd = YearMonth.of(terminationDate.getYear(), terminationDate.getMonthValue()).atEndOfMonth();
         int totalDaysInMonth = monthEnd.getDayOfMonth();
 
-        // Fetch structures and configs
+        // Fetch structures and configs (with fallback to earliest config if none found for date)
         TenantPayrollConfig tenantConfig = tenantPayrollConfigRepo.findActiveByTenantAndDate(tenantId, monthStart)
-                .orElseThrow(() -> new IllegalArgumentException("Tenant payroll configuration not found"));
+                .orElseGet(() -> tenantPayrollConfigRepo.findActiveByTenant(tenantId).stream()
+                        .min(Comparator.comparing(TenantPayrollConfig::getEffectiveFrom))
+                        .orElseThrow(() -> new IllegalArgumentException("Tenant payroll configuration not found")));
 
         List<TenantSalaryStructure> salaryStructure = tenantSalaryStructureRepo.findActiveByTenantAndDate(tenantId, monthStart);
+        if (salaryStructure.isEmpty()) {
+            salaryStructure = tenantSalaryStructureRepo.findByTenantPayrollConfigId(tenantConfig.getId());
+        }
         List<TenantSalaryStructure> orderedStructure = new ArrayList<>(salaryStructure);
         orderedStructure.sort(Comparator.comparingInt(TenantSalaryStructure::getEvaluationOrder));
 
@@ -92,7 +97,13 @@ public class FnfSettlementService {
                 .collect(Collectors.toList());
 
         if (profiles.isEmpty()) {
-            throw new IllegalArgumentException("No salary profile active in termination month");
+            List<EmployeeSalaryProfile> empProfiles = employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(employeeId);
+            if (!empProfiles.isEmpty()) {
+                profiles = new ArrayList<>();
+                profiles.add(empProfiles.get(0));
+            } else {
+                throw new IllegalArgumentException("No salary profile active in termination month");
+            }
         }
         EmployeeSalaryProfile activeProfile = profiles.get(profiles.size() - 1);
 

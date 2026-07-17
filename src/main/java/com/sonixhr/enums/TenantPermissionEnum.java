@@ -109,6 +109,8 @@ public enum TenantPermissionEnum {
     // =====================================================
     AUDIT_ROLE_ASSIGNMENTS("View role assignment audit logs", "Audit", 1),
     AUDIT_PERMISSION_CHANGES("View permission change audit logs", "Audit", 2),
+    API_LOG_VIEW("View API hit logs", "Audit", 3),
+    API_LOG_TOGGLE("Toggle API hit logging visibility", "Audit", 4),
 
     // =====================================================
     // TASK MANAGEMENT
