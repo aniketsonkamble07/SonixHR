@@ -10,7 +10,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Entity
 @Table(name = "platform_permissions",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_permission_name", columnNames = {"permission"})
+                @UniqueConstraint(name = "uk_platform_permission_name", columnNames = {"permission"})
         },
         indexes = {
                 @Index(name = "idx_permission_type", columnList = "permission"),

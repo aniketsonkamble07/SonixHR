@@ -12,7 +12,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "tenant_permissions",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_permission_name", columnNames = {"permission"})
+                @UniqueConstraint(name = "uk_tenant_permission_name", columnNames = {"permission"})
         },
         indexes = {
                 @Index(name = "idx_tenant_permission_type", columnList = "permission"),
