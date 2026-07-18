@@ -6,10 +6,12 @@ import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.calendar.CalendarService;
+import com.sonixhr.security.CustomPermissionEvaluator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,7 @@ public class CalendarController {
 
     private final CalendarService calendarService;
     private final EmployeeRepository employeeRepository;
+    private final CustomPermissionEvaluator permissionEvaluator;
 
     @GetMapping("/my")
     public ResponseEntity<CalendarMonthDTO> getMyCalendar(
@@ -48,12 +51,13 @@ public class CalendarController {
     }
 
     @GetMapping("/employee/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'LEAVE_VIEW_TEAM', 'SUPER_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_ALL') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_ALL')")
     public ResponseEntity<CalendarMonthDTO> getEmployeeCalendar(
             @PathVariable Long employeeId,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
-            @AuthenticationPrincipal Employee currentEmployee) {
+            @AuthenticationPrincipal Employee currentEmployee,
+            Authentication authentication) {
         
         LocalDate now = LocalDate.now();
         int targetYear = year != null ? year : now.getYear();
@@ -62,8 +66,12 @@ public class CalendarController {
         log.info("REST request to get consolidated calendar for employee: {} by user: {} for {}-{}", 
                 employeeId, currentEmployee.getId(), targetYear, targetMonth);
 
-        // Security check: Only allow if super admin, or if target employee reports to the manager, or is the employee themselves
-        if (!currentEmployee.isSuperAdmin() && !currentEmployee.getId().equals(employeeId)) {
+        // Security check: Only allow if has view all permissions, or if target employee reports to the manager, or is the employee themselves
+        boolean isAuthorizedViewAll = permissionEvaluator.hasPermission(authentication, "ATTENDANCE_VIEW_ALL")
+                || permissionEvaluator.hasPermission(authentication, "LEAVE_VIEW_ALL")
+                || permissionEvaluator.hasPermission(authentication, "EMPLOYEE_VIEW_ALL");
+
+        if (!isAuthorizedViewAll && !currentEmployee.getId().equals(employeeId)) {
             Employee targetEmployee = employeeRepository.findById(employeeId)
                     .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
             

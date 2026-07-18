@@ -67,8 +67,16 @@ public class EmployeeDetailsService implements UserDetailsService {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
                     employeeCache.invalidate(email);
                 } else if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
-                    log.warn("Cached employee tenant is inactive or suspended, removing from cache: {}", email);
-                    employeeCache.invalidate(email);
+                    boolean hasPermission = cachedEmployee.getAuthorities() != null && cachedEmployee.getAuthorities().stream()
+                            .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                                    || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
+                    if (!hasPermission) {
+                        log.warn("Cached employee tenant is inactive or suspended, removing from cache: {}", email);
+                        employeeCache.invalidate(email);
+                    } else {
+                        log.debug("Cache hit for authorized employee from inactive tenant: {}", email);
+                        return cachedEmployee;
+                    }
                 } else {
                     log.debug("Cache hit for employee: {}", email);
                     return cachedEmployee;
@@ -92,8 +100,13 @@ public class EmployeeDetailsService implements UserDetailsService {
 
         // Check if employee's tenant is active/suspended
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
-            log.warn("Employee tenant is inactive or suspended for email: {}", email);
-            throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            boolean hasPermission = employee.getAuthorities() != null && employee.getAuthorities().stream()
+                    .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                            || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
+            if (!hasPermission) {
+                log.warn("Employee tenant is inactive or suspended for email: {}", email);
+                throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            }
         }
 
         //  Cache only if active
@@ -202,8 +215,13 @@ public class EmployeeDetailsService implements UserDetailsService {
         }
 
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
-            log.warn("Employee tenant is inactive or suspended for email: {}", email);
-            throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            boolean hasPermission = employee.getAuthorities() != null && employee.getAuthorities().stream()
+                    .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                            || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
+            if (!hasPermission) {
+                log.warn("Employee tenant is inactive or suspended for email: {}", email);
+                throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            }
         }
 
         // Clear cached authorities to force reload
@@ -233,9 +251,14 @@ public class EmployeeDetailsService implements UserDetailsService {
             }
 
             if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
-                log.warn("Cached employee tenant is inactive or suspended during version check, removing: {}", email);
-                employeeCache.invalidate(email);
-                return loadUserByUsername(email);
+                boolean hasPermission = cachedEmployee.getAuthorities() != null && cachedEmployee.getAuthorities().stream()
+                        .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                                || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
+                if (!hasPermission) {
+                    log.warn("Cached employee tenant is inactive or suspended during version check, removing: {}", email);
+                    employeeCache.invalidate(email);
+                    return loadUserByUsername(email);
+                }
             }
 
             // Check if roles version in token matches cached version

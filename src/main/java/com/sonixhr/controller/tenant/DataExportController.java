@@ -26,7 +26,7 @@ public class DataExportController {
     private final PayslipRepository payslipRepository;
 
     @GetMapping({"/api/export/employees", "/api/employees/export"})
-    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('ROLE_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'EMPLOYEE_EXPORT')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'EMPLOYEE_EXPORT')")
     public ResponseEntity<byte[]> exportEmployees(@AuthenticationPrincipal Employee currentEmployee) {
         log.info("REST request to export employees for tenant ID: {}", currentEmployee.getTenantId());
         Long tenantId = currentEmployee.getTenantId();
@@ -58,7 +58,7 @@ public class DataExportController {
     }
 
     @GetMapping("/api/export/payroll")
-    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('ROLE_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'REPORT_EXPORT')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'REPORT_EXPORT')")
     public ResponseEntity<byte[]> exportPayroll(@AuthenticationPrincipal Employee currentEmployee) {
         log.info("REST request to export payroll for tenant ID: {}", currentEmployee.getTenantId());
         Long tenantId = currentEmployee.getTenantId();

@@ -62,7 +62,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> activateShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -76,7 +76,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> deactivateShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -90,7 +90,7 @@ public class ShiftConfigurationController {
     }
 
     @PostMapping("/{id}/set-default")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_ADMIN')")
     public ResponseEntity<Void> setDefaultShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -104,7 +104,7 @@ public class ShiftConfigurationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or @permissionEvaluator.hasPermission(authentication, 'SHIFT_DELETE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_DELETE')")
     public ResponseEntity<Void> softDeleteShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -118,7 +118,7 @@ public class ShiftConfigurationController {
     }
 
     @DeleteMapping("/{id}/hard")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_DELETE')")
     public ResponseEntity<Void> hardDeleteShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {

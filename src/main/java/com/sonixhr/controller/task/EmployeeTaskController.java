@@ -28,7 +28,7 @@ public class EmployeeTaskController {
     private final EmployeeTaskService taskService;
 
     @GetMapping("/assignees")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or #currentEmployee.isManager() or #currentEmployee.isSuperAdmin()")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or @permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_ALL')")
     public ResponseEntity<List<TaskAssigneeDTO>> getAssignableEmployees(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int size,
@@ -39,7 +39,7 @@ public class EmployeeTaskController {
     }
 
     @PostMapping
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or #currentEmployee.isManager() or #currentEmployee.isSuperAdmin()")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE')")
     public ResponseEntity<TaskResponseDTO> createTask(
             @Valid @RequestBody TaskCreateRequestDTO dto,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -59,7 +59,7 @@ public class EmployeeTaskController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_ALL') or #currentEmployee.isManager() or #currentEmployee.isSuperAdmin()")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_ALL')")
     public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
