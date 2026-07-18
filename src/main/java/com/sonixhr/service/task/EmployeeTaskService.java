@@ -69,15 +69,14 @@ public class EmployeeTaskService {
         }
 
         // Validate authority
-        boolean isSuperAdmin = assigner.isSuperAdmin();
         boolean hasTaskCreatePermission = assigner.hasPermission("TASK_CREATE");
         boolean isDirectManager = assignee.getManager() != null && assignee.getManager().getId().equals(assignerId);
-        boolean isSameDepartmentManager = assigner.isManager() && 
+        boolean isSameDepartmentManager = assigner.hasPermission("TASK_VIEW_TEAM") && 
                 assigner.getDepartment() != null && 
                 assignee.getDepartment() != null && 
                 assigner.getDepartment().getId().equals(assignee.getDepartment().getId());
 
-        if (!isSuperAdmin && !hasTaskCreatePermission && !isDirectManager && !isSameDepartmentManager) {
+        if (!hasTaskCreatePermission && !isDirectManager && !isSameDepartmentManager) {
             throw new BusinessException("You are not authorized to assign tasks to this employee");
         }
 
@@ -184,7 +183,7 @@ public class EmployeeTaskService {
 
         boolean isAssignee = task.getAssignedTo().getId().equals(employeeId);
         boolean isAssigner = task.getAssignedBy().getId().equals(employeeId);
-        boolean isSuperAdmin = caller.isSuperAdmin();
+        boolean hasTaskEditPermission = caller.hasPermission("TASK_EDIT");
         boolean isDirectManager = task.getAssignedTo().getManager() != null && 
                 task.getAssignedTo().getManager().getId().equals(employeeId);
 
@@ -192,22 +191,22 @@ public class EmployeeTaskService {
             if (task.getStatus() == TaskStatus.COMPLETED || task.getStatus() == TaskStatus.CANCELLED || task.getStatus() == TaskStatus.DECLINED) {
                 throw new BusinessException("Cannot cancel a task that is completed, declined, or already cancelled");
             }
-            // Only assigner, direct manager, or super admin can cancel a task
-            if (!isAssigner && !isDirectManager && !isSuperAdmin) {
+            // Only assigner, direct manager, or user with task edit permission can cancel a task
+            if (!isAssigner && !isDirectManager && !hasTaskEditPermission) {
                 throw new BusinessException("You are not authorized to cancel this task");
             }
         } else if (newStatus == TaskStatus.IN_PROGRESS) {
             if (task.getStatus() != TaskStatus.ACCEPTED) {
                 throw new BusinessException("Task must be accepted before starting work");
             }
-            if (!isAssignee && !isSuperAdmin) {
+            if (!isAssignee && !hasTaskEditPermission) {
                 throw new BusinessException("You are not authorized to update this task status");
             }
         } else if (newStatus == TaskStatus.COMPLETED) {
             if (task.getStatus() != TaskStatus.ACCEPTED && task.getStatus() != TaskStatus.IN_PROGRESS) {
                 throw new BusinessException("Task must be accepted or in progress before completing");
             }
-            if (!isAssignee && !isSuperAdmin) {
+            if (!isAssignee && !hasTaskEditPermission) {
                 throw new BusinessException("You are not authorized to update this task status");
             }
             task.setCompletedAt(LocalDateTime.now());
@@ -345,12 +344,12 @@ public class EmployeeTaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         Page<EmployeeTask> tasks;
-        if (caller.isSuperAdmin() || caller.hasPermission("TASK_VIEW_ALL")) {
+        if (caller.hasPermission("TASK_VIEW_ALL")) {
             tasks = taskRepository.findByTenantId(tenantId, pageable);
-        } else if (caller.isManager() && caller.getDepartment() != null) {
+        } else if (caller.hasPermission("TASK_VIEW_TEAM") && caller.getDepartment() != null) {
             tasks = taskRepository.findByTenantIdAndAssignedToDepartmentId(tenantId, caller.getDepartment().getId(), pageable);
         } else {
-            tasks = taskRepository.findByTenantId(tenantId, pageable);
+            tasks = taskRepository.findByTenantIdAndAssignedToId(tenantId, callerId, pageable);
         }
 
         return tasks.map(this::convertToResponse);
@@ -369,12 +368,12 @@ public class EmployeeTaskService {
         org.springframework.data.domain.Pageable pageable = PageRequest.of(0, Math.min(size, 100));
 
         List<Employee> employees;
-        if (caller.isSuperAdmin() || caller.hasPermission("TASK_CREATE")) {
+        if (caller.hasPermission("TASK_CREATE") || caller.hasPermission("TASK_VIEW_ALL")) {
             employees = employeeRepository.searchAssignableEmployees(tenantId, callerId, safeQuery, pageable);
-        } else if (caller.isManager() && caller.getDepartment() != null) {
+        } else if (caller.hasPermission("TASK_VIEW_TEAM") && caller.getDepartment() != null) {
             employees = employeeRepository.searchAssignableEmployeesForManager(
                     tenantId, caller.getDepartment().getId(), callerId, callerId, safeQuery, pageable);
-        } else if (caller.isManager()) {
+        } else if (caller.hasPermission("TASK_VIEW_TEAM")) {
             employees = employeeRepository.searchAssignableDirectReports(tenantId, callerId, callerId, safeQuery, pageable);
         } else {
             employees = List.of();

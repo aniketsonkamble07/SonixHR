@@ -46,6 +46,7 @@ public enum TenantPermissionEnum {
     SHIFT_VIEW_ALL("View all shift configurations", "Attendance Management", 11),
     SHIFT_ADMIN("Manage shifts", "Attendance Management", 12),
     SHIFT_DELETE("Delete shift configurations", "Attendance Management", 13),
+    SHIFT_HARD_DELETE("Hard delete shift configurations", "Attendance Management", 16),
     ATTENDANCE_MARK("Mark attendance", "Attendance Management", 14),
     ATTENDANCE_VIEW("View attendance logs", "Attendance Management", 15),
 

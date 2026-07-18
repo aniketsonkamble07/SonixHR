@@ -134,9 +134,9 @@ public class ManualAttendanceService {
     // =====================================================
 
     private void validateAuthorization(Employee currentUser, Long targetEmployeeId) {
-        // Super Admin can mark for anyone
-        if (currentUser.isSuperAdmin()) {
-            log.info("Super Admin {} marking attendance", currentUser.getEmail());
+        // has ATTENDANCE_MARK permission can mark for anyone
+        if (currentUser.hasPermission("ATTENDANCE_MARK")) {
+            log.info("Authorized user {} marking attendance", currentUser.getEmail());
             return;
         }
 
@@ -239,7 +239,7 @@ public class ManualAttendanceService {
                 record.setOvertimeHours(overtimeHours);
             record.setMarkedBy(currentUser.getId());
             record.setMarkedByName(currentUser.getFullName());
-            record.setMarkedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER");
+            record.setMarkedByRole(currentUser.hasPermission("ATTENDANCE_MARK") ? "SUPER_ADMIN" : "MANAGER");
             record.setUpdatedAt(LocalDateTime.now());
 
             log.info("Updated attendance for employee: {} on date: {} to status: {}",
@@ -254,7 +254,7 @@ public class ManualAttendanceService {
                     .overtimeHours(overtimeHours)
                     .markedBy(currentUser.getId())
                     .markedByName(currentUser.getFullName())
-                    .markedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER")
+                    .markedByRole(currentUser.hasPermission("ATTENDANCE_MARK") ? "SUPER_ADMIN" : "MANAGER")
                     .markedAt(LocalDateTime.now())
                     .build();
 
@@ -391,14 +391,14 @@ public class ManualAttendanceService {
                     .reason("Overtime: " + reason)
                     .markedBy(currentUser.getId())
                     .markedByName(currentUser.getFullName())
-                    .markedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER")
+                    .markedByRole(currentUser.hasPermission("ATTENDANCE_MARK") ? "SUPER_ADMIN" : "MANAGER")
                     .markedAt(LocalDateTime.now())
                     .build();
         }
 
         record.setMarkedBy(currentUser.getId());
         record.setMarkedByName(currentUser.getFullName());
-        record.setMarkedByRole(currentUser.isSuperAdmin() ? "SUPER_ADMIN" : "MANAGER");
+        record.setMarkedByRole(currentUser.hasPermission("ATTENDANCE_MARK") ? "SUPER_ADMIN" : "MANAGER");
 
         log.info("Overtime added successfully. Total: {} hours", record.getOvertimeHours());
         return attendanceRepository.save(record);
@@ -484,7 +484,7 @@ public class ManualAttendanceService {
         Long tenantId = currentUser.getTenantId();
         List<Long> teamIds;
 
-        if (currentUser.isSuperAdmin()) {
+        if (currentUser.hasPermission("ATTENDANCE_VIEW_ALL") || currentUser.hasPermission("ATTENDANCE_VIEW")) {
             List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
             teamIds = allEmployees.stream()
                     .filter(e -> e.getHireDate() == null || !e.getHireDate().isAfter(endDate))
@@ -523,7 +523,7 @@ public class ManualAttendanceService {
             log.info("Adjusted start date to hire date: {}", startDate);
         }
 
-        if (!currentUser.isSuperAdmin() && !currentUser.getId().equals(employeeId)) {
+        if (!currentUser.hasPermission("ATTENDANCE_VIEW_ALL") && !currentUser.hasPermission("ATTENDANCE_VIEW") && !currentUser.getId().equals(employeeId)) {
             if (targetEmployee.getManager() == null ||
                     !targetEmployee.getManager().getId().equals(currentUser.getId())) {
                 throw new BusinessException("You can only view attendance for your team members");
@@ -813,7 +813,7 @@ public class ManualAttendanceService {
         long totalEmployees;
         List<Object[]> summary;
 
-        if (currentUser.isSuperAdmin()) {
+        if (currentUser.hasPermission("ATTENDANCE_VIEW_ALL") || currentUser.hasPermission("ATTENDANCE_VIEW")) {
             totalEmployees = employeeRepository.countByTenantIdAndHireDateBeforeOrNull(tenantId, today);
             summary = attendanceRepository.getTodayAttendanceSummary(tenantId, today);
         } else {

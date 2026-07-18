@@ -375,8 +375,8 @@ public class LeaveService {
             // For other types, restrict to a maximum 30 days buffer.
             boolean isRetroactiveAllowed = request.getLeaveType() == LeaveType.SICK 
                     || request.getLeaveType() == LeaveType.EMERGENCY
-                    || currentUser.isManager()
-                    || currentUser.isSuperAdmin();
+                    || currentUser.hasPermission("LEAVE_APPROVE_DEPARTMENT")
+                    || currentUser.hasPermission("LEAVE_APPROVE_ANY");
             
             if (!isRetroactiveAllowed) {
                 if (request.getStartDate().isBefore(LocalDate.now().minusDays(30))) {
@@ -422,7 +422,7 @@ public class LeaveService {
 
         // Determine if auto-approval is needed
         boolean autoApprove = !settings.getLeaveApprovalRequired() ||
-                (settings.getAutoApproveForManager() && currentUser.isManager());
+                (settings.getAutoApproveForManager() && (currentUser.hasPermission("LEAVE_APPROVE_DEPARTMENT") || currentUser.hasPermission("LEAVE_APPROVE_ANY")));
 
         LeaveStatus initialStatus = autoApprove ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
 
@@ -851,8 +851,8 @@ public class LeaveService {
         if (request.getStartDate().isBefore(LocalDate.now())) {
             boolean isRetroactiveAllowed = request.getLeaveType() == LeaveType.SICK 
                     || request.getLeaveType() == LeaveType.EMERGENCY
-                    || currentUser.isManager()
-                    || currentUser.isSuperAdmin();
+                    || currentUser.hasPermission("LEAVE_APPROVE_DEPARTMENT")
+                    || currentUser.hasPermission("LEAVE_APPROVE_ANY");
             
             if (!isRetroactiveAllowed) {
                 if (request.getStartDate().isBefore(LocalDate.now().minusDays(30))) {
@@ -898,7 +898,7 @@ public class LeaveService {
 
         // Determine if auto-approval is needed
         boolean autoApprove = !settings.getLeaveApprovalRequired() ||
-                (settings.getAutoApproveForManager() && currentUser.isManager());
+                (settings.getAutoApproveForManager() && (currentUser.hasPermission("LEAVE_APPROVE_DEPARTMENT") || currentUser.hasPermission("LEAVE_APPROVE_ANY")));
 
         LeaveStatus initialStatus = autoApprove ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
 

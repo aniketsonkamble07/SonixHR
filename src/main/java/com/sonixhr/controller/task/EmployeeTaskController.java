@@ -49,7 +49,7 @@ public class EmployeeTaskController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_OWN') or hasAnyAuthority('EMPLOYEE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_OWN')")
     public ResponseEntity<Page<TaskResponseDTO>> getMyTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -69,7 +69,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/acknowledge")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_ACKNOWLEDGE') or hasAnyAuthority('EMPLOYEE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_ACKNOWLEDGE')")
     public ResponseEntity<TaskResponseDTO> acknowledgeTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -79,7 +79,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS') or hasAnyAuthority('EMPLOYEE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> updateTaskStatus(
             @PathVariable Long id,
             @RequestParam TaskStatus status,
@@ -90,7 +90,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/accept")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS') or hasAnyAuthority('EMPLOYEE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> acceptTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -100,7 +100,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/decline")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS') or hasAnyAuthority('EMPLOYEE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> declineTask(
             @PathVariable Long id,
             @RequestParam String declineReason,

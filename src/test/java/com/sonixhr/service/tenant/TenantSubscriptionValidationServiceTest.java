@@ -105,7 +105,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Admin cannot access workspace paths like /api/employees
         BusinessException exception = assertThrows(BusinessException.class, () -> {
@@ -127,7 +127,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Billing path should be allowed
         assertDoesNotThrow(() -> {
@@ -158,7 +158,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Path containing webhook should be blocked
         BusinessException exception1 = assertThrows(BusinessException.class, () -> {
@@ -189,7 +189,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Company Admin can access billing/renewal paths to self-serve renew even if tenant is inactive/suspended
         assertDoesNotThrow(() -> {
@@ -223,7 +223,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Even billing/renewal path is blocked for Admin when archived
         BusinessException exception = assertThrows(BusinessException.class, () -> {
@@ -245,7 +245,7 @@ public class TenantSubscriptionValidationServiceTest {
 
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("MANAGE_SUBSCRIPTION"), new SimpleGrantedAuthority("VIEW_BILLING"));
 
         // Marked for deletion error
         BusinessException exception = assertThrows(BusinessException.class, () -> {

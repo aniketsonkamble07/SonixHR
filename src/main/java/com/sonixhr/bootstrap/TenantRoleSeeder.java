@@ -135,12 +135,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Employee");
-        if (existingRole.isPresent()) {
-            log.debug("Employee role already exists for tenant: {}", tenantId);
-            return;
-        }
-
         // Define employee permissions as Strings (enum names)
         Set<String> employeePermissionNames = Set.of(
                 TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
@@ -148,11 +142,28 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
                 TenantPermissionEnum.LEAVE_CANCEL_OWN.name(),
                 TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
-                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name());
+                TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
+                TenantPermissionEnum.TASK_VIEW_OWN.name(),
+                TenantPermissionEnum.TASK_ACKNOWLEDGE.name(),
+                TenantPermissionEnum.TASK_UPDATE_STATUS.name());
 
         Set<TenantPermission> employeePermissions = allPermissions.stream()
                 .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
+
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Employee");
+        if (existingRole.isPresent()) {
+            TenantRole employeeRole = existingRole.get();
+            if (employeeRole.getPermissions() == null || !employeeRole.getPermissions().containsAll(employeePermissions)) {
+                if (employeeRole.getPermissions() == null) {
+                    employeeRole.setPermissions(new HashSet<>());
+                }
+                employeeRole.getPermissions().addAll(employeePermissions);
+                roleRepository.save(employeeRole);
+                log.info("Synced permissions for existing Employee role for tenant: {}", tenantId);
+            }
+            return;
+        }
 
         TenantRole employeeRole = TenantRole.builder()
                 .tenantId(tenantId)
@@ -168,12 +179,6 @@ public class TenantRoleSeeder implements ApplicationRunner {
     }
 
     private void createManagerRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Manager");
-        if (existingRole.isPresent()) {
-            log.debug("Manager role already exists for tenant: {}", tenantId);
-            return;
-        }
-
         // Define manager permissions as Strings (enum names)
         Set<String> managerPermissionNames = Set.of(
                 TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
@@ -187,11 +192,32 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
                 TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
                 TenantPermissionEnum.DEPARTMENT_VIEW.name(),
-                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name());
+                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name(),
+                TenantPermissionEnum.TASK_CREATE.name(),
+                TenantPermissionEnum.TASK_VIEW_ALL.name(),
+                TenantPermissionEnum.TASK_VIEW_TEAM.name(),
+                TenantPermissionEnum.TASK_VIEW_OWN.name(),
+                TenantPermissionEnum.TASK_EDIT.name(),
+                TenantPermissionEnum.TASK_ACKNOWLEDGE.name(),
+                TenantPermissionEnum.TASK_UPDATE_STATUS.name());
 
         Set<TenantPermission> managerPermissions = allPermissions.stream()
                 .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
+
+        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Manager");
+        if (existingRole.isPresent()) {
+            TenantRole managerRole = existingRole.get();
+            if (managerRole.getPermissions() == null || !managerRole.getPermissions().containsAll(managerPermissions)) {
+                if (managerRole.getPermissions() == null) {
+                    managerRole.setPermissions(new HashSet<>());
+                }
+                managerRole.getPermissions().addAll(managerPermissions);
+                roleRepository.save(managerRole);
+                log.info("Synced permissions for existing Manager role for tenant: {}", tenantId);
+            }
+            return;
+        }
 
         TenantRole managerRole = TenantRole.builder()
                 .tenantId(tenantId)

@@ -7,6 +7,11 @@ import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.events.EmployeeUpdatedEvent;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Collection;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,31 +32,45 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service("employeeDetailsService")
 @Primary
-@RequiredArgsConstructor
 public class EmployeeDetailsService implements UserDetailsService {
 
     private final EmployeeRepository employeeRepository;
     private final TenantRoleRepository roleRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Value("${app.employee.cache.enabled:true}")
-    private boolean cacheEnabled;
-
-    @Value("${app.employee.cache.ttl-minutes:10}")
-    private long cacheTtlMinutes;
+    private final boolean cacheEnabled;
+    private final long cacheTtlMinutes;
 
     //  Use Caffeine cache with TTL and max size (instead of ConcurrentHashMap)
-    private final Cache<String, Employee> employeeCache = Caffeine.newBuilder()
-            .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)  // Auto-expiry
-            .maximumSize(10_000)  // Prevent memory issues
-            .recordStats()  // For monitoring
-            .build();
+    private final Cache<String, Employee> employeeCache;
 
     // Cache for authority counts (for monitoring)
-    private final Cache<String, Integer> authorityCountCache = Caffeine.newBuilder()
-            .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
-            .maximumSize(10_000)
-            .build();
+    private final Cache<String, Integer> authorityCountCache;
+
+    public EmployeeDetailsService(
+            EmployeeRepository employeeRepository,
+            TenantRoleRepository roleRepository,
+            ApplicationEventPublisher eventPublisher,
+            @Value("${app.employee.cache.enabled:true}") boolean cacheEnabled,
+            @Value("${app.employee.cache.ttl-minutes:10}") long cacheTtlMinutes) {
+        
+        this.employeeRepository = employeeRepository;
+        this.roleRepository = roleRepository;
+        this.eventPublisher = eventPublisher;
+        this.cacheEnabled = cacheEnabled;
+        this.cacheTtlMinutes = cacheTtlMinutes;
+
+        this.employeeCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)  // Auto-expiry
+                .maximumSize(10_000)  // Prevent memory issues
+                .recordStats()  // For monitoring
+                .build();
+
+        this.authorityCountCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                .maximumSize(10_000)
+                .build();
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -67,14 +86,12 @@ public class EmployeeDetailsService implements UserDetailsService {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
                     employeeCache.invalidate(email);
                 } else if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
-                    boolean hasPermission = cachedEmployee.getAuthorities() != null && cachedEmployee.getAuthorities().stream()
-                            .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
-                                    || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
-                    if (!hasPermission) {
+                    if (!hasBillingAccess(cachedEmployee)) {
                         log.warn("Cached employee tenant is inactive or suspended, removing from cache: {}", email);
                         employeeCache.invalidate(email);
                     } else {
-                        log.debug("Cache hit for authorized employee from inactive tenant: {}", email);
+                        limitToBillingOnly(cachedEmployee);
+                        log.debug("Cache hit for authorized employee from inactive tenant (limited scope): {}", email);
                         return cachedEmployee;
                     }
                 } else {
@@ -100,12 +117,11 @@ public class EmployeeDetailsService implements UserDetailsService {
 
         // Check if employee's tenant is active/suspended
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
-            boolean hasPermission = employee.getAuthorities() != null && employee.getAuthorities().stream()
-                    .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
-                            || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
-            if (!hasPermission) {
+            if (!hasBillingAccess(employee)) {
                 log.warn("Employee tenant is inactive or suspended for email: {}", email);
                 throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            } else {
+                limitToBillingOnly(employee);
             }
         }
 
@@ -215,12 +231,11 @@ public class EmployeeDetailsService implements UserDetailsService {
         }
 
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
-            boolean hasPermission = employee.getAuthorities() != null && employee.getAuthorities().stream()
-                    .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
-                            || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
-            if (!hasPermission) {
+            if (!hasBillingAccess(employee)) {
                 log.warn("Employee tenant is inactive or suspended for email: {}", email);
                 throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+            } else {
+                limitToBillingOnly(employee);
             }
         }
 
@@ -251,13 +266,12 @@ public class EmployeeDetailsService implements UserDetailsService {
             }
 
             if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
-                boolean hasPermission = cachedEmployee.getAuthorities() != null && cachedEmployee.getAuthorities().stream()
-                        .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
-                                || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
-                if (!hasPermission) {
+                if (!hasBillingAccess(cachedEmployee)) {
                     log.warn("Cached employee tenant is inactive or suspended during version check, removing: {}", email);
                     employeeCache.invalidate(email);
                     return loadUserByUsername(email);
+                } else {
+                    limitToBillingOnly(cachedEmployee);
                 }
             }
 
@@ -434,5 +448,29 @@ public class EmployeeDetailsService implements UserDetailsService {
             log.error("Failed to assign default role to employee: {}", employee.getEmail(), e);
             throw new UsernameNotFoundException("Account configuration error");
         }
+    }
+
+    private boolean hasBillingAccess(Employee employee) {
+        if (employee == null) {
+            return false;
+        }
+        return employee.getAuthorities() != null && employee.getAuthorities().stream()
+                .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                        || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
+    }
+
+    private void limitToBillingOnly(Employee employee) {
+        if (employee == null) return;
+        // Trigger getAuthorities to populate cachedAuthorities if needed
+        employee.getAuthorities();
+        
+        Set<GrantedAuthority> billingOnly = employee.getAuthorities().stream()
+                .filter(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                        || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())))
+                .map(a -> new SimpleGrantedAuthority(a.getAuthority()))
+                .collect(Collectors.toSet());
+                
+        employee.setCachedAuthorities(billingOnly);
+        employee.setCachedRolesVersion(employee.getRolesVersion());
     }
 }

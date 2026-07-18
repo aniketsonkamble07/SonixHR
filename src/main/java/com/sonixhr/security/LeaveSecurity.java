@@ -19,8 +19,8 @@ public class LeaveSecurity {
             return false;
         }
 
-        // Super Admin / Platform User or has LEAVE_APPROVE_ANY can do it
-        if (currentEmployee.isSuperAdmin() || currentEmployee.hasPermission("LEAVE_APPROVE_ANY")) {
+        // has LEAVE_APPROVE_ANY can do it
+        if (currentEmployee.hasPermission("LEAVE_APPROVE_ANY")) {
             return true;
         }
 

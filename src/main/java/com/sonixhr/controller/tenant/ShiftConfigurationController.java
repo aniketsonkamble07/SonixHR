@@ -118,7 +118,7 @@ public class ShiftConfigurationController {
     }
 
     @DeleteMapping("/{id}/hard")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_DELETE')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'SHIFT_HARD_DELETE')")
     public ResponseEntity<Void> hardDeleteShift(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {

@@ -297,7 +297,8 @@ public class TenantRegistrationService {
         // 2. Employee
         Set<String> employeePermissionNames = Set.of(
                 "EMPLOYEE_VIEW_SELF", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_CANCEL_OWN",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN");
+                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
+                "TASK_VIEW_OWN", "TASK_ACKNOWLEDGE", "TASK_UPDATE_STATUS");
         Set<TenantPermission> employeePermissions = allPermissions.stream()
                 .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
                 .collect(java.util.stream.Collectors.toSet());
@@ -315,7 +316,8 @@ public class TenantRegistrationService {
         Set<String> managerPermissionNames = Set.of(
                 "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
                 "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN", "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
-                "ATTENDANCE_VIEW_TEAM", "DEPARTMENT_VIEW", "REPORT_VIEW_DEPARTMENT");
+                "ATTENDANCE_VIEW_TEAM", "DEPARTMENT_VIEW", "REPORT_VIEW_DEPARTMENT",
+                "TASK_CREATE", "TASK_VIEW_ALL", "TASK_VIEW_TEAM", "TASK_VIEW_OWN", "TASK_EDIT", "TASK_ACKNOWLEDGE", "TASK_UPDATE_STATUS");
         Set<TenantPermission> managerPermissions = allPermissions.stream()
                 .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
                 .collect(java.util.stream.Collectors.toSet());

@@ -50,13 +50,9 @@ public class PayslipService {
         // Fix 2: EMPLOYEE_VIEW_ALL grants access to all payslips.
         // EMPLOYEE_VIEW_TEAM grants access only to direct reports' payslips (manager check).
         // All others can only view their own payslip.
-        Set<String> authorities = currentEmployee.getAuthorities().stream()
-                .map(a -> a.getAuthority())
-                .collect(Collectors.toSet());
-
-        boolean hasViewAll     = authorities.contains("EMPLOYEE_VIEW_ALL");
+        boolean hasViewAll     = currentEmployee.hasPermission("EMPLOYEE_VIEW_ALL");
         boolean isOwnPayslip   = currentEmployee.getId().equals(payslip.getEmployee().getId());
-        boolean isDirectReport = authorities.contains("EMPLOYEE_VIEW_TEAM")
+        boolean isDirectReport = currentEmployee.hasPermission("EMPLOYEE_VIEW_TEAM")
                 && payslip.getEmployee().getManager() != null
                 && payslip.getEmployee().getManager().getId().equals(currentEmployee.getId());
 
@@ -108,13 +104,9 @@ public class PayslipService {
         }
 
         // Fix 2: EMPLOYEE_VIEW_TEAM can only view direct reports, not any employee.
-        Set<String> authorities = currentEmployee.getAuthorities().stream()
-                .map(a -> a.getAuthority())
-                .collect(Collectors.toSet());
-
-        boolean hasViewAll     = authorities.contains("EMPLOYEE_VIEW_ALL");
+        boolean hasViewAll     = currentEmployee.hasPermission("EMPLOYEE_VIEW_ALL");
         boolean isOwnRequest   = currentEmployee.getId().equals(employeeId);
-        boolean isDirectReport = authorities.contains("EMPLOYEE_VIEW_TEAM")
+        boolean isDirectReport = currentEmployee.hasPermission("EMPLOYEE_VIEW_TEAM")
                 && employee.getManager() != null
                 && employee.getManager().getId().equals(currentEmployee.getId());
 
@@ -167,12 +159,8 @@ public class PayslipService {
 
         // Fix 2: separate EMPLOYEE_VIEW_ALL/SETTINGS_VIEW (full access) from EMPLOYEE_VIEW_TEAM
         // (direct reports only). Previously EMPLOYEE_VIEW_TEAM was treated identically to EMPLOYEE_VIEW_ALL.
-        Set<String> authorities = currentEmployee.getAuthorities().stream()
-                .map(a -> a.getAuthority())
-                .collect(Collectors.toSet());
-
-        boolean hasViewAll  = authorities.contains("EMPLOYEE_VIEW_ALL") || authorities.contains("SETTINGS_VIEW");
-        boolean hasViewTeam = authorities.contains("EMPLOYEE_VIEW_TEAM");
+        boolean hasViewAll  = currentEmployee.hasPermission("EMPLOYEE_VIEW_ALL") || currentEmployee.hasPermission("SETTINGS_VIEW");
+        boolean hasViewTeam = currentEmployee.hasPermission("EMPLOYEE_VIEW_TEAM");
 
         if (!hasViewAll && !hasViewTeam) {
             throw new BusinessException("Access denied: You do not have permission to view tenant-wide payslips.");

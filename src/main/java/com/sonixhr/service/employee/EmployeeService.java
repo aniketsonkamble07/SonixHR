@@ -206,8 +206,8 @@ public class EmployeeService {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean hasEditAuthority = auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("EMPLOYEE_EDIT"));
+        boolean hasEditAuthority = auth != null && auth.getPrincipal() instanceof Employee 
+                && ((Employee) auth.getPrincipal()).hasPermission("EMPLOYEE_EDIT");
 
         if (!hasEditAuthority) {
             Map<String, String> errors = new HashMap<>();

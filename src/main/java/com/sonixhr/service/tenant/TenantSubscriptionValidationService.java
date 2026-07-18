@@ -79,7 +79,8 @@ public class TenantSubscriptionValidationService {
         // Evaluate path and authority-based restrictions first
         boolean isAllowedGrace = (requestPath != null) && isAllowedGracePath(requestPath);
         boolean isAdmin = (authorities != null) && authorities.stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN"));
+                .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
+                        || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
 
         // If a Company Admin attempts to access a self-serve renewal/billing path, do not block on suspended/inactive status
         boolean isSelfServeRenewalAttempt = isAllowedGrace && isAdmin && 
