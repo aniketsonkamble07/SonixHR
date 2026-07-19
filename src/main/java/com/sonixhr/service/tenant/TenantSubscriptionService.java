@@ -566,8 +566,8 @@ public class TenantSubscriptionService {
     @Transactional
     public TenantSubscriptionResponseDTO upgradeSubscription(Long tenantId, String planTypeCode) {
         log.info("Upgrading tenant ID: {} to plan code: {}", tenantId, planTypeCode);
-        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(planTypeCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planTypeCode));
+        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeOrNameIgnoreCase(planTypeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found with code or name: " + planTypeCode));
         return activateSubscription(tenantId, plan.getId());
     }
 

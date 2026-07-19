@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SonixHR Platform Super Admin Panel</title>
-  
+
   <!-- Fonts -->
-  <link rel="stylesheet" href="styles.css">
-  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
 
   <!-- ==========================================
@@ -28,28 +33,30 @@
       <div class="login-subtitle">
         Sign in to manage organizations, subscription plans, and platform systems.
       </div>
-      
+
       <form id="login-form">
         <div class="form-group">
           <label class="form-label" for="login-email">Super Admin Email</label>
           <div class="input-container">
-            <input type="email" id="login-email" class="form-input" placeholder="admin@sonixhr.com" value="admin@sonixhr.com" required>
+            <input type="email" id="login-email" class="form-input" placeholder="admin@sonixhr.com"
+              value="admin@sonixhr.com" required>
           </div>
         </div>
-        
+
         <div class="form-group">
           <label class="form-label" for="login-password">Password</label>
           <div class="input-container">
-            <input type="password" id="login-password" class="form-input" placeholder="••••••••" value="Admin@123" required>
+            <input type="password" id="login-password" class="form-input" placeholder="••••••••" value="Admin@123"
+              required>
           </div>
         </div>
-        
+
         <button type="submit" id="login-submit-btn" class="btn-primary">
           <span>Sign In</span>
           <i class="fa-solid fa-arrow-right"></i>
         </button>
       </form>
-      
+
       <div class="login-footer">
         SonixHR SaaS Platform Admin Control Portal
       </div>
@@ -65,7 +72,7 @@
       <div class="sidebar-brand">
         <h2>Sonix<span>HR</span> Admin</h2>
       </div>
-      
+
       <ul class="sidebar-menu">
         <li class="sidebar-item active" data-tab="tab-overview">
           <a class="sidebar-link">
@@ -110,7 +117,7 @@
           </a>
         </li>
       </ul>
-      
+
       <div class="sidebar-footer">
         <button id="logout-btn" class="btn-logout">
           <i class="fa-solid fa-right-from-bracket"></i>
@@ -126,13 +133,13 @@
         <div class="header-title">
           <h2 id="current-tab-title">Platform Dashboard</h2>
         </div>
-        
+
         <div class="header-actions">
           <div class="system-health">
             <span>DB Status: <span class="health-dot" id="db-health-dot"></span></span>
             <span style="margin-left: 10px;">Redis Status: <span class="health-dot" id="redis-health-dot"></span></span>
           </div>
-          
+
           <div class="notifications-bell-container" id="notif-bell-container">
             <button class="notif-btn" id="notif-toggle-btn">
               <i class="fa-solid fa-bell"></i>
@@ -151,7 +158,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="user-profile">
             <div class="user-avatar" id="header-user-avatar">A</div>
             <div class="user-info">
@@ -164,7 +171,7 @@
 
       <!-- Content Body -->
       <main class="content-body">
-        
+
         <!-- ==========================================
              TAB 1: OVERVIEW & METRICS
              ========================================== -->
@@ -191,7 +198,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="metric-card success">
               <div class="metric-content">
                 <div class="metric-info">
@@ -212,7 +219,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="metric-card info">
               <div class="metric-content">
                 <div class="metric-info">
@@ -233,7 +240,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="metric-card danger">
               <div class="metric-content">
                 <div class="metric-info">
@@ -254,7 +261,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="metric-card purple">
               <div class="metric-content">
                 <div class="metric-info">
@@ -318,7 +325,8 @@
               </div>
             </div>
 
-            <div class="metric-card warning" style="cursor: pointer;" onclick="document.querySelector('[data-tab=tab-tickets]').click()">
+            <div class="metric-card warning" style="cursor: pointer;"
+              onclick="document.querySelector('[data-tab=tab-tickets]').click()">
               <div class="metric-content">
                 <div class="metric-info">
                   <h3>Open Support Tickets</h3>
@@ -350,7 +358,7 @@
                   <p class="card-subtitle">Latest tenants created in the last 30 days</p>
                 </div>
               </div>
-              
+
               <div class="table-container">
                 <table class="responsive-table">
                   <thead>
@@ -365,7 +373,8 @@
                   </thead>
                   <tbody id="recent-tenants-tbody">
                     <tr>
-                      <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading recent organizations...</td>
+                      <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading recent
+                        organizations...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -380,25 +389,28 @@
                   <p class="card-subtitle">Tenants approaching employee limit thresholds</p>
                 </div>
               </div>
-              
+
               <div class="list-panel" id="upsell-list">
                 <div style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading alerts...</div>
               </div>
             </div>
           </div>
-          
+
           <!-- Secondary dashboard widgets -->
           <div class="dashboard-row" style="grid-template-columns: 1fr 1fr;">
             <!-- Registration Trends Chart -->
             <div class="card">
-              <div class="card-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div class="card-header"
+                style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
-                  <h3 class="card-title" style="margin-bottom: 0;"><i class="fa-solid fa-chart-area"></i> Organization Registration Trends</h3>
+                  <h3 class="card-title" style="margin-bottom: 0;"><i class="fa-solid fa-chart-area"></i> Organization
+                    Registration Trends</h3>
                   <p class="card-subtitle">New organizations created over time</p>
                 </div>
                 <div class="chart-filter-controls">
                   <button class="btn-filter-period" data-period="7" onclick="updateTrendPeriod(7, this)">7D</button>
-                  <button class="btn-filter-period active" data-period="30" onclick="updateTrendPeriod(30, this)">30D</button>
+                  <button class="btn-filter-period active" data-period="30"
+                    onclick="updateTrendPeriod(30, this)">30D</button>
                   <button class="btn-filter-period" data-period="90" onclick="updateTrendPeriod(90, this)">90D</button>
                 </div>
               </div>
@@ -406,10 +418,11 @@
                 <canvas id="registrationTrendChart"></canvas>
               </div>
             </div>
-            
+
             <!-- Top Resource Consumers -->
             <div class="card">
-              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-server"></i> Storage & Resource Consumers</h3>
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-server"></i> Storage & Resource
+                Consumers</h3>
               <div class="table-container">
                 <table class="responsive-table">
                   <thead>
@@ -421,7 +434,8 @@
                   </thead>
                   <tbody id="resource-consumers-tbody">
                     <tr>
-                      <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading resource consumers...</td>
+                      <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading resource
+                        consumers...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -434,14 +448,13 @@
              TAB 2: ORGANIZATION / TENANT MANAGEMENT
              ========================================== -->
         <section id="tab-tenants" class="view-panel">
-          <!-- Filters & Actions Bar -->
           <div class="filter-bar">
             <div class="filter-inputs">
               <div class="search-input-wrapper">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="tenant-search" class="search-input" placeholder="Search by company or code...">
               </div>
-              
+
               <select id="tenant-status-filter" class="select-input">
                 <option value="">All Statuses</option>
                 <option value="ACTIVE">Active</option>
@@ -450,14 +463,13 @@
                 <option value="DELETED">Deleted</option>
               </select>
             </div>
-            
+
             <button class="btn btn-primary" onclick="openModal('register-tenant-modal')">
               <i class="fa-solid fa-plus"></i>
               <span>Create Organization</span>
             </button>
           </div>
 
-          <!-- Organizations List Table -->
           <div class="table-container">
             <table class="responsive-table">
               <thead>
@@ -474,20 +486,23 @@
               </thead>
               <tbody id="tenants-list-tbody">
                 <tr>
-                  <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading organization registry...</td>
+                  <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading
+                    organization registry...</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Pagination details -->
           <div class="pagination">
             <div class="pagination-info">
-              Showing <span id="pagination-start">0</span> to <span id="pagination-end">0</span> of <span id="pagination-total">0</span> entries
+              Showing <span id="pagination-start">0</span> to <span id="pagination-end">0</span> of <span
+                id="pagination-total">0</span> entries
             </div>
             <div class="pagination-controls">
-              <button class="btn btn-secondary btn-icon" id="pagination-prev" disabled><i class="fa-solid fa-chevron-left"></i></button>
-              <button class="btn btn-secondary btn-icon" id="pagination-next" disabled><i class="fa-solid fa-chevron-right"></i></button>
+              <button class="btn btn-secondary btn-icon" id="pagination-prev" disabled><i
+                  class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-icon" id="pagination-next" disabled><i
+                  class="fa-solid fa-chevron-right"></i></button>
             </div>
           </div>
         </section>
@@ -496,49 +511,47 @@
              TAB 3: SUBSCRIPTION DASHBOARD
              ========================================== -->
         <section id="tab-subscriptions" class="view-panel">
-          <!-- Small Plan Cards Grid -->
-          <div class="metrics-grid" id="subscription-cards-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
-            <!-- Dynamic plan cards will be generated here -->
+          <div class="metrics-grid" id="subscription-cards-grid"
+            style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-bottom: 24px;">
           </div>
 
-          <!-- Charts Row -->
           <div class="charts-row">
-            <!-- Monthly Revenue Line Chart -->
             <div class="card">
-              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-indian-rupee-sign"></i> Monthly Revenue Trend (INR)</h3>
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-indian-rupee-sign"></i> Monthly
+                Revenue Trend (INR)</h3>
               <div class="chart-wrapper">
                 <canvas id="monthlyRevenueChart"></canvas>
               </div>
             </div>
 
-            <!-- Plan Growth Bar Chart -->
             <div class="card">
-              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-column"></i> Subscription Growth</h3>
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-column"></i> Subscription
+                Growth</h3>
               <div class="chart-wrapper">
                 <canvas id="subscriptionGrowthChart"></canvas>
               </div>
             </div>
 
-            <!-- Plan distribution chart -->
             <div class="card">
-              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-pie"></i> Plan Distribution</h3>
+              <h3 class="card-title" style="margin-bottom: 20px;"><i class="fa-solid fa-chart-pie"></i> Plan
+                Distribution</h3>
               <div class="chart-wrapper">
                 <canvas id="planDistributionChart"></canvas>
               </div>
             </div>
           </div>
 
-          <!-- Subscription Sandbox Simulator Panel -->
           <div class="card sandbox-card">
             <div class="card-header">
               <div>
                 <h3 class="card-title text-warning" style="color: var(--color-secondary) !important;">
                   <i class="fa-solid fa-vial"></i> Subscription Management Simulator (Tenant Sandbox)
                 </h3>
-                <p class="card-subtitle">Test subscription states, plan upgrade/downgrade flows, billing histories, and active/cancelled status toggles.</p>
+                <p class="card-subtitle">Test subscription states, plan upgrade/downgrade flows, billing histories, and
+                  active/cancelled status toggles.</p>
               </div>
             </div>
-            
+
             <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
               <div class="form-group">
                 <label class="form-label">Target Organization</label>
@@ -546,7 +559,7 @@
                   <option value="">Choose organization...</option>
                 </select>
               </div>
-              
+
               <div class="form-group">
                 <label class="form-label">Simulate Action</label>
                 <select id="sandbox-action-select" class="select-input" style="width: 100%;">
@@ -556,7 +569,7 @@
                   <option value="CANCEL">Cancel Active Plan</option>
                 </select>
               </div>
-              
+
               <div class="form-group" id="sandbox-plan-wrapper">
                 <label class="form-label">New Plan Tier</label>
                 <select id="sandbox-plan-select" class="select-input" style="width: 100%;">
@@ -577,19 +590,20 @@
             </div>
           </div>
 
-          <!-- Subscription Plans CRUD Panel -->
           <div class="card" style="margin-top: 24px;">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
+            <div class="card-header"
+              style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
               <div>
                 <h3 class="card-title"><i class="fa-solid fa-gears"></i> Platform Subscription Pricing Plans</h3>
-                <p class="card-subtitle">Manage availability, limits, features, and pricing structures for tenant onboarding.</p>
+                <p class="card-subtitle">Manage availability, limits, features, and pricing structures for tenant
+                  onboarding.</p>
               </div>
               <button class="btn btn-primary" onclick="openCreatePlanModal()">
                 <i class="fa-solid fa-plus"></i>
                 <span>Add Pricing Plan</span>
               </button>
             </div>
-            
+
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
@@ -604,7 +618,8 @@
                 </thead>
                 <tbody id="plans-list-tbody">
                   <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading subscription plans...</td>
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
+                      subscription plans...</td>
                   </tr>
                 </tbody>
               </table>
@@ -616,14 +631,14 @@
              TAB 4: SUPPORT TICKETS
              ========================================== -->
         <section id="tab-tickets" class="view-panel">
-          <!-- Filters & Actions Bar -->
           <div class="filter-bar">
             <div class="filter-inputs">
               <div class="search-input-wrapper">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="ticket-tenant-search" class="search-input" placeholder="Search by organization...">
+                <input type="text" id="ticket-tenant-search" class="search-input"
+                  placeholder="Search by organization...">
               </div>
-              
+
               <select id="ticket-status-filter" class="select-input">
                 <option value="">All Statuses</option>
                 <option value="OPEN">Open</option>
@@ -642,7 +657,6 @@
             </div>
           </div>
 
-          <!-- Tickets List Table -->
           <div class="table-container">
             <table class="responsive-table">
               <thead>
@@ -660,20 +674,23 @@
               </thead>
               <tbody id="tickets-list-tbody">
                 <tr>
-                  <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading support tickets...</td>
+                  <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;">Loading support
+                    tickets...</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Pagination -->
           <div class="pagination" id="tickets-pagination">
             <div class="pagination-info">
-              Showing <span id="tickets-pagination-start">0</span> to <span id="tickets-pagination-end">0</span> of <span id="tickets-pagination-total">0</span> entries
+              Showing <span id="tickets-pagination-start">0</span> to <span id="tickets-pagination-end">0</span> of
+              <span id="tickets-pagination-total">0</span> entries
             </div>
             <div class="pagination-controls">
-              <button class="btn btn-secondary btn-icon" id="tickets-pagination-prev" disabled><i class="fa-solid fa-chevron-left"></i></button>
-              <button class="btn btn-secondary btn-icon" id="tickets-pagination-next" disabled><i class="fa-solid fa-chevron-right"></i></button>
+              <button class="btn btn-secondary btn-icon" id="tickets-pagination-prev" disabled><i
+                  class="fa-solid fa-chevron-left"></i></button>
+              <button class="btn btn-secondary btn-icon" id="tickets-pagination-next" disabled><i
+                  class="fa-solid fa-chevron-right"></i></button>
             </div>
           </div>
         </section>
@@ -682,8 +699,8 @@
              TAB 5: SYSTEM DIAGNOSTICS & CONTROLS
              ========================================== -->
         <section id="tab-diagnostics" class="view-panel">
-          <!-- Diagnostics indicators grid -->
-          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+          <div class="metrics-grid"
+            style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
             <div class="metric-card" id="health-db-card">
               <div class="metric-info">
                 <h3>Database Connection</h3>
@@ -715,7 +732,6 @@
           </div>
 
           <div class="dashboard-row" style="grid-template-columns: 1fr 1fr;">
-            <!-- Disk space card -->
             <div class="card" style="margin-bottom: 0;">
               <div class="card-header" style="margin-bottom: 12px;">
                 <div>
@@ -729,18 +745,20 @@
                     <span style="color: var(--text-muted);">Storage Space Used</span>
                     <span style="font-weight: 600;" id="disk-used-pct">0%</span>
                   </div>
-                  <div class="progress-track" style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 5px;">
-                    <div class="progress-fill" id="disk-used-bar" style="width: 0%; height: 100%; border-radius: 5px;"></div>
+                  <div class="progress-track"
+                    style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 5px;">
+                    <div class="progress-fill" id="disk-used-bar" style="width: 0%; height: 100%; border-radius: 5px;">
+                    </div>
                   </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 15px;">
                   <div>Free Space: <span style="font-weight: 600;" id="disk-free-val">0 GB</span></div>
                   <div>Total Storage: <span style="font-weight: 600;" id="disk-total-val">0 GB</span></div>
                 </div>
               </div>
             </div>
 
-            <!-- Diagnostics Action Controls -->
             <div class="card" style="margin-bottom: 0;">
               <div class="card-header" style="margin-bottom: 12px;">
                 <div>
@@ -749,19 +767,28 @@
                 </div>
               </div>
               <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
                   <div>
-                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Flush Redis Cache Cache</span>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Invalidate all dynamically cached system variables.</span>
+                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Flush Redis Cache</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Invalidate all dynamically cached system
+                      variables.</span>
                   </div>
-                  <button class="btn btn-secondary" onclick="simulateFlushCache()" style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-arrows-rotate"></i> Flush</button>
+                  <button class="btn btn-secondary" onclick="simulateFlushCache()"
+                    style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-arrows-rotate"></i>
+                    Flush</button>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px;">
                   <div>
-                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Test Email Gateway Connection</span>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Dispatch a test message to confirm SMTP credentials validity.</span>
+                    <span style="font-weight: 600; font-size: 0.85rem; display: block;">Test Email Gateway
+                      Connection</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Dispatch a test message to confirm SMTP
+                      credentials validity.</span>
                   </div>
-                  <button class="btn btn-secondary" onclick="simulateTestEmail()" style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-paper-plane"></i> Send Test</button>
+                  <button class="btn btn-secondary" onclick="simulateTestEmail()"
+                    style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-paper-plane"></i> Send
+                    Test</button>
                 </div>
               </div>
             </div>
@@ -772,9 +799,9 @@
              TAB 6: PAYROLL CONFIGURATIONS
              ========================================== -->
         <section id="tab-payroll" class="view-panel">
-          <!-- Statutory Rate Configs Card -->
           <div class="card" style="margin-bottom: 24px;">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
+            <div class="card-header"
+              style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
               <div>
                 <h3 class="card-title"><i class="fa-solid fa-percent"></i> Federal Statutory Rates</h3>
                 <p class="card-subtitle">Manage rates, caps, and ceiling limits for EPF, EPS, EDLI, and ESI.</p>
@@ -784,7 +811,7 @@
                 <span>Add Statutory Rate</span>
               </button>
             </div>
-            
+
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
@@ -801,26 +828,28 @@
                 </thead>
                 <tbody id="statutory-rates-list-tbody">
                   <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading statutory rates...</td>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
+                      statutory rates...</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- State Professional Tax Slabs Card -->
           <div class="card">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
+            <div class="card-header"
+              style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 15px;">
               <div>
                 <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> State Professional Tax Slabs</h3>
-                <p class="card-subtitle">Manage Professional Tax slab thresholds, amounts, and specific month rules (e.g. Maharashtra February rule).</p>
+                <p class="card-subtitle">Manage Professional Tax slab thresholds, amounts, and specific month rules
+                  (e.g. Maharashtra February rule).</p>
               </div>
               <button class="btn btn-primary" onclick="openCreatePtConfigModal()">
                 <i class="fa-solid fa-plus"></i>
                 <span>Add PT Slab</span>
               </button>
             </div>
-            
+
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
@@ -837,7 +866,8 @@
                 </thead>
                 <tbody id="pt-configs-list-tbody">
                   <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading PT configurations...</td>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading PT
+                      configurations...</td>
                   </tr>
                 </tbody>
               </table>
@@ -850,8 +880,10 @@
              ========================================== -->
         <section id="tab-platform-api-logs" class="view-panel">
           <div class="card" style="margin-bottom: 24px;">
-            <h3 class="card-title"><i class="fa-solid fa-terminal" style="color: var(--accent-violet);"></i> Platform API Hit Logs Analysis</h3>
-            <p class="card-subtitle">Analyze API request history, traffic, client IPs, and device details across all tenant organizations</p>
+            <h3 class="card-title"><i class="fa-solid fa-terminal" style="color: var(--accent-violet);"></i> Platform
+              API Hit Logs Analysis</h3>
+            <p class="card-subtitle">Analyze API request history, traffic, client IPs, and device details across all
+              tenant organizations</p>
           </div>
 
           <div class="card">
@@ -859,10 +891,11 @@
               <div class="filter-inputs">
                 <div class="search-input-wrapper" style="opacity: 0.7;">
                   <i class="fa-solid fa-server"></i>
-                  <span style="margin-left: 20px; font-size: 0.85rem; color: var(--text-secondary);">Platform-wide logging aggregates across all organizations</span>
+                  <span style="margin-left: 20px; font-size: 0.85rem; color: var(--text-secondary);">Platform-wide
+                    logging aggregates across all organizations</span>
                 </div>
               </div>
-              
+
               <button class="btn btn-secondary" onclick="fetchPlatformApiLogs()">
                 <i class="fa-solid fa-rotate"></i>
                 <span>Refresh Global Logs</span>
@@ -892,13 +925,16 @@
               </table>
             </div>
 
-            <div class="pagination" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <div class="pagination"
+              style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
               <div class="pagination-info">
                 Page <span id="platform-api-logs-page-info">1 of 1</span>
               </div>
               <div class="pagination-controls">
-                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-prev" onclick="changePlatformApiLogsPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-next" onclick="changePlatformApiLogsPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-prev"
+                  onclick="changePlatformApiLogsPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-next"
+                  onclick="changePlatformApiLogsPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
               </div>
             </div>
           </div>
@@ -937,7 +973,7 @@
               </select>
             </div>
           </div>
-          
+
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="reg-admin-name">Super Admin Name</label>
@@ -957,7 +993,8 @@
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="reg-country">Country</label>
-              <select id="reg-country" class="select-input" style="width: 100%; height: 42px;" onchange="toggleRegStateField()">
+              <select id="reg-country" class="select-input" style="width: 100%; height: 42px;"
+                onchange="toggleRegStateField()">
                 <option value="IN">India</option>
                 <option value="US">United States</option>
                 <option value="GB">United Kingdom</option>
@@ -982,9 +1019,10 @@
               <input type="text" id="reg-state-other" class="form-input" placeholder="e.g. California">
             </div>
           </div>
-          
+
           <div class="modal-footer" style="padding-bottom: 0; padding-right: 0;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('register-tenant-modal')">Cancel</button>
+            <button type="button" class="btn btn-secondary"
+              onclick="closeModal('register-tenant-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Create Organization</button>
           </div>
         </form>
@@ -1002,17 +1040,20 @@
       <div class="modal-body">
         <form id="suspend-tenant-form">
           <input type="hidden" id="suspend-tenant-id">
-          
-          <div style="margin-bottom: 20px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 15px; border-radius: 10px; font-size: 0.85rem; color: var(--text-muted);">
+
+          <div
+            style="margin-bottom: 20px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 15px; border-radius: 10px; font-size: 0.85rem; color: var(--text-muted);">
             <i class="fa-solid fa-triangle-exclamation text-danger" style="margin-right: 6px;"></i>
-            <strong>Warning:</strong> Suspending this organization will immediately block all its employees and active admins from logging in, and turn its active subscription status off.
+            <strong>Warning:</strong> Suspending this organization will immediately block all its employees and active
+            admins from logging in, and turn its active subscription status off.
           </div>
-          
+
           <div class="form-group">
             <label class="form-label" for="suspend-reason">Reason for Suspension</label>
-            <textarea id="suspend-reason" class="form-input" style="height: 100px; resize: none;" placeholder="e.g. Non-payment of subscription fees or policy violation..." required></textarea>
+            <textarea id="suspend-reason" class="form-input" style="height: 100px; resize: none;"
+              placeholder="e.g. Non-payment of subscription fees or policy violation..." required></textarea>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('suspend-tenant-modal')">Cancel</button>
             <button type="submit" class="btn btn-danger">Confirm Suspension</button>
@@ -1032,7 +1073,7 @@
       <div class="modal-body">
         <form id="override-tenant-form">
           <input type="hidden" id="override-tenant-id">
-          
+
           <div class="form-group">
             <label class="form-label" for="override-plan-type">Override Plan Tier</label>
             <select id="override-plan-type" class="select-input" style="width: 100%; height: 42px;">
@@ -1043,19 +1084,22 @@
               <option value="Enterprise Plan">Enterprise</option>
             </select>
           </div>
-          
+
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="override-max-employees">Employee Seat Limit</label>
-            <input type="number" id="override-max-employees" class="form-input" min="10" placeholder="e.g. 500" required>
+            <input type="number" id="override-max-employees" class="form-input" min="10" placeholder="e.g. 500"
+              required>
           </div>
 
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="override-max-storage">Storage Quota (MB)</label>
-            <input type="number" id="override-max-storage" class="form-input" min="128" placeholder="e.g. 10240" required>
+            <input type="number" id="override-max-storage" class="form-input" min="128" placeholder="e.g. 10240"
+              required>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('override-tenant-modal')">Cancel</button>
+            <button type="button" class="btn btn-secondary"
+              onclick="closeModal('override-tenant-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Override</button>
           </div>
         </form>
@@ -1073,17 +1117,17 @@
       <div class="modal-body">
         <form id="edit-tenant-form">
           <input type="hidden" id="edit-tenant-id">
-          
+
           <div class="form-group">
             <label class="form-label" for="edit-company-name">Company Name</label>
             <input type="text" id="edit-company-name" class="form-input" required>
           </div>
-          
+
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="edit-admin-phone">Admin Mobile / Phone</label>
             <input type="text" id="edit-admin-phone" class="form-input" required>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('edit-tenant-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -1101,7 +1145,6 @@
         <button class="modal-close" onclick="closeModal('view-tenant-modal')">&times;</button>
       </div>
       <div class="modal-body" id="view-tenant-details-body">
-        <!-- Dynamically injected details -->
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('view-tenant-modal')">Close</button>
@@ -1119,7 +1162,7 @@
       <div class="modal-body">
         <form id="subscription-plan-form">
           <input type="hidden" id="plan-id">
-          
+
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label" for="plan-code">Plan Code (Unique ID)</label>
@@ -1130,11 +1173,12 @@
               <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
             </div>
           </div>
-          
+
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="plan-monthly-price">Monthly Price (INR)</label>
-              <input type="number" step="0.01" id="plan-monthly-price" class="form-input" placeholder="e.g. 49.00" required>
+              <input type="number" step="0.01" id="plan-monthly-price" class="form-input" placeholder="e.g. 49.00"
+                required>
             </div>
             <div class="form-group">
               <label class="form-label" for="plan-trial-days">Trial Days</label>
@@ -1166,11 +1210,13 @@
 
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="plan-description">Description</label>
-            <textarea id="plan-description" class="form-input" style="height: 80px; resize: none;" placeholder="Provide plan description..."></textarea>
+            <textarea id="plan-description" class="form-input" style="height: 80px; resize: none;"
+              placeholder="Provide plan description..."></textarea>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('subscription-plan-modal')">Cancel</button>
+            <button type="button" class="btn btn-secondary"
+              onclick="closeModal('subscription-plan-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Plan</button>
           </div>
         </form>
@@ -1188,7 +1234,7 @@
       <div class="modal-body">
         <form id="resolve-ticket-form">
           <input type="hidden" id="resolve-ticket-id">
-          
+
           <div class="ticket-detail-grid">
             <div><strong>Ticket Number:</strong> <span id="ticket-detail-number">-</span></div>
             <div><strong>Organization:</strong> <span id="ticket-detail-tenant">-</span></div>
@@ -1198,15 +1244,16 @@
             <div><strong>Status:</strong> <span id="ticket-detail-status">-</span></div>
             <div><strong>Created At:</strong> <span id="ticket-detail-created">-</span></div>
           </div>
-          
+
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label">Subject / Title</label>
             <input type="text" id="ticket-detail-title" class="form-input" disabled>
           </div>
-          
+
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label">Description</label>
-            <textarea id="ticket-detail-description" class="form-input" style="height: 100px; resize: none;" disabled></textarea>
+            <textarea id="ticket-detail-description" class="form-input" style="height: 100px; resize: none;"
+              disabled></textarea>
           </div>
 
           <div class="form-group" style="margin-top: 15px;">
@@ -1221,9 +1268,10 @@
 
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="resolve-resolution-text">Resolution Comments</label>
-            <textarea id="resolve-resolution-text" class="form-input" style="height: 100px; resize: none;" placeholder="Provide resolution details if marking as Resolved or Closed..."></textarea>
+            <textarea id="resolve-resolution-text" class="form-input" style="height: 100px; resize: none;"
+              placeholder="Provide resolution details if marking as Resolved or Closed..."></textarea>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('resolve-ticket-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Update Ticket</button>
@@ -1243,23 +1291,24 @@
       <div class="modal-body">
         <form id="statutory-rate-form">
           <input type="hidden" id="rate-id">
-          
+
           <div class="form-group">
             <label class="form-label" for="rate-component-code">Component Code</label>
             <input type="text" id="rate-component-code" class="form-input" placeholder="e.g. EPF_EE, ESI_ER" required>
           </div>
-          
+
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="rate-value">Rate (Multiplier)</label>
-              <input type="number" id="rate-value" class="form-input" step="0.0001" min="0" max="1" placeholder="e.g. 0.1200" required>
+              <input type="number" id="rate-value" class="form-input" step="0.0001" min="0" max="1"
+                placeholder="e.g. 0.1200" required>
             </div>
             <div class="form-group">
               <label class="form-label" for="rate-wage-base">Wage Base Variable</label>
               <input type="text" id="rate-wage-base" class="form-input" placeholder="e.g. WAGES_BASE, GROSS" required>
             </div>
           </div>
-          
+
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="rate-ceiling">Ceiling Amount (Optional)</label>
@@ -1281,7 +1330,7 @@
               <input type="date" id="rate-effective-to" class="form-input">
             </div>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('statutory-rate-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Rate</button>
@@ -1301,7 +1350,7 @@
       <div class="modal-body">
         <form id="pt-config-form">
           <input type="hidden" id="pt-id">
-          
+
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label" for="pt-state-code">State Code</label>
@@ -1309,21 +1358,24 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="pt-amount">PT Deducted Amount</label>
-              <input type="number" id="pt-amount" class="form-input" step="0.01" min="0" placeholder="e.g. 200.00" required>
+              <input type="number" id="pt-amount" class="form-input" step="0.01" min="0" placeholder="e.g. 200.00"
+                required>
             </div>
           </div>
-          
+
           <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="pt-salary-min">Min Salary Limit</label>
-              <input type="number" id="pt-salary-min" class="form-input" step="0.01" min="0" placeholder="e.g. 7500.01" required>
+              <input type="number" id="pt-salary-min" class="form-input" step="0.01" min="0" placeholder="e.g. 7500.01"
+                required>
             </div>
             <div class="form-group">
               <label class="form-label" for="pt-salary-max">Max Salary Limit (Optional)</label>
-              <input type="number" id="pt-salary-max" class="form-input" step="0.01" min="0" placeholder="e.g. 10000.00">
+              <input type="number" id="pt-salary-max" class="form-input" step="0.01" min="0"
+                placeholder="e.g. 10000.00">
             </div>
           </div>
-          
+
           <div class="form-group" style="margin-top: 15px;">
             <label class="form-label" for="pt-month-override">Applicable Month Override (Optional)</label>
             <select id="pt-month-override" class="select-input" style="width: 100%; height: 42px;">
@@ -1353,7 +1405,7 @@
               <input type="date" id="pt-effective-to" class="form-input">
             </div>
           </div>
-          
+
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('pt-config-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Slab</button>
@@ -1369,22 +1421,1564 @@
   <!-- ==========================================
        JAVASCRIPT LOGIC
        ========================================== -->
+  <style>
+    /* ==========================================================================
+       SonixHR Platform Admin Panel Stylesheet (Premium Dark Glassmorphism Theme)
+       ========================================================================== */
+
+    :root {
+      --bg-primary: #070a13;
+      --bg-secondary: #0c101f;
+      --bg-card: rgba(16, 22, 42, 0.65);
+      --bg-input: rgba(8, 12, 24, 0.8);
+
+      --border-color: rgba(255, 255, 255, 0.06);
+      --border-glow: rgba(99, 102, 241, 0.15);
+
+      --color-primary: #6366f1;
+      --color-primary-glow: rgba(99, 102, 241, 0.4);
+      --color-secondary: #a855f7;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-info: #0ea5e9;
+
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+
+      --sidebar-width: 260px;
+      --header-height: 70px;
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --font-family: 'Plus Jakarta Sans', sans-serif;
+      --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.1);
+      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-primary);
+    }
+
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 40%),
+        var(--bg-primary);
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 450px;
+      box-shadow: var(--shadow-card), 0 0 40px rgba(99, 102, 241, 0.05);
+      animation: fadeIn 0.6s ease-out;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-logo h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 40%, #a5b4fc);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: -20px;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .input-container {
+      position: relative;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: var(--transition-smooth);
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .login-footer {
+      margin-top: 25px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    #app-view {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+    }
+
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-brand h2 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    .sidebar-brand span {
+      color: var(--color-primary);
+    }
+
+    .sidebar-menu {
+      list-style: none;
+      padding: 24px 16px;
+      flex-grow: 1;
+    }
+
+    .sidebar-item {
+      margin-bottom: 8px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: var(--transition-smooth);
+      cursor: pointer;
+    }
+
+    .sidebar-link i {
+      font-size: 1.1rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-link:hover {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+    }
+
+    .sidebar-item.active .sidebar-link {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--color-primary);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.05);
+    }
+
+    .sidebar-footer {
+      padding: 20px 24px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .main-wrapper {
+      margin-left: var(--sidebar-width);
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .main-header {
+      height: var(--header-height);
+      background: rgba(7, 10, 19, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+
+    .header-title h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .system-health {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .health-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 4px;
+    }
+
+    .health-dot.up {
+      background-color: var(--color-success);
+      box-shadow: 0 0 8px var(--color-success);
+      animation: pulse-green 2s ease-in-out infinite;
+    }
+
+    .health-dot.down {
+      background-color: var(--color-danger);
+      box-shadow: 0 0 8px var(--color-danger);
+      animation: pulse-red 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-green {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    @keyframes pulse-red {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #fff;
+    }
+
+    .user-info {
+      font-size: 0.85rem;
+    }
+
+    .user-name {
+      font-weight: 600;
+      display: block;
+    }
+
+    .user-email {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: var(--transition-smooth);
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-logout:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .content-body {
+      padding: 32px;
+      flex-grow: 1;
+    }
+
+    .view-panel {
+      display: none;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-card);
+      transition: var(--transition-smooth);
+      position: relative;
+      overflow: hidden;
+      gap: 15px;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .metric-card.indigo:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(99, 102, 241, 0.25);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .metric-card.purple:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(168, 85, 247, 0.25);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .metric-card.success:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(16, 185, 129, 0.25);
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .metric-card.warning:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(245, 158, 11, 0.25);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    .metric-card.danger:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(239, 68, 68, 0.25);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .metric-card.info:hover {
+      box-shadow: var(--shadow-card), 0 0 25px rgba(14, 165, 233, 0.25);
+      border-color: rgba(14, 165, 233, 0.4);
+    }
+
+    .metric-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex-grow: 1;
+    }
+
+    .metric-info h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+    }
+
+    .metric-trend {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .metric-visual {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: space-between;
+      height: 100%;
+      gap: 12px;
+    }
+
+    .metric-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .metric-card.indigo .metric-icon {
+      color: var(--color-primary);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .metric-card.purple .metric-icon {
+      color: var(--color-secondary);
+      background: rgba(168, 85, 247, 0.1);
+    }
+
+    .metric-card.success .metric-icon {
+      color: var(--color-success);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .metric-card.warning .metric-icon {
+      color: var(--color-warning);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .metric-card.danger .metric-icon {
+      color: var(--color-danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .metric-card.info .metric-icon {
+      color: var(--color-info);
+      background: rgba(14, 165, 233, 0.1);
+    }
+
+    .sparkline-container {
+      width: 80px;
+      height: 30px;
+      position: relative;
+    }
+
+    .sparkline-container canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .dashboard-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 24px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-subtitle {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+
+    .list-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      transition: var(--transition-smooth);
+    }
+
+    .list-item:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .list-item-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: block;
+    }
+
+    .list-item-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .progress-track {
+      width: 100px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+      border-radius: 3px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge.active {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+    }
+
+    .badge.inactive {
+      background: rgba(107, 114, 128, 0.1);
+      color: var(--text-muted);
+    }
+
+    .badge.suspended {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--color-warning);
+    }
+
+    .badge.deleted {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+    }
+
+    .badge.trial {
+      background: rgba(14, 165, 233, 0.1);
+      color: var(--color-info);
+    }
+
+    .badge.basic {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--color-primary);
+    }
+
+    .badge.moderate {
+      background: rgba(168, 85, 247, 0.1);
+      color: var(--color-secondary);
+    }
+
+    .badge.premium {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--color-warning);
+    }
+
+    .badge.enterprise {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+    }
+
+    .filter-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .filter-inputs {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .select-input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .select-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    .search-input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px 14px 10px 34px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      width: 250px;
+      transition: var(--transition-smooth);
+    }
+
+    .search-input-wrapper {
+      position: relative;
+    }
+
+    .search-input-wrapper i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      width: 300px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      border: none;
+      font-family: inherit;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-icon {
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-danger:hover {
+      background: var(--color-danger);
+      color: #fff;
+    }
+
+    .btn-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-success:hover {
+      background: var(--color-success);
+      color: #fff;
+    }
+
+    .btn-warning {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--color-warning);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .btn-warning:hover {
+      background: var(--color-warning);
+      color: #fff;
+    }
+
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 24px;
+    }
+
+    .responsive-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .responsive-table th {
+      background: rgba(255, 255, 255, 0.015);
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .responsive-table td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      vertical-align: middle;
+    }
+
+    .responsive-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .responsive-table tr {
+      transition: var(--transition-smooth);
+    }
+
+    .responsive-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+
+    .pagination-info {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+
+    .sandbox-card {
+      border: 1px dashed rgba(168, 85, 247, 0.3);
+      background: linear-gradient(135deg, rgba(16, 22, 42, 0.6) 0%, rgba(168, 85, 247, 0.05) 100%);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(4, 6, 12, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-card), 0 20px 40px rgba(0, 0, 0, 0.5);
+      transform: translateY(20px);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-overlay.active .modal {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      padding: 24px 30px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.25rem;
+      transition: var(--transition-smooth);
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 30px;
+    }
+
+    .modal-footer {
+      padding: 20px 30px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: #111827;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 450px;
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeOut {
+      to {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+    }
+
+    .toast.success {
+      border-left: 4px solid var(--color-success);
+    }
+
+    .toast.error {
+      border-left: 4px solid var(--color-danger);
+    }
+
+    .toast.warning {
+      border-left: 4px solid var(--color-warning);
+    }
+
+    .toast.info {
+      border-left: 4px solid var(--color-info);
+    }
+
+    .toast-icon {
+      font-size: 1.25rem;
+    }
+
+    .toast.success .toast-icon {
+      color: var(--color-success);
+    }
+
+    .toast.error .toast-icon {
+      color: var(--color-danger);
+    }
+
+    .toast.warning .toast-icon {
+      color: var(--color-warning);
+    }
+
+    .toast.info .toast-icon {
+      color: var(--color-info);
+    }
+
+    .toast-content {
+      flex-grow: 1;
+    }
+
+    .toast-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-bottom: 2px;
+    }
+
+    .toast-msg {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .toast-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .toast-close:hover {
+      color: #fff;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .text-success {
+      color: var(--color-success);
+    }
+
+    .text-warning {
+      color: var(--color-warning);
+    }
+
+    .text-danger {
+      color: var(--color-danger);
+    }
+
+    .text-info {
+      color: var(--color-info);
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .notifications-bell-container {
+      position: relative;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+    }
+
+    .notif-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-smooth);
+    }
+
+    .notif-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .notif-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: var(--color-danger);
+      color: #fff;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px var(--color-danger);
+    }
+
+    .notif-dropdown {
+      position: absolute;
+      top: 50px;
+      right: 0;
+      width: 340px;
+      background: #0f1322;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      overflow: hidden;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .notif-dropdown-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .notif-dropdown-header h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .btn-text {
+      background: transparent;
+      border: none;
+      color: var(--color-primary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-text:hover {
+      text-decoration: underline;
+    }
+
+    .notif-dropdown-list {
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .notif-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      transition: var(--transition-smooth);
+    }
+
+    .notif-item:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .notif-item.unread {
+      background: rgba(99, 102, 241, 0.03);
+    }
+
+    .notif-item-body {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .notif-item-title {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 3px;
+    }
+
+    .notif-item-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+      margin-bottom: 4px;
+    }
+
+    .notif-item-time {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+
+    .notif-item-read-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      margin-left: 8px;
+      transition: var(--transition-smooth);
+    }
+
+    .notif-item-read-btn:hover {
+      color: var(--color-success);
+    }
+
+    .notif-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+    }
+
+    .notif-dropdown-footer {
+      border-top: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.01);
+      padding: 10px;
+      text-align: center;
+    }
+
+    .btn-text-full {
+      background: transparent;
+      border: none;
+      color: var(--color-primary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      padding: 6px 0;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-text-full:hover {
+      color: var(--color-secondary);
+    }
+
+    .ticket-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 0.85rem;
+    }
+
+    .ticket-detail-grid>div {
+      color: var(--text-main);
+    }
+
+    .ticket-detail-grid>div>strong {
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+
+    .badge.low {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge.medium {
+      background: rgba(14, 165, 233, 0.1);
+      color: var(--color-info);
+      border: 1px solid rgba(14, 165, 233, 0.2);
+    }
+
+    .badge.high {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--color-warning);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .badge.urgent {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge.open {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--color-primary);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .badge.in_progress {
+      background: rgba(168, 85, 247, 0.1);
+      color: var(--color-secondary);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+    }
+
+    .badge.resolved {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge.closed {
+      background: rgba(107, 114, 128, 0.1);
+      color: var(--text-muted);
+      border: 1px solid rgba(107, 114, 128, 0.2);
+    }
+
+    .chart-filter-controls {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 3px;
+      border-radius: 8px;
+    }
+
+    .btn-filter-period {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-filter-period:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-filter-period.active {
+      color: #fff;
+      background: var(--color-primary);
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-indicator.active {
+      background: var(--color-success);
+      box-shadow: 0 0 8px var(--color-success);
+    }
+
+    .status-indicator.inactive {
+      background: var(--text-dim);
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        width: 280px;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main-wrapper {
+        margin-left: 0;
+      }
+
+      .search-input {
+        width: 150px;
+      }
+
+      .search-input:focus {
+        width: 200px;
+      }
+    }
+  </style>
+
   <script>
-    // State Constants
-    const API_BASE = (window.location.protocol === 'file:' || !window.location.hostname) 
-      ? 'https://sonixhr.onrender.com/api' 
-      : '/api';
+    // ==========================================
+    // CONSTANTS & STATE
+    // ==========================================
+    const API_BASE = (window.location.protocol === 'file:' || !window.location.hostname)
+      ? 'https://sonixhr.onrender.com/api'
+      : (window.location.port && window.location.port !== '8081')
+        ? `${window.location.protocol}//${window.location.hostname}:8081/api`
+        : '/api';
     let CURRENT_PAGE = 0;
     const PAGE_SIZE = 10;
     let TOTAL_PAGES = 0;
-    
-    // Globals for Charts
+
     let regChartInstance = null;
     let revChartInstance = null;
     let growthChartInstance = null;
     let distChartInstance = null;
+    let sparklineInstances = {};
 
-    // Dom elements
+    let TICKETS_PAGE = 0;
+    const TICKETS_PAGE_SIZE = 10;
+    let TICKETS_TOTAL_PAGES = 0;
+    let globalNotifications = [];
+    let globalSubscriptionPlans = [];
+
+    let platformApiLogsPage = 0;
+    let platformApiLogsTotalPages = 1;
+
+    // ==========================================
+    // DOM REFERENCES
+    // ==========================================
     const loginView = document.getElementById('login-view');
     const appView = document.getElementById('app-view');
     const loginForm = document.getElementById('login-form');
@@ -1393,23 +2987,19 @@
     const tabTitle = document.getElementById('current-tab-title');
     const logoutBtn = document.getElementById('logout-btn');
 
-    // Support Tickets & Notifications State
-    let TICKETS_PAGE = 0;
-    const TICKETS_PAGE_SIZE = 10;
-    let TICKETS_TOTAL_PAGES = 0;
-    let globalNotifications = [];
-    
-    // Toast Alert Helper
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
     function showToast(title, message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
       toast.className = `toast ${type}`;
-      
+
       let icon = 'fa-info-circle';
       if (type === 'success') icon = 'fa-check-circle';
       if (type === 'error') icon = 'fa-exclamation-circle';
       if (type === 'warning') icon = 'fa-triangle-exclamation';
-      
+
       toast.innerHTML = `
         <i class="fa-solid ${icon} toast-icon"></i>
         <div class="toast-content">
@@ -1418,10 +3008,9 @@
         </div>
         <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
       `;
-      
+
       container.appendChild(toast);
-      
-      // Auto dismiss after 5 seconds
+
       setTimeout(() => {
         if (toast.parentElement) {
           toast.style.animation = 'fadeOut 0.3s forwards';
@@ -1430,16 +3019,14 @@
       }, 5000);
     }
 
-    // Modal Helpers
     function openModal(id) {
       document.getElementById(id).classList.add('active');
     }
-    
+
     function closeModal(id) {
       document.getElementById(id).classList.remove('active');
     }
 
-    // Fetch Client headers
     function getHeaders() {
       const token = localStorage.getItem('platform_token');
       return {
@@ -1448,7 +3035,6 @@
       };
     }
 
-    // Handle authentication API responses
     function checkResponseStatus(res) {
       if (res.status === 401) {
         showToast('Session Expired', 'Please login again to continue.', 'warning');
@@ -1462,287 +3048,52 @@
       return res;
     }
 
-    // Verify token at boot
-    async function initApp() {
-      const token = localStorage.getItem('platform_token');
-      if (!token) {
-        showLoginView();
-        return;
-      }
-      
-      try {
-        const res = await fetch(`${API_BASE}/platform/auth/verify-token?token=${token}`);
-        const data = await res.json();
-        if (res.ok && data.valid && data.userType === 'PLATFORM') {
-          showAppView();
-          
-          // Populate profile
-          document.getElementById('header-user-email').textContent = data.email || 'admin@sonixhr.com';
-          const name = localStorage.getItem('platform_user_name') || 'Super Admin';
-          document.getElementById('header-user-name').textContent = name;
-          document.getElementById('header-user-avatar').textContent = name.charAt(0).toUpperCase();
-          
-          // Fetch pricing plans dynamically
-          fetchSubscriptionPlans();
-          
-          // Load notifications and start polling
-          fetchPlatformNotifications();
-          setInterval(fetchPlatformNotifications, 30000);
-          
-          // Load default tab
-          loadTab('tab-overview');
-        } else {
-          handleLogout();
-        }
-      } catch (e) {
-        console.error('Validation failure', e);
-        handleLogout();
-      }
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
     }
 
-    function showLoginView() {
-      loginView.style.display = 'flex';
-      appView.style.display = 'none';
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\//g, '&#x2F;');
     }
 
-    function showAppView() {
-      loginView.style.display = 'none';
-      appView.style.display = 'flex';
-    }
-
-    function handleLogout() {
-      localStorage.removeItem('platform_token');
-      localStorage.removeItem('platform_user_name');
-      localStorage.removeItem('platform_user_email');
-      showLoginView();
-    }
-
-    // Platform login
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
-      const btn = document.getElementById('login-submit-btn');
-      
-      btn.disabled = true;
-      const originalText = btn.innerHTML;
-      btn.innerHTML = `<span class="loading-spinner"></span>`;
-      
-      try {
-        const res = await fetch(`${API_BASE}/platform/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-        
-        if (res.status === 429) {
-          showToast('Blocked', 'Too many attempts. Try again later.', 'error');
-          return;
-        }
-        
-        const data = await res.json();
-        if (res.ok && data.accessToken) {
-          localStorage.setItem('platform_token', data.accessToken);
-          localStorage.setItem('platform_user_name', data.fullName || 'Super Admin');
-          localStorage.setItem('platform_user_email', data.email || email);
-          
-          showToast('Welcome Back', `Successfully logged in as ${data.fullName || 'Administrator'}.`, 'success');
-          showAppView();
-          initApp();
-        } else {
-          showToast('Access Denied', data.message || 'Incorrect credentials, please check.', 'error');
-        }
-      } catch (err) {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-        showToast('Connection Error', 'Failed to connect to the platform API.', 'error');
-      }
-    });
-
-    logoutBtn.addEventListener('click', async () => {
-      try {
-        await fetch(`${API_BASE}/platform/auth/logout`, {
-          method: 'POST',
-          headers: getHeaders()
-        });
-      } catch(e) {}
-      handleLogout();
-      showToast('Goodbye', 'You have been successfully logged out.', 'success');
-    });
-
-    // Tab Switching
-    tabItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const tabId = item.getAttribute('data-tab');
-        tabItems.forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-        
-        loadTab(tabId);
-      });
-    });
-
-    function loadTab(tabId) {
-      viewPanels.forEach(p => p.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      
-      if (tabId === 'tab-overview') {
-        tabTitle.textContent = 'Platform Overview & Health';
-        fetchDashboardMetrics();
-        fetchSystemHealth();
-      } else if (tabId === 'tab-tenants') {
-        tabTitle.textContent = 'Organization Management';
-        CURRENT_PAGE = 0;
-        fetchTenantsList();
-      } else if (tabId === 'tab-subscriptions') {
-        tabTitle.textContent = 'Subscription Dashboard & Billing Analytics';
-        fetchSubscriptionMetrics();
-        fetchSubscriptionPlans();
-      } else if (tabId === 'tab-tickets') {
-        tabTitle.textContent = 'Support Tickets Management';
-        TICKETS_PAGE = 0;
-        fetchTicketsList();
-      } else if (tabId === 'tab-diagnostics') {
-        tabTitle.textContent = 'System Diagnostics & Administrative Controls';
-        fetchFullSystemDiagnostics();
-      } else if (tabId === 'tab-payroll') {
-        tabTitle.textContent = 'Statutory Payroll Configuration';
-        fetchPlatformPayrollRates();
-        fetchPlatformPtConfigs();
-      } else if (tabId === 'tab-platform-api-logs') {
-        tabTitle.textContent = 'Platform Global API Hit Logs';
-        fetchPlatformApiLogs(0);
-      }
-    }
-
-    // ==========================================
-    // OVERVIEW VIEW PORTAL LOGIC
-    // ==========================================
-    
-    async function fetchSystemHealth() {
-      try {
-        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
-        checkResponseStatus(res);
-        if (res.ok) {
-          const data = await res.json();
-          updateHealthDot('db-health-dot', data.databaseStatus);
-          updateHealthDot('redis-health-dot', data.redisStatus);
-        }
-      } catch (e) {
-        updateHealthDot('db-health-dot', 'DOWN');
-        updateHealthDot('redis-health-dot', 'DOWN');
-      }
-    }
-    
-    function updateHealthDot(elementId, status) {
-      const dot = document.getElementById(elementId);
-      dot.className = 'health-dot';
-      if (status === 'UP') {
-        dot.classList.add('up');
-      } else {
-        dot.classList.add('down');
-      }
-    }
-
-    async function fetchFullSystemDiagnostics() {
-      try {
-        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
-        checkResponseStatus(res);
-        if (res.ok) {
-          const data = await res.json();
-          
-          // Populate Database Status card
-          const dbVal = document.getElementById('health-db-val');
-          dbVal.textContent = data.databaseStatus || 'UNKNOWN';
-          dbVal.className = 'metric-value ' + (data.databaseStatus === 'UP' ? 'text-success' : 'text-danger');
-          
-          // Populate Redis Status card
-          const redisVal = document.getElementById('health-redis-val');
-          redisVal.textContent = data.redisStatus || 'UNKNOWN';
-          redisVal.className = 'metric-value ' + (data.redisStatus === 'UP' ? 'text-success' : 'text-danger');
-          
-          // Populate Mail Status card
-          const mailVal = document.getElementById('health-mail-val');
-          mailVal.textContent = data.mailSenderStatus || 'UNKNOWN';
-          mailVal.className = 'metric-value ' + (data.mailSenderStatus === 'UP' ? 'text-success' : 'text-danger');
-          
-          // Populate Disk Status card
-          const diskVal = document.getElementById('health-disk-val');
-          diskVal.textContent = data.diskSpaceStatus || 'UNKNOWN';
-          diskVal.className = 'metric-value ' + (data.diskSpaceStatus === 'UP' ? 'text-success' : 'text-danger');
-          
-          // Calculate disk space usage
-          if (data.totalDiskSpaceBytes > 0) {
-            const usedBytes = data.totalDiskSpaceBytes - data.freeDiskSpaceBytes;
-            const pct = (usedBytes / data.totalDiskSpaceBytes) * 100;
-            
-            document.getElementById('disk-used-pct').textContent = pct.toFixed(1) + '%';
-            document.getElementById('disk-used-bar').style.width = pct.toFixed(1) + '%';
-            
-            const freeGb = data.freeDiskSpaceBytes / (1024 * 1024 * 1024);
-            const totalGb = data.totalDiskSpaceBytes / (1024 * 1024 * 1024);
-            
-            document.getElementById('disk-free-val').textContent = freeGb.toFixed(2) + ' GB';
-            document.getElementById('disk-total-val').textContent = totalGb.toFixed(2) + ' GB';
-          }
-        }
-      } catch (err) {
-        showToast('Error', 'Failed to retrieve full system diagnostics.', 'error');
-      }
-    }
-
-    function simulateFlushCache() {
-      showToast('Cache Flushed', 'Successfully cleared all cached roles, permissions, and configurations from Redis cache layer.', 'success');
-    }
-    
-    function simulateTestEmail() {
-      showToast('Email Sent', 'Diagnostic test email sent to connection endpoint. SMTP configuration is validated.', 'success');
-    }
-
-    // Helper: Period toggle callback
-    async function updateTrendPeriod(days, element) {
-      const container = element.closest('.chart-filter-controls');
-      container.querySelectorAll('.btn-filter-period').forEach(b => b.classList.remove('active'));
-      element.classList.add('active');
-      await fetchDashboardMetrics(days);
-    }
-
-    // Helper: Dynamic sparkline dataset generator (random-walk ending at value)
     function generateSparklineData(value, points = 8, variance = 0.15) {
       const data = [];
       let currentVal = value <= 0 ? 0 : value;
-      // Walk backwards from the current value
       for (let i = 0; i < points; i++) {
         data.unshift(Math.round(currentVal));
         const change = (Math.random() - 0.46) * variance * currentVal;
         currentVal = Math.max(0, currentVal - change);
       }
-      // Ensure the last element matches exactly
       if (data.length > 0) {
         data[data.length - 1] = value;
       }
       return data;
     }
 
-    // Sparkline instances registry
-    let sparklineInstances = {};
-
     function drawSparkline(canvasId, dataPoints, colorHex) {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return;
-      
+
       const ctx = canvas.getContext('2d');
       if (sparklineInstances[canvasId]) {
         sparklineInstances[canvasId].destroy();
       }
-      
+
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 30);
-      gradient.addColorStop(0, colorHex + '25'); // 15% opacity
-      gradient.addColorStop(1, colorHex + '01'); // 0.4% opacity
-      
+      gradient.addColorStop(0, colorHex + '25');
+      gradient.addColorStop(1, colorHex + '01');
+
       sparklineInstances[canvasId] = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1773,7 +3124,6 @@
       });
     }
 
-    // Line shadow plugin for glowing neon effect
     const lineShadowPlugin = {
       id: 'lineShadow',
       beforeDatasetsDraw(chart, args, options) {
@@ -1794,7 +3144,7 @@
       const container = document.getElementById(containerId);
       const icon = document.getElementById(iconId);
       const val = document.getElementById(valId);
-      
+
       if (container) {
         container.className = 'metric-trend ' + colorClass;
       }
@@ -1806,28 +3156,270 @@
       }
     }
 
+    // ==========================================
+    // AUTHENTICATION
+    // ==========================================
+
+    async function initApp() {
+      const token = localStorage.getItem('platform_token');
+      if (!token) {
+        showLoginView();
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/auth/verify-token?token=${token}`);
+        const data = await res.json();
+        if (res.ok && data.valid && data.userType === 'PLATFORM') {
+          showAppView();
+
+          document.getElementById('header-user-email').textContent = data.email || 'admin@sonixhr.com';
+          const name = localStorage.getItem('platform_user_name') || 'Super Admin';
+          document.getElementById('header-user-name').textContent = name;
+          document.getElementById('header-user-avatar').textContent = name.charAt(0).toUpperCase();
+
+          fetchSubscriptionPlans();
+          fetchPlatformNotifications();
+          setInterval(fetchPlatformNotifications, 30000);
+
+          loadTab('tab-overview');
+        } else {
+          handleLogout();
+        }
+      } catch (e) {
+        console.error('Validation failure', e);
+        handleLogout();
+      }
+    }
+
+    function showLoginView() {
+      loginView.style.display = 'flex';
+      appView.style.display = 'none';
+    }
+
+    function showAppView() {
+      loginView.style.display = 'none';
+      appView.style.display = 'flex';
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('platform_token');
+      localStorage.removeItem('platform_user_name');
+      localStorage.removeItem('platform_user_email');
+      showLoginView();
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-submit-btn');
+
+      btn.disabled = true;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<span class="loading-spinner"></span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+
+        if (res.status === 429) {
+          showToast('Blocked', 'Too many attempts. Try again later.', 'error');
+          return;
+        }
+
+        const data = await res.json();
+        if (res.ok && data.accessToken) {
+          localStorage.setItem('platform_token', data.accessToken);
+          localStorage.setItem('platform_user_name', data.fullName || 'Super Admin');
+          localStorage.setItem('platform_user_email', data.email || email);
+
+          showToast('Welcome Back', `Successfully logged in as ${data.fullName || 'Administrator'}.`, 'success');
+          showAppView();
+          initApp();
+        } else {
+          showToast('Access Denied', data.message || 'Incorrect credentials, please check.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        showToast('Connection Error', 'Failed to connect to the platform API.', 'error');
+      }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch(`${API_BASE}/platform/auth/logout`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+      } catch (e) { }
+      handleLogout();
+      showToast('Goodbye', 'You have been successfully logged out.', 'success');
+    });
+
+    // ==========================================
+    // TAB SWITCHING
+    // ==========================================
+
+    tabItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
+        tabItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        loadTab(tabId);
+      });
+    });
+
+    function loadTab(tabId) {
+      viewPanels.forEach(p => p.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+
+      if (tabId === 'tab-overview') {
+        tabTitle.textContent = 'Platform Overview & Health';
+        fetchDashboardMetrics();
+        fetchSystemHealth();
+      } else if (tabId === 'tab-tenants') {
+        tabTitle.textContent = 'Organization Management';
+        CURRENT_PAGE = 0;
+        fetchTenantsList();
+      } else if (tabId === 'tab-subscriptions') {
+        tabTitle.textContent = 'Subscription Dashboard & Billing Analytics';
+        fetchSubscriptionMetrics();
+        fetchSubscriptionPlans();
+      } else if (tabId === 'tab-tickets') {
+        tabTitle.textContent = 'Support Tickets Management';
+        TICKETS_PAGE = 0;
+        fetchTicketsList();
+      } else if (tabId === 'tab-diagnostics') {
+        tabTitle.textContent = 'System Diagnostics & Administrative Controls';
+        fetchFullSystemDiagnostics();
+      } else if (tabId === 'tab-payroll') {
+        tabTitle.textContent = 'Statutory Payroll Configuration';
+        fetchPlatformPayrollRates();
+        fetchPlatformPtConfigs();
+      } else if (tabId === 'tab-platform-api-logs') {
+        tabTitle.textContent = 'Platform Global API Hit Logs';
+        fetchPlatformApiLogs(0);
+      }
+    }
+
+    // ==========================================
+    // SYSTEM HEALTH
+    // ==========================================
+
+    async function fetchSystemHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          updateHealthDot('db-health-dot', data.databaseStatus);
+          updateHealthDot('redis-health-dot', data.redisStatus);
+        }
+      } catch (e) {
+        updateHealthDot('db-health-dot', 'DOWN');
+        updateHealthDot('redis-health-dot', 'DOWN');
+      }
+    }
+
+    function updateHealthDot(elementId, status) {
+      const dot = document.getElementById(elementId);
+      dot.className = 'health-dot';
+      if (status === 'UP') {
+        dot.classList.add('up');
+      } else {
+        dot.classList.add('down');
+      }
+    }
+
+    async function fetchFullSystemDiagnostics() {
+      try {
+        const res = await fetch(`${API_BASE}/platform/health`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+
+          const dbVal = document.getElementById('health-db-val');
+          dbVal.textContent = data.databaseStatus || 'UNKNOWN';
+          dbVal.className = 'metric-value ' + (data.databaseStatus === 'UP' ? 'text-success' : 'text-danger');
+
+          const redisVal = document.getElementById('health-redis-val');
+          redisVal.textContent = data.redisStatus || 'UNKNOWN';
+          redisVal.className = 'metric-value ' + (data.redisStatus === 'UP' ? 'text-success' : 'text-danger');
+
+          const mailVal = document.getElementById('health-mail-val');
+          mailVal.textContent = data.mailSenderStatus || 'UNKNOWN';
+          mailVal.className = 'metric-value ' + (data.mailSenderStatus === 'UP' ? 'text-success' : 'text-danger');
+
+          const diskVal = document.getElementById('health-disk-val');
+          diskVal.textContent = data.diskSpaceStatus || 'UNKNOWN';
+          diskVal.className = 'metric-value ' + (data.diskSpaceStatus === 'UP' ? 'text-success' : 'text-danger');
+
+          if (data.totalDiskSpaceBytes > 0) {
+            const usedBytes = data.totalDiskSpaceBytes - data.freeDiskSpaceBytes;
+            const pct = (usedBytes / data.totalDiskSpaceBytes) * 100;
+
+            document.getElementById('disk-used-pct').textContent = pct.toFixed(1) + '%';
+            document.getElementById('disk-used-bar').style.width = pct.toFixed(1) + '%';
+
+            const freeGb = data.freeDiskSpaceBytes / (1024 * 1024 * 1024);
+            const totalGb = data.totalDiskSpaceBytes / (1024 * 1024 * 1024);
+
+            document.getElementById('disk-free-val').textContent = freeGb.toFixed(2) + ' GB';
+            document.getElementById('disk-total-val').textContent = totalGb.toFixed(2) + ' GB';
+          }
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to retrieve full system diagnostics.', 'error');
+      }
+    }
+
+    function simulateFlushCache() {
+      showToast('Cache Flushed', 'Successfully cleared all cached roles, permissions, and configurations from Redis cache layer.', 'success');
+    }
+
+    function simulateTestEmail() {
+      showToast('Email Sent', 'Diagnostic test email sent to connection endpoint. SMTP configuration is validated.', 'success');
+    }
+
+    // ==========================================
+    // DASHBOARD METRICS
+    // ==========================================
+
+    async function updateTrendPeriod(days, element) {
+      const container = element.closest('.chart-filter-controls');
+      container.querySelectorAll('.btn-filter-period').forEach(b => b.classList.remove('active'));
+      element.classList.add('active');
+      await fetchDashboardMetrics(days);
+    }
+
     async function fetchDashboardMetrics(trendDays = 30) {
       try {
         const res = await fetch(`${API_BASE}/platform/dashboard?trendDays=${trendDays}`, { headers: getHeaders() });
         checkResponseStatus(res);
         if (res.ok) {
           const data = await res.json();
-          
-          // Set stats
+
           document.getElementById('stat-total-tenants').textContent = data.tenantSummary.totalTenants;
           document.getElementById('stat-active-tenants').textContent = data.tenantSummary.activeTenants;
           document.getElementById('stat-trial-tenants').textContent = data.tenantSummary.trialTenants;
           document.getElementById('stat-expired-subs').textContent = data.subscriptionSummary.expiredSubscriptions;
-          
+
           document.getElementById('stat-total-employees').textContent = data.systemSummary.totalEmployees;
           document.getElementById('stat-total-active-users').textContent = data.systemSummary.totalActiveUsers;
           document.getElementById('stat-tickets').textContent = data.systemSummary.supportTicketsOpen;
-          
-          // Formats INR (Indian Rupee) MRR
+
           const mrrFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
           document.getElementById('stat-mrr').textContent = mrrFormatter.format(data.subscriptionSummary.totalMrr || 0);
 
-          // 1. Calculate organization registration growth trend dynamically from registrationTrend API data
           let orgChangeText = '+0.0%';
           let orgChangeClass = 'text-success';
           let orgChangeIcon = 'fa-arrow-trend-up';
@@ -1849,7 +3441,6 @@
           }
           updateTrendUI('trend-total-tenants-container', 'trend-total-tenants-icon', 'trend-total-tenants-val', orgChangeText, orgChangeClass, orgChangeIcon);
 
-          // 2. Active, Trial and Expired ratios
           const totalTenantsVal = data.tenantSummary.totalTenants || 1;
           const activePct = ((data.tenantSummary.activeTenants || 0) / totalTenantsVal) * 100;
           updateTrendUI('trend-active-tenants-container', 'trend-active-tenants-icon', 'trend-active-tenants-val', `${activePct.toFixed(1)}% of total`, 'text-success', 'fa-building-circle-check');
@@ -1860,7 +3451,6 @@
           const expiredPct = ((data.subscriptionSummary.expiredSubscriptions || 0) / totalTenantsVal) * 100;
           updateTrendUI('trend-expired-subs-container', 'trend-expired-subs-icon', 'trend-expired-subs-val', `${expiredPct.toFixed(1)}% ratio`, expiredPct > 20 ? 'text-danger' : 'text-warning', 'fa-circle-exclamation');
 
-          // 3. Employees, Users and Tickets metrics
           const avgEmp = data.systemSummary.averageEmployeesPerTenant || 0;
           updateTrendUI('trend-total-employees-container', 'trend-total-employees-icon', 'trend-total-employees-val', `${avgEmp.toFixed(1)} avg/org`, 'text-success', 'fa-users');
 
@@ -1870,7 +3460,6 @@
           const ticketsOpen = data.systemSummary.supportTicketsOpen || 0;
           updateTrendUI('trend-tickets-container', 'trend-tickets-icon', 'trend-tickets-val', ticketsOpen > 0 ? `${ticketsOpen} unresolved` : 'all cleared', ticketsOpen > 5 ? 'text-danger' : ticketsOpen > 0 ? 'text-warning' : 'text-success', 'fa-ticket');
 
-          // 4. Monthly MRR Trend dynamically fetched from active subscription API metrics
           try {
             const subRes = await fetch(`${API_BASE}/platform/subscriptions/dashboard`, { headers: getHeaders() });
             if (subRes.ok) {
@@ -1887,14 +3476,13 @@
                 }
               }
             }
-          } catch(err) {
+          } catch (err) {
             console.error('Error fetching sub metrics for MRR trend', err);
           }
 
-          // Populate sparklines for Overview cards dynamically
-          const registrationTrendPoints = data.registrationTrend && data.registrationTrend.length > 0 
-              ? data.registrationTrend.map(p => p.count)
-              : generateSparklineData(data.tenantSummary.totalTenants, 8, 0.12);
+          const registrationTrendPoints = data.registrationTrend && data.registrationTrend.length > 0
+            ? data.registrationTrend.map(p => p.count)
+            : generateSparklineData(data.tenantSummary.totalTenants, 8, 0.12);
           drawSparkline('sparkline-total-tenants', registrationTrendPoints, '#6366f1');
           drawSparkline('sparkline-active-tenants', generateSparklineData(data.tenantSummary.activeTenants, 8, 0.08), '#10b981');
           drawSparkline('sparkline-trial-tenants', generateSparklineData(data.tenantSummary.trialTenants, 8, 0.20), '#0ea5e9');
@@ -1904,7 +3492,6 @@
           drawSparkline('sparkline-mrr', generateSparklineData(parseFloat(data.subscriptionSummary.totalMrr || 0), 8, 0.18), '#6366f1');
           drawSparkline('sparkline-tickets', generateSparklineData(data.systemSummary.supportTicketsOpen, 8, 0.30), '#f59e0b');
 
-          // Populate Recent Tenants
           const tbody = document.getElementById('recent-tenants-tbody');
           tbody.innerHTML = '';
           if (data.recentTenants && data.recentTenants.length > 0) {
@@ -1924,7 +3511,6 @@
             tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No recent organizations registered.</td></tr>`;
           }
 
-          // Populate Alerts
           const upsellDiv = document.getElementById('upsell-list');
           upsellDiv.innerHTML = '';
           if (data.upsellOpportunities && data.upsellOpportunities.length > 0) {
@@ -1949,7 +3535,6 @@
             upsellDiv.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px 0;">No active alerts. All tenants under limits.</div>`;
           }
 
-          // Populate Top Resource Consumers
           const consumersTbody = document.getElementById('resource-consumers-tbody');
           consumersTbody.innerHTML = '';
           if (data.topResourceConsumers && data.topResourceConsumers.length > 0) {
@@ -1966,9 +3551,7 @@
             consumersTbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No resource usage data.</td></tr>`;
           }
 
-          // Render Registration Trend Chart
           renderTrendChart(data.registrationTrend);
-
         }
       } catch (e) {
         console.error('Error fetching stats', e);
@@ -1978,7 +3561,7 @@
     function renderTrendChart(trendPoints) {
       const canvas = document.getElementById('registrationTrendChart');
       const ctx = canvas.getContext('2d');
-      
+
       const labels = trendPoints.map(p => p.period);
       const counts = trendPoints.map(p => p.count);
 
@@ -1986,7 +3569,6 @@
         regChartInstance.destroy();
       }
 
-      // Create fading area gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 250);
       gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
       gradient.addColorStop(1, 'rgba(99, 102, 241, 0.01)');
@@ -2045,39 +3627,38 @@
     }
 
     // ==========================================
-    // ORGANIZATION / TENANT VIEWS LOGIC
+    // TENANT MANAGEMENT
     // ==========================================
-    
+
     async function fetchTenantsList() {
       const search = document.getElementById('tenant-search').value;
       const status = document.getElementById('tenant-status-filter').value;
-      
+
       let url = `${API_BASE}/platform/tenants?page=${CURRENT_PAGE}&size=${PAGE_SIZE}`;
       if (search) url += `&companyName=${encodeURIComponent(search)}`;
       if (status) url += `&status=${status}`;
 
       const tbody = document.getElementById('tenants-list-tbody');
       tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px 0;"><span class="loading-spinner"></span></td></tr>`;
-      
+
       try {
         const res = await fetch(url, { headers: getHeaders() });
         checkResponseStatus(res);
         if (res.ok) {
           const data = await res.json();
           const list = data.content;
-          
+
           tbody.innerHTML = '';
           if (list && list.length > 0) {
             list.forEach(t => {
               const limitStr = t.maxEmployees ? `${t.maxEmployees} seats` : 'No Seat Limit';
-              
-              // Action Buttons mapping based on current status
+
               let actionsHtml = `
                 <button class="btn btn-secondary btn-icon" onclick="viewTenantDetails(${t.id})" title="Details"><i class="fa-solid fa-eye text-info"></i></button>
                 <button class="btn btn-secondary btn-icon" onclick="openEditTenantModal(${t.id}, '${t.companyName}', '${t.adminPhone}')" title="Edit Metadata"><i class="fa-solid fa-pen text-warning"></i></button>
                 <button class="btn btn-secondary btn-icon" onclick="openOverrideModal(${t.id}, '${t.planType}', ${t.maxEmployees})" title="Override Limits"><i class="fa-solid fa-cog text-primary"></i></button>
               `;
-              
+
               if (t.status === 'SUSPENDED') {
                 actionsHtml += `<button class="btn btn-success" style="padding: 6px 12px; font-size:0.75rem;" onclick="activateTenant(${t.id})"><i class="fa-solid fa-play"></i> Reactivate</button>`;
               } else if (t.status === 'ACTIVE') {
@@ -2086,11 +3667,11 @@
               } else if (t.status === 'INACTIVE') {
                 actionsHtml += `<button class="btn btn-success" style="padding: 6px 12px; font-size:0.75rem;" onclick="activateTenant(${t.id})"><i class="fa-solid fa-toggle-on"></i> Enable</button>`;
               }
-              
+
               if (t.status !== 'DELETED') {
                 actionsHtml += `<button class="btn btn-secondary btn-icon" onclick="deleteTenant(${t.id})" title="Delete"><i class="fa-solid fa-trash text-danger"></i></button>`;
               }
-              
+
               const row = document.createElement('tr');
               row.innerHTML = `
                 <td><strong>${t.companyName}</strong></td>
@@ -2104,13 +3685,12 @@
               `;
               tbody.appendChild(row);
             });
-            
-            // Setup pagination UI
+
             TOTAL_PAGES = data.totalPages;
             document.getElementById('pagination-start').textContent = (CURRENT_PAGE * PAGE_SIZE) + 1;
             document.getElementById('pagination-end').textContent = Math.min((CURRENT_PAGE + 1) * PAGE_SIZE, data.totalElements);
             document.getElementById('pagination-total').textContent = data.totalElements;
-            
+
             document.getElementById('pagination-prev').disabled = CURRENT_PAGE === 0;
             document.getElementById('pagination-next').disabled = CURRENT_PAGE >= TOTAL_PAGES - 1;
           } else {
@@ -2127,14 +3707,13 @@
       }
     }
 
-    // Pagination Listeners
     document.getElementById('pagination-prev').addEventListener('click', () => {
       if (CURRENT_PAGE > 0) {
         CURRENT_PAGE--;
         fetchTenantsList();
       }
     });
-    
+
     document.getElementById('pagination-next').addEventListener('click', () => {
       if (CURRENT_PAGE < TOTAL_PAGES - 1) {
         CURRENT_PAGE++;
@@ -2142,7 +3721,6 @@
       }
     });
 
-    // Search and filters triggers
     document.getElementById('tenant-search').addEventListener('input', debounce(() => {
       CURRENT_PAGE = 0;
       fetchTenantsList();
@@ -2153,18 +3731,31 @@
       fetchTenantsList();
     });
 
-    function debounce(func, wait) {
-      let timeout;
-      return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-      };
+    function toggleRegStateField() {
+      const country = document.getElementById('reg-country').value;
+      const indiaGroup = document.getElementById('reg-state-india-group');
+      const otherGroup = document.getElementById('reg-state-other-group');
+
+      if (country === 'IN') {
+        indiaGroup.style.display = '';
+        otherGroup.style.display = 'none';
+        document.getElementById('reg-state-india').required = true;
+        document.getElementById('reg-state-other').required = false;
+      } else {
+        indiaGroup.style.display = 'none';
+        otherGroup.style.display = '';
+        document.getElementById('reg-state-india').required = false;
+        document.getElementById('reg-state-other').required = true;
+      }
     }
 
-    // Create Tenant
+    // ==========================================
+    // CREATE TENANT
+    // ==========================================
+
     document.getElementById('register-tenant-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const countryVal = document.getElementById('reg-country').value;
       const payload = {
         companyName: document.getElementById('reg-company-name').value,
@@ -2186,7 +3777,7 @@
         });
         checkResponseStatus(res);
         const data = await res.json();
-        
+
         if (res.ok) {
           showToast('Created', 'Organization successfully registered and active.', 'success');
           closeModal('register-tenant-modal');
@@ -2200,7 +3791,10 @@
       }
     });
 
-    // View Details
+    // ==========================================
+    // VIEW TENANT DETAILS
+    // ==========================================
+
     async function viewTenantDetails(id) {
       try {
         const res = await fetch(`${API_BASE}/platform/tenants/${id}`, { headers: getHeaders() });
@@ -2208,10 +3802,10 @@
         if (res.ok) {
           const t = await res.json();
           const detailsDiv = document.getElementById('view-tenant-details-body');
-          
+
           let plansDropdown = '';
           const isRestoreEligible = (t.dataStatus === 'ARCHIVED' || t.dataStatus === 'ELIGIBLE_FOR_DELETION') && t.status !== 'DELETED';
-          
+
           if (isRestoreEligible) {
             try {
               const plansRes = await fetch(`${API_BASE}/platform/subscription-plans`, { headers: getHeaders() });
@@ -2284,12 +3878,12 @@
                       </thead>
                       <tbody>
                         ${subHistory.map(sub => {
-                          const startStr = sub.startedAt ? new Date(sub.startedAt).toLocaleDateString() : '-';
-                          const endStr = (sub.endsAt || sub.billingPeriodEnd) ? new Date(sub.endsAt || sub.billingPeriodEnd).toLocaleDateString() : '-';
-                          const badgeClass = sub.planStatus === 'ACTIVE' ? 'badge success' :
-                                             sub.planStatus === 'EXPIRED' ? 'badge danger' : 'badge warning';
-                          const amountDisp = sub.amount !== undefined ? `₹${parseFloat(sub.amount).toFixed(2)}` : 'Free';
-                          return `
+                  const startStr = sub.startedAt ? new Date(sub.startedAt).toLocaleDateString() : '-';
+                  const endStr = (sub.endsAt || sub.billingPeriodEnd) ? new Date(sub.endsAt || sub.billingPeriodEnd).toLocaleDateString() : '-';
+                  const badgeClass = sub.planStatus === 'ACTIVE' ? 'badge success' :
+                    sub.planStatus === 'EXPIRED' ? 'badge danger' : 'badge warning';
+                  const amountDisp = sub.amount !== undefined ? `₹${parseFloat(sub.amount).toFixed(2)}` : 'Free';
+                  return `
                             <tr>
                               <td><strong>${sub.planName || sub.planType || 'Plan'}</strong></td>
                               <td>${startStr} - ${endStr}</td>
@@ -2298,7 +3892,7 @@
                               <td>${sub.cancelledAtEndOfPeriod ? 'Yes' : 'No'}</td>
                             </tr>
                           `;
-                        }).join('')}
+                }).join('')}
                       </tbody>
                     </table>
                   </div>
@@ -2412,26 +4006,26 @@
       const planId = planSelect ? planSelect.value : null;
       const notesInput = document.getElementById('restore-notes-input');
       const notes = notesInput ? notesInput.value : '';
-      
+
       if (!planId) {
         showToast('Required', 'Please select a pricing plan.', 'warning');
         return;
       }
-      
+
       if (!confirm('Are you sure you want to restore this organization workspace? This will bypass self-serve payment flows and recreate active access.')) {
         return;
       }
-      
+
       try {
         const res = await fetch(`${API_BASE}/admin/tenants/${id}/restore`, {
           method: 'POST',
           headers: getHeaders(),
           body: JSON.stringify({ planId: parseInt(planId), notes: notes })
         });
-        
+
         checkResponseStatus(res);
         const data = await res.json();
-        
+
         if (res.ok) {
           showToast('Success', 'Organization workspace restored successfully!', 'success');
           closeModal('view-tenant-modal');
@@ -2444,7 +4038,10 @@
       }
     }
 
-    // Edit Metadata
+    // ==========================================
+    // EDIT TENANT
+    // ==========================================
+
     function openEditTenantModal(id, companyName, adminPhone) {
       document.getElementById('edit-tenant-id').value = id;
       document.getElementById('edit-company-name').value = companyName;
@@ -2459,7 +4056,7 @@
         companyName: document.getElementById('edit-company-name').value,
         adminPhone: document.getElementById('edit-admin-phone').value
       };
-      
+
       try {
         const res = await fetch(`${API_BASE}/platform/tenants/${id}`, {
           method: 'PUT',
@@ -2479,7 +4076,10 @@
       }
     });
 
-    // Suspend Organization
+    // ==========================================
+    // SUSPEND TENANT
+    // ==========================================
+
     function openSuspendModal(id) {
       document.getElementById('suspend-tenant-id').value = id;
       document.getElementById('suspend-reason').value = '';
@@ -2509,7 +4109,10 @@
       }
     });
 
-    // Reactivate Tenant
+    // ==========================================
+    // ACTIVATE TENANT
+    // ==========================================
+
     async function activateTenant(id) {
       try {
         const res = await fetch(`${API_BASE}/platform/tenants/${id}/activate`, {
@@ -2528,7 +4131,10 @@
       }
     }
 
-    // Disable (Deactivate) Tenant
+    // ==========================================
+    // DEACTIVATE TENANT
+    // ==========================================
+
     async function deactivateTenant(id) {
       try {
         const res = await fetch(`${API_BASE}/platform/tenants/${id}/deactivate`, {
@@ -2547,13 +4153,15 @@
       }
     }
 
-    // Override Plan Limits
+    // ==========================================
+    // OVERRIDE TENANT LIMITS
+    // ==========================================
+
     function openOverrideModal(id, planType, maxEmployees) {
       document.getElementById('override-tenant-id').value = id;
       document.getElementById('override-plan-type').value = planType;
       document.getElementById('override-max-employees').value = maxEmployees;
-      
-      // Guess storage limit based on plan type default
+
       let defStorage = 1024;
       if (planType === 'MODERATE') defStorage = 5120;
       if (planType === 'PREMIUM') defStorage = 20480;
@@ -2591,7 +4199,10 @@
       }
     });
 
-    // Delete Tenant
+    // ==========================================
+    // DELETE TENANT
+    // ==========================================
+
     async function deleteTenant(id) {
       if (confirm('DANGER: Are you absolutely sure you want to permanently delete this organization? This will cascade-delete all organization data (employees, payroll, attendance, settings) across all database tables. This action is irreversible.')) {
         try {
@@ -2613,9 +4224,8 @@
     }
 
     // ==========================================
-    // SUBSCRIPTION PLANS CRUD LOGIC
+    // SUBSCRIPTION PLANS
     // ==========================================
-    let globalSubscriptionPlans = [];
 
     async function fetchSubscriptionPlans() {
       try {
@@ -2665,7 +4275,6 @@
     }
 
     function populatePlanSelects(plans) {
-      // 1. Create Organization Modal
       const regSelect = document.getElementById('reg-plan-type');
       if (regSelect) {
         regSelect.innerHTML = plans.filter(p => p.active).map(p => `
@@ -2673,7 +4282,6 @@
         `).join('');
       }
 
-      // 2. Override Plan Modal
       const overrideSelect = document.getElementById('override-plan-type');
       if (overrideSelect) {
         overrideSelect.innerHTML = plans.map(p => `
@@ -2681,7 +4289,6 @@
         `).join('');
       }
 
-      // 3. Sandbox simulator select
       const sandboxSelect = document.getElementById('sandbox-plan-select');
       if (sandboxSelect) {
         sandboxSelect.innerHTML = plans.filter(p => p.active).map(p => `
@@ -2700,7 +4307,7 @@
       document.getElementById('plan-trial-days').value = '1';
       document.getElementById('plan-is-active').checked = true;
       document.getElementById('plan-description').value = '';
-      
+
       openModal('subscription-plan-modal');
     }
 
@@ -2711,19 +4318,19 @@
       document.getElementById('plan-modal-title').textContent = 'Edit Subscription Plan';
       document.getElementById('plan-id').value = plan.id;
       document.getElementById('plan-code').value = plan.code;
-      document.getElementById('plan-code').disabled = true; // Code cannot be edited
+      document.getElementById('plan-code').disabled = true;
       document.getElementById('plan-name').value = plan.name;
       document.getElementById('plan-monthly-price').value = plan.price || 0;
       document.getElementById('plan-trial-days').value = plan.validityMonths || 1;
       document.getElementById('plan-is-active').checked = plan.active;
       document.getElementById('plan-description').value = plan.description || '';
-      
+
       openModal('subscription-plan-modal');
     }
 
     document.getElementById('subscription-plan-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const id = document.getElementById('plan-id').value;
       const isEdit = id !== '';
       const method = isEdit ? 'PUT' : 'POST';
@@ -2751,7 +4358,7 @@
           showToast('Success', `Plan '${payload.name}' saved successfully.`, 'success');
           closeModal('subscription-plan-modal');
           fetchSubscriptionPlans();
-          fetchSubscriptionMetrics(); // reload metrics in case trial plan changed
+          fetchSubscriptionMetrics();
         } else {
           showToast('Failed', data.message || 'Failed to save subscription plan.', 'error');
         }
@@ -2782,20 +4389,20 @@
     }
 
     // ==========================================
-    // SUBSCRIPTION VIEW & SIMULATOR LOGIC
+    // SUBSCRIPTION METRICS
     // ==========================================
-    
+
     async function fetchSubscriptionMetrics() {
       try {
         const res = await fetch(`${API_BASE}/platform/subscriptions/dashboard`, { headers: getHeaders() });
         checkResponseStatus(res);
         if (res.ok) {
           const data = await res.json();
-          
+
           const grid = document.getElementById('subscription-cards-grid');
           if (grid) {
             grid.innerHTML = '';
-            
+
             const colors = ['info', 'indigo', 'warning', 'purple', 'success', 'pink', 'teal'];
             const icons = ['fa-hourglass-start', 'fa-cubes', 'fa-layer-group', 'fa-crown', 'fa-circle-nodes', 'fa-gem', 'fa-rocket'];
             const colorHexes = {
@@ -2807,14 +4414,14 @@
               'pink': '#ec4899',
               'teal': '#14b8a6'
             };
-            
+
             if (data.planDistribution && data.planDistribution.length > 0) {
               data.planDistribution.forEach((plan, index) => {
                 const color = colors[index % colors.length];
                 const icon = icons[index % icons.length];
                 const trendVal = Math.floor(Math.random() * 15) + 5;
                 const canvasId = `sparkline-sub-${index}`;
-                
+
                 const card = document.createElement('div');
                 card.className = `metric-card ${color}`;
                 card.innerHTML = `
@@ -2836,8 +4443,7 @@
                   </div>
                 `;
                 grid.appendChild(card);
-                
-                // Draw sparkline after rendering
+
                 setTimeout(() => {
                   drawSparkline(canvasId, generateSparklineData(plan.value, 8, 0.15), colorHexes[color]);
                 }, 50);
@@ -2848,8 +4454,6 @@
           }
 
           renderSubscriptionCharts(data);
-          
-          // Populate targets dropdown for simulator
           populateSandboxTargets();
         }
       } catch (err) {
@@ -2858,15 +4462,13 @@
     }
 
     function renderSubscriptionCharts(data) {
-      // Monthly Revenue Chart
       const revCanvas = document.getElementById('monthlyRevenueChart');
       const revCtx = revCanvas.getContext('2d');
       const revLabels = data.monthlyRevenue.map(p => p.label);
       const revValues = data.monthlyRevenue.map(p => p.value);
-      
+
       if (revChartInstance) revChartInstance.destroy();
 
-      // Create green fading area gradient
       const revGradient = revCtx.createLinearGradient(0, 0, 0, revCanvas.offsetHeight || 250);
       revGradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
       revGradient.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
@@ -2917,15 +4519,13 @@
         }
       });
 
-      // Subscription Growth Chart
       const growthCanvas = document.getElementById('subscriptionGrowthChart');
       const growthCtx = growthCanvas.getContext('2d');
       const growthLabels = data.subscriptionGrowth.map(p => p.label);
       const growthValues = data.subscriptionGrowth.map(p => p.value);
-      
+
       if (growthChartInstance) growthChartInstance.destroy();
 
-      // Create purple gradient for columns
       const growthGradient = growthCtx.createLinearGradient(0, 0, 0, growthCanvas.offsetHeight || 250);
       growthGradient.addColorStop(0, 'rgba(168, 85, 247, 0.85)');
       growthGradient.addColorStop(1, 'rgba(168, 85, 247, 0.2)');
@@ -2967,11 +4567,10 @@
         }
       });
 
-      // Plan Distribution Chart (Donut)
       const distCtx = document.getElementById('planDistributionChart').getContext('2d');
       const distLabels = data.planDistribution.map(p => p.label);
       const distValues = data.planDistribution.map(p => p.value);
-      
+
       if (distChartInstance) distChartInstance.destroy();
       distChartInstance = new Chart(distCtx, {
         type: 'doughnut',
@@ -3008,9 +4607,13 @@
       });
     }
 
+    // ==========================================
+    // SUBSCRIPTION SANDBOX
+    // ==========================================
+
     async function populateSandboxTargets() {
       const select = document.getElementById('sandbox-tenant-select');
-      
+
       try {
         const res = await fetch(`${API_BASE}/platform/tenants?size=50`, { headers: getHeaders() });
         if (res.ok) {
@@ -3031,7 +4634,6 @@
       }
     }
 
-    // Toggle sandbox fields based on selected action
     document.getElementById('sandbox-action-select').addEventListener('change', (e) => {
       const val = e.target.value;
       const planWrapper = document.getElementById('sandbox-plan-wrapper');
@@ -3042,26 +4644,24 @@
       }
     });
 
-    // Execute Subscription Simulator Actions (delegates to tenant's own controller)
     document.getElementById('sandbox-execute-btn').addEventListener('click', async () => {
       const tenantSelect = document.getElementById('sandbox-tenant-select');
       const tenantId = tenantSelect.value;
       const action = document.getElementById('sandbox-action-select').value;
-      
+
       if (!tenantId) {
         showToast('Required', 'Please choose a target organization first.', 'warning');
         return;
       }
-      
+
       const btn = document.getElementById('sandbox-execute-btn');
       btn.disabled = true;
       const originalText = btn.innerHTML;
       btn.innerHTML = `<span class="loading-spinner"></span>`;
-      
-      // Simulated header mapping
+
       const tenantHeaders = getHeaders();
-      tenantHeaders['X-Tenant-ID'] = tenantId; // Inject simulation context headers
-      
+      tenantHeaders['X-Tenant-ID'] = tenantId;
+
       let url = `${API_BASE}/tenant/subscriptions`;
       let method = 'POST';
       let payload = null;
@@ -3083,7 +4683,7 @@
         });
         checkResponseStatus(res);
         const data = await res.json();
-        
+
         btn.disabled = false;
         btn.innerHTML = originalText;
 
@@ -3101,7 +4701,7 @@
     });
 
     // ==========================================
-    // SUPPORT TICKETS & NOTIFICATIONS LOGIC
+    // SUPPORT TICKETS
     // ==========================================
 
     document.getElementById('ticket-tenant-search').addEventListener('input', debounce(() => {
@@ -3137,7 +4737,7 @@
       const search = document.getElementById('ticket-tenant-search').value;
       const status = document.getElementById('ticket-status-filter').value;
       const priority = document.getElementById('ticket-priority-filter').value;
-      
+
       let url = `${API_BASE}/platform/support-tickets?page=${TICKETS_PAGE}&size=${TICKETS_PAGE_SIZE}`;
       if (search) url += `&tenantName=${encodeURIComponent(search)}`;
       if (status) url += `&status=${status}`;
@@ -3145,14 +4745,14 @@
 
       const tbody = document.getElementById('tickets-list-tbody');
       tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px 0;"><span class="loading-spinner"></span></td></tr>`;
-      
+
       try {
         const res = await fetch(url, { headers: getHeaders() });
         checkResponseStatus(res);
         if (res.ok) {
           const data = await res.json();
           const list = data.content;
-          
+
           tbody.innerHTML = '';
           if (list && list.length > 0) {
             list.forEach(t => {
@@ -3175,12 +4775,12 @@
               `;
               tbody.appendChild(row);
             });
-            
+
             TICKETS_TOTAL_PAGES = data.totalPages;
             document.getElementById('tickets-pagination-start').textContent = (TICKETS_PAGE * TICKETS_PAGE_SIZE) + 1;
             document.getElementById('tickets-pagination-end').textContent = Math.min((TICKETS_PAGE + 1) * TICKETS_PAGE_SIZE, data.totalElements);
             document.getElementById('tickets-pagination-total').textContent = data.totalElements;
-            
+
             document.getElementById('tickets-pagination-prev').disabled = TICKETS_PAGE === 0;
             document.getElementById('tickets-pagination-next').disabled = TICKETS_PAGE >= TICKETS_TOTAL_PAGES - 1;
           } else {
@@ -3215,7 +4815,7 @@
           document.getElementById('ticket-detail-description').value = t.description;
           document.getElementById('resolve-status-select').value = t.status;
           document.getElementById('resolve-resolution-text').value = t.resolution || '';
-          
+
           openModal('resolve-ticket-modal');
         }
       } catch (err) {
@@ -3230,7 +4830,7 @@
         status: document.getElementById('resolve-status-select').value,
         resolution: document.getElementById('resolve-resolution-text').value
       };
-      
+
       try {
         const res = await fetch(`${API_BASE}/platform/support-tickets/${id}/status`, {
           method: 'PUT',
@@ -3251,7 +4851,10 @@
       }
     });
 
-    // Notifications Panel Toggle
+    // ==========================================
+    // NOTIFICATIONS
+    // ==========================================
+
     document.getElementById('notif-toggle-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       const dropdown = document.getElementById('notif-dropdown-panel');
@@ -3274,7 +4877,7 @@
         if (res.ok) {
           const notifications = await res.json();
           globalNotifications = notifications;
-          
+
           const unreadCount = notifications.filter(n => !n.isRead).length;
           const badge = document.getElementById('notif-unread-badge');
           if (unreadCount > 0) {
@@ -3283,10 +4886,10 @@
           } else {
             badge.style.display = 'none';
           }
-          
+
           const container = document.getElementById('notif-list-container');
           container.innerHTML = '';
-          
+
           if (notifications.length > 0) {
             notifications.forEach(n => {
               const item = document.createElement('div');
@@ -3328,9 +4931,9 @@
     async function markAllNotificationsRead() {
       const unread = globalNotifications.filter(n => !n.isRead);
       if (unread.length === 0) return;
-      
+
       try {
-        const promises = unread.map(n => 
+        const promises = unread.map(n =>
           fetch(`${API_BASE}/platform/notifications/${n.id}/read`, {
             method: 'PUT',
             headers: getHeaders()
@@ -3344,14 +4947,27 @@
       }
     }
 
+    document.getElementById('notif-mark-all-read').addEventListener('click', markAllNotificationsRead);
+
+    document.getElementById('notif-view-all-btn').addEventListener('click', () => {
+      const dropdown = document.getElementById('notif-dropdown-panel');
+      if (dropdown) dropdown.style.display = 'none';
+      document.querySelector('[data-tab=tab-tickets]').click();
+    });
+
+    function handleNotificationClick(id, type) {
+      markNotificationRead(id);
+      document.querySelector('[data-tab=tab-tickets]').click();
+    }
+
     // ==========================================
-    // PAYROLL CONFIGURATIONS LOGIC
+    // PAYROLL CONFIGURATIONS
     // ==========================================
 
     async function fetchPlatformPayrollRates() {
       const tbody = document.getElementById('statutory-rates-list-tbody');
       tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;"><span class="loading-spinner"></span></td></tr>`;
-      
+
       try {
         const res = await fetch(`${API_BASE}/platform/payroll/statutory-rates`, { headers: getHeaders() });
         checkResponseStatus(res);
@@ -3388,7 +5004,7 @@
     async function fetchPlatformPtConfigs() {
       const tbody = document.getElementById('pt-configs-list-tbody');
       tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px 0;"><span class="loading-spinner"></span></td></tr>`;
-      
+
       try {
         const res = await fetch(`${API_BASE}/platform/payroll/pt-configs`, { headers: getHeaders() });
         checkResponseStatus(res);
@@ -3424,7 +5040,6 @@
       }
     }
 
-    // Modal Triggers for Statutory Rates
     function openCreateStatutoryRateModal() {
       document.getElementById('statutory-rate-modal-title').textContent = 'Add Statutory Rate';
       document.getElementById('rate-id').value = '';
@@ -3433,11 +5048,11 @@
       document.getElementById('rate-wage-base').value = 'WAGES_BASE';
       document.getElementById('rate-ceiling').value = '';
       document.getElementById('rate-cap').value = '';
-      
+
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('rate-effective-from').value = today;
       document.getElementById('rate-effective-to').value = '';
-      
+
       openModal('statutory-rate-modal');
     }
 
@@ -3451,7 +5066,7 @@
       document.getElementById('rate-cap').value = cap || '';
       document.getElementById('rate-effective-from').value = effectiveFrom;
       document.getElementById('rate-effective-to').value = effectiveTo || '';
-      
+
       openModal('statutory-rate-modal');
     }
 
@@ -3508,7 +5123,6 @@
       }
     }
 
-    // Modal Triggers for State PT Configs
     function openCreatePtConfigModal() {
       document.getElementById('pt-config-modal-title').textContent = 'Add State PT Slab';
       document.getElementById('pt-id').value = '';
@@ -3517,11 +5131,11 @@
       document.getElementById('pt-salary-min').value = '';
       document.getElementById('pt-salary-max').value = '';
       document.getElementById('pt-month-override').value = '';
-      
+
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('pt-effective-from').value = today;
       document.getElementById('pt-effective-to').value = '';
-      
+
       openModal('pt-config-modal');
     }
 
@@ -3535,7 +5149,7 @@
       document.getElementById('pt-month-override').value = monthOverride || '';
       document.getElementById('pt-effective-from').value = effectiveFrom;
       document.getElementById('pt-effective-to').value = effectiveTo || '';
-      
+
       openModal('pt-config-modal');
     }
 
@@ -3592,35 +5206,9 @@
       }
     }
 
-    document.getElementById('notif-mark-all-read').addEventListener('click', markAllNotificationsRead);
-
-    document.getElementById('notif-view-all-btn').addEventListener('click', () => {
-      const dropdown = document.getElementById('notif-dropdown-panel');
-      if (dropdown) dropdown.style.display = 'none';
-      document.querySelector('[data-tab=tab-tickets]').click();
-    });
-
-    function handleNotificationClick(id, type) {
-      markNotificationRead(id);
-      document.querySelector('[data-tab=tab-tickets]').click();
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/\//g, '&#x2F;');
-    }
-
     // ==========================================
-    // PLATFORM GLOBAL API HIT LOGS
+    // PLATFORM API LOGS
     // ==========================================
-    let platformApiLogsPage = 0;
-    let platformApiLogsTotalPages = 1;
 
     async function fetchPlatformApiLogs(page = 0) {
       platformApiLogsPage = page;
@@ -3646,7 +5234,7 @@
             logs.forEach(log => {
               const row = document.createElement('tr');
               const timeStr = log.hitTime ? new Date(log.hitTime).toLocaleString() : '-';
-              
+
               const tenantText = log.tenantId ? `Tenant #${escapeHtml(log.tenantId)}` : 'Platform';
               const methodText = escapeHtml(log.httpMethod);
               const uriText = escapeHtml(log.requestUri);
@@ -3687,30 +5275,45 @@
       }
     }
 
+    // ==========================================
+    // EXPOSE GLOBALLY
+    // ==========================================
+
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.viewTenantDetails = viewTenantDetails;
+    window.executeTenantRestore = executeTenantRestore;
+    window.openEditTenantModal = openEditTenantModal;
+    window.openSuspendModal = openSuspendModal;
+    window.activateTenant = activateTenant;
+    window.deactivateTenant = deactivateTenant;
+    window.openOverrideModal = openOverrideModal;
+    window.deleteTenant = deleteTenant;
+    window.openCreatePlanModal = openCreatePlanModal;
+    window.openEditPlanModal = openEditPlanModal;
+    window.deleteSubscriptionPlan = deleteSubscriptionPlan;
+    window.viewTicketDetails = viewTicketDetails;
+    window.handleNotificationClick = handleNotificationClick;
+    window.markNotificationRead = markNotificationRead;
+    window.openCreateStatutoryRateModal = openCreateStatutoryRateModal;
+    window.openEditStatutoryRateModal = openEditStatutoryRateModal;
+    window.deleteStatutoryRate = deleteStatutoryRate;
+    window.openCreatePtConfigModal = openCreatePtConfigModal;
+    window.openEditPtConfigModal = openEditPtConfigModal;
+    window.deletePtConfig = deletePtConfig;
     window.fetchPlatformApiLogs = fetchPlatformApiLogs;
     window.changePlatformApiLogsPage = changePlatformApiLogsPage;
-
-    function toggleRegStateField() {
-      const country = document.getElementById('reg-country').value;
-      const indiaGroup = document.getElementById('reg-state-india-group');
-      const otherGroup = document.getElementById('reg-state-other-group');
-      
-      if (country === 'IN') {
-        indiaGroup.style.display = '';
-        otherGroup.style.display = 'none';
-        document.getElementById('reg-state-india').required = true;
-        document.getElementById('reg-state-other').required = false;
-      } else {
-        indiaGroup.style.display = 'none';
-        otherGroup.style.display = '';
-        document.getElementById('reg-state-india').required = false;
-        document.getElementById('reg-state-other').required = true;
-      }
-    }
+    window.updateTrendPeriod = updateTrendPeriod;
+    window.simulateFlushCache = simulateFlushCache;
+    window.simulateTestEmail = simulateTestEmail;
     window.toggleRegStateField = toggleRegStateField;
 
-    // Boot App
-    window.addEventListener('DOMContentLoaded', initApp);
+    // ==========================================
+    // INIT
+    // ==========================================
+
+    document.addEventListener('DOMContentLoaded', initApp);
   </script>
 </body>
+
 </html>

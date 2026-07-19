@@ -20,4 +20,8 @@ public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPl
 
     @Query("SELECT p FROM SubscriptionPlan p WHERE p.deletedAt IS NULL")
     List<SubscriptionPlan> findAllActivePlans();
+
+    @Query("SELECT p FROM SubscriptionPlan p WHERE (LOWER(p.code) = LOWER(:codeOrName) OR LOWER(p.name) = LOWER(:codeOrName)) AND p.deletedAt IS NULL")
+    Optional<SubscriptionPlan> findByCodeOrNameIgnoreCase(@Param("codeOrName") String codeOrName);
 }
+

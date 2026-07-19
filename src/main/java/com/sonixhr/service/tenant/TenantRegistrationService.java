@@ -80,9 +80,9 @@ public class TenantRegistrationService {
         if (request.getPlanCode() == null || request.getPlanCode().trim().isEmpty()) {
             throw new BusinessException("Subscription plan selection is required.");
         }
-        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(request.getPlanCode().trim())
+        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeOrNameIgnoreCase(request.getPlanCode().trim())
                 .orElseThrow(() -> new BusinessException(
-                        "Subscription plan not found with name: " + request.getPlanCode()));
+                        "Subscription plan not found with code or name: " + request.getPlanCode()));
 
         if (!plan.isActive()) {
             throw new BusinessException("The selected subscription plan is currently inactive.");

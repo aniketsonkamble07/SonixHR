@@ -8236,6 +8236,28 @@ false
 
 ## TenantRegistrationController
 
+### GET `/api/public/plans`
+- **Handler Method**: `getPublicPlans`
+- **Description**: List public active subscription plans
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SubscriptionPlanDTO[]`
+#### Response JSON Example:
+```json
+[
+  {
+    "id": 1,
+    "code": "trial",
+    "name": "Trial Plan",
+    "price": 0.0,
+    "validityMonths": 1,
+    "description": "Default free trial plan",
+    "isActive": true
+  }
+]
+```
+
+---
+
 ### GET `/api/public/check-email`
 - **Handler Method**: `checkEmail`
 - **Description**: No description provided

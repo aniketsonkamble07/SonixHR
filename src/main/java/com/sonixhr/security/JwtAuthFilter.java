@@ -119,7 +119,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Check if token is blacklisted first
+            // Check if token is expired first
+            if (jwtService.isTokenExpired(token)) {
+                if (cacheEnabled) {
+                    authCache.invalidate(token);
+                }
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // Check if token is blacklisted next
             if (jwtService.isTokenBlacklisted(token)) {
                 if (cacheEnabled) {
                     authCache.invalidate(token);

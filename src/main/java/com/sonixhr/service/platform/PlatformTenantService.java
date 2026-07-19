@@ -132,9 +132,9 @@ public class PlatformTenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
 
-        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(dto.getPlanType())
+        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeOrNameIgnoreCase(dto.getPlanType())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Subscription plan not found with code: " + dto.getPlanType()));
+                        "Subscription plan not found with code or name: " + dto.getPlanType()));
 
         tenant.setSubscriptionPlan(plan);
         tenant.setMaxEmployees(dto.getMaxEmployees());
