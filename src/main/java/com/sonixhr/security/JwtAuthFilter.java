@@ -114,7 +114,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             // Note: token from URL query params (?token=...) is intentionally NOT supported.
             // URL tokens are logged by servers, proxies, and stored in browser history.
 
-            if (token == null || token.isEmpty()) {
+            if (token == null || token.isEmpty() || "null".equals(token) || "undefined".equals(token)) {
                 filterChain.doFilter(request, response);
                 return;
             }

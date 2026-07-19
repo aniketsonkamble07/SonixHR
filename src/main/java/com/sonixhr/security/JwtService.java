@@ -249,7 +249,7 @@ public class JwtService {
 
     public boolean validateToken(String token) {
         try {
-            if (token == null || token.isBlank()) {
+            if (token == null || token.isBlank() || "null".equals(token) || "undefined".equals(token)) {
                 return false;
             }
             return !isTokenExpired(token) && !isTokenBlacklisted(token) && isAccessToken(token);
@@ -260,7 +260,7 @@ public class JwtService {
 
     public boolean validateRefreshToken(String token) {
         try {
-            if (token == null || token.isBlank()) {
+            if (token == null || token.isBlank() || "null".equals(token) || "undefined".equals(token)) {
                 return false;
             }
             return !isTokenExpired(token) && !isTokenBlacklisted(token) && isRefreshToken(token);
@@ -301,6 +301,9 @@ public class JwtService {
     }
 
     public boolean isTokenBlacklisted(String token) {
+        if (token == null || token.isEmpty() || "null".equals(token) || "undefined".equals(token)) {
+            return false;
+        }
         try {
             String userType = extractUserType(token);
             if ("PLATFORM".equals(userType)) {
