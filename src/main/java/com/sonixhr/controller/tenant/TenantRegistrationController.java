@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ public class TenantRegistrationController {
     private final EmployeeRepository employeeRepository;
     private final RateLimiterService rateLimiterService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @GetMapping("/plans")
     public ResponseEntity<List<com.sonixhr.dto.platform.SubscriptionPlanDTO>> getPublicPlans() {
@@ -182,6 +184,20 @@ public class TenantRegistrationController {
             result.put("error", "Redis connection error. Check server logs for details.");
             // ✅ Log to server logs only
             log.error("Redis debug endpoint error: {}", e.getMessage(), e);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/debug-db")
+    public ResponseEntity<Map<String, Object>> debugDb() {
+        Map<String, Object> result = new java.util.HashMap<>();
+        try {
+            result.put("employees", jdbcTemplate.queryForList("SELECT id, email, is_active, status, tenant_id FROM employees"));
+            result.put("tenants", jdbcTemplate.queryForList("SELECT id, company_name, tenant_code, status, is_active FROM tenants"));
+            result.put("success", true);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
         }
         return ResponseEntity.ok(result);
     }
