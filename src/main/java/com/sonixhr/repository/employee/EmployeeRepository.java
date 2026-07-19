@@ -337,6 +337,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("""
     SELECT DISTINCT e FROM Employee e
+    LEFT JOIN FETCH e.tenant
     LEFT JOIN FETCH e.roles r
     LEFT JOIN FETCH r.permissions
     WHERE e.email = :email
