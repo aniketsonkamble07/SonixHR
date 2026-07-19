@@ -9,6 +9,7 @@ import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.security.PlatformTokenBlacklistService;
 import com.sonixhr.security.RateLimiterService;
+import com.sonixhr.security.HashingService;
 import com.sonixhr.service.platform.PlatformAuthService;
 import com.sonixhr.service.platform.PlatformUserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,8 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
+import java.security.SecureRandom;
 
 import java.util.Map;
 
@@ -33,11 +34,14 @@ import java.util.Map;
 @SuppressWarnings("null")
 public class PlatformAuthController {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final PlatformAuthService platformAuthService;
     private final PlatformUserService platformUserService;
     private final JwtService jwtService;
     private final PlatformTokenBlacklistService tokenBlacklistService;
     private final RateLimiterService rateLimiterService;
+    private final HashingService hashingService;
 
     @Value("${app.trust-proxy:false}")
     private boolean trustProxy;
@@ -50,7 +54,7 @@ public class PlatformAuthController {
         String ip = resolveClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : "";
-        String hashedEmail = DigestUtils.md5DigestAsHex(email.getBytes());
+        String hashedEmail = hashingService.hashEmail(email);
 
         log.info("Login attempt for platform user: {}, IP: {}, User-Agent: {}", 
             request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
@@ -151,13 +155,17 @@ public class PlatformAuthController {
         rateLimiterService.checkOrThrow("forgot:ip:" + ip, 3, 600);
 
         // Email-based rate limiting to prevent enumeration
-        String hashedEmail = DigestUtils.md5DigestAsHex(email.toLowerCase().trim().getBytes());
+        String hashedEmail = hashingService.hashEmail(email);
         rateLimiterService.checkOrThrow("forgot:email:" + hashedEmail, 2, 3600);
 
         // Random delay to prevent timing attacks
         try {
-            Thread.sleep(500 + (long) (Math.random() * 500));
-        } catch (InterruptedException ignored) {}
+            Thread.sleep(500 + SECURE_RANDOM.nextInt(500));
+        } catch (InterruptedException e) {
+            log.error("Thread was interrupted during login delay", e);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Authentication delay was interrupted", e);
+        }
 
         platformUserService.forgotPassword(email);
         return ResponseEntity.ok(Map.of(
@@ -195,15 +203,13 @@ public class PlatformAuthController {
         rateLimiterService.checkOrThrow("verify-token:ip:" + resolveClientIp(httpRequest), 20, 60);
 
         if (tokenBlacklistService.isBlacklisted(token)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("valid", false, "error", "Token has been revoked"));
+            return ResponseEntity.ok(Map.of("valid", false, "error", "Token is invalid or expired"));
         }
 
         try {
             boolean isValid = jwtService.validateToken(token);
             if (!isValid) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("valid", false, "error", "Token is invalid or expired"));
+                return ResponseEntity.ok(Map.of("valid", false, "error", "Token is invalid or expired"));
             }
 
             return ResponseEntity.ok(Map.of(
@@ -213,8 +219,7 @@ public class PlatformAuthController {
             ));
         } catch (Exception e) {
             log.warn("Token verification failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("valid", false, "error", "Token is invalid or expired"));
+            return ResponseEntity.ok(Map.of("valid", false, "error", "Token is invalid or expired"));
         }
     }
 
@@ -235,4 +240,6 @@ public class PlatformAuthController {
         }
         return request.getRemoteAddr();
     }
+
+
 }

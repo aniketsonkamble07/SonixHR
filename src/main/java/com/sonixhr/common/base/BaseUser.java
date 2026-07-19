@@ -32,10 +32,6 @@ public abstract class BaseUser extends BaseEntity implements UserDetails {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
-    // ❌ REMOVE THIS - Duplicate with BaseEntity.active
-    // @Column(name = "is_active")
-    // @Builder.Default
-    // private boolean isActive = true;
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
@@ -59,14 +55,7 @@ public abstract class BaseUser extends BaseEntity implements UserDetails {
         this.cachedRolesVersion = null;
     }
 
-    // Helper method to access active from BaseEntity
-    public boolean isActive() {
-        return super.isActive();  // This calls BaseEntity's active field
-    }
 
-    public void setActive(boolean active) {
-        super.setActive(active);
-    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

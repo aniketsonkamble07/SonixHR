@@ -122,6 +122,7 @@ public class PlatformPermission extends BasePermission {
     /**
      * Check if permission is active
      */
+    @Override
     public boolean isActive() {
         return active;
     }

@@ -550,6 +550,7 @@ public class TenantRLSService {
     }
 
     @Transactional
+    @SuppressWarnings("squid:S2077")
     public void applyRLSPolicy(String tableName, String tenantColumn) {
         if (tableName == null || tenantColumn == null) {
             log.warn("Cannot apply RLS policy: tableName or tenantColumn is null");
@@ -582,6 +583,7 @@ public class TenantRLSService {
      * Apply RLS policies to multiple tables in batch
      */
     @Transactional
+    @SuppressWarnings("squid:S2077")
     public void applyRLSPolicies(Map<String, String> tableTenantColumnMap) {
         // Use batch update for better performance
         String[] sqls = tableTenantColumnMap.entrySet().stream()

@@ -44,15 +44,10 @@ import java.util.concurrent.TimeUnit;
 public class RateLimiterService {
 
     private final StringRedisTemplate redisTemplate;
-    private final Environment env;
 
     // Fail open by default — a Redis outage should not lock everyone out.
     // Set to false if you prefer to reject requests when Redis is unavailable.
     private static final boolean FAIL_OPEN = true;
-
-    // ✅ Use Spring profiles for test detection instead of stack trace inspection
-    private static final Set<String> TEST_PROFILES = new HashSet<>(Arrays.asList(
-            "test", "integration-test", "unit-test"));
 
     @Value("${app.rate-limiting.enabled:true}")
     private boolean rateLimitingEnabled;

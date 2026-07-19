@@ -16,8 +16,7 @@ public interface LoanAdvanceRepository extends JpaRepository<LoanAdvance, UUID> 
     List<LoanAdvance> findActiveByEmployeeIdAndTenantId(@Param("employeeId") Long employeeId, @Param("tenantId") Long tenantId);
 
     @Query("SELECT l, COALESCE(SUM(pi.amount), 0) FROM LoanAdvance l " +
-           "LEFT JOIN PayslipItem pi ON pi.resolvedVariables LIKE CONCAT('%\"loanId\":\"', l.id, '\"%') " +
-           "AND pi.componentCode = 'LOAN_EMI' " +
+           "LEFT JOIN PayslipItem pi ON pi.componentCode = CONCAT('LOAN_EMI_', l.id) " +
            "WHERE l.employee.id = :employeeId " +
            "AND l.tenant.id = :tenantId " +
            "AND l.status != 'CLOSED' " +

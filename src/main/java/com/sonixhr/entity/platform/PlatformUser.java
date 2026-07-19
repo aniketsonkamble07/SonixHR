@@ -91,7 +91,8 @@ public class PlatformUser extends BaseUser {
     protected void loadAuthorities(Set<GrantedAuthority> authorities) {
         for (PlatformRole role : roles) {
             if (role.isActive()) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+                String roleName = role.getName().trim().toUpperCase().replace(" ", "_");
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
 
                 for (PlatformPermission permission : role.getPermissions()) {
                     if (permission != null && permission.isActive()) {
@@ -189,7 +190,7 @@ public class PlatformUser extends BaseUser {
     // ==================== Permission Check Methods ====================
 
     public boolean isSuperAdmin() {
-        return hasRole("SUPER_ADMIN");
+        return hasRole("Admin") || hasRole("ADMIN");
     }
 
     public boolean hasPermission(String permissionName) {

@@ -125,7 +125,7 @@ public class PayslipGenerator {
                 payslipItemRepo.save(PayslipItem.builder()
                         .tenant(tenantConfig.getTenant())
                         .payslipId(payslip.getId())
-                        .componentCode("LOAN_EMI")
+                        .componentCode("LOAN_EMI_" + entry.getKey())
                         .componentName("Loan/Advance Recovery")
                         .type("DEDUCTION")
                         .amount(entry.getValue())

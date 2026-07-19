@@ -12,18 +12,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
- 
+
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
- 
+
 @Slf4j
 @RestController
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
-@SuppressWarnings({"unchecked", "null"})
+@SuppressWarnings({ "unchecked", "null" })
 public class ManualAttendanceController {
 
     private final ManualAttendanceService attendanceService;
@@ -34,7 +34,7 @@ public class ManualAttendanceController {
     // =====================================================
 
     @PostMapping("/mark")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_MARK_TEAM', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_MARK_TEAM')") // ✅ Updated
     public ResponseEntity<ManualAttendanceRecordResponse> markAttendance(
             @Valid @RequestBody ManualAttendanceMarkRequest request,
             @AuthenticationPrincipal Employee currentUser) {
@@ -45,14 +45,13 @@ public class ManualAttendanceController {
                 request.getStatus(),
                 request.getReason(),
                 request.getOvertimeHours(),
-                currentUser
-        );
+                currentUser);
 
         return ResponseEntity.ok(convertToResponse(record));
     }
 
     @PostMapping("/team/bulk")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_MARK_TEAM', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_MARK_TEAM')") // ✅ Updated
     public ResponseEntity<List<ManualAttendanceRecordResponse>> bulkMarkTeamAttendance(
             @Valid @RequestBody ManualBulkAttendanceMarkRequest request,
             @AuthenticationPrincipal Employee currentUser) {
@@ -62,14 +61,13 @@ public class ManualAttendanceController {
                 request.getAttendanceDate(),
                 request.getAttendanceMap(),
                 request.getReasonMap(),
-                request.getOvertimeMap()
-        );
+                request.getOvertimeMap());
 
         return ResponseEntity.ok(records.stream().map(this::convertToResponse).toList());
     }
 
     @PostMapping("/team/quick-mark")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_MARK_TEAM', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_MARK_TEAM')") // ✅ Updated
     public ResponseEntity<List<ManualAttendanceRecordResponse>> quickMarkTeamAttendance(
             @Valid @RequestBody ManualQuickMarkRequest request,
             @AuthenticationPrincipal Employee currentUser) {
@@ -83,7 +81,7 @@ public class ManualAttendanceController {
     // =====================================================
 
     @PostMapping("/overtime")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_EDIT', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_EDIT')")  // ✅ Updated
     public ResponseEntity<ManualAttendanceRecordResponse> addOvertime(
             @Valid @RequestBody ManualOvertimeRequest request,
             @AuthenticationPrincipal Employee currentUser) {
@@ -93,8 +91,7 @@ public class ManualAttendanceController {
                 request.getDate(),
                 request.getOvertimeHours(),
                 request.getReason(),
-                currentUser
-        );
+                currentUser);
 
         return ResponseEntity.ok(convertToResponse(record));
     }
@@ -104,7 +101,7 @@ public class ManualAttendanceController {
     // =====================================================
 
     @GetMapping("/team/members")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_TEAM')")  // ✅ Updated
     public ResponseEntity<List<ManualTeamMemberAttendanceDTO>> getTeamWithTodayAttendance(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Employee currentUser) {
@@ -114,20 +111,22 @@ public class ManualAttendanceController {
     }
 
     @GetMapping("/team/search")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_TEAM', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_TEAM')")
     public ResponseEntity<List<ManualTeamMemberAttendanceDTO>> searchTeamWithTodayAttendance(
             @RequestParam String searchTerm,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Employee currentUser) {
 
-        log.info("REST request to search team members with term: {} by manager: {} for date: {}", searchTerm, currentUser.getId(), date);
+        log.info("REST request to search team members with term: {} by manager: {} for date: {}", searchTerm,
+                currentUser.getId(), date);
         LocalDate targetDate = date != null ? date : LocalDate.now(java.time.Clock.systemUTC());
-        List<ManualTeamMemberAttendanceDTO> results = attendanceService.searchTeamWithTodayAttendance(currentUser.getId(), searchTerm, targetDate);
+        List<ManualTeamMemberAttendanceDTO> results = attendanceService
+                .searchTeamWithTodayAttendance(currentUser.getId(), searchTerm, targetDate);
         return ResponseEntity.ok(results);
     }
 
     @GetMapping("/team/summary")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_ALL', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_ALL')") // ✅ Updated
     public ResponseEntity<ManualTeamAttendanceSummaryResponse> getTeamAttendanceSummary(
             @AuthenticationPrincipal Employee currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -142,7 +141,7 @@ public class ManualAttendanceController {
     // =====================================================
 
     @GetMapping("/employee/{employeeId}/summary")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_ALL', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_ALL')") // ✅ Updated
     public ResponseEntity<ManualAttendanceSummaryResponse> getEmployeeMonthlySummary(
             @PathVariable Long employeeId,
             @RequestParam int year,
@@ -154,7 +153,7 @@ public class ManualAttendanceController {
     }
 
     @GetMapping("/employee/{employeeId}/calendar")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_OWN', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_OWN') or #employeeId == principal.id")  // ✅ Updated
     public ResponseEntity<ManualAttendanceCalendarResponse> getEmployeeCalendar(
             @PathVariable Long employeeId,
             @RequestParam int year,
@@ -170,7 +169,7 @@ public class ManualAttendanceController {
     // =====================================================
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_ALL', 'SUPER_ADMIN')")  // ✅ Updated
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW_ALL')") // ✅ Updated
     public ResponseEntity<ManualDashboardStatsResponse> getDashboardStats(
             @AuthenticationPrincipal Employee currentUser) {
 
@@ -182,21 +181,21 @@ public class ManualAttendanceController {
     // CONVERSION METHODS
     // =====================================================
 
-    private ManualAttendanceRecordResponse convertToResponse(AttendanceRecord record) {
+    private ManualAttendanceRecordResponse convertToResponse(AttendanceRecord attendanceRecord) {
         return ManualAttendanceRecordResponse.builder()
-                .id(record.getId())
-                .tenantId(record.getTenant().getId())
-                .employeeId(record.getEmployee().getId())
-                .employeeName(record.getEmployee().getFullName())
-                .employeeCode(record.getEmployee().getEmployeeCode())
-                .attendanceDate(record.getAttendanceDate())
-                .status(record.getStatus())
-                .overtimeHours(record.getOvertimeHours())
-                .reason(record.getReason())
-                .markedByName(record.getMarkedByName())
-                .markedByRole(record.getMarkedByRole())
-                .markedAt(record.getMarkedAt())
-                .updatedAt(record.getUpdatedAt())
+                .id(attendanceRecord.getId())
+                .tenantId(attendanceRecord.getTenant().getId())
+                .employeeId(attendanceRecord.getEmployee().getId())
+                .employeeName(attendanceRecord.getEmployee().getFullName())
+                .employeeCode(attendanceRecord.getEmployee().getEmployeeCode())
+                .attendanceDate(attendanceRecord.getAttendanceDate())
+                .status(attendanceRecord.getStatus())
+                .overtimeHours(attendanceRecord.getOvertimeHours())
+                .reason(attendanceRecord.getReason())
+                .markedByName(attendanceRecord.getMarkedByName())
+                .markedByRole(attendanceRecord.getMarkedByRole())
+                .markedAt(attendanceRecord.getMarkedAt())
+                .updatedAt(attendanceRecord.getUpdatedAt())
                 .build();
     }
 
@@ -244,7 +243,7 @@ public class ManualAttendanceController {
     }
 
     private ManualAttendanceCalendarResponse convertToCalendarResponse(Long employeeId, int year, int month,
-                                                                       Map<LocalDate, Map<String, Object>> calendar) {
+            Map<LocalDate, Map<String, Object>> calendar) {
         Employee employee = employeeRepository.findById(employeeId).orElse(null);
 
         Map<LocalDate, ManualAttendanceCalendarResponse.CalendarDayInfo> convertedCalendar = new LinkedHashMap<>();
@@ -274,9 +273,10 @@ public class ManualAttendanceController {
     }
 
     private double getAsPrimitiveDouble(Object val) {
-        if (val == null) return 0.0;
-        if (val instanceof Number) {
-            return ((Number) val).doubleValue();
+        if (val == null)
+            return 0.0;
+        if (val instanceof Number number) {
+            return number.doubleValue();
         }
         try {
             return Double.parseDouble(val.toString());
@@ -286,9 +286,10 @@ public class ManualAttendanceController {
     }
 
     private Double getAsDouble(Object val) {
-        if (val == null) return null;
-        if (val instanceof Number) {
-            return ((Number) val).doubleValue();
+        if (val == null)
+            return null;
+        if (val instanceof Number number) {
+            return number.doubleValue();
         }
         try {
             return Double.parseDouble(val.toString());

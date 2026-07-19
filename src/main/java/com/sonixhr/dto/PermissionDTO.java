@@ -23,8 +23,7 @@ public class PermissionDTO {
 
     private boolean selected;  // For role assignment UI
 
-    // ✅ Optional: Add if you have icons in your system
-    // private String icon;
+
 
 
 

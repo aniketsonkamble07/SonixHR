@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.sonixhr.repository.platform.SubscriptionPlanRepository;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -29,6 +31,26 @@ public class TenantRegistrationController {
     private final ActivationTokenService activationTokenService;
     private final EmployeeRepository employeeRepository;
     private final RateLimiterService rateLimiterService;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
+
+    @GetMapping("/plans")
+    public ResponseEntity<List<com.sonixhr.dto.platform.SubscriptionPlanDTO>> getPublicPlans() {
+        log.info("REST request to list public active subscription plans");
+        List<com.sonixhr.entity.platform.SubscriptionPlan> plans = subscriptionPlanRepository.findAllActivePlans();
+        List<com.sonixhr.dto.platform.SubscriptionPlanDTO> dtos = plans.stream()
+                .filter(p -> p.isActive())
+                .map(p -> com.sonixhr.dto.platform.SubscriptionPlanDTO.builder()
+                        .id(p.getId())
+                        .code(p.getCode())
+                        .name(p.getName())
+                        .description(p.getDescription())
+                        .price(p.getPrice())
+                        .validityMonths(p.getValidityMonths())
+                        .isActive(p.isActive())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
 
     @Value("${app.debug.redis-endpoint-enabled:false}")
     private boolean redisDebugEnabled;

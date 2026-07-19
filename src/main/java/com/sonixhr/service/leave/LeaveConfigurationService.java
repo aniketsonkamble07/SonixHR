@@ -198,10 +198,10 @@ public class LeaveConfigurationService {
         DayOfWeek dayOfWeek = date.getDayOfWeek();
         switch (config) {
             case SATURDAY_SUNDAY:
-                return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
+                return DayOfWeek.SATURDAY.equals(dayOfWeek) || DayOfWeek.SUNDAY.equals(dayOfWeek);
 
             case SUNDAY_ONLY:
-                return dayOfWeek == DayOfWeek.SUNDAY;
+                return DayOfWeek.SUNDAY.equals(dayOfWeek);
             case CUSTOM:
                 return isCustomWeekend(date, customDays);
             default:

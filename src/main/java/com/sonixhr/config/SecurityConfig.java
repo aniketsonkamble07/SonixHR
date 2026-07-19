@@ -69,9 +69,16 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // CSRF protection is disabled only for stateless REST API paths (/api/**, /actuator/**, etc.) 
+        // because they use JWT tokens in the Authorization header rather than session cookies.
+        // Since authentication for these endpoints never uses cookies, they are safe from CSRF.
+        // CSRF remains enabled for all other endpoints (such as static/browser-delivered HTML UI routes)
+        // to prevent potential cross-site request forgery attacks if session cookies are introduced.
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/actuator/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**"))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(unauthorizedHandler)
                         .accessDeniedHandler(accessDeniedHandler))

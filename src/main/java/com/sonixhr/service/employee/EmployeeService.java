@@ -159,16 +159,7 @@ public class EmployeeService {
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created successfully with code: {} and {} roles", employeeCode, roles.size());
 
-        // Generate activation token & send activation email (disabled for development
-        // testing)
-        // String activationToken =
-        // activationTokenService.generateTokenForEmployee(savedEmployee.getId());
-        // String activationLink = baseUrl + "/api/tenant/auth/activate?token=" +
-        // activationToken;
-        // emailService.sendActivationEmail(savedEmployee.getEmail(),
-        // savedEmployee.getFullName(), activationLink);
-        // log.info("Activation email sent to new employee: {}",
-        // savedEmployee.getEmail());
+        // Generate activation token & send activation email (disabled for development testing)
 
         if (request.getSalary() != null) {
             java.math.BigDecimal monthlyCtc;
@@ -1038,8 +1029,8 @@ public class EmployeeService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
             Object principal = authentication.getPrincipal();
-            if (principal instanceof Employee) {
-                return ((Employee) principal).getId();
+            if (principal instanceof Employee employee) {
+                return employee.getId();
             }
         }
         return null;
@@ -1371,5 +1362,17 @@ public class EmployeeService {
                 .isPrimary(map.get("isPrimary") instanceof Boolean ? (Boolean) map.get("isPrimary") : true)
                 .isActive(map.get("isActive") instanceof Boolean ? (Boolean) map.get("isActive") : true)
                 .build();
+    }
+
+    @Transactional
+    public void updateLoginDetails(Long employeeId, Long tenantId) {
+        Employee employee = employeeRepository.findByIdAndTenantId(employeeId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+        employee.setLastLoginAt(java.time.LocalDateTime.now());
+        if (employee.getShift() == null) {
+            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(tenantId)
+                    .ifPresent(employee::setShift);
+        }
+        employeeRepository.save(employee);
     }
 }

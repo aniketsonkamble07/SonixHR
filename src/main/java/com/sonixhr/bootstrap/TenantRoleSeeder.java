@@ -4,6 +4,7 @@ import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantPermission;
 import com.sonixhr.entity.tenant.TenantRole;
 import com.sonixhr.enums.TenantPermissionEnum;
+import com.sonixhr.common.constant.AppConstants;
 import com.sonixhr.repository.tenant.TenantPermissionRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantRoleRepository;
@@ -57,9 +58,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
         }
 
         try {
-            log.info("=========================================");
+            log.info(AppConstants.DIVIDER);
             log.info("Tenant Role Seeder Started");
-            log.info("=========================================");
+            log.info(AppConstants.DIVIDER);
 
             List<TenantPermission> allPermissions = permissionRepository.findAll();
             log.info("Found {} permissions", allPermissions.size());
@@ -88,9 +89,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 log.warn("No tenants found — skipping role seeding.");
             }
 
-            log.info("=========================================");
+            log.info(AppConstants.DIVIDER);
             log.info("Tenant Role Seeder Completed");
-            log.info("=========================================");
+            log.info(AppConstants.DIVIDER);
         } finally {
             if (Boolean.TRUE.equals(lockAcquired)) {
                 try {

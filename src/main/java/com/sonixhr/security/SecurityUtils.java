@@ -18,11 +18,14 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@SuppressWarnings({"unchecked", "null"})
+@SuppressWarnings({ "unchecked", "null" })
 public class SecurityUtils {
 
-    @Autowired(required = false)
-    private RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    public SecurityUtils(@Autowired(required = false) RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     @Value("${app.security.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -97,7 +100,7 @@ public class SecurityUtils {
         public String email;
         public List<String> roles;
         public String userType;
-        public Long tenantId;  // Changed to Long for consistency
+        public Long tenantId; // Changed to Long for consistency
         public Long employeeId;
         public String employeeCode;
         public long cachedAt;
@@ -229,7 +232,8 @@ public class SecurityUtils {
                     String cacheKey = REDIS_KEY_USER_CONTEXT + key;
                     redisTemplate.opsForValue().set(cacheKey, context, cacheTtlMinutes, TimeUnit.MINUTES);
                 } catch (Exception e) {
-                    log.warn("Redis unavailable for security context cache write (possible restart): {}", e.getMessage());
+                    log.warn("Redis unavailable for security context cache write (possible restart): {}",
+                            e.getMessage());
                 }
             }
         }
@@ -551,8 +555,8 @@ public class SecurityUtils {
         Object principal = auth.getPrincipal();
         if (principal instanceof UserDetails) {
             String className = principal.getClass().getSimpleName();
-            String userType = className.contains("Employee") ? USER_TYPE_EMPLOYEE :
-                    className.contains("PlatformUser") ? USER_TYPE_PLATFORM : null;
+            String userType = className.contains("Employee") ? USER_TYPE_EMPLOYEE
+                    : className.contains("PlatformUser") ? USER_TYPE_PLATFORM : null;
             if (userType != null) {
                 reqCache.put("userType", userType);
                 return userType;
@@ -877,8 +881,10 @@ public class SecurityUtils {
 
         // Clear local caches matching the email suffix or exact email
         localCache.keySet().removeIf(k -> k.toLowerCase().endsWith(":" + lowerEmail) || k.equalsIgnoreCase(email));
-        roleCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_") || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
-        permissionCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_") || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
+        roleCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_")
+                || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
+        permissionCheckCache.keySet().removeIf(k -> k.toLowerCase().contains(":" + lowerEmail + "_")
+                || k.toLowerCase().contains("_" + lowerEmail + "_") || k.toLowerCase().contains(lowerEmail));
 
         // Clear Redis cache
         if (cacheEnabled && redisTemplate != null) {
@@ -903,31 +909,33 @@ public class SecurityUtils {
 
     private void scanAndInvalidateRedisKeys(String pattern, String suffix, boolean containsMode) {
         try {
-            Set<String> keys = redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
-                Set<String> keySet = new java.util.HashSet<>();
-                org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
-                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000).build()
-                );
-                while (cursor.hasNext()) {
-                    String key = new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8);
-                    String lowerKey = key.toLowerCase();
-                    if (containsMode) {
-                        if (lowerKey.contains(":" + suffix + ":")) {
-                            keySet.add(key);
+            Set<String> keys = redisTemplate
+                    .execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
+                        Set<String> keySet = new java.util.HashSet<>();
+                        org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
+                                org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000)
+                                        .build());
+                        while (cursor.hasNext()) {
+                            String key = new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8);
+                            String lowerKey = key.toLowerCase();
+                            if (containsMode) {
+                                if (lowerKey.contains(":" + suffix + ":")) {
+                                    keySet.add(key);
+                                }
+                            } else {
+                                if (lowerKey.endsWith(":" + suffix)) {
+                                    keySet.add(key);
+                                }
+                            }
                         }
-                    } else {
-                        if (lowerKey.endsWith(":" + suffix)) {
-                            keySet.add(key);
-                        }
-                    }
-                }
-                return keySet;
-            });
+                        return keySet;
+                    });
             if (keys != null && !keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         } catch (Exception e) {
-            log.warn("Failed to scan and invalidate Redis keys for pattern {} and suffix {}: {}", pattern, suffix, e.getMessage());
+            log.warn("Failed to scan and invalidate Redis keys for pattern {} and suffix {}: {}", pattern, suffix,
+                    e.getMessage());
         }
     }
 
@@ -949,16 +957,17 @@ public class SecurityUtils {
 
     private void scanAndDelete(String pattern) {
         try {
-            Set<String> keys = redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
-                Set<String> keySet = new java.util.HashSet<>();
-                org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
-                        org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000).build()
-                );
-                while (cursor.hasNext()) {
-                    keySet.add(new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8));
-                }
-                return keySet;
-            });
+            Set<String> keys = redisTemplate
+                    .execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
+                        Set<String> keySet = new java.util.HashSet<>();
+                        org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(
+                                org.springframework.data.redis.core.ScanOptions.scanOptions().match(pattern).count(1000)
+                                        .build());
+                        while (cursor.hasNext()) {
+                            keySet.add(new String(cursor.next(), java.nio.charset.StandardCharsets.UTF_8));
+                        }
+                        return keySet;
+                    });
             if (keys != null && !keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }

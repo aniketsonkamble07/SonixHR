@@ -2,8 +2,8 @@ package com.sonixhr.controller.payroll;
 
 import com.sonixhr.entity.payroll.FnfSettlement;
 import com.sonixhr.service.payroll.FnfSettlementService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,10 +14,14 @@ import java.time.LocalDate;
 @PreAuthorize("isAuthenticated()")
 public class FnfController {
 
-    @Autowired
-    private FnfSettlementService fnfSettlementService;
+    private final FnfSettlementService fnfSettlementService;
+
+    public FnfController(FnfSettlementService fnfSettlementService) {
+        this.fnfSettlementService = fnfSettlementService;
+    }
 
     @PostMapping("/process")
+    @ResponseStatus(HttpStatus.CREATED)
     public FnfSettlement processFnf(
             @RequestParam("employeeId") Long employeeId,
             @RequestParam("tenantId") Long tenantId,

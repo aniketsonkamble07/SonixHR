@@ -34,4 +34,7 @@ public final class AppConstants {
     public static final String API_TENANT = API_PREFIX + "/tenant";
     public static final String API_PUBLIC = API_PREFIX + "/public";
     public static final String API_AUTH = API_PREFIX + "/auth";
+
+    // Logging/Console Dividers
+    public static final String DIVIDER = "=========================================";
 }

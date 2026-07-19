@@ -27,10 +27,10 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service("platformUserDetailsService")
-@RequiredArgsConstructor
 public class PlatformUserDetailsService implements UserDetailsService {
 
     private final PlatformUserRepository platformUserRepository;
+    private final org.springframework.cache.CacheManager cacheManager;
 
     @Value("${app.platform.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -40,13 +40,25 @@ public class PlatformUserDetailsService implements UserDetailsService {
 
     private Cache<String, PlatformUser> userCache;
 
+    public PlatformUserDetailsService(
+            PlatformUserRepository platformUserRepository,
+            @org.springframework.beans.factory.annotation.Qualifier("caffeineCacheManager") org.springframework.cache.CacheManager cacheManager) {
+        this.platformUserRepository = platformUserRepository;
+        this.cacheManager = cacheManager;
+    }
+
     @PostConstruct
     private void initCache() {
-        userCache = Caffeine.newBuilder()
-                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
-                .maximumSize(10_000)
-                .recordStats()
-                .build();
+        org.springframework.cache.Cache springCache = cacheManager.getCache("platformUsers");
+        if (springCache != null && springCache.getNativeCache() instanceof com.github.benmanes.caffeine.cache.Cache) {
+            this.userCache = (com.github.benmanes.caffeine.cache.Cache<String, PlatformUser>) springCache.getNativeCache();
+        } else {
+            this.userCache = Caffeine.newBuilder()
+                    .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                    .maximumSize(10_000)
+                    .recordStats()
+                    .build();
+        }
         log.info("Platform user cache initialised: ttl={}min", cacheTtlMinutes);
     }
 

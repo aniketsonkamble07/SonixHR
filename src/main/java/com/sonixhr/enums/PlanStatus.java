@@ -2,6 +2,7 @@ package com.sonixhr.enums;
 
 import lombok.Getter;
 
+// PlanStatus enum for subscription lifecycle
 @Getter
 public enum PlanStatus {
     ACTIVE("active", "Active", "success"),

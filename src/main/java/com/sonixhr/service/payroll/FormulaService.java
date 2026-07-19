@@ -116,10 +116,10 @@ public class FormulaService {
         }
         Map<String, Object> output = new HashMap<>();
         input.forEach((k, v) -> {
-            if (v instanceof BigDecimal) {
-                output.put(k, ((BigDecimal) v).doubleValue());
-            } else if (v instanceof Number) {
-                output.put(k, ((Number) v).doubleValue());
+            if (v instanceof BigDecimal bigDecimal) {
+                output.put(k, bigDecimal.doubleValue());
+            } else if (v instanceof Number number) {
+                output.put(k, number.doubleValue());
             } else {
                 output.put(k, v);
             }
@@ -178,8 +178,8 @@ public class FormulaService {
         if ("MethodReference".equals(nodeClass)) {
             String methodName = node.toStringAST();
             // Extract method name from the AST string representation
-            // The format is typically "methodName" or "methodName()"
-            String cleanName = methodName.replaceAll("\\s*\\(.*\\)\\s*$", "").trim();
+            int openParenIdx = methodName.indexOf('(');
+            String cleanName = (openParenIdx != -1) ? methodName.substring(0, openParenIdx).trim() : methodName.trim();
             
             // Check if it's a whitelisted method
             boolean isWhitelisted = ALLOWED_METHOD_NAMES.stream()

@@ -153,6 +153,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId")
     long countByTenantId(@Param("tenantId") Long tenantId);
 
+    @Query("SELECT e.tenant.id, COUNT(e) FROM Employee e GROUP BY e.tenant.id")
+    List<Object[]> countEmployeesGroupByTenantId();
+
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = true")
     long countActiveByTenantId(@Param("tenantId") Long tenantId);
 

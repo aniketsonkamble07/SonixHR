@@ -13,7 +13,7 @@ import java.util.Set;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public abstract class BaseRole extends BaseEntity {
+public abstract class BaseRole<P extends BasePermission> extends BaseEntity {
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -30,6 +30,16 @@ public abstract class BaseRole extends BaseEntity {
         return !systemRole;
     }
 
-    public abstract Set<? extends BasePermission> getPermissions();
-    public abstract void setPermissions(Set<? extends BasePermission> permissions);
+    public abstract Set<P> getPermissions();
+    public abstract void setPermissions(Set<P> permissions);
+
+    @Deprecated(since = "1.0", forRemoval = false)
+    public Set<? extends BasePermission> getPermissionsWildcard() {
+        return this.getPermissions();
+    }
+
+    @SuppressWarnings("unchecked")
+    public void setPermissionsWildcard(Set<? extends BasePermission> permissions) {
+        this.setPermissions((Set<P>) permissions);
+    }
 }

@@ -11,6 +11,7 @@ import java.util.Map;
 
 @Data
 @NoArgsConstructor
+@SuppressWarnings("null")
 public class PeriodPayData {
     private final Map<String, BigDecimal> componentValues = new LinkedHashMap<>();
     private final Map<String, String> expressions = new LinkedHashMap<>();
@@ -120,7 +121,7 @@ public class PeriodPayData {
         this.arrears = this.arrears.add(other.arrears);
         this.bonus = this.bonus.add(other.bonus);
 
-        this.wagesBase = other.wagesBase;
+        this.wagesBase = this.wagesBase.add(other.wagesBase);
         this.contributionPeriodGross = other.contributionPeriodGross;
         this.overtimeRate = other.overtimeRate;
     }

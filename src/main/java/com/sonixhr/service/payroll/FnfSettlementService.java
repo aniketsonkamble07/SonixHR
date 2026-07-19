@@ -85,52 +85,31 @@ public class FnfSettlementService {
                 .collect(Collectors.groupingBy(StateProfessionalTaxConfig::getStateCode));
 
         List<SalaryComponentDefinition> componentDefs = componentDefinitionRepo.findAllowedByTenantAndDate(tenantId, monthStart);
-        Map<String, String> customComponentTypes = componentDefs.stream()
-                .collect(Collectors.toMap(d -> d.getComponentCode().toUpperCase(), d -> d.getComponentType().toUpperCase(), (a, b) -> a));
-        Map<String, String> customComponentNames = componentDefs.stream()
-                .collect(Collectors.toMap(d -> d.getComponentCode().toUpperCase(), d -> d.getComponentName(), (a, b) -> a));
+        Map<String, String> customComponentTypes = fetchCustomComponentTypes(componentDefs);
+        Map<String, String> customComponentNames = fetchCustomComponentNames(componentDefs);
+        Map<String, String> customComponentFormulas = componentDefs.stream()
+                .filter(d -> d.getFormulaExpression() != null)
+                .collect(Collectors.toMap(
+                        d -> d.getComponentCode().toUpperCase(),
+                        d -> d.getFormulaExpression(),
+                        (a, b) -> a
+                ));
 
-        List<EmployeeSalaryProfile> profiles = employeeSalaryProfileRepo.findActiveProfilesByTenantInPeriod(tenantId, monthStart, monthEnd)
-                .stream()
-                .filter(p -> p.getEmployee().getId().equals(employeeId))
-                .sorted(Comparator.comparing(EmployeeSalaryProfile::getEffectiveFrom))
-                .collect(Collectors.toList());
-
-        if (profiles.isEmpty()) {
-            List<EmployeeSalaryProfile> empProfiles = employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(employeeId);
-            if (!empProfiles.isEmpty()) {
-                profiles = new ArrayList<>();
-                profiles.add(empProfiles.get(0));
-            } else {
-                throw new IllegalArgumentException("No salary profile active in termination month");
-            }
-        }
-        EmployeeSalaryProfile activeProfile = profiles.get(profiles.size() - 1);
+        EmployeeSalaryProfile activeProfile = resolveActiveProfile(tenantId, employeeId, monthStart, monthEnd);
 
         // Calculate unprorated basic to use as lastDrawnBasic
         PeriodPayData fullMonthData = salaryComponentCalculator.computePeriodPayData(
                 activeProfile, monthStart, monthEnd, totalDaysInMonth,
                 tenantConfig, orderedStructure, statutoryRates, ptSlabsByState, BigDecimal.ZERO,
                 terminationDate.getMonthValue(), terminationDate.getYear(),
-                customComponentTypes, customComponentNames);
+                customComponentTypes, customComponentNames, customComponentFormulas);
         BigDecimal lastDrawnBasic = fullMonthData.getComponentValues().getOrDefault("BASIC", BigDecimal.ZERO);
 
         // 1. Gratuity
         GratuityCalculator.GratuityResult gratuityResult = gratuityCalculator.calculateGratuity(employee, lastDrawnBasic, terminationDate);
 
         // 2. Leave Encashment
-        int earnedLeaveDays = 0;
-        try {
-            Map<String, Object> balanceMap = leaveService.getLeaveBalanceWithTenantSettings(employeeId, tenantId);
-            if (balanceMap != null && balanceMap.containsKey("EARNED")) {
-                Map<String, Object> earnedDetails = (Map<String, Object>) balanceMap.get("EARNED");
-                if (earnedDetails != null && earnedDetails.containsKey("available")) {
-                    earnedLeaveDays = ((Number) earnedDetails.get("available")).intValue();
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to retrieve leave balance for employee ID: {}", employeeId, e);
-        }
+        int earnedLeaveDays = fetchEarnedLeaveDays(employeeId, tenantId);
 
         long fullYears = ChronoUnit.YEARS.between(employee.getHireDate(), terminationDate);
         long remainingMonths = ChronoUnit.MONTHS.between(
@@ -148,24 +127,10 @@ public class FnfSettlementService {
                 activeProfile, monthStart, terminationDate, totalDaysInMonth,
                 tenantConfig, orderedStructure, statutoryRates, ptSlabsByState, BigDecimal.ZERO,
                 terminationDate.getMonthValue(), terminationDate.getYear(),
-                customComponentTypes, customComponentNames);
+                customComponentTypes, customComponentNames, customComponentFormulas);
 
         // 4. Sum outstanding loan balances and close them
-        List<Object[]> loanRecoveryData = loanAdvanceRepository.findActiveLoansWithRecoverySum(
-                employeeId, tenantId);
-        
-        BigDecimal totalLoanOutstanding = BigDecimal.ZERO;
-        for (Object[] row : loanRecoveryData) {
-            LoanAdvance loan = (LoanAdvance) row[0];
-            BigDecimal recoveredSoFar = (BigDecimal) row[1];
-            if (recoveredSoFar == null) recoveredSoFar = BigDecimal.ZERO;
-            
-            BigDecimal outstanding = loan.getPrincipalAmount().subtract(recoveredSoFar).max(BigDecimal.ZERO);
-            totalLoanOutstanding = totalLoanOutstanding.add(outstanding);
-            
-            loan.setStatus(LoanStatus.CLOSED);
-            loanAdvanceRepository.save(loan);
-        }
+        BigDecimal totalLoanOutstanding = recoverOutstandingLoans(employeeId, tenantId);
 
         // 5. Combine taxable excess from gratuity + leave encashment into this month's non-recurring taxable gross
         BigDecimal fnfNonRecurringTaxable = gratuityResult.getTaxableAmount()
@@ -216,7 +181,89 @@ public class FnfSettlementService {
 
         settlement = fnfSettlementRepository.save(settlement);
 
-        // Save FnfSettlementItems breakdown
+        List<FnfSettlementItem> items = buildSettlementItems(
+                settlement, grossProrated, monthStart, terminationDate,
+                gratuityResult, leaveEncashmentResult, totalLoanOutstanding, fnfTds,
+                proratedFinalMonthSalary
+        );
+
+        fnfSettlementItemRepository.saveAll(items);
+        settlement.setItems(items);
+
+        return settlement;
+    }
+
+    private Map<String, String> fetchCustomComponentTypes(List<SalaryComponentDefinition> componentDefs) {
+        return componentDefs.stream()
+                .collect(Collectors.toMap(d -> d.getComponentCode().toUpperCase(), d -> d.getComponentType().toUpperCase(), (a, b) -> a));
+    }
+
+    private Map<String, String> fetchCustomComponentNames(List<SalaryComponentDefinition> componentDefs) {
+        return componentDefs.stream()
+                .collect(Collectors.toMap(d -> d.getComponentCode().toUpperCase(), d -> d.getComponentName(), (a, b) -> a));
+    }
+
+    private EmployeeSalaryProfile resolveActiveProfile(Long tenantId, Long employeeId, LocalDate monthStart, LocalDate monthEnd) {
+        List<EmployeeSalaryProfile> profiles = employeeSalaryProfileRepo.findActiveProfilesByTenantInPeriod(tenantId, monthStart, monthEnd)
+                .stream()
+                .filter(p -> p.getEmployee().getId().equals(employeeId))
+                .sorted(Comparator.comparing(EmployeeSalaryProfile::getEffectiveFrom))
+                .collect(Collectors.toList());
+
+        if (profiles.isEmpty()) {
+            List<EmployeeSalaryProfile> empProfiles = employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(employeeId);
+            if (!empProfiles.isEmpty()) {
+                return empProfiles.get(0);
+            } else {
+                throw new IllegalArgumentException("No salary profile active in termination month");
+            }
+        }
+        return profiles.get(profiles.size() - 1);
+    }
+
+    @SuppressWarnings("unchecked")
+    private int fetchEarnedLeaveDays(Long employeeId, Long tenantId) {
+        try {
+            Map<String, Object> balanceMap = leaveService.getLeaveBalanceWithTenantSettings(employeeId, tenantId);
+            if (balanceMap != null && balanceMap.containsKey("EARNED")) {
+                Map<String, Object> earnedDetails = (Map<String, Object>) balanceMap.get("EARNED");
+                if (earnedDetails != null && earnedDetails.containsKey("available")) {
+                    return ((Number) earnedDetails.get("available")).intValue();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to retrieve leave balance for employee ID: {}", employeeId, e);
+        }
+        return 0;
+    }
+
+    private BigDecimal recoverOutstandingLoans(Long employeeId, Long tenantId) {
+        List<Object[]> loanRecoveryData = loanAdvanceRepository.findActiveLoansWithRecoverySum(employeeId, tenantId);
+        BigDecimal totalLoanOutstanding = BigDecimal.ZERO;
+        for (Object[] row : loanRecoveryData) {
+            LoanAdvance loan = (LoanAdvance) row[0];
+            BigDecimal recoveredSoFar = (BigDecimal) row[1];
+            if (recoveredSoFar == null) {
+                recoveredSoFar = BigDecimal.ZERO;
+            }
+            BigDecimal outstanding = loan.getPrincipalAmount().subtract(recoveredSoFar).max(BigDecimal.ZERO);
+            totalLoanOutstanding = totalLoanOutstanding.add(outstanding);
+            loan.setStatus(LoanStatus.CLOSED);
+            loanAdvanceRepository.save(loan);
+        }
+        return totalLoanOutstanding;
+    }
+
+    private List<FnfSettlementItem> buildSettlementItems(
+            FnfSettlement settlement,
+            BigDecimal grossProrated,
+            LocalDate monthStart,
+            LocalDate terminationDate,
+            GratuityCalculator.GratuityResult gratuityResult,
+            LeaveEncashmentCalculator.LeaveEncashmentResult leaveEncashmentResult,
+            BigDecimal totalLoanOutstanding,
+            BigDecimal fnfTds,
+            PeriodPayData proratedFinalMonthSalary) {
         List<FnfSettlementItem> items = new ArrayList<>();
         items.add(FnfSettlementItem.builder()
                 .tenant(settlement.getTenant())
@@ -290,12 +337,9 @@ public class FnfSettlementService {
                         .build());
             }
         }
-
-        fnfSettlementItemRepository.saveAll(items);
-        settlement.setItems(items);
-
-        return settlement;
+        return items;
     }
+
 
     BigDecimal getAvgMonthlySalaryLast10Months(Long employeeId, Long tenantId, 
             BigDecimal currentBasic, LocalDate terminationDate) {

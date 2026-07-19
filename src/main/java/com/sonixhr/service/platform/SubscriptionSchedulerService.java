@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -42,7 +43,7 @@ public class SubscriptionSchedulerService {
     @Scheduled(cron = "0 0 1 * * ?")
     public void checkExpiringSubscriptions() {
         log.info("Subscription expiry check scheduler triggered");
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime sevenDaysFromNow = now.plusDays(7);
         LocalDateTime oneDayFromNow = now.plusDays(1);
 
@@ -88,7 +89,7 @@ public class SubscriptionSchedulerService {
             
             for (TenantSubscription sub : expiredPage.getContent()) {
                 try {
-                    processExpiredSubscription(sub, now);
+                    subscriptionService.processExpiredSubscription(sub.getId(), now);
                 } catch (Exception e) {
                     log.error("Error processing expired subscription ID: {}: {}", sub.getId(), e.getMessage());
                 }
@@ -155,59 +156,13 @@ public class SubscriptionSchedulerService {
                     log.info("Auto-renewed subscription ID: {}", sub.getId());
                 } catch (Exception e) {
                     log.error("Failed to auto-renew subscription ID: {}: {}. Entering grace period.", sub.getId(), e.getMessage());
-                    try {
-                        enterGracePeriod(sub.getId(), now);
-                    } catch (Exception ex) {
-                        log.error("Failed to transition subscription ID: {} to grace period: {}", sub.getId(), ex.getMessage());
-                    }
+                    enterGracePeriodSafe(sub.getId(), now);
                 }
             }
         } while (autoRenewPage.hasNext());
     }
 
-    @Transactional
-    public void processExpiredSubscription(TenantSubscription sub, LocalDateTime now) {
-        if (sub.getGracePeriodEnd() == null) {
-            // Enter 3-day grace period
-            sub.setGracePeriodEnd(now.plusDays(3));
-            sub.setStatus(PlanStatus.PAST_DUE);
-            subscriptionRepository.save(sub);
 
-            if (sub.getTenant() != null) {
-                try {
-                    emailService.sendPaymentFailedEmail(
-                        sub.getTenant().getAdminEmail(),
-                        sub.getTenant().getCompanyName()
-                    );
-                } catch (Exception e) {
-                    log.error("Failed to send payment failed email for tenant ID {}: {}", sub.getTenant().getId(), e.getMessage());
-                }
-            }
-        } else if (sub.getGracePeriodEnd().isBefore(now)) {
-            // Grace period ended - expire
-            subscriptionService.handleSubscriptionExpiration(sub.getId());
-        }
-    }
-
-    @Transactional
-    public void enterGracePeriod(Long subscriptionId, LocalDateTime now) {
-        subscriptionRepository.findById(subscriptionId).ifPresent(sub -> {
-            sub.setGracePeriodEnd(now.plusDays(3));
-            sub.setStatus(PlanStatus.PAST_DUE);
-            subscriptionRepository.save(sub);
-
-            if (sub.getTenant() != null) {
-                try {
-                    emailService.sendPaymentFailedEmail(
-                        sub.getTenant().getAdminEmail(),
-                        sub.getTenant().getCompanyName()
-                    );
-                } catch (Exception e) {
-                    log.error("Failed to send payment failed email for tenant ID {}: {}", sub.getTenant().getId(), e.getMessage());
-                }
-            }
-        });
-    }
 
     /**
      * Runs daily at 1:30 AM to check for tenants approaching their 30-day archival threshold
@@ -217,7 +172,7 @@ public class SubscriptionSchedulerService {
     @Transactional
     public void checkArchiveWarnings() {
         log.info("Subscription archive warnings job triggered");
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime thresholdDate = now.minusDays(23);
 
         int pageIndex = 0;
@@ -255,7 +210,7 @@ public class SubscriptionSchedulerService {
     @Transactional
     public void processTenantArchivals() {
         log.info("Tenant archivals transition job triggered");
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime thresholdDate = now.minusDays(30);
 
         Page<Tenant> tenantsPage;
@@ -292,7 +247,7 @@ public class SubscriptionSchedulerService {
     @Transactional
     public void checkFinalDataReminders() {
         log.info("Subscription final data reminders job triggered");
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime thresholdDate = now.minusMonths(11);
 
         int pageIndex = 0;
@@ -332,7 +287,7 @@ public class SubscriptionSchedulerService {
     @Transactional
     public void processTenantSoftDeleteTransition() {
         log.info("Tenant soft-delete transition job triggered");
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime thresholdDate = now.minusYears(1);
 
         Page<Tenant> tenantsPage;
@@ -360,5 +315,13 @@ public class SubscriptionSchedulerService {
                 }
             }
         } while (tenantsPage.hasNext());
+    }
+
+    private void enterGracePeriodSafe(Long subscriptionId, LocalDateTime now) {
+        try {
+            subscriptionService.enterGracePeriod(subscriptionId, now);
+        } catch (Exception ex) {
+            log.error("Failed to transition subscription ID: {} to grace period: {}", subscriptionId, ex.getMessage());
+        }
     }
 }

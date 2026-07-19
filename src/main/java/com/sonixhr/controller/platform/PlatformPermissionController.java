@@ -24,7 +24,7 @@ public class PlatformPermissionController {
     private final PlatformPermissionService permissionService;
 
     @GetMapping("/groups")
-    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES') or hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
     public ResponseEntity<List<PermissionGroupDTO>> getGroupedPermissions() {
         log.info("REST request to get grouped platform permissions");
         List<PermissionGroupDTO> permissions = permissionService.getGroupedPermissions();
@@ -32,7 +32,7 @@ public class PlatformPermissionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES') or hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
     public ResponseEntity<List<PermissionDTO>> getAllPermissions() {
         log.info("REST request to get all platform permissions");
         List<PermissionDTO> permissions = permissionService.getAllPermissions().stream()

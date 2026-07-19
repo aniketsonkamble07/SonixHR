@@ -60,6 +60,10 @@ public class EmployeeSalaryProfile {
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
+    @Column(name = "arrears_paid", nullable = false)
+    @Builder.Default
+    private boolean arrearsPaid = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

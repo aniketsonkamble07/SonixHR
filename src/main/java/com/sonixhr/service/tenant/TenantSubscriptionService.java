@@ -11,7 +11,6 @@ import com.sonixhr.enums.CancellationType;
 import com.sonixhr.enums.CancellationReason;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
-import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -33,8 +32,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -80,7 +79,7 @@ public class TenantSubscriptionService {
         closeActiveSubscription(tenantId, "Upgraded to new plan");
         
         // Create new subscription
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         int validityMonths = plan.getValidityMonths() != null && plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
         
         TenantSubscription subscription = TenantSubscription.builder()
@@ -159,7 +158,7 @@ public class TenantSubscriptionService {
         
         // Check if it's already active and not near expiry
         if (current.getStatus() == PlanStatus.ACTIVE && 
-            current.getBillingPeriodEnd().isAfter(LocalDateTime.now().plusDays(7))) {
+            current.getBillingPeriodEnd().isAfter(LocalDateTime.now(ZoneId.of("UTC")).plusDays(7))) {
             throw new BusinessException("Subscription is already active and not expiring soon");
         }
         
@@ -169,7 +168,7 @@ public class TenantSubscriptionService {
         }
         
         // Normal renewal
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         LocalDateTime newBillingEnd;
         
         // Determine if we should extend from end date or from now
@@ -250,7 +249,7 @@ public class TenantSubscriptionService {
         
         // Check if we should allow reactivation (configurable reactivation window)
         if (expired.getEndedAt() != null && 
-            expired.getEndedAt().isBefore(LocalDateTime.now().minusDays(reactivationWindowDays))) {
+            expired.getEndedAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")).minusDays(reactivationWindowDays))) {
             throw new BusinessException(
                 String.format("Subscription expired more than %d days ago. Please create a new subscription.", 
                     reactivationWindowDays)
@@ -258,7 +257,7 @@ public class TenantSubscriptionService {
         }
         
         SubscriptionPlan plan = expired.getSubscriptionPlan();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         int months = (plan.getValidityMonths() == null || plan.getValidityMonths() <= 0) ? 1 : plan.getValidityMonths();
         LocalDateTime newEnd = now.plusMonths(months);
         
@@ -339,7 +338,7 @@ public class TenantSubscriptionService {
             subscriptionRepository.saveAndFlush(sub);
         });
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
         int months = (plan.getValidityMonths() == null || plan.getValidityMonths() <= 0) ? 1 : plan.getValidityMonths();
         LocalDateTime newEnd = now.plusMonths(months);
 
@@ -443,19 +442,24 @@ public class TenantSubscriptionService {
     // ===== HANDLE EXPIRATION =====
     @Transactional
     public void handleSubscriptionExpiration(Long subscriptionId) {
-        log.info("Handling expiration for subscription ID: {}", subscriptionId);
         TenantSubscription subscription = subscriptionRepository.findById(subscriptionId)
             .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
             
+        Long tenantId = subscription.getTenant() != null ? subscription.getTenant().getId() : null;
+        log.info("Handling expiration for subscription. [subscriptionId={}, tenantId={}, status={}]", 
+            subscriptionId, tenantId, subscription.getStatus());
+            
         if (subscription.getStatus() != PlanStatus.ACTIVE && subscription.getStatus() != PlanStatus.PAST_DUE) {
+            log.info("Subscription expiration already processed or not eligible. [subscriptionId={}, status={}]", 
+                subscriptionId, subscription.getStatus());
             return; // Already handled
         }
         
         // Check if we're in grace period
         if (subscription.getGracePeriodEnd() != null && 
-            subscription.getGracePeriodEnd().isAfter(LocalDateTime.now())) {
-            log.info("Subscription {} is in grace period until {}", 
-                subscriptionId, subscription.getGracePeriodEnd());
+            subscription.getGracePeriodEnd().isAfter(LocalDateTime.now(ZoneId.of("UTC")))) {
+            log.info("Subscription is in grace period until {}. [subscriptionId={}, tenantId={}]", 
+                subscription.getGracePeriodEnd(), subscriptionId, tenantId);
             return;
         }
         
@@ -463,7 +467,7 @@ public class TenantSubscriptionService {
         subscription.setStatus(PlanStatus.EXPIRED);
         subscription.setIsCurrent(false);
         subscription.setIsActive(false);
-        subscription.setEndedAt(LocalDateTime.now());
+        subscription.setEndedAt(LocalDateTime.now(ZoneId.of("UTC")));
         subscriptionRepository.save(subscription);
         
         // Update tenant
@@ -472,7 +476,7 @@ public class TenantSubscriptionService {
             tenant.setPlanStatus(PlanStatus.EXPIRED);
             tenant.setStatus(UserStatus.SUSPENDED);
             if (tenant.getExpiredAt() == null) {
-                tenant.setExpiredAt(LocalDateTime.now());
+                tenant.setExpiredAt(LocalDateTime.now(ZoneId.of("UTC")));
             }
             tenant.setDataStatus(TenantDataStatus.RETAINED);
             tenant.setArchivedAt(null);
@@ -485,9 +489,10 @@ public class TenantSubscriptionService {
                         tenant.getCompanyName(),
                         subscription.getPlanName()
                     );
-                    tenant.setExpirationNotifiedAt(LocalDateTime.now());
+                    tenant.setExpirationNotifiedAt(LocalDateTime.now(ZoneId.of("UTC")));
                 } catch (Exception e) {
-                    log.warn("Failed to send subscription expiration email: {}", e.getMessage());
+                    log.warn("Failed to send subscription expiration email. [subscriptionId={}, tenantId={}]: {}", 
+                        subscriptionId, tenantId, e.getMessage());
                 }
             }
             tenantRepository.save(tenant);
@@ -499,6 +504,7 @@ public class TenantSubscriptionService {
         
         // Publish event
         eventPublisher.publishEvent(new SubscriptionExpiredEvent(subscription));
+        log.info("Subscription successfully expired. [subscriptionId={}, tenantId={}]", subscriptionId, tenantId);
     }
     
     // ===== CANCEL SUBSCRIPTION =====
@@ -528,8 +534,8 @@ public class TenantSubscriptionService {
             subscription.setStatus(PlanStatus.TERMINATED);
             subscription.setIsCurrent(false);
             subscription.setIsActive(false);
-            subscription.setEndedAt(LocalDateTime.now());
-            subscription.setCancellationDate(LocalDateTime.now());
+            subscription.setEndedAt(LocalDateTime.now(ZoneId.of("UTC")));
+            subscription.setCancellationDate(LocalDateTime.now(ZoneId.of("UTC")));
             subscription.setCancellationReason(cancelReason);
             
             Tenant tenant = subscription.getTenant();
@@ -545,7 +551,7 @@ public class TenantSubscriptionService {
             // Cancel at end of period (downgrade/stop renewal)
             subscription.setCancelledAtEndOfPeriod(true);
             subscription.setStatus(PlanStatus.CANCELLED);
-            subscription.setCancellationDate(LocalDateTime.now());
+            subscription.setCancellationDate(LocalDateTime.now(ZoneId.of("UTC")));
             subscription.setCancellationReason(cancelReason);
         }
         
@@ -580,13 +586,124 @@ public class TenantSubscriptionService {
         return list.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
+    // ===== HANDLE EXPIRED TENANT =====
+    @Transactional
+    public void handleExpiredTenant(Long tenantId) {
+        log.info("Subscription for tenant {} is detected as expired in real-time. Deactivating...", tenantId);
+
+        // 1. Evict caches first to prevent race conditions
+        cacheEvictionService.evictTenantCaches(tenantId);
+        tenantRLSService.invalidateTenantCache(tenantId);
+
+        // 2. Update TenantSubscription
+        subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId).ifPresent(sub -> {
+            sub.expire(); // sets planStatus = PlanStatus.EXPIRED and isActive = false
+            subscriptionRepository.save(sub);
+        });
+
+        // 3. Update Tenant and Send Email (idempotent)
+        tenantRepository.findById(tenantId).ifPresent(tenant -> {
+            tenant.expire("Subscription expired (real-time check)");
+            tenant.setDataStatus(TenantDataStatus.RETAINED);
+            tenant.setArchivedAt(null);
+
+            // Send expiration email atomically/idempotently
+            if (tenant.getExpirationNotifiedAt() == null) {
+                try {
+                    String planName = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan().getName() : "Standard Plan";
+                    emailService.sendSubscriptionExpiredEmail(
+                        tenant.getAdminEmail(),
+                        tenant.getCompanyName(),
+                        planName
+                    );
+                    tenant.setExpirationNotifiedAt(LocalDateTime.now(ZoneId.of("UTC")));
+                } catch (Exception e) {
+                    log.warn("Failed to send subscription expiration email for tenant {}: {}", tenantId, e.getMessage());
+                }
+            }
+            tenantRepository.save(tenant);
+        });
+    }
+
+    @Transactional
+    public void processExpiredSubscription(Long subscriptionId, LocalDateTime now) {
+        subscriptionRepository.findById(subscriptionId).ifPresent(sub -> {
+            Long tenantId = sub.getTenant() != null ? sub.getTenant().getId() : null;
+            log.info("Processing expired subscription check. [subscriptionId={}, tenantId={}, status={}, gracePeriodEnd={}]",
+                subscriptionId, tenantId, sub.getStatus(), sub.getGracePeriodEnd());
+
+            if (sub.getGracePeriodEnd() == null) {
+                // First time detecting expiration - delegate to enterGracePeriod
+                enterGracePeriod(subscriptionId, now);
+            } else {
+                // Already has a grace period set
+                if (sub.getGracePeriodEnd().isBefore(now)) {
+                    log.info("Grace period ended. Expiring subscription. [subscriptionId={}, tenantId={}]", subscriptionId, tenantId);
+                    handleSubscriptionExpiration(subscriptionId);
+                } else {
+                    log.info("Grace period is still active. [subscriptionId={}, tenantId={}, gracePeriodEnd={}]",
+                        subscriptionId, tenantId, sub.getGracePeriodEnd());
+                }
+            }
+        });
+    }
+
+    @Transactional
+    public void enterGracePeriod(Long subscriptionId, LocalDateTime now) {
+        subscriptionRepository.findById(subscriptionId).ifPresent(sub -> {
+            Long tenantId = sub.getTenant() != null ? sub.getTenant().getId() : null;
+            log.info("Entering grace period check. [subscriptionId={}, tenantId={}, status={}, gracePeriodEnd={}]",
+                subscriptionId, tenantId, sub.getStatus(), sub.getGracePeriodEnd());
+
+            // If it is already in PAST_DUE and grace period is active, do not overwrite or resend email
+            if (sub.getStatus() == PlanStatus.PAST_DUE && sub.getGracePeriodEnd() != null) {
+                log.info("Subscription already in grace period. [subscriptionId={}, tenantId={}, gracePeriodEnd={}]",
+                    subscriptionId, tenantId, sub.getGracePeriodEnd());
+                return;
+            }
+
+            // Increment retry count
+            int newRetryCount = (sub.getPaymentRetryCount() != null ? sub.getPaymentRetryCount() : 0) + 1;
+            sub.setPaymentRetryCount(newRetryCount);
+
+            if (newRetryCount > 3) {
+                log.warn("Payment retry count exceeded threshold (3). Expiring subscription immediately. [subscriptionId={}, tenantId={}]",
+                    subscriptionId, tenantId);
+                // Reset/clear grace period to avoid confusion
+                sub.setGracePeriodEnd(null);
+                subscriptionRepository.saveAndFlush(sub);
+                handleSubscriptionExpiration(subscriptionId);
+                return;
+            }
+
+            // Enter grace period
+            sub.setGracePeriodEnd(now.plusDays(3));
+            sub.setStatus(PlanStatus.PAST_DUE);
+            subscriptionRepository.save(sub);
+
+            if (sub.getTenant() != null) {
+                try {
+                    emailService.sendPaymentFailedEmail(
+                        sub.getTenant().getAdminEmail(),
+                        sub.getTenant().getCompanyName()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send payment failed email. [subscriptionId={}, tenantId={}]: {}", 
+                        subscriptionId, tenantId, e.getMessage());
+                }
+            }
+            log.info("Successfully transitioned subscription to grace period. [subscriptionId={}, tenantId={}, retryCount={}]",
+                subscriptionId, tenantId, newRetryCount);
+        });
+    }
+
     // ===== HELPER: Close Active Subscription =====
     private void closeActiveSubscription(Long tenantId, String reason) {
         subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)
             .ifPresent(sub -> {
                 sub.setIsCurrent(false);
                 sub.setIsActive(false);
-                sub.setEndedAt(LocalDateTime.now());
+                sub.setEndedAt(LocalDateTime.now(ZoneId.of("UTC")));
                 sub.setStatus(PlanStatus.TERMINATED);
                 subscriptionRepository.save(sub);
             });
@@ -607,7 +724,7 @@ public class TenantSubscriptionService {
                 .planStatus(sub.getStatus())
                 .maxEmployees(maxEmployees)
                 .startedAt(sub.getStartedAt())
-                .endsAt(sub.getEndsAt())
+                .endsAt(sub.getBillingPeriodEnd())
                 .amount(sub.getAmount())
                 .currency(sub.getCurrency())
                 .isActive(sub.getIsActive() != null ? sub.getIsActive() : false)

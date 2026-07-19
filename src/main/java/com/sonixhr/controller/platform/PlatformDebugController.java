@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/platform/debug")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SUPER_ADMIN')")
+@PreAuthorize("hasAnyAuthority('VIEW_SYSTEM_METRICS', 'VIEW_SYSTEM_SETTINGS', 'VIEW_PLATFORM_ROLES', 'VIEW_PLATFORM_ADMINS')")
 public class PlatformDebugController {
 
     private final PlatformUserRepository platformUserRepository;
@@ -105,15 +105,15 @@ public class PlatformDebugController {
                 .collect(Collectors.toList()));
 
         platformUserRepository.findByEmail("admin@sonixhr.com").ifPresentOrElse(
-                superAdmin -> {
-                    info.put("superAdminExists", true);
-                    info.put("superAdminId", superAdmin.getId());
-                    info.put("superAdminStatus", superAdmin.getStatus());
-                    info.put("superAdminRoles", superAdmin.getRoles().size());
-                    info.put("superAdminAuthorities", superAdmin.getAuthorities().size());
+                admin -> {
+                    info.put("adminExists", true);
+                    info.put("adminId", admin.getId());
+                    info.put("adminStatus", admin.getStatus());
+                    info.put("adminRoles", admin.getRoles().size());
+                    info.put("adminAuthorities", admin.getAuthorities().size());
                 },
                 () -> {
-                    info.put("superAdminExists", false);
+                    info.put("adminExists", false);
                     info.put("expectedEmail", "admin@sonixhr.com");
                 }
         );

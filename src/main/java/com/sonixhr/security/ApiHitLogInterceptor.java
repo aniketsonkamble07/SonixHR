@@ -21,7 +21,11 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
     private final ApiHitLogService apiHitLogService;
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+    public void afterCompletion(
+            @org.springframework.lang.NonNull HttpServletRequest request,
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull Object handler,
+            @org.springframework.lang.Nullable Exception ex) throws Exception {
         try {
             String requestUri = request.getRequestURI();
             String httpMethod = request.getMethod();
@@ -37,8 +41,7 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
 
             if (auth != null && auth.isAuthenticated()) {
                 Object principal = auth.getPrincipal();
-                if (principal instanceof Employee) {
-                    Employee employee = (Employee) principal;
+                if (principal instanceof Employee employee) {
                     employeeId = employee.getId();
                     employeeEmail = employee.getEmail();
                     if (employee.getTenant() != null) {
@@ -46,15 +49,13 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
                     } else if (employee.getTenantId() != null) {
                         tenantId = employee.getTenantId();
                     }
-                } else if (principal instanceof PlatformUser) {
-                    PlatformUser platformUser = (PlatformUser) principal;
+                } else if (principal instanceof PlatformUser platformUser) {
                     employeeId = platformUser.getId();
                     employeeEmail = platformUser.getEmail() + " (Platform)";
-                } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-                    org.springframework.security.core.userdetails.UserDetails userDetails = (org.springframework.security.core.userdetails.UserDetails) principal;
+                } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
                     employeeEmail = userDetails.getUsername();
-                } else if (principal instanceof String) {
-                    employeeEmail = (String) principal;
+                } else if (principal instanceof String email) {
+                    employeeEmail = email;
                 }
             }
 

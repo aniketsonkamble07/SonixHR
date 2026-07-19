@@ -265,7 +265,9 @@ public class TokenBlacklistService {
                         .clientType(type)
                         .build();
                 String value = objectMapper.writeValueAsString(activeSession);
-                redisTemplate.opsForValue().set(sessionKey, value, newTtl, TimeUnit.MILLISECONDS);
+                if (value != null) {
+                    redisTemplate.opsForValue().set(sessionKey, value, newTtl, TimeUnit.MILLISECONDS);
+                }
                 log.debug("Registered active session for user {} on client type {}: JTI {}", userId, type, newJti);
             }
         } catch (Exception e) {

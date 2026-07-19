@@ -4207,6 +4207,17 @@
     window.loadCalendarFromSelectors = loadCalendarFromSelectors;
     window.closeModal = closeModal;
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\//g, '&#x2F;');
+    }
+
     // ==========================================
     // API HIT LOGGING
     // ==========================================
@@ -4243,13 +4254,19 @@
                                   log.httpMethod === 'POST' ? 'badge-success' :
                                   log.httpMethod === 'DELETE' ? 'badge-danger' : 'badge-warning';
               
+              const methodText = escapeHtml(log.httpMethod);
+              const uriText = escapeHtml(log.requestUri);
+              const ipText = escapeHtml(log.ipAddress || '-');
+              const nameText = escapeHtml(log.deviceName || 'Unknown');
+              const emailText = escapeHtml(log.employeeEmail || 'anonymous');
+
               row.innerHTML = `
                 <td>${timeStr}</td>
-                <td><span class="badge ${methodBadge}">${log.httpMethod}</span></td>
-                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${log.requestUri}</code></td>
-                <td>${log.ipAddress || '-'}</td>
-                <td><i class="fa-solid fa-laptop-code" style="color: var(--accent-violet); margin-right: 6px;"></i> ${log.deviceName || 'Unknown'}</td>
-                <td><strong>${log.employeeEmail || 'anonymous'}</strong></td>
+                <td><span class="badge ${methodBadge}">${methodText}</span></td>
+                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${uriText}</code></td>
+                <td>${ipText}</td>
+                <td><i class="fa-solid fa-laptop-code" style="color: var(--accent-violet); margin-right: 6px;"></i> ${nameText}</td>
+                <td><strong>${emailText}</strong></td>
               `;
               tbody.appendChild(row);
             });

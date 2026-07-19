@@ -8,6 +8,7 @@ import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.attendance.ManualAttendanceRepository;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.common.AuditLogService;
+import com.sonixhr.entity.tenant.Tenant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,7 @@ public class PayrollCalculationServiceIntegrationTest {
     @Mock private TenantPayrollConfigRepository tenantPayrollConfigRepo;
     @Mock private TenantSalaryStructureRepository tenantSalaryStructureRepo;
     @Mock private EmployeeSalaryProfileRepository employeeSalaryProfileRepo;
+    @Mock private EmployeeSalaryComponentRepository employeeSalaryComponentRepo;
     @Mock private PayrunRepository payrunRepo;
     @Mock private PayrunConfigRepository payrunConfigRepo;
     @Mock private PayslipRepository payslipRepo;
@@ -55,12 +57,14 @@ public class PayrollCalculationServiceIntegrationTest {
         MockitoAnnotations.openMocks(this);
         EmployeePayrunProcessor employeePayrunProcessor = new EmployeePayrunProcessor(
                 employeeSalaryProfileRepo,
+                employeeSalaryComponentRepo,
                 salaryComponentCalculator,
                 overtimeCalculator,
                 tdsCalculator,
                 loanRecoveryCalculator,
                 reimbursementCalculator,
-                payslipGenerator
+                payslipGenerator,
+                statutoryCalculator
         );
 
         payrollCalculationService = new PayrollCalculationService(
@@ -87,64 +91,55 @@ public class PayrollCalculationServiceIntegrationTest {
         int month = 4;
         int year = 2026;
 
-        com.sonixhr.entity.tenant.Tenant tenant = new com.sonixhr.entity.tenant.Tenant();
+        Employee employee = new Employee();
+        employee.setId(1L);
+        employee.setHireDate(LocalDate.of(2025, 1, 1));
+        employee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE);
+
+        Tenant tenant = new Tenant();
         tenant.setId(tenantId);
+        TenantPayrollConfig tenantConfig = new TenantPayrollConfig();
+        tenantConfig.setTenant(tenant);
+        tenantConfig.setEnablePfCapping(true);
+        tenantConfig.setEnableEsi(true);
+        tenantConfig.setEnablePt(true);
+
+        when(employeeRepository.findActiveEmployeesByTenantId(eq(tenantId)))
+                .thenReturn(List.of(employee));
+        when(tenantPayrollConfigRepo.findActiveByTenantAndDate(eq(tenantId), any()))
+                .thenReturn(Optional.of(tenantConfig));
+
+        // Two overlapping profiles:
+        // Profile 1 active April 1 - April 15
+        EmployeeSalaryProfile profile1 = EmployeeSalaryProfile.builder()
+                .employee(employee)
+                .effectiveFrom(LocalDate.of(2025, 1, 1))
+                .monthlyCtc(BigDecimal.valueOf(40000))
+                .taxRegime("NEW_REGIME")
+                .build();
+
+        // Profile 2 active April 16 onwards (retrospective adjustment)
+        EmployeeSalaryProfile profile2 = EmployeeSalaryProfile.builder()
+                .employee(employee)
+                .effectiveFrom(LocalDate.of(2026, 4, 16))
+                .monthlyCtc(BigDecimal.valueOf(50000))
+                .taxRegime("NEW_REGIME")
+                .build();
+
+        when(employeeSalaryProfileRepo.findActiveProfilesByTenantInPeriod(eq(tenantId), any(), any()))
+                .thenReturn(List.of(profile1, profile2));
+        when(employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(eq(1L)))
+                .thenReturn(List.of(profile1, profile2));
 
         Payrun payrun = Payrun.builder()
-                .id(UUID.randomUUID())
                 .tenant(tenant)
                 .month(month)
                 .year(year)
                 .status("DRAFT")
                 .version(1)
                 .build();
-
-        TenantPayrollConfig tenantConfig = new TenantPayrollConfig();
-        tenantConfig.setDefaultTaxRegime("NEW_REGIME");
-        tenantConfig.setTenant(tenant);
-
-        Employee employee = new Employee();
-        employee.setId(1L);
-
-        // Segment 1: April 1 to April 15 (OLD regime, ₹50,000 ctc)
-        EmployeeSalaryProfile profile1 = EmployeeSalaryProfile.builder()
-                .employee(employee)
-                .taxRegime("OLD_REGIME")
-                .effectiveFrom(LocalDate.of(2026, 4, 1))
-                .monthlyCtc(BigDecimal.valueOf(50000))
-                .build();
-
-        // Segment 2: April 16 to April 30 (NEW regime, ₹60,000 ctc)
-        EmployeeSalaryProfile profile2 = EmployeeSalaryProfile.builder()
-                .employee(employee)
-                .taxRegime("NEW_REGIME")
-                .effectiveFrom(LocalDate.of(2026, 4, 16))
-                .monthlyCtc(BigDecimal.valueOf(60000))
-                .build();
-
-        List<EmployeeSalaryProfile> profiles = Arrays.asList(profile1, profile2);
-
-        // Setup mock configurations and lookups
-        when(payrunRepo.findByTenantAndMonthAndYear(tenantId, month, year)).thenReturn(Optional.empty());
-        when(payrunRepo.findLatestVersionNumber(tenantId, month, year)).thenReturn(0);
         when(payrunRepo.save(any(Payrun.class))).thenReturn(payrun);
-        
-        when(tenantPayrollConfigRepo.findActiveByTenantAndDate(eq(tenantId), any(LocalDate.class)))
-                .thenReturn(Optional.of(tenantConfig));
-        
-        List<TenantSalaryStructure> structure = new ArrayList<>();
-        structure.add(TenantSalaryStructure.builder()
-                .componentCode("BASIC")
-                .evaluationOrder(1)
-                .isTaxable(true)
-                .build());
-        when(tenantSalaryStructureRepo.findActiveByTenantAndDate(eq(tenantId), any(LocalDate.class)))
-                .thenReturn(structure);
-                
-        when(employeeSalaryProfileRepo.findActiveProfilesByTenantInPeriod(eq(tenantId), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(profiles);
 
-        // Setup segment pay mocks
         PeriodPayData seg1Data = new PeriodPayData();
         seg1Data.setGrossEarnings(BigDecimal.valueOf(25000));
         seg1Data.setTaxableGrossEarnings(BigDecimal.valueOf(20000)); // taxable portion of Segment 1
@@ -155,18 +150,18 @@ public class PayrollCalculationServiceIntegrationTest {
 
         when(salaryComponentCalculator.computePeriodPayData(
                 eq(profile1), eq(LocalDate.of(2026, 4, 1)), eq(LocalDate.of(2026, 4, 15)), anyInt(),
-                any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
+                any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any(), any()))
                 .thenReturn(seg1Data);
 
         when(salaryComponentCalculator.computePeriodPayData(
                 eq(profile2), eq(LocalDate.of(2026, 4, 16)), eq(LocalDate.of(2026, 4, 30)), anyInt(),
-                any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
+                any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any(), any()))
                 .thenReturn(seg2Data);
 
         // Setup mock TDS returns
         BigDecimal expectedTds = BigDecimal.valueOf(1250).setScale(2);
         when(tdsCalculator.calculateMonthlyTds(
-                eq(employee), eq(tenantId), eq(TaxRegime.NEW_REGIME), eq(BigDecimal.valueOf(45000)), eq(month), eq(year)))
+                eq(employee), eq(tenantId), eq(TaxRegime.NEW_REGIME), eq(BigDecimal.valueOf(45000)), eq(new BigDecimal("0.00")), eq(month), eq(year)))
                 .thenReturn(expectedTds);
 
         // Execute payrun processing
@@ -179,7 +174,7 @@ public class PayrollCalculationServiceIntegrationTest {
         // Expected taxable gross is Segment 1 (20,000) + Segment 2 (25,000) = 45,000
         // Expected regime is NEW_REGIME (last segment's regime)
         verify(tdsCalculator, times(1)).calculateMonthlyTds(
-                eq(employee), eq(tenantId), eq(TaxRegime.NEW_REGIME), eq(BigDecimal.valueOf(45000)), eq(4), eq(2026));
+                eq(employee), eq(tenantId), eq(TaxRegime.NEW_REGIME), eq(BigDecimal.valueOf(45000)), eq(new BigDecimal("0.00")), eq(4), eq(2026));
 
         // 3. Verify that the correct TDS value was passed to payslip generator
         ArgumentCaptor<PeriodPayData> dataCaptor = ArgumentCaptor.forClass(PeriodPayData.class);
@@ -189,5 +184,70 @@ public class PayrollCalculationServiceIntegrationTest {
         PeriodPayData finalData = dataCaptor.getValue();
         assertEquals(expectedTds, finalData.getComponentValues().get("TDS"));
         assertEquals(expectedTds, finalData.getTotalDeductions());
+    }
+
+    @Test
+    public void testProcessPayrun_PayslipGenerationFails_PropagatesException() {
+        Long tenantId = 100L;
+        int month = 4;
+        int year = 2026;
+
+        Employee employee = new Employee();
+        employee.setId(1L);
+        employee.setHireDate(LocalDate.of(2025, 1, 1));
+        employee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.ACTIVE);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        TenantPayrollConfig tenantConfig = new TenantPayrollConfig();
+        tenantConfig.setTenant(tenant);
+        tenantConfig.setEnablePfCapping(true);
+        tenantConfig.setEnableEsi(true);
+        tenantConfig.setEnablePt(true);
+
+        when(employeeRepository.findActiveEmployeesByTenantId(eq(tenantId)))
+                .thenReturn(List.of(employee));
+        when(tenantPayrollConfigRepo.findActiveByTenantAndDate(eq(tenantId), any()))
+                .thenReturn(Optional.of(tenantConfig));
+        
+        EmployeeSalaryProfile profile = EmployeeSalaryProfile.builder()
+                .employee(employee)
+                .effectiveFrom(LocalDate.of(2025, 1, 1))
+                .monthlyCtc(BigDecimal.valueOf(50000))
+                .build();
+        when(employeeSalaryProfileRepo.findActiveProfilesByTenantInPeriod(eq(tenantId), any(), any()))
+                .thenReturn(List.of(profile));
+        when(employeeSalaryProfileRepo.findByEmployeeIdOrderByEffectiveFromAsc(eq(1L)))
+                .thenReturn(List.of(profile));
+
+        Payrun payrun = Payrun.builder()
+                .tenant(tenant)
+                .month(month)
+                .year(year)
+                .status("DRAFT")
+                .version(1)
+                .build();
+        when(payrunRepo.save(any(Payrun.class))).thenReturn(payrun);
+
+        PeriodPayData segData = new PeriodPayData();
+        segData.setGrossEarnings(BigDecimal.valueOf(50000));
+        segData.setTaxableGrossEarnings(BigDecimal.valueOf(50000));
+        segData.putComponentValue("BASIC", BigDecimal.valueOf(25000));
+
+        when(salaryComponentCalculator.computePeriodPayData(
+                eq(profile), any(), any(), anyInt(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any(), any()))
+                .thenReturn(segData);
+
+        when(tdsCalculator.calculateMonthlyTds(
+                any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(BigDecimal.ZERO);
+
+        doThrow(new RuntimeException("Database error during payslip persist"))
+                .when(payslipGenerator).persistPayslip(any(), any(), any(), any(), any(), any(), any());
+
+        // Process payrun (should catch and log error for partial successes, rolling back the transaction for this employee)
+        payrollCalculationService.processPayrun(tenantId, month, year);
+
+        verify(payslipGenerator, times(1)).persistPayslip(any(), any(), any(), any(), any(), any(), any());
     }
 }

@@ -25,6 +25,7 @@ public class PlatformSubscriptionPlanController {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('VIEW_SUBSCRIPTIONS')")
     public ResponseEntity<List<SubscriptionPlanDTO>> getAllPlans() {
         log.info("REST request to list all active subscription plans");
         List<SubscriptionPlan> plans = subscriptionPlanRepository.findAllActivePlans();

@@ -28,7 +28,7 @@ public class EmployeeTaskController {
     private final EmployeeTaskService taskService;
 
     @GetMapping("/assignees")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE') or @permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_ALL')")
+    @PreAuthorize("hasAnyAuthority('TASK_CREATE', 'TASK_VIEW_TEAM', 'TASK_VIEW_ALL')")
     public ResponseEntity<List<TaskAssigneeDTO>> getAssignableEmployees(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int size,
@@ -39,7 +39,7 @@ public class EmployeeTaskController {
     }
 
     @PostMapping
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_CREATE')")
+    @PreAuthorize("hasAuthority('TASK_CREATE')")
     public ResponseEntity<TaskResponseDTO> createTask(
             @Valid @RequestBody TaskCreateRequestDTO dto,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -49,7 +49,7 @@ public class EmployeeTaskController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_OWN')")
+    @PreAuthorize("hasAuthority('TASK_VIEW_OWN')")
     public ResponseEntity<Page<TaskResponseDTO>> getMyTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -59,7 +59,7 @@ public class EmployeeTaskController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_VIEW_ALL')")
+    @PreAuthorize("hasAuthority('TASK_VIEW_ALL')")
     public ResponseEntity<Page<TaskResponseDTO>> getAllTasks(
             @AuthenticationPrincipal Employee currentEmployee,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -69,7 +69,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/acknowledge")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_ACKNOWLEDGE')")
+    @PreAuthorize("hasAuthority('TASK_ACKNOWLEDGE')")
     public ResponseEntity<TaskResponseDTO> acknowledgeTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -79,7 +79,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
+    @PreAuthorize("hasAuthority('TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> updateTaskStatus(
             @PathVariable Long id,
             @RequestParam TaskStatus status,
@@ -90,7 +90,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/accept")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
+    @PreAuthorize("hasAuthority('TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> acceptTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Employee currentEmployee) {
@@ -100,7 +100,7 @@ public class EmployeeTaskController {
     }
 
     @PutMapping("/{id}/decline")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'TASK_UPDATE_STATUS')")
+    @PreAuthorize("hasAuthority('TASK_UPDATE_STATUS')")
     public ResponseEntity<TaskResponseDTO> declineTask(
             @PathVariable Long id,
             @RequestParam String declineReason,

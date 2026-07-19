@@ -6,6 +6,7 @@ import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.enums.PlatformPermissionEnum;
 import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.IndianState;
+import com.sonixhr.common.constant.AppConstants;
 import com.sonixhr.repository.platform.PlatformPermissionRepository;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -43,6 +44,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Month;
 
 @Slf4j
 @Component // Trigger save to resolve temporary IDE syntax parsing cache issues
@@ -66,14 +68,16 @@ public class PlatformDataInitializer implements ApplicationRunner {
         private final PlatformMigrationFlagRepository platformMigrationFlagRepo;
 
         private static final String SUPER_ADMIN_EMAIL = "admin@sonixhr.com";
-        private static final String SUPER_ADMIN_NAME = "Super Administrator";
+        private static final String FY_2025_26 = "2025-26";
+        private static final String FY_2026_27 = "2026-27";
+        private static final String WAGES_BASE = "WAGES_BASE";
 
         @Override
         @Transactional
         public void run(ApplicationArguments args) {
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
                 log.info("Platform Data Initializer Started");
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
 
                 // Alter blood_group only if the column type/length does not already match —
                 // avoids a table lock on every boot
@@ -120,35 +124,30 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 // Drop obsolete state enum check constraints dynamically if they exist
                 try {
                         log.info("Dropping obsolete state CHECK constraints dynamically...");
-                        jdbcTemplate.execute(
-                                        "DO $$\n" +
-                                                        "DECLARE\n" +
-                                                        "    r RECORD;\n" +
-                                                        "BEGIN\n" +
-                                                        "    FOR r IN (\n" +
-                                                        "        SELECT tc.table_name, tc.constraint_name\n" +
-                                                        "        FROM information_schema.table_constraints tc\n" +
-                                                        "        JOIN information_schema.constraint_column_usage ccu \n"
-                                                        +
-                                                        "            ON tc.constraint_name = ccu.constraint_name \n" +
-                                                        "            AND tc.table_schema = ccu.table_schema\n" +
-                                                        "        WHERE tc.constraint_type = 'CHECK'\n" +
-                                                        "          AND tc.table_schema = 'public'\n" +
-                                                        "          AND (\n" +
-                                                        "            (tc.table_name = 'employees' AND ccu.column_name = 'state') OR\n"
-                                                        +
-                                                        "            (tc.table_name = 'tenants' AND ccu.column_name = 'state') OR\n"
-                                                        +
-                                                        "            (tc.table_name = 'tenant_leave_settings' AND ccu.column_name = 'state') OR\n"
-                                                        +
-                                                        "            (tc.table_name = 'platform_state_pt_configs' AND ccu.column_name = 'state_code')\n"
-                                                        +
-                                                        "          )\n" +
-                                                        "    ) LOOP\n" +
-                                                        "        EXECUTE 'ALTER TABLE ' || quote_ident(r.table_name) || ' DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);\n"
-                                                        +
-                                                        "    END LOOP;\n" +
-                                                        "END $$;");
+                        jdbcTemplate.execute("""
+                                        DO $$
+                                        DECLARE
+                                            r RECORD;
+                                        BEGIN
+                                            FOR r IN (
+                                                SELECT tc.table_name, tc.constraint_name
+                                                FROM information_schema.table_constraints tc
+                                                JOIN information_schema.constraint_column_usage ccu 
+                                                    ON tc.constraint_name = ccu.constraint_name 
+                                                    AND tc.table_schema = ccu.table_schema
+                                                WHERE tc.constraint_type = 'CHECK'
+                                                  AND tc.table_schema = 'public'
+                                                  AND (
+                                                    (tc.table_name = 'employees' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'tenants' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'tenant_leave_settings' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'platform_state_pt_configs' AND ccu.column_name = 'state_code')
+                                                  )
+                                            ) LOOP
+                                                EXECUTE 'ALTER TABLE ' || quote_ident(r.table_name) || ' DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
+                                            END LOOP;
+                                        END $$;
+                                        """);
                         log.info("Successfully dropped obsolete state CHECK constraints.");
                 } catch (Exception e) {
                         log.warn("Could not drop state CHECK constraints: {}", e.getMessage());
@@ -169,9 +168,9 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 // Step 6: Seed Statutory Rates and PT Configs
                 seedStatutoryRatesAndPtConfigs();
 
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
                 log.info("Platform Data Initializer Completed");
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
         }
 
         // KEEP ONLY ONE of these methods
@@ -250,9 +249,9 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         password = envPassword;
                 } else {
                         password = "Admin@123";
-                        log.warn("=========================================");
+                        log.warn(AppConstants.DIVIDER);
                         log.warn("SONIXHR_SUPER_ADMIN_PASSWORD env var is not set. Defaulting to Admin@123.");
-                        log.warn("=========================================");
+                        log.warn(AppConstants.DIVIDER);
                 }
 
                 PlatformUser adminUser = PlatformUser.builder()
@@ -267,13 +266,13 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 adminUser.getRoles().add(adminRole);
                 userRepository.save(adminUser);
 
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
                 log.info(" ADMIN CREATED WITH ALL PERMISSIONS!");
                 log.info("   Email: {}", SUPER_ADMIN_EMAIL);
                 log.info("   Name: Administrator");
                 log.info("   Role: Admin (ALL permissions)");
                 log.info("   Authorities: {}", adminUser.getAuthorities().size());
-                log.info("=========================================");
+                log.info(AppConstants.DIVIDER);
         }
 
         private void createOtherDefaultRoles() {
@@ -284,12 +283,12 @@ public class PlatformDataInitializer implements ApplicationRunner {
         private void seedStatutoryRatesAndPtConfigs() {
                 if (statutoryRateConfigRepo.count() == 0) {
                         log.info("Seeding statutory rate configurations...");
-                        LocalDate epoch = LocalDate.of(2020, 1, 1);
+                        LocalDate epoch = LocalDate.of(2020, Month.JANUARY, 1);
 
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("EPF_EE")
                                         .rate(BigDecimal.valueOf(0.1200))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .ceilingAmount(BigDecimal.valueOf(15000.00))
                                         .capAmount(BigDecimal.valueOf(1800.00))
                                         .effectiveFrom(epoch)
@@ -298,14 +297,14 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("EPF_ER")
                                         .rate(BigDecimal.valueOf(0.1200))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .effectiveFrom(epoch)
                                         .build());
 
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("EPS_ER")
                                         .rate(BigDecimal.valueOf(0.0833))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .ceilingAmount(BigDecimal.valueOf(15000.00))
                                         .capAmount(BigDecimal.valueOf(1250.00))
                                         .effectiveFrom(epoch)
@@ -314,7 +313,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("EDLI")
                                         .rate(BigDecimal.valueOf(0.0050))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .ceilingAmount(BigDecimal.valueOf(15000.00))
                                         .capAmount(BigDecimal.valueOf(75.00))
                                         .effectiveFrom(epoch)
@@ -323,7 +322,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("ESI_EE")
                                         .rate(BigDecimal.valueOf(0.0075))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .ceilingAmount(BigDecimal.valueOf(21000.00))
                                         .effectiveFrom(epoch)
                                         .build());
@@ -331,14 +330,14 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         statutoryRateConfigRepo.save(StatutoryRateConfig.builder()
                                         .componentCode("ESI_ER")
                                         .rate(BigDecimal.valueOf(0.0325))
-                                        .wageBase("WAGES_BASE")
+                                        .wageBase(WAGES_BASE)
                                         .ceilingAmount(BigDecimal.valueOf(21000.00))
                                         .effectiveFrom(epoch)
                                         .build());
                         log.info(" Statutory rate configurations seeded successfully.");
                 }
 
-                LocalDate epoch = LocalDate.of(2020, 1, 1);
+                LocalDate epoch = LocalDate.of(2020, Month.JANUARY, 1);
                 if (!statePtConfigRepo.existsByStateCode(IndianState.KARNATAKA)) {
                         log.info("Seeding default state Professional Tax configs for KA...");
 
@@ -745,7 +744,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
                 // FY 2025-26 NEW_REGIME (₹7L threshold, ₹25k rebate, ₹50k standard deduction,
                 // slabs at 3L intervals)
-                if (taxSlabConfigRepo.findByFinancialYearAndRegime("2025-26", TaxRegime.NEW_REGIME).isEmpty()) {
+                if (taxSlabConfigRepo.findByFinancialYearAndRegime(FY_2025_26, TaxRegime.NEW_REGIME).isEmpty()) {
                         log.info("Seeding NEW_REGIME slab config for FY 2025-26...");
                         List<TaxSlabRow> slabs = List.of(
                                         new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(300000.0), BigDecimal.ZERO),
@@ -765,7 +764,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         new SurchargeSlab(BigDecimal.valueOf(20000000.0), BigDecimal.valueOf(25.0)));
 
                         taxSlabConfigRepo.save(TaxRegimeSlabConfig.builder()
-                                        .financialYear("2025-26")
+                                        .financialYear(FY_2025_26)
                                         .regime(TaxRegime.NEW_REGIME)
                                         .slabs(slabs)
                                         .standardDeduction(BigDecimal.valueOf(50000.0))
@@ -778,7 +777,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
                 // FY 2026-27 NEW_REGIME (₹12L threshold, ₹60k rebate, ₹75k standard deduction,
                 // slabs at 4L intervals)
-                if (taxSlabConfigRepo.findByFinancialYearAndRegime("2026-27", TaxRegime.NEW_REGIME).isEmpty()) {
+                if (taxSlabConfigRepo.findByFinancialYearAndRegime(FY_2026_27, TaxRegime.NEW_REGIME).isEmpty()) {
                         log.info("Seeding NEW_REGIME slab config for FY 2026-27...");
                         List<TaxSlabRow> slabs = List.of(
                                         new TaxSlabRow(BigDecimal.ZERO, BigDecimal.valueOf(400000.0), BigDecimal.ZERO),
@@ -798,7 +797,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                         new SurchargeSlab(BigDecimal.valueOf(20000000.0), BigDecimal.valueOf(25.0)));
 
                         taxSlabConfigRepo.save(TaxRegimeSlabConfig.builder()
-                                        .financialYear("2026-27")
+                                        .financialYear(FY_2026_27)
                                         .regime(TaxRegime.NEW_REGIME)
                                         .slabs(slabs)
                                         .standardDeduction(BigDecimal.valueOf(75000.0))
@@ -810,7 +809,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 }
 
                 // OLD_REGIME seeding for both years
-                String[] financialYears = { "2025-26", "2026-27" };
+                String[] financialYears = { FY_2025_26, FY_2026_27 };
                 for (String fy : financialYears) {
                         if (taxSlabConfigRepo.findByFinancialYearAndRegime(fy, TaxRegime.OLD_REGIME).isEmpty()) {
                                 log.info("Seeding OLD_REGIME slab config for FY {}...", fy);
@@ -856,7 +855,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
                 log.info("Performing TDS component backfill for all tenants...");
                 List<Tenant> tenants = tenantRepository.findAll();
-                LocalDate epoch = LocalDate.of(2020, 1, 1);
+                LocalDate epoch = LocalDate.of(2020, Month.JANUARY, 1);
 
                 for (Tenant tenant : tenants) {
                         List<TenantPayrollConfig> configs = tenantPayrollConfigRepo.findActiveByTenant(tenant.getId());

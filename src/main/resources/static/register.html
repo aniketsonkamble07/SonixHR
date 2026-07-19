@@ -279,8 +279,8 @@
         <div class="form-group">
           <label for="planCode">Plan Option</label>
           <select id="planCode" name="planCode">
-            <option value="TRIAL">Trial Plan (14 Days Free)</option>
-            <option value="ENTERPRISE">Enterprise Plan</option>
+            <option value="Trial Plan">Trial Plan (14 Days Free)</option>
+            <option value="Enterprise Plan">Enterprise Plan</option>
           </select>
         </div>
 
@@ -450,6 +450,25 @@
     }
 
     document.getElementById('country').addEventListener('input', toggleStateInput);
+
+    async function loadPlans() {
+      const select = document.getElementById('planCode');
+      try {
+        const response = await fetch('/api/public/plans');
+        if (response.ok) {
+          const plans = await response.json();
+          if (plans && plans.length > 0) {
+            select.innerHTML = plans.map(p => `
+              <option value="${p.name}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
+            `).join('');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load active plans', error);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadPlans);
   </script>
 </body>
 </html>

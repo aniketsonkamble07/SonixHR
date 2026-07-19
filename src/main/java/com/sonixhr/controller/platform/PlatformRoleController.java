@@ -30,8 +30,7 @@ public class PlatformRoleController {
  
     private final PlatformRoleService roleService;
 
-    // ✅ REMOVED - Platform users don't have tenantId
-    // private Long getCurrentTenantId(PlatformUser currentUser) { ... }
+
 
     @PostMapping
     @PreAuthorize("hasAuthority('CREATE_PLATFORM_ROLE')")
@@ -70,7 +69,7 @@ public class PlatformRoleController {
     }
 
     @GetMapping("/lookup")
-    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES') or hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_ROLES')")
     public ResponseEntity<List<PlatformRoleLookupResponse>> getRoleLookup() {
         log.debug("Getting platform roles lookup");
         List<PlatformRoleLookupResponse> roles = roleService.getPlatformRoleLookup();

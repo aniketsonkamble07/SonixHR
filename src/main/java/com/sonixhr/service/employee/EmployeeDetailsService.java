@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -32,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service("employeeDetailsService")
 @Primary
+@Transactional(readOnly = true)
 public class EmployeeDetailsService implements UserDetailsService {
 
     private final EmployeeRepository employeeRepository;
@@ -51,6 +53,7 @@ public class EmployeeDetailsService implements UserDetailsService {
             EmployeeRepository employeeRepository,
             TenantRoleRepository roleRepository,
             ApplicationEventPublisher eventPublisher,
+            @org.springframework.beans.factory.annotation.Qualifier("caffeineCacheManager") org.springframework.cache.CacheManager cacheManager,
             @Value("${app.employee.cache.enabled:true}") boolean cacheEnabled,
             @Value("${app.employee.cache.ttl-minutes:10}") long cacheTtlMinutes) {
         
@@ -60,11 +63,16 @@ public class EmployeeDetailsService implements UserDetailsService {
         this.cacheEnabled = cacheEnabled;
         this.cacheTtlMinutes = cacheTtlMinutes;
 
-        this.employeeCache = Caffeine.newBuilder()
-                .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)  // Auto-expiry
-                .maximumSize(10_000)  // Prevent memory issues
-                .recordStats()  // For monitoring
-                .build();
+        org.springframework.cache.Cache springCache = cacheManager.getCache("employeeDetails");
+        if (springCache != null && springCache.getNativeCache() instanceof com.github.benmanes.caffeine.cache.Cache) {
+            this.employeeCache = (com.github.benmanes.caffeine.cache.Cache<String, Employee>) springCache.getNativeCache();
+        } else {
+            this.employeeCache = Caffeine.newBuilder()
+                    .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
+                    .maximumSize(10_000)
+                    .recordStats()
+                    .build();
+        }
 
         this.authorityCountCache = Caffeine.newBuilder()
                 .expireAfterWrite(cacheTtlMinutes, TimeUnit.MINUTES)
@@ -73,7 +81,6 @@ public class EmployeeDetailsService implements UserDetailsService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         long startTime = System.nanoTime();
 
@@ -112,14 +119,14 @@ public class EmployeeDetailsService implements UserDetailsService {
         //  Check if employee is active before caching
         if (!employee.isActive()) {
             log.warn("Employee account is inactive for email: {}", email);
-            throw new UsernameNotFoundException("Employee account is inactive");
+            throw new DisabledException("Employee account is inactive");
         }
 
         // Check if employee's tenant is active/suspended
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
             if (!hasBillingAccess(employee)) {
                 log.warn("Employee tenant is inactive or suspended for email: {}", email);
-                throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+                throw new DisabledException("Tenant account is suspended or inactive");
             } else {
                 limitToBillingOnly(employee);
             }
@@ -188,7 +195,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         // Check if employee has any roles
         if (employee.getRoles() == null || employee.getRoles().isEmpty()) {
             log.error("Employee {} has NO roles assigned!", email);
-            throw new UsernameNotFoundException(
+            throw new org.springframework.security.authentication.InternalAuthenticationServiceException(
                     "Account not properly configured. Please contact administrator.");
         }
     }
@@ -227,13 +234,13 @@ public class EmployeeDetailsService implements UserDetailsService {
 
         if (!employee.isActive()) {
             log.warn("Employee account is inactive for email: {}", email);
-            throw new UsernameNotFoundException("Employee account is inactive");
+            throw new DisabledException("Employee account is inactive");
         }
 
         if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
             if (!hasBillingAccess(employee)) {
                 log.warn("Employee tenant is inactive or suspended for email: {}", email);
-                throw new UsernameNotFoundException("Tenant account is suspended or inactive");
+                throw new DisabledException("Tenant account is suspended or inactive");
             } else {
                 limitToBillingOnly(employee);
             }
@@ -293,7 +300,6 @@ public class EmployeeDetailsService implements UserDetailsService {
     /**
      * Batch load multiple employees (for performance)
      */
-    @Transactional(readOnly = true)
     public java.util.Map<String, UserDetails> loadUsersByEmails(java.util.List<String> emails) {
         log.debug("Batch loading {} employees", emails.size());
 
@@ -446,7 +452,7 @@ public class EmployeeDetailsService implements UserDetailsService {
                     defaultRole.getName(), saved.getEmail());
         } catch (Exception e) {
             log.error("Failed to assign default role to employee: {}", employee.getEmail(), e);
-            throw new UsernameNotFoundException("Account configuration error");
+            throw new org.springframework.security.authentication.InternalAuthenticationServiceException("Account configuration error", e);
         }
     }
 

@@ -168,6 +168,13 @@ public class PayrollCalculationService {
                         d -> d.getComponentName(),
                         (a, b) -> a
                 ));
+        Map<String, String> customComponentFormulas = componentDefs.stream()
+                .filter(d -> d.getFormulaExpression() != null)
+                .collect(Collectors.toMap(
+                        d -> d.getComponentCode().toUpperCase(),
+                        d -> d.getFormulaExpression(),
+                        (a, b) -> a
+                ));
 
         int totalDaysInMonth = YearMonth.of(year, month).lengthOfMonth();
 
@@ -189,9 +196,6 @@ public class PayrollCalculationService {
                     EmployeeSalaryProfile prof = profiles.get(i);
                     LocalDate segStart = prof.getEffectiveFrom().isBefore(monthStart)
                             ? monthStart : prof.getEffectiveFrom();
-                    if (i == 0 && segStart.isAfter(monthEnd)) {
-                        segStart = monthStart;
-                    }
                     LocalDate segEnd;
                     if (i < profiles.size() - 1) {
                         segEnd = profiles.get(i + 1).getEffectiveFrom().minusDays(1);
@@ -213,7 +217,7 @@ public class PayrollCalculationService {
                 employeePayrunProcessor.processEmployee(
                         payrun, employee, segments, totalDaysInMonth, tenantConfig, orderedStructure,
                         statutoryRates, ptSlabsByState, empLopDays, month, year,
-                        customComponentTypes, customComponentNames, monthStart, monthEnd
+                        customComponentTypes, customComponentNames, customComponentFormulas, monthStart, monthEnd
                 );
 
             } catch (Exception e) {

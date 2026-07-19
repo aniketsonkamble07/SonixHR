@@ -223,7 +223,7 @@ public class TenantRegistrationService {
         String baseCode = companyName.toLowerCase()
                 .replaceAll("[^a-z0-9]", "-")
                 .replaceAll("-+", "-")
-                .replaceAll("^-|-$", "");
+                .replaceAll("(?:^-)|(?:-$)", "");
         String code = baseCode;
         int counter = 1;
         while (tenantRepository.existsByTenantCode(code)) {

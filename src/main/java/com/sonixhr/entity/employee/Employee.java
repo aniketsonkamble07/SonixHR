@@ -626,7 +626,7 @@ public class Employee implements UserDetails {
                     if (role.getName() == null)
                         return false;
                     String normalized = role.getName().trim().replace(" ", "_").toUpperCase();
-                    return "SUPER_ADMIN".equals(normalized);
+                    return "ADMIN".equals(normalized);
                 });
     }
 

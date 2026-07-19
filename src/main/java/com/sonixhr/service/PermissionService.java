@@ -24,8 +24,7 @@ public class PermissionService {
         Object principal = auth.getPrincipal();
 
         // Check for Employee (tenant user)
-        if (principal instanceof Employee) {
-            Employee employee = (Employee) principal;
+        if (principal instanceof Employee employee) {
             boolean hasPermission = employee.hasPermission(permissionName);
             if (log.isDebugEnabled()) {
                 log.debug("Employee {} permission check for '{}': {}",
@@ -35,8 +34,7 @@ public class PermissionService {
         }
 
         // Check for PlatformUser (platform admin)
-        if (principal instanceof PlatformUser) {
-            PlatformUser platformUser = (PlatformUser) principal;
+        if (principal instanceof PlatformUser platformUser) {
             boolean hasPermission = platformUser.hasPermission(permissionName);
             if (log.isDebugEnabled()) {
                 log.debug("Platform user {} permission check for '{}': {}",
@@ -103,8 +101,8 @@ public class PermissionService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
             Object principal = auth.getPrincipal();
-            if (principal instanceof Employee) {
-                return (Employee) principal;
+            if (principal instanceof Employee employee) {
+                return employee;
             }
         }
         return null;
@@ -118,8 +116,8 @@ public class PermissionService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
             Object principal = auth.getPrincipal();
-            if (principal instanceof PlatformUser) {
-                return (PlatformUser) principal;
+            if (principal instanceof PlatformUser platformUser) {
+                return platformUser;
             }
         }
         return null;

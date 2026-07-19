@@ -38,7 +38,8 @@ public class SalaryComponentCalculator {
             Map<IndianState, List<StateProfessionalTaxConfig>> ptSlabsByState,
             BigDecimal lopDays, int month, int year,
             Map<String, String> customComponentTypes,
-            Map<String, String> customComponentNames) {
+            Map<String, String> customComponentNames,
+            Map<String, String> customComponentFormulas) {
 
         PeriodPayData data = new PeriodPayData();
         data.setLopDays(lopDays);
@@ -92,7 +93,7 @@ public class SalaryComponentCalculator {
                 continue; // Skip - calculate in second stage
             }
             if ("ALLOWANCE".equalsIgnoreCase(getComponentType(code, customComponentTypes))) {
-                BigDecimal val = calculateComponentValue(item, overrides, variables);
+                BigDecimal val = calculateComponentValue(item, overrides, variables, customComponentFormulas);
                 baseAllowances.put(code, val);
                 sumOfOtherAllowances = sumOfOtherAllowances.add(val);
                 variables.put(code, val);
@@ -144,9 +145,8 @@ public class SalaryComponentCalculator {
                     BigDecimal lopDeduction = dailyWage.multiply(lopDays).setScale(2, RoundingMode.HALF_EVEN);
                     proratedVal = proratedVal.subtract(lopDeduction).max(BigDecimal.ZERO);
                 }
-
                 data.putComponentValue(item.getComponentCode(), proratedVal);
-                data.putExpression(item.getComponentCode(), getFormulaExpression(item, overrides));
+                data.putExpression(item.getComponentCode(), getFormulaExpression(item, overrides, customComponentFormulas));
                 variables.put(item.getComponentCode(), proratedVal);
                 data.setGrossEarnings(data.getGrossEarnings().add(proratedVal));
                 if (item.isTaxable()) {
@@ -190,37 +190,16 @@ public class SalaryComponentCalculator {
                 String code = item.getComponentCode();
 
                 if ("ESI_EE".equalsIgnoreCase(code) || "ESI_ER".equalsIgnoreCase(code)) {
-                    if (tenantConfig.isEnableEsi()
-                            && data.getContributionPeriodGross().compareTo(esiCeiling) <= 0) {
-                        val = calculateComponentValue(item, overrides, variables);
-                    }
-                } else if ("PT_DEDUCTION".equalsIgnoreCase(code) || "PT".equalsIgnoreCase(code)) {
-                    if (tenantConfig.isEnablePt()) {
-                        String workCountry = employee.getWorkCountry();
-                        if (workCountry != null && !"IN".equalsIgnoreCase(workCountry)) {
-                            val = BigDecimal.ZERO;
-                        } else {
-                            // PT is levied based on work location (state where work is performed)
-                            // Primary: employee's work state (most accurate)
-                            // Fallback: tenant's configured state (for organizational uniformity)
-                            IndianState ptState = employee.getWorkState();
-                            if (ptState == null && employee.getTenant() != null) {
-                                ptState = employee.getTenant().getState();
-                            }
-                            
-                            if (ptState == null) {
-                                log.error("Employee ID {} has no work state configured; PT calculation cannot proceed", employee.getId());
-                                throw new BusinessException("PT_STATE_MISSING",
-                                        "Employee must have a work state configured (work location). PT is calculated based on work location, not residence.");
-                            }
-                            val = statutoryCalculator.calculatePTAmount(ptState, data.getGrossEarnings(), month, ptSlabsByState);
-                        }
-                    }
-                } else if ("EPF_EE".equalsIgnoreCase(code)) {
+                     // Handled post-merge in EmployeePayrunProcessor
+                     continue;
+                 } else if ("PT_DEDUCTION".equalsIgnoreCase(code) || "PT".equalsIgnoreCase(code)) {
+                     // Handled post-merge in EmployeePayrunProcessor
+                     continue;
+                 } else if ("EPF_EE".equalsIgnoreCase(code)) {
                     // When capping is enabled, apply formula-based calculation from structure
                     // When capping is disabled, apply simple rate calculation
                     if (tenantConfig.isEnablePfCapping()) {
-                        val = calculateComponentValue(item, overrides, variables);
+                        val = calculateComponentValue(item, overrides, variables, customComponentFormulas);
                     } else {
                         // Uncapped: simple EPF_EE rate * wages base
                         double epfEeRate = variables.containsKey("EPF_EE_RATE") ? ((BigDecimal) variables.get("EPF_EE_RATE")).doubleValue() : 0.12;
@@ -228,10 +207,10 @@ public class SalaryComponentCalculator {
                                 .setScale(2, RoundingMode.HALF_EVEN);
                     }
                 } else {
-                    val = calculateComponentValue(item, overrides, variables);
+                    val = calculateComponentValue(item, overrides, variables, customComponentFormulas);
                 }
                 data.putComponentValue(code, val);
-                data.putExpression(code, getFormulaExpression(item, overrides));
+                data.putExpression(code, getFormulaExpression(item, overrides, customComponentFormulas));
                 variables.put(code, val);
                 if (!isEmployerContribution(code)) {
                     data.setTotalDeductions(data.getTotalDeductions().add(val));
@@ -256,7 +235,8 @@ public class SalaryComponentCalculator {
 
     public BigDecimal calculateComponentValue(TenantSalaryStructure structure,
             List<EmployeeSalaryComponent> overrides,
-            Map<String, Object> variables) {
+            Map<String, Object> variables,
+            Map<String, String> customComponentFormulas) {
         
         Optional<EmployeeSalaryComponent> override = overrides.stream()
                 .filter(o -> o.getComponentCode().equals(structure.getComponentCode()))
@@ -275,6 +255,9 @@ public class SalaryComponentCalculator {
                     BigDecimal basic = (BigDecimal) variables.getOrDefault("BASIC", BigDecimal.ZERO);
                     return basic.multiply(pct.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
                             .setScale(2, RoundingMode.HALF_EVEN);
+                } else {
+                    throw new BusinessException("INVALID_OVERRIDE_TYPE", 
+                            "Percentage override is only allowed for components with PERCENTAGE_OF_BASIC or PERCENTAGE_OF_CTC calculation types");
                 }
             }
             if (compOverride.getOverrideFormula() != null && !compOverride.getOverrideFormula().isEmpty()) {
@@ -301,13 +284,17 @@ public class SalaryComponentCalculator {
             return basic.multiply(structure.getValue().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_EVEN))
                     .setScale(2, RoundingMode.HALF_EVEN);
         } else if ("FORMULA".equalsIgnoreCase(structure.getCalculationType())) {
-            return formulaService.evaluate(getFormulaForComponent(structure.getComponentCode()), variables);
+            String formula = customComponentFormulas != null ? customComponentFormulas.get(structure.getComponentCode().toUpperCase()) : null;
+            if (formula == null || formula.trim().isEmpty()) {
+                formula = getFormulaForComponent(structure.getComponentCode());
+            }
+            return formulaService.evaluate(formula, variables);
         }
 
         return BigDecimal.ZERO;
     }
 
-    public String getFormulaExpression(TenantSalaryStructure structure, List<EmployeeSalaryComponent> overrides) {
+    public String getFormulaExpression(TenantSalaryStructure structure, List<EmployeeSalaryComponent> overrides, Map<String, String> customComponentFormulas) {
         Optional<EmployeeSalaryComponent> override = overrides.stream()
                 .filter(o -> o.getComponentCode().equals(structure.getComponentCode()))
                 .findFirst();
@@ -318,7 +305,11 @@ public class SalaryComponentCalculator {
             return "FIXED: " + override.get().getOverrideValue();
         }
         if ("FORMULA".equalsIgnoreCase(structure.getCalculationType())) {
-            return getFormulaForComponent(structure.getComponentCode());
+            String formula = customComponentFormulas != null ? customComponentFormulas.get(structure.getComponentCode().toUpperCase()) : null;
+            if (formula == null || formula.trim().isEmpty()) {
+                formula = getFormulaForComponent(structure.getComponentCode());
+            }
+            return formula;
         }
         return structure.getCalculationType() + " : " + structure.getValue();
     }

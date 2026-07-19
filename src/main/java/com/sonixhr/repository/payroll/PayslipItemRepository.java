@@ -18,7 +18,7 @@ public interface PayslipItemRepository extends JpaRepository<PayslipItem, UUID> 
     @Query("SELECT p FROM PayslipItem p WHERE p.payslipId = :payslipId")
     List<PayslipItem> findByPayslipId(@Param("payslipId") UUID payslipId);
 
-    @Query("SELECT SUM(i.amount) FROM PayslipItem i WHERE i.componentCode = 'LOAN_EMI' AND i.resolvedVariables LIKE CONCAT('%\"loanId\":\"', :loanId, '\"%')")
+    @Query("SELECT SUM(i.amount) FROM PayslipItem i WHERE i.componentCode = CONCAT('LOAN_EMI_', :loanId)")
     BigDecimal sumRecoveredForLoan(@Param("loanId") String loanId);
 
     @Query("SELECT pi.amount FROM PayslipItem pi " +

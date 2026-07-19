@@ -2,7 +2,6 @@ package com.sonixhr.entity.platform;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.sonixhr.common.base.BasePermission;
 import com.sonixhr.common.base.BaseRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -30,7 +29,7 @@ import java.util.stream.Collectors;
 @EntityListeners(AuditingEntityListener.class)
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @SuppressWarnings("null")
-public class PlatformRole extends BaseRole {
+public class PlatformRole extends BaseRole<PlatformPermission> {
 
     @Column(name = "is_active")
     @Builder.Default
@@ -64,9 +63,8 @@ public class PlatformRole extends BaseRole {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void setPermissions(Set<? extends BasePermission> permissions) {
-        this.permissions = (Set<PlatformPermission>) permissions;
+    public void setPermissions(Set<PlatformPermission> permissions) {
+        this.permissions = permissions;
     }
 
     // ==================== Helper Methods ====================

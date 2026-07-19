@@ -7,9 +7,9 @@ import com.sonixhr.dto.SetPasswordRequest;
 import com.sonixhr.security.RateLimiterService;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.repository.employee.EmployeeRepository;
-import com.sonixhr.repository.attendance.ShiftConfigurationRepository;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.security.TokenBlacklistService;
+import com.sonixhr.security.HashingService;
 import com.sonixhr.security.TokenPair;
 import com.sonixhr.service.employee.EmployeeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.DigestUtils;
 import com.sonixhr.exceptions.TenantAuthException;
 import com.sonixhr.exceptions.TokenValidationException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -31,6 +30,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import java.security.SecureRandom;
 import com.sonixhr.security.TenantContext;
 import com.sonixhr.security.TenantRLSService;
 
@@ -40,16 +40,25 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/tenant/auth")
+@SuppressWarnings("null")
 public class TenantAuthController {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String KEY_USER_TYPE = "userType";
+    private static final String VALUE_EMPLOYEE = "EMPLOYEE";
+    private static final String KEY_EMAIL = "email";
+    private static final String KEY_FULL_NAME = "fullName";
+    private static final String KEY_TENANT_ID = "tenantId";
+    private static final String KEY_AUTHORITIES = "authorities";
 
     private final AuthenticationManager tenantAuthenticationManager;
     private final JwtService jwtService;
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final ShiftConfigurationRepository shiftConfigurationRepository;
     private final TenantRLSService tenantRLSService;
     private final RateLimiterService rateLimiterService;
+    private final HashingService hashingService;
 
     @Value("${app.trust-proxy:false}")
     private boolean trustProxy;
@@ -60,17 +69,17 @@ public class TenantAuthController {
             EmployeeRepository employeeRepository,
             EmployeeService employeeService,
             TokenBlacklistService tokenBlacklistService,
-            ShiftConfigurationRepository shiftConfigurationRepository,
             TenantRLSService tenantRLSService,
-            RateLimiterService rateLimiterService) {
+            RateLimiterService rateLimiterService,
+            HashingService hashingService) {
         this.tenantAuthenticationManager = tenantAuthenticationManager;
         this.jwtService = jwtService;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
         this.tokenBlacklistService = tokenBlacklistService;
-        this.shiftConfigurationRepository = shiftConfigurationRepository;
         this.tenantRLSService = tenantRLSService;
         this.rateLimiterService = rateLimiterService;
+        this.hashingService = hashingService;
     }
 
     @PostMapping("/login")
@@ -82,28 +91,22 @@ public class TenantAuthController {
         String ip = resolveClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : "";
-        String hashedEmail = DigestUtils.md5DigestAsHex(email.getBytes());
+        String hashedEmail = hashingService.hashEmail(email);
 
-        log.info("Login attempt for tenant user: {}, IP: {}, User-Agent: {}", 
-            request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
+        log.info("Login attempt for tenant user: {}, IP: {}, User-Agent: {}",
+                request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
 
         rateLimiterService.checkOrThrow("login:ip:" + ip, 10, 60);
         rateLimiterService.checkOrThrow("login:email:" + hashedEmail, 5, 60);
 
         try {
             Authentication auth = tenantAuthenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-            );
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
             Employee employee = (Employee) auth.getPrincipal();
 
             // Update last login details
-            employee.setLastLoginAt(java.time.LocalDateTime.now());
-            if (employee.getShift() == null) {
-                shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(employee.getTenantId())
-                        .ifPresent(employee::setShift);
-            }
-            employeeRepository.save(employee);
+            employeeService.updateLoginDetails(employee.getId(), employee.getTenantId());
 
             TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
 
@@ -157,8 +160,7 @@ public class TenantAuthController {
 
         return ResponseEntity.ok(Map.of(
                 "message", "Logout successful",
-                "status", "success"
-        ));
+                "status", "success"));
     }
 
     @PostMapping("/refresh")
@@ -200,7 +202,8 @@ public class TenantAuthController {
 
                     // Register active session & invalidate previous one of same clientType
                     String finalClientType = clientType != null ? clientType : "WEB";
-                    tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType, tokenPair.getAccessToken());
+                    tokenBlacklistService.registerActiveSession(employee.getId(), finalClientType,
+                            tokenPair.getAccessToken());
 
                     return ResponseEntity.ok(LoginResponse.builder()
                             .accessToken(tokenPair.getAccessToken())
@@ -242,8 +245,7 @@ public class TenantAuthController {
         Employee employee = employeeService.activateEmployee(
                 request.getToken(),
                 request.getPassword(),
-                request.getConfirmPassword()
-        );
+                request.getConfirmPassword());
 
         TokenPair tokenPair = jwtService.generateEmployeeTokenPair(employee);
 
@@ -258,11 +260,11 @@ public class TenantAuthController {
         response.put("refreshToken", tokenPair.getRefreshToken());
         response.put("tokenType", "Bearer");
         response.put("expiresIn", tokenPair.getExpiresIn());
-        response.put("userType", "EMPLOYEE");
+        response.put(KEY_USER_TYPE, VALUE_EMPLOYEE);
         response.put("userId", employee.getId());
-        response.put("email", employee.getEmail());
-        response.put("fullName", employee.getFullName());
-        response.put("tenantId", employee.getTenantId());
+        response.put(KEY_EMAIL, employee.getEmail());
+        response.put(KEY_FULL_NAME, employee.getFullName());
+        response.put(KEY_TENANT_ID, employee.getTenantId());
 
         log.info("Tenant user activated successfully: {}, IP: {}", employee.getEmail(), ip);
 
@@ -278,22 +280,25 @@ public class TenantAuthController {
         rateLimiterService.checkOrThrow("tenant:forgot:ip:" + ip, 3, 600);
 
         // Email-based rate limiting to prevent enumeration
-        String hashedEmail = DigestUtils.md5DigestAsHex(email.toLowerCase().trim().getBytes());
+        String hashedEmail = hashingService.hashEmail(email);
         rateLimiterService.checkOrThrow("tenant:forgot:email:" + hashedEmail, 2, 3600);
 
         log.info("Forgot password request for tenant email from IP: {}", ip);
 
         // Random delay to prevent timing attacks
         try {
-            Thread.sleep(500 + (long) (Math.random() * 500));
-        } catch (InterruptedException ignored) {}
+            Thread.sleep(500 + SECURE_RANDOM.nextInt(500));
+        } catch (InterruptedException e) {
+            log.error("Thread was interrupted during login delay", e);
+            Thread.currentThread().interrupt();
+            throw new TenantAuthException("Authentication delay was interrupted", e);
+        }
 
         employeeService.forgotPassword(email);
 
         return ResponseEntity.ok(Map.of(
                 "message", "If the email exists, a password reset link has been sent.",
-                "status", "success"
-        ));
+                "status", "success"));
     }
 
     @PostMapping("/reset-password")
@@ -305,12 +310,12 @@ public class TenantAuthController {
         rateLimiterService.checkOrThrow("tenant:reset:ip:" + ip, 5, 600);
         log.info("Reset password request with token from IP: {}", ip);
 
-        employeeService.resetPasswordWithToken(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
+        employeeService.resetPasswordWithToken(request.getToken(), request.getNewPassword(),
+                request.getConfirmPassword());
 
         return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully!",
-                "status", "success"
-        ));
+                "status", "success"));
     }
 
     @GetMapping("/me")
@@ -320,8 +325,7 @@ public class TenantAuthController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                     "authenticated", false,
-                    "message", "Not authenticated"
-            ));
+                    "message", "Not authenticated"));
         }
 
         String email = authentication.getName();
@@ -330,21 +334,20 @@ public class TenantAuthController {
         if (employee == null) {
             return ResponseEntity.ok(Map.of(
                     "authenticated", true,
-                    "email", email,
-                    "message", "User authenticated but not found in database"
-            ));
+                    KEY_EMAIL, email,
+                    "message", "User authenticated but not found in database"));
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("authenticated", true);
-        response.put("userType", "EMPLOYEE");
+        response.put(KEY_USER_TYPE, VALUE_EMPLOYEE);
         response.put("id", employee.getId());
-        response.put("email", employee.getEmail());
-        response.put("fullName", employee.getFullName());
-        response.put("tenantId", employee.getTenantId());
+        response.put(KEY_EMAIL, employee.getEmail());
+        response.put(KEY_FULL_NAME, employee.getFullName());
+        response.put(KEY_TENANT_ID, employee.getTenantId());
         response.put("status", employee.getStatus());
         response.put("isActive", employee.isActive());
-        response.put("authorities", authentication.getAuthorities().toString());
+        response.put(KEY_AUTHORITIES, authentication.getAuthorities().toString());
 
         return ResponseEntity.ok(response);
     }
@@ -359,35 +362,32 @@ public class TenantAuthController {
 
         log.debug("Verifying tenant token from IP: {}", ip);
 
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            return ResponseEntity.ok(Map.of(
+                    "valid", false,
+                    "error", "Token is invalid or expired"));
+        }
+
         try {
-            if (tokenBlacklistService.isBlacklisted(token)) {
+            boolean isValid = jwtService.validateToken(token);
+            if (!isValid) {
                 return ResponseEntity.ok(Map.of(
                         "valid", false,
-                        "error", "Token has been revoked"
-                ));
+                        "error", "Token is invalid or expired"));
             }
 
-            boolean isValid = jwtService.validateToken(token);
-            String userType = null;
-            String email = null;
+            String userType = jwtService.extractUserType(token);
+            String email = jwtService.extractUsername(token);
 
-            if (isValid) {
-                userType = jwtService.extractUserType(token);
-                email = jwtService.extractUsername(token);
-            }
-
-            // Issue 5: Return minimal info (no tenantId exposed in response map)
             return ResponseEntity.ok(Map.of(
-                    "valid", isValid,
-                    "userType", userType != null ? userType : "unknown",
-                    "email", email != null ? email : "unknown"
-            ));
+                    "valid", true,
+                    KEY_USER_TYPE, userType != null ? userType : "unknown",
+                    KEY_EMAIL, email != null ? email : "unknown"));
         } catch (Exception e) {
             log.error("Token verification error: {}", e.getMessage());
             return ResponseEntity.ok(Map.of(
                     "valid", false,
-                    "error", "Token verification failed"
-            ));
+                    "error", "Token is invalid or expired"));
         }
     }
 
@@ -398,24 +398,22 @@ public class TenantAuthController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.ok(Map.of(
                     "authenticated", false,
-                    "email", "null",
-                    "authorities", "[]",
-                    "message", "No authentication found"
-            ));
+                    KEY_EMAIL, "null",
+                    KEY_AUTHORITIES, "[]",
+                    "message", "No authentication found"));
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("authenticated", true);
         response.put("name", authentication.getName());
-        response.put("authorities", authentication.getAuthorities().toString());
+        response.put(KEY_AUTHORITIES, authentication.getAuthorities().toString());
 
         Object principal = authentication.getPrincipal();
-        if (principal instanceof Employee) {
-            Employee employee = (Employee) principal;
-            response.put("userType", "EMPLOYEE");
-            response.put("email", employee.getEmail());
-            response.put("fullName", employee.getFullName());
-            response.put("tenantId", employee.getTenantId());
+        if (principal instanceof Employee employee) {
+            response.put(KEY_USER_TYPE, VALUE_EMPLOYEE);
+            response.put(KEY_EMAIL, employee.getEmail());
+            response.put(KEY_FULL_NAME, employee.getFullName());
+            response.put(KEY_TENANT_ID, employee.getTenantId());
         }
 
         return ResponseEntity.ok(response);
@@ -438,4 +436,5 @@ public class TenantAuthController {
         }
         return request.getRemoteAddr();
     }
+
 }

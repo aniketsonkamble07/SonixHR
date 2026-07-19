@@ -65,6 +65,11 @@ import java.util.stream.Collectors;
 @SuppressWarnings("null")
 public class PlatformUserService {
 
+    private static final java.util.regex.Pattern UPPERCASE_PAT = java.util.regex.Pattern.compile("[A-Z]");
+    private static final java.util.regex.Pattern LOWERCASE_PAT = java.util.regex.Pattern.compile("[a-z]");
+    private static final java.util.regex.Pattern DIGIT_PAT = java.util.regex.Pattern.compile("\\d");
+    private static final java.util.regex.Pattern SPECIAL_PAT = java.util.regex.Pattern.compile("[@#$%^&+=!]");
+
     private final PlatformUserRepository platformUserRepository;
     private final PlatformRoleRepository platformRoleRepository;
     private final ActivationTokenService activationTokenService;
@@ -453,13 +458,13 @@ public class PlatformUserService {
     private void validatePasswordStrength(String password) {
         if (password == null || password.length() < 8)
             throw new BusinessException("Password must be at least 8 characters long");
-        if (!password.matches(".*[A-Z].*"))
+        if (!UPPERCASE_PAT.matcher(password).find())
             throw new BusinessException("Password must contain at least one uppercase letter");
-        if (!password.matches(".*[a-z].*"))
+        if (!LOWERCASE_PAT.matcher(password).find())
             throw new BusinessException("Password must contain at least one lowercase letter");
-        if (!password.matches(".*\\d.*"))
+        if (!DIGIT_PAT.matcher(password).find())
             throw new BusinessException("Password must contain at least one number");
-        if (!password.matches(".*[@#$%^&+=!].*"))
+        if (!SPECIAL_PAT.matcher(password).find())
             throw new BusinessException("Password must contain at least one special character (@#$%^&+=!)");
     }
 

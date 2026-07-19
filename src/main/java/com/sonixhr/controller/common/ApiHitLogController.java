@@ -29,7 +29,7 @@ public class ApiHitLogController {
      * Accessible to tenant super admins or users with role view authority.
      */
     @GetMapping
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'API_LOG_VIEW')")
+    @PreAuthorize("hasAuthority('API_LOG_VIEW')")
     public ResponseEntity<Page<ApiHitLog>> getTenantApiLogs(
             @AuthenticationPrincipal Employee currentUser,
             Pageable pageable) {
@@ -50,7 +50,7 @@ public class ApiHitLogController {
      * Toggle the visibility/enabled status of API hit logs for the current tenant.
      */
     @PutMapping("/toggle")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'API_LOG_TOGGLE')")
+    @PreAuthorize("hasAuthority('API_LOG_TOGGLE')")
     public ResponseEntity<Map<String, Object>> toggleApiLogging(
             @AuthenticationPrincipal Employee currentUser,
             @RequestParam boolean enabled) {

@@ -19,6 +19,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import com.sonixhr.exceptions.TenantAuthException;
+import com.sonixhr.exceptions.BusinessException;
 
 import java.util.List;
 import java.util.Map;
@@ -40,19 +42,19 @@ public class DepartmentController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("User not authenticated");
+            throw new TenantAuthException("User not authenticated");
         }
 
         Object principal = authentication.getPrincipal();
 
-        if (principal instanceof Employee) {
-            return (Employee) principal;
-        } else if (principal instanceof UserDetails) {
-            String email = ((UserDetails) principal).getUsername();
+        if (principal instanceof Employee employee) {
+            return employee;
+        } else if (principal instanceof UserDetails userDetails) {
+            String email = userDetails.getUsername();
             return employeeRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Employee not found with email: " + email));
+                    .orElseThrow(() -> new BusinessException("Employee not found with email: " + email));
         } else {
-            throw new RuntimeException("Unknown principal type: " + principal.getClass().getName());
+            throw new TenantAuthException("Unknown principal type: " + principal.getClass().getName());
         }
     }
 

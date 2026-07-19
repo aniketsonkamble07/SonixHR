@@ -29,6 +29,7 @@ public class CalendarController {
     private final CustomPermissionEvaluator permissionEvaluator;
 
     @GetMapping("/my")
+    @PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_OWN', 'LEAVE_VIEW_OWN')")
     public ResponseEntity<CalendarMonthDTO> getMyCalendar(
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
@@ -51,7 +52,7 @@ public class CalendarController {
     }
 
     @GetMapping("/employee/{employeeId}")
-    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_ALL') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_ALL')")
+    @PreAuthorize("@permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_TEAM') or @permissionEvaluator.hasPermission(authentication, 'ATTENDANCE_VIEW_ALL') or @permissionEvaluator.hasPermission(authentication, 'LEAVE_VIEW_ALL') or #employeeId == principal.id")
     public ResponseEntity<CalendarMonthDTO> getEmployeeCalendar(
             @PathVariable Long employeeId,
             @RequestParam(required = false) Integer year,

@@ -2,7 +2,6 @@ package com.sonixhr.entity.tenant;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.sonixhr.common.base.BasePermission;
 import com.sonixhr.common.base.BaseRole;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.TenantPermissionEnum;
@@ -18,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "tenant_roles", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_role_tenant_name", columnNames = {"tenant_id", "name"})
+        @UniqueConstraint(name = "uk_role_tenant_name", columnNames = { "tenant_id", "name" })
 }, indexes = {
         @Index(name = "idx_tenant_role_tenant", columnList = "tenant_id"),
         @Index(name = "idx_tenant_role_name", columnList = "name"),
@@ -31,9 +30,9 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @SuppressWarnings("null")
-public class TenantRole extends BaseRole {
+public class TenantRole extends BaseRole<TenantPermission> {
 
     @Column(name = "tenant_id", nullable = true)
     private Long tenantId;
@@ -51,12 +50,8 @@ public class TenantRole extends BaseRole {
     private Integer priority = 0;
 
     @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinTable(
-            name = "role_tenant_permissions",
-            joinColumns = @JoinColumn(name = "role_id"),
-            inverseJoinColumns = @JoinColumn(name = "permission_id")
-    )
+    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinTable(name = "role_tenant_permissions", joinColumns = @JoinColumn(name = "role_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"))
     private Set<TenantPermission> permissions = new HashSet<>();
 
     @ManyToMany(mappedBy = "roles")
@@ -72,20 +67,11 @@ public class TenantRole extends BaseRole {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void setPermissions(Set<? extends BasePermission> permissions) {
-        this.permissions = (Set<TenantPermission>) permissions;
+    public void setPermissions(Set<TenantPermission> permissions) {
+        this.permissions = permissions;
     }
 
     // ==================== Helper Methods ====================
-
-    public boolean isSystemRole() {
-        return super.isSystemRole();
-    }
-
-    public void setSystemRole(boolean systemRole) {
-        super.setSystemRole(systemRole);
-    }
 
     public boolean isActive() {
         return active;
@@ -117,7 +103,8 @@ public class TenantRole extends BaseRole {
 
     // Check if role has specific permission (by enum)
     public boolean hasPermission(TenantPermissionEnum permissionEnum) {
-        if (permissionEnum == null) return false;
+        if (permissionEnum == null)
+            return false;
         return this.permissions.stream()
                 .anyMatch(p -> p.getPermissionName() != null &&
                         p.getPermissionName().equals(permissionEnum.name()));
@@ -125,7 +112,8 @@ public class TenantRole extends BaseRole {
 
     // Check by string name (for Spring Security)
     public boolean hasPermission(String permissionName) {
-        if (permissionName == null) return false;
+        if (permissionName == null)
+            return false;
         return this.permissions.stream()
                 .anyMatch(p -> p.getPermissionName() != null &&
                         p.getPermissionName().equals(permissionName));
@@ -178,8 +166,10 @@ public class TenantRole extends BaseRole {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         TenantRole that = (TenantRole) o;
         return getId() != null && Objects.equals(getId(), that.getId());
     }

@@ -12,6 +12,7 @@ import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.exceptions.ResourceNotFoundException;
+import com.sonixhr.exceptions.TechnicalException;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
@@ -48,6 +49,10 @@ public class PlatformTenantService {
     private final PlatformUserRepository platformUserRepository;
     private final TenantDeletionLogRepository tenantDeletionLogRepository;
     private final EntityManager entityManager;
+
+    private static final java.util.Set<String> ALLOWED_ENTITIES = java.util.Set.of(
+            "Employee", "Department", "AttendanceRecord", "LeaveRequest", "Payrun", "Payslip"
+    );
 
     public Page<PlatformTenantResponseDTO> getAllTenants(String companyName, String status, Boolean isActive,
             Pageable pageable) {
@@ -274,7 +279,7 @@ public class PlatformTenantService {
         long payslipCount = countEntityRows("Payslip", id);
 
         // 2. Generate JSON manifest
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("UTC"));
         String manifestJson = String.format(
                 "{\"tenantId\":%d,\"tenantCode\":%s,\"companyName\":%s,\"deletedAt\":\"%s\"," +
                         "\"employeesCount\":%d,\"departmentsCount\":%d,\"attendanceRecordsCount\":%d," +
@@ -420,7 +425,11 @@ public class PlatformTenantService {
         log.info("Finished deleting all entities for tenant ID: {}", tenantId);
     }
 
+    @SuppressWarnings("squid:S2077")
     private long countEntityRows(String entityName, Long tenantId) {
+        if (!ALLOWED_ENTITIES.contains(entityName)) {
+            throw new IllegalArgumentException("Invalid entity name for row count: " + entityName);
+        }
         try {
             return entityManager.createQuery(
                     "SELECT COUNT(x) FROM " + entityName + " x WHERE x.tenant.id = :tenantId", Long.class)
@@ -445,7 +454,7 @@ public class PlatformTenantService {
             }
             return hexString.toString();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to calculate SHA-256 hash", e);
+            throw new TechnicalException("Failed to calculate SHA-256 hash", e);
         }
     }
 

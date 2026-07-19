@@ -10,6 +10,8 @@ import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.repository.platform.SupportTicketRepository;
 import com.sonixhr.repository.tenant.TenantRepository;
 import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
+import com.sonixhr.repository.tenant.TenantUsageStatRepository;
+import com.sonixhr.entity.tenant.TenantUsageStat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -37,6 +39,7 @@ public class PlatformDashboardService {
     private final JavaMailSender mailSender;
     private final DataSource dataSource;
     private final org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
+    private final TenantUsageStatRepository tenantUsageStatRepository;
 
     public PlatformDashboardDTO getDashboard(int trendDays) {
         log.info("Generating platform dashboard stats for the last {} days", trendDays);
@@ -46,12 +49,22 @@ public class PlatformDashboardService {
         long totalEmployees = employeeRepository.count();
         long totalPlatformUsers = platformUserRepository.count();
 
+        List<Object[]> countsData = employeeRepository.countEmployeesGroupByTenantId();
+        Map<Long, Long> tenantEmployeeCounts = countsData.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1],
+                        (v1, v2) -> v1
+                ));
+
         // 1. Tenant Summary
         long totalTenants = allTenants.size();
         long activeTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.ACTIVE).count();
         long suspendedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.SUSPENDED).count();
         long deletedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.DELETED).count();
-        long trialTenants = 0L;
+        long trialTenants = allTenants.stream()
+                .filter(t -> t.getStatus() != UserStatus.DELETED && t.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(t.getSubscriptionPlan().getCode()))
+                .count();
 
         Map<String, Long> planDistribution = allTenants.stream()
                 .filter(t -> t.getStatus() != UserStatus.DELETED && t.getPlanType() != null)
@@ -67,10 +80,12 @@ public class PlatformDashboardService {
                 .build();
 
         // 2. Subscription Summary
-        long activePaidSubscriptions = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isExpired())
+        long activeTrials = allSubscriptions.stream()
+                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(sub.getSubscriptionPlan().getCode()))
                 .count();
-        long activeTrials = 0L;
+        long activePaidSubscriptions = allSubscriptions.stream()
+                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && !"trial".equalsIgnoreCase(sub.getSubscriptionPlan().getCode()))
+                .count();
 
         // Expired Subscriptions
         long expiredSubscriptions = allSubscriptions.stream()
@@ -149,7 +164,7 @@ public class PlatformDashboardService {
             if (tenant.getStatus() == UserStatus.DELETED || tenant.getMaxEmployees() == null || tenant.getMaxEmployees() <= 0) {
                 continue;
             }
-            long count = employeeRepository.countByTenantId(tenant.getId());
+            long count = tenantEmployeeCounts.getOrDefault(tenant.getId(), 0L);
             double utilization = ((double) count / tenant.getMaxEmployees()) * 100.0;
             if (utilization >= 90.0) {
                 upsellOpportunities.add(PlatformDashboardDTO.UpsellOpportunity.builder()
@@ -163,20 +178,31 @@ public class PlatformDashboardService {
             }
         }
 
-        // 7. Top Resource Consumers (Mocked storage and API calls using active employee metrics as base)
+        // 7. Top Resource Consumers (Querying real daily stats, with fallback)
+        List<TenantUsageStat> latestStats = tenantUsageStatRepository.findAllLatestStats();
+        Map<Long, TenantUsageStat> statsMap = latestStats.stream()
+                .collect(Collectors.toMap(
+                        s -> s.getTenant().getId(),
+                        s -> s,
+                        (s1, s2) -> s1
+                ));
+
         List<PlatformDashboardDTO.ResourceConsumer> topResourceConsumers = allTenants.stream()
                 .filter(t -> t.getStatus() != UserStatus.DELETED)
                 .map(t -> {
-                    long count = employeeRepository.countByTenantId(t.getId());
-                    int mockStorage = (int) count * 15;
-                    int mockApi = (int) count * 150 + 20;
+                    long count = tenantEmployeeCounts.getOrDefault(t.getId(), 0L);
+                    TenantUsageStat stat = statsMap.get(t.getId());
+                    int employees = stat != null ? stat.getCurrentEmployees() : (int) count;
+                    int storage = stat != null ? stat.getCurrentStorageMb() : (int) count * 15;
+                    int apiCalls = stat != null ? stat.getApiCallsCount() : (int) count * 150 + 20;
+
                     return PlatformDashboardDTO.ResourceConsumer.builder()
                             .id(t.getId())
                             .tenantCode(t.getTenantCode())
                             .companyName(t.getCompanyName())
-                            .currentEmployees((int) count)
-                            .currentStorageMb(mockStorage)
-                            .apiCallsCount(mockApi)
+                            .currentEmployees(employees)
+                            .currentStorageMb(storage)
+                            .apiCallsCount(apiCalls)
                             .build();
                 })
                 .sorted(Comparator.comparing(PlatformDashboardDTO.ResourceConsumer::getCurrentEmployees).reversed())

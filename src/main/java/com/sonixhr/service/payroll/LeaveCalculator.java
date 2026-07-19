@@ -82,7 +82,7 @@ public class LeaveCalculator {
                                                || !settings.getCountHolidaysAsLeave()));
                 leaveDays = skipDay ? BigDecimal.ZERO : BigDecimal.valueOf(0.5);
             } else {
-                double days = 0;
+                int days = 0;
                 LocalDate date = overlapStart;
 
                 while (!date.isAfter(overlapEnd)) {

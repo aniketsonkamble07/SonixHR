@@ -32,7 +32,7 @@ public class OvertimeCalculator {
                     wagesBase = data.getGrossEarnings();
                 }
                 BigDecimal normalHourlyRate = wagesBase
-                    .divide(BigDecimal.valueOf(26 * 8), 6, RoundingMode.HALF_EVEN);
+                    .divide(BigDecimal.valueOf(26L * 8), 6, RoundingMode.HALF_EVEN);
                 
                 // Overtime rate: tenant-configured rate or 2x normal rate (1.5x minimum per law, but 2x is standard)
                 BigDecimal overtimeRate = (tenantConfig.getOvertimeRatePerHour() != null 

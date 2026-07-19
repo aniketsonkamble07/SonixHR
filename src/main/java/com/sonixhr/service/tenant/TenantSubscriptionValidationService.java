@@ -9,19 +9,15 @@ import com.sonixhr.enums.TenantDataStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.exceptions.ResourceNotFoundException;
 import com.sonixhr.repository.tenant.TenantRepository;
-import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
-import com.sonixhr.service.EmailService;
-import com.sonixhr.service.common.CacheEvictionService;
-import com.sonixhr.security.TenantRLSService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.core.GrantedAuthority;
 import java.util.Collection;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @Service
@@ -29,10 +25,6 @@ import java.time.LocalDateTime;
 public class TenantSubscriptionValidationService {
 
     private final TenantRepository tenantRepository;
-    private final TenantSubscriptionRepository subscriptionRepository;
-    private final CacheEvictionService cacheEvictionService;
-    private final TenantRLSService tenantRLSService;
-    private final EmailService emailService;
 
     @Cacheable(value = "tenantDetails", key = "#tenantId", unless = "#result == null")
     public CachedTenantDetails getTenantDetails(Long tenantId) {
@@ -110,16 +102,14 @@ public class TenantSubscriptionValidationService {
         }
 
         if (details.getPlanStatus() == PlanStatus.CANCELLED) {
-            if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now())) {
-                handleExpiredTenant(tenantId);
+            if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
                 throw new BusinessException("Subscription has expired. Please log in and renew online.");
             }
         }
 
         // Real-time expiration check
-        if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now())) {
+        if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
             if (details.getPlanStatus() != PlanStatus.PAST_DUE && details.getPlanStatus() != PlanStatus.EXPIRED) {
-                handleExpiredTenant(tenantId);
                 throw new BusinessException("Subscription has expired. Please log in and renew online.");
             }
         }
@@ -196,42 +186,5 @@ public class TenantSubscriptionValidationService {
                 path.equals("/api/tenants/my-tenant");
     }
 
-    @Transactional
-    public void handleExpiredTenant(Long tenantId) {
-        log.info("Subscription for tenant {} is detected as expired in real-time. Deactivating...", tenantId);
 
-        // 1. Evict caches first to prevent race conditions
-        evictTenantDetails(tenantId);
-        cacheEvictionService.evictTenantCaches(tenantId);
-        tenantRLSService.invalidateTenantCache(tenantId);
-
-        // 2. Update TenantSubscription
-        subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId).ifPresent(sub -> {
-            sub.expire(); // sets planStatus = PlanStatus.EXPIRED and isActive = false
-            subscriptionRepository.save(sub);
-        });
-
-        // 3. Update Tenant and Send Email (idempotent)
-        tenantRepository.findById(tenantId).ifPresent(tenant -> {
-            tenant.expire("Subscription expired (real-time check)");
-            tenant.setDataStatus(TenantDataStatus.RETAINED);
-            tenant.setArchivedAt(null);
-
-            // Send expiration email atomically/idempotently
-            if (tenant.getExpirationNotifiedAt() == null) {
-                try {
-                    String planName = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan().getName() : "Standard Plan";
-                    emailService.sendSubscriptionExpiredEmail(
-                        tenant.getAdminEmail(),
-                        tenant.getCompanyName(),
-                        planName
-                    );
-                    tenant.setExpirationNotifiedAt(LocalDateTime.now());
-                } catch (Exception e) {
-                    log.warn("Failed to send subscription expiration email for tenant {}: {}", tenantId, e.getMessage());
-                }
-            }
-            tenantRepository.save(tenant);
-        });
-    }
 }

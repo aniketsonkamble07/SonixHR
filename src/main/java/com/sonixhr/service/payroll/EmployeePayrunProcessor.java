@@ -3,6 +3,7 @@ package com.sonixhr.service.payroll;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.payroll.*;
 import com.sonixhr.enums.IndianState;
+import com.sonixhr.repository.payroll.EmployeeSalaryComponentRepository;
 import com.sonixhr.repository.payroll.EmployeeSalaryProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,12 +24,14 @@ import java.util.stream.Collectors;
 public class EmployeePayrunProcessor {
 
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepo;
+    private final EmployeeSalaryComponentRepository employeeSalaryComponentRepo;
     private final SalaryComponentCalculator salaryComponentCalculator;
     private final OvertimeCalculator overtimeCalculator;
     private final TdsCalculator tdsCalculator;
     private final LoanRecoveryCalculator loanRecoveryCalculator;
     private final ReimbursementCalculator reimbursementCalculator;
     private final PayslipGenerator payslipGenerator;
+    private final StatutoryCalculator statutoryCalculator;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processEmployee(
@@ -44,6 +47,7 @@ public class EmployeePayrunProcessor {
             int month, int year,
             Map<String, String> customComponentTypes,
             Map<String, String> customComponentNames,
+            Map<String, String> customComponentFormulas,
             LocalDate monthStart,
             LocalDate monthEnd) {
 
@@ -61,7 +65,7 @@ public class EmployeePayrunProcessor {
             PeriodPayData segData = salaryComponentCalculator.computePeriodPayData(
                     seg.profile(), seg.start(), seg.end(), totalDaysInMonth,
                     tenantConfig, orderedStructure, statutoryRates, ptSlabsByState, segLopDays, month, year,
-                    customComponentTypes, customComponentNames);
+                    customComponentTypes, customComponentNames, customComponentFormulas);
 
             merged = (merged == null) ? segData : mergePeriodData(merged, segData);
         }
@@ -91,6 +95,11 @@ public class EmployeePayrunProcessor {
         // Compute overtime once per employee using OvertimeCalculator
         overtimeCalculator.calculateOvertime(employee, tenantConfig, monthStart, monthEnd, merged);
 
+        // PT and ESI calculations post-merge (Issue 9b)
+        EmployeeSalaryProfile activeProfile = segments.get(segments.size() - 1).profile();
+        calculatePtAndEsi(merged, employee, tenantConfig, orderedStructure, statutoryRates, ptSlabsByState,
+                month, year, customComponentTypes, customComponentFormulas, activeProfile);
+
         // Resolve governing tax regime (last segment wins, fallback to tenant default)
         String regimeStr = segments.get(segments.size() - 1).profile().getTaxRegime();
         if (regimeStr == null) {
@@ -102,8 +111,9 @@ public class EmployeePayrunProcessor {
         }
 
         // Compute TDS once per employee-month
+        BigDecimal nonRecurringGross = arrearsVal.add(bonusVal);
         BigDecimal tds = tdsCalculator.calculateMonthlyTds(
-                employee, tenantConfig.getTenant().getId(), regime, merged.getTaxableGrossEarnings(), month, year);
+                employee, tenantConfig.getTenant().getId(), regime, merged.getTaxableGrossEarnings(), nonRecurringGross, month, year);
 
         merged.putComponentValue("TDS", tds);
         merged.putExpression("TDS", "Projected annual tax / remaining months");
@@ -167,24 +177,23 @@ public class EmployeePayrunProcessor {
         }
         
         // Check if arrears were already paid for this change
-        // Query previous month's payslip to see if ARREARS were already added
-        LocalDate prevMonthStart = monthStart.minusMonths(1);
-        boolean arrearsAlreadyProcessed = false;
+        if (latest.isArrearsPaid()) {
+            return BigDecimal.ZERO;
+        }
         
-        // If this is the month AFTER the effective date, pay arrears only once
         long monthsDiff = java.time.temporal.ChronoUnit.MONTHS.between(
             effectiveDate.withDayOfMonth(1), 
             monthStart.withDayOfMonth(1)
         );
         
-        // Arrears should be paid only in the first month after a retrospective change
-        // i.e., when monthsDiff == 1 (one month has passed since effective date)
-        if (monthsDiff <= 0 || monthsDiff > 1) {
+        if (monthsDiff <= 0) {
             return BigDecimal.ZERO;
         }
         
-        // Pay arrears for just one month (the month between effective date and current)
-        return ctcDiff.setScale(2, RoundingMode.HALF_EVEN);
+        latest.setArrearsPaid(true);
+        employeeSalaryProfileRepo.save(latest);
+        
+        return ctcDiff.multiply(BigDecimal.valueOf(monthsDiff)).setScale(2, RoundingMode.HALF_EVEN);
     }
 
     private BigDecimal calculateMonthlyBonus(BigDecimal basicSalary, BigDecimal grossSalary, 
@@ -192,6 +201,11 @@ public class EmployeePayrunProcessor {
         
         // Check eligibility: null basic or no service in FY disqualifies
         if (basicSalary == null) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Bonus eligibility cap: basic exceeds ₹21,000 disqualifies
+        if (basicSalary.compareTo(new BigDecimal("21000")) > 0) {
             return BigDecimal.ZERO;
         }
         
@@ -234,5 +248,99 @@ public class EmployeePayrunProcessor {
         ) + 1; // include current month
         
         return (int) months;
+    }
+
+    private void calculatePtAndEsi(
+            PeriodPayData merged,
+            Employee employee,
+            TenantPayrollConfig tenantConfig,
+            List<TenantSalaryStructure> orderedStructure,
+            List<StatutoryRateConfig> statutoryRates,
+            Map<IndianState, List<StateProfessionalTaxConfig>> ptSlabsByState,
+            int month, int year,
+            Map<String, String> customComponentTypes,
+            Map<String, String> customComponentFormulas,
+            EmployeeSalaryProfile activeProfile) {
+        
+        // ESI ceiling resolution
+        BigDecimal esiCeiling = BigDecimal.valueOf(21000); // Default fallback
+        for (StatutoryRateConfig rateConfig : statutoryRates) {
+            if ("ESI_ER".equalsIgnoreCase(rateConfig.getComponentCode())) {
+                if (rateConfig.getCeilingAmount() != null) {
+                    esiCeiling = rateConfig.getCeilingAmount();
+                    break;
+                }
+            }
+        }
+
+        // Calculate contribution period gross (Issue 9a: pass merged.getGrossEarnings())
+        BigDecimal contributionPeriodGross = statutoryCalculator.getContributionPeriodStartGross(
+                tenantConfig.getTenant().getId(), employee.getId(), year, month, merged.getGrossEarnings());
+        merged.setContributionPeriodGross(contributionPeriodGross);
+
+        // Variables map for SpEL evaluations
+        Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("CTC", activeProfile.getMonthlyCtc());
+        variables.put("BASIC", merged.getComponentValues().getOrDefault("BASIC", BigDecimal.ZERO));
+        variables.put("WAGES_BASE", merged.getWagesBase());
+        variables.put("GROSS", merged.getGrossEarnings());
+        variables.put("LOP_DAYS", merged.getLopDays());
+        variables.put("CONTRIBUTION_PERIOD_GROSS", contributionPeriodGross);
+
+        for (StatutoryRateConfig rateConfig : statutoryRates) {
+            variables.put(rateConfig.getComponentCode() + "_RATE", rateConfig.getRate());
+            if (rateConfig.getCeilingAmount() != null) {
+                variables.put(rateConfig.getComponentCode() + "_CEILING", rateConfig.getCeilingAmount());
+            }
+            if (rateConfig.getCapAmount() != null) {
+                variables.put(rateConfig.getComponentCode() + "_CAP", rateConfig.getCapAmount());
+            }
+        }
+
+        List<EmployeeSalaryComponent> overrides = employeeSalaryComponentRepo.findBySalaryProfileId(activeProfile.getId());
+
+        for (TenantSalaryStructure item : orderedStructure) {
+            String code = item.getComponentCode();
+            if ("DEDUCTION".equalsIgnoreCase(salaryComponentCalculator.getComponentType(code, customComponentTypes))) {
+                if ("ESI_EE".equalsIgnoreCase(code) || "ESI_ER".equalsIgnoreCase(code)) {
+                    BigDecimal val = BigDecimal.ZERO;
+                    if (tenantConfig.isEnableEsi() && contributionPeriodGross.compareTo(esiCeiling) <= 0) {
+                        val = salaryComponentCalculator.calculateComponentValue(item, overrides, variables, customComponentFormulas);
+                    }
+                    merged.putComponentValue(code, val);
+                    merged.putExpression(code, salaryComponentCalculator.getFormulaExpression(item, overrides, customComponentFormulas));
+                    variables.put(code, val);
+                    if (!salaryComponentCalculator.isEmployerContribution(code)) {
+                        merged.setTotalDeductions(merged.getTotalDeductions().add(val));
+                    }
+                } else if ("PT_DEDUCTION".equalsIgnoreCase(code) || "PT".equalsIgnoreCase(code)) {
+                    BigDecimal val = BigDecimal.ZERO;
+                    if (tenantConfig.isEnablePt()) {
+                        String workCountry = employee.getWorkCountry();
+                        if (workCountry != null && !"IN".equalsIgnoreCase(workCountry)) {
+                            val = BigDecimal.ZERO;
+                        } else {
+                            IndianState ptState = employee.getWorkState();
+                            if (ptState == null && employee.getTenant() != null) {
+                                ptState = employee.getTenant().getState();
+                            }
+                            
+                            if (ptState == null) {
+                                log.error("Employee ID {} has no work state configured; PT calculation cannot proceed", employee.getId());
+                                throw new com.sonixhr.exceptions.BusinessException("PT_STATE_MISSING",
+                                        "Employee must have a work state configured (work location). PT is calculated based on work location, not residence.");
+                            }
+                            val = statutoryCalculator.calculatePTAmount(ptState, merged.getGrossEarnings(), month, ptSlabsByState);
+                        }
+                    }
+                    merged.putComponentValue(code, val);
+                    merged.putExpression(code, "Professional Tax slab rate");
+                    variables.put(code, val);
+                    if (!salaryComponentCalculator.isEmployerContribution(code)) {
+                        merged.setTotalDeductions(merged.getTotalDeductions().add(val));
+                    }
+                }
+            }
+        }
     }
 }

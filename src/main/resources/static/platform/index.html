@@ -177,9 +177,9 @@
                   <h3>Total Organizations</h3>
                   <div class="metric-value" id="stat-total-tenants">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+12.4%</span>
+                <div class="metric-trend text-success" id="trend-total-tenants-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-total-tenants-icon"></i>
+                  <span id="trend-total-tenants-val">+12.4%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -198,9 +198,9 @@
                   <h3>Active Organizations</h3>
                   <div class="metric-value" id="stat-active-tenants">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+8.2%</span>
+                <div class="metric-trend text-success" id="trend-active-tenants-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-active-tenants-icon"></i>
+                  <span id="trend-active-tenants-val">+8.2%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -219,9 +219,9 @@
                   <h3>Trial Organizations</h3>
                   <div class="metric-value" id="stat-trial-tenants">-</div>
                 </div>
-                <div class="metric-trend text-warning">
-                  <i class="fa-solid fa-arrow-trend-down"></i>
-                  <span>-3.1%</span>
+                <div class="metric-trend text-warning" id="trend-trial-tenants-container">
+                  <i class="fa-solid fa-arrow-trend-down" id="trend-trial-tenants-icon"></i>
+                  <span id="trend-trial-tenants-val">-3.1%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -240,9 +240,9 @@
                   <h3>Expired Subscriptions</h3>
                   <div class="metric-value" id="stat-expired-subs">-</div>
                 </div>
-                <div class="metric-trend text-danger">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+1.8%</span>
+                <div class="metric-trend text-danger" id="trend-expired-subs-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-expired-subs-icon"></i>
+                  <span id="trend-expired-subs-val">+1.8%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -261,9 +261,9 @@
                   <h3>Total Employees</h3>
                   <div class="metric-value" id="stat-total-employees">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+18.5%</span>
+                <div class="metric-trend text-success" id="trend-total-employees-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-total-employees-icon"></i>
+                  <span id="trend-total-employees-val">+18.5%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -282,9 +282,9 @@
                   <h3>Total Active Users</h3>
                   <div class="metric-value" id="stat-total-active-users">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+14.2%</span>
+                <div class="metric-trend text-success" id="trend-total-active-users-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-total-active-users-icon"></i>
+                  <span id="trend-total-active-users-val">+14.2%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -303,9 +303,9 @@
                   <h3>Monthly MRR</h3>
                   <div class="metric-value" id="stat-mrr">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-up"></i>
-                  <span>+22.1%</span>
+                <div class="metric-trend text-success" id="trend-mrr-container">
+                  <i class="fa-solid fa-arrow-trend-up" id="trend-mrr-icon"></i>
+                  <span id="trend-mrr-val">+22.1%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -324,9 +324,9 @@
                   <h3>Open Support Tickets</h3>
                   <div class="metric-value" id="stat-tickets">-</div>
                 </div>
-                <div class="metric-trend text-success">
-                  <i class="fa-solid fa-arrow-trend-down"></i>
-                  <span>-25.0%</span>
+                <div class="metric-trend text-success" id="trend-tickets-container">
+                  <i class="fa-solid fa-arrow-trend-down" id="trend-tickets-icon"></i>
+                  <span id="trend-tickets-val">-25.0%</span>
                 </div>
               </div>
               <div class="metric-visual">
@@ -560,10 +560,11 @@
               <div class="form-group" id="sandbox-plan-wrapper">
                 <label class="form-label">New Plan Tier</label>
                 <select id="sandbox-plan-select" class="select-input" style="width: 100%;">
-                  <option value="basic">Basic Plan</option>
-                  <option value="moderate">Moderate Plan</option>
-                  <option value="premium">Premium Plan</option>
-                  <option value="enterprise">Enterprise Plan</option>
+                  <option value="Trial Plan">Trial Plan</option>
+                  <option value="Basic Plan">Basic Plan</option>
+                  <option value="Moderate Plan">Moderate Plan</option>
+                  <option value="Premium Plan">Premium Plan</option>
+                  <option value="Enterprise Plan">Enterprise Plan</option>
                 </select>
               </div>
 
@@ -928,11 +929,11 @@
             <div class="form-group">
               <label class="form-label" for="reg-plan-type">Initial Subscription Plan</label>
               <select id="reg-plan-type" class="select-input" style="width: 100%; height: 42px;">
-                <option value="trial">Free Trial (14 days, 10 employees)</option>
-                <option value="basic">Basic ($49/mo, 100 employees)</option>
-                <option value="moderate">Moderate ($99/mo, 500 employees)</option>
-                <option value="premium">Premium ($299/mo, 2000 employees)</option>
-                <option value="enterprise">Enterprise ($999/mo, 10000 employees)</option>
+                <option value="Trial Plan">Free Trial (14 days, 10 employees)</option>
+                <option value="Basic Plan">Basic ($49/mo, 100 employees)</option>
+                <option value="Moderate Plan">Moderate ($99/mo, 500 employees)</option>
+                <option value="Premium Plan">Premium ($299/mo, 2000 employees)</option>
+                <option value="Enterprise Plan">Enterprise ($999/mo, 10000 employees)</option>
               </select>
             </div>
           </div>
@@ -1035,11 +1036,11 @@
           <div class="form-group">
             <label class="form-label" for="override-plan-type">Override Plan Tier</label>
             <select id="override-plan-type" class="select-input" style="width: 100%; height: 42px;">
-              <option value="TRIAL">Trial</option>
-              <option value="BASIC">Basic</option>
-              <option value="MODERATE">Moderate</option>
-              <option value="PREMIUM">Premium</option>
-              <option value="ENTERPRISE">Enterprise</option>
+              <option value="Trial Plan">Trial</option>
+              <option value="Basic Plan">Basic</option>
+              <option value="Moderate Plan">Moderate</option>
+              <option value="Premium Plan">Premium</option>
+              <option value="Enterprise Plan">Enterprise</option>
             </select>
           </div>
           
@@ -1789,6 +1790,22 @@
       }
     };
 
+    function updateTrendUI(containerId, iconId, valId, text, colorClass, iconClass) {
+      const container = document.getElementById(containerId);
+      const icon = document.getElementById(iconId);
+      const val = document.getElementById(valId);
+      
+      if (container) {
+        container.className = 'metric-trend ' + colorClass;
+      }
+      if (icon) {
+        icon.className = 'fa-solid ' + iconClass;
+      }
+      if (val) {
+        val.textContent = text;
+      }
+    }
+
     async function fetchDashboardMetrics(trendDays = 30) {
       try {
         const res = await fetch(`${API_BASE}/platform/dashboard?trendDays=${trendDays}`, { headers: getHeaders() });
@@ -1810,8 +1827,75 @@
           const mrrFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
           document.getElementById('stat-mrr').textContent = mrrFormatter.format(data.subscriptionSummary.totalMrr || 0);
 
-          // Populate sparklines for Overview cards
-          drawSparkline('sparkline-total-tenants', generateSparklineData(data.tenantSummary.totalTenants, 8, 0.12), '#6366f1');
+          // 1. Calculate organization registration growth trend dynamically from registrationTrend API data
+          let orgChangeText = '+0.0%';
+          let orgChangeClass = 'text-success';
+          let orgChangeIcon = 'fa-arrow-trend-up';
+          if (data.registrationTrend && data.registrationTrend.length >= 2) {
+            const first = data.registrationTrend[0].count;
+            const last = data.registrationTrend[data.registrationTrend.length - 1].count;
+            if (first > 0) {
+              const change = ((last - first) / first) * 100;
+              orgChangeText = (change >= 0 ? '+' : '') + change.toFixed(1) + '%';
+              if (change < 0) {
+                orgChangeClass = 'text-warning';
+                orgChangeIcon = 'fa-arrow-trend-down';
+              }
+            } else if (last > 0) {
+              orgChangeText = '+' + last + ' new';
+            }
+          } else if (data.registrationTrend && data.registrationTrend.length === 1) {
+            orgChangeText = '+' + data.registrationTrend[0].count + ' new';
+          }
+          updateTrendUI('trend-total-tenants-container', 'trend-total-tenants-icon', 'trend-total-tenants-val', orgChangeText, orgChangeClass, orgChangeIcon);
+
+          // 2. Active, Trial and Expired ratios
+          const totalTenantsVal = data.tenantSummary.totalTenants || 1;
+          const activePct = ((data.tenantSummary.activeTenants || 0) / totalTenantsVal) * 100;
+          updateTrendUI('trend-active-tenants-container', 'trend-active-tenants-icon', 'trend-active-tenants-val', `${activePct.toFixed(1)}% of total`, 'text-success', 'fa-building-circle-check');
+
+          const trialPct = ((data.tenantSummary.trialTenants || 0) / totalTenantsVal) * 100;
+          updateTrendUI('trend-trial-tenants-container', 'trend-trial-tenants-icon', 'trend-trial-tenants-val', `${trialPct.toFixed(1)}% of total`, 'text-info', 'fa-hourglass-half');
+
+          const expiredPct = ((data.subscriptionSummary.expiredSubscriptions || 0) / totalTenantsVal) * 100;
+          updateTrendUI('trend-expired-subs-container', 'trend-expired-subs-icon', 'trend-expired-subs-val', `${expiredPct.toFixed(1)}% ratio`, expiredPct > 20 ? 'text-danger' : 'text-warning', 'fa-circle-exclamation');
+
+          // 3. Employees, Users and Tickets metrics
+          const avgEmp = data.systemSummary.averageEmployeesPerTenant || 0;
+          updateTrendUI('trend-total-employees-container', 'trend-total-employees-icon', 'trend-total-employees-val', `${avgEmp.toFixed(1)} avg/org`, 'text-success', 'fa-users');
+
+          const activeUsersPct = data.systemSummary.totalEmployees > 0 ? ((data.systemSummary.totalActiveUsers || 0) / data.systemSummary.totalEmployees) * 100 : 0;
+          updateTrendUI('trend-total-active-users-container', 'trend-total-active-users-icon', 'trend-total-active-users-val', `${activeUsersPct.toFixed(1)}% active`, 'text-success', 'fa-user-check');
+
+          const ticketsOpen = data.systemSummary.supportTicketsOpen || 0;
+          updateTrendUI('trend-tickets-container', 'trend-tickets-icon', 'trend-tickets-val', ticketsOpen > 0 ? `${ticketsOpen} unresolved` : 'all cleared', ticketsOpen > 5 ? 'text-danger' : ticketsOpen > 0 ? 'text-warning' : 'text-success', 'fa-ticket');
+
+          // 4. Monthly MRR Trend dynamically fetched from active subscription API metrics
+          try {
+            const subRes = await fetch(`${API_BASE}/platform/subscriptions/dashboard`, { headers: getHeaders() });
+            if (subRes.ok) {
+              const subData = await subRes.json();
+              if (subData.monthlyRevenue && subData.monthlyRevenue.length >= 2) {
+                const first = subData.monthlyRevenue[0].value;
+                const last = subData.monthlyRevenue[subData.monthlyRevenue.length - 1].value;
+                if (first > 0) {
+                  const change = ((last - first) / first) * 100;
+                  const mrrText = (change >= 0 ? '+' : '') + change.toFixed(1) + '% MoM';
+                  updateTrendUI('trend-mrr-container', 'trend-mrr-icon', 'trend-mrr-val', mrrText, change >= 0 ? 'text-success' : 'text-warning', 'fa-arrow-trend-up');
+                } else if (last > 0) {
+                  updateTrendUI('trend-mrr-container', 'trend-mrr-icon', 'trend-mrr-val', `+100% growth`, 'text-success', 'fa-arrow-trend-up');
+                }
+              }
+            }
+          } catch(err) {
+            console.error('Error fetching sub metrics for MRR trend', err);
+          }
+
+          // Populate sparklines for Overview cards dynamically
+          const registrationTrendPoints = data.registrationTrend && data.registrationTrend.length > 0 
+              ? data.registrationTrend.map(p => p.count)
+              : generateSparklineData(data.tenantSummary.totalTenants, 8, 0.12);
+          drawSparkline('sparkline-total-tenants', registrationTrendPoints, '#6366f1');
           drawSparkline('sparkline-active-tenants', generateSparklineData(data.tenantSummary.activeTenants, 8, 0.08), '#10b981');
           drawSparkline('sparkline-trial-tenants', generateSparklineData(data.tenantSummary.trialTenants, 8, 0.20), '#0ea5e9');
           drawSparkline('sparkline-expired-subs', generateSparklineData(data.subscriptionSummary.expiredSubscriptions, 8, 0.35), '#ef4444');
@@ -2986,12 +3070,8 @@
         url += '/renew';
       } else if (action === 'CANCEL') {
         url += '/cancel';
-      } else if (action === 'UPGRADE') {
+      } else if (action === 'UPGRADE' || action === 'DOWNGRADE') {
         url += '/upgrade';
-        const plan = document.getElementById('sandbox-plan-select').value;
-        url += `?planType=${plan}&billingCycle=monthly`;
-      } else if (action === 'DOWNGRADE') {
-        url += '/downgrade';
         const plan = document.getElementById('sandbox-plan-select').value;
         url += `?planType=${plan}&billingCycle=monthly`;
       }
@@ -3525,6 +3605,17 @@
       document.querySelector('[data-tab=tab-tickets]').click();
     }
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\//g, '&#x2F;');
+    }
+
     // ==========================================
     // PLATFORM GLOBAL API HIT LOGS
     // ==========================================
@@ -3556,17 +3647,25 @@
               const row = document.createElement('tr');
               const timeStr = log.hitTime ? new Date(log.hitTime).toLocaleString() : '-';
               
+              const tenantText = log.tenantId ? `Tenant #${escapeHtml(log.tenantId)}` : 'Platform';
+              const methodText = escapeHtml(log.httpMethod);
+              const uriText = escapeHtml(log.requestUri);
+              const ipText = escapeHtml(log.ipAddress || '-');
+              const nameText = escapeHtml(log.deviceName || 'Unknown');
+              const detailsText = escapeHtml(log.deviceDetails || '-');
+              const emailText = escapeHtml(log.employeeEmail || 'anonymous');
+
               row.innerHTML = `
                 <td>${timeStr}</td>
-                <td><span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; font-family: monospace;">Tenant #${log.tenantId || 'Platform'}</span></td>
-                <td><span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; text-transform: uppercase;">${log.httpMethod}</span></td>
-                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${log.requestUri}</code></td>
-                <td>${log.ipAddress || '-'}</td>
+                <td><span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; font-family: monospace;">${tenantText}</span></td>
+                <td><span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; text-transform: uppercase;">${methodText}</span></td>
+                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${uriText}</code></td>
+                <td>${ipText}</td>
                 <td>
-                  <div style="font-weight:600;"><i class="fa-solid fa-laptop-code" style="color: #a78bfa; margin-right: 6px;"></i> ${log.deviceName || 'Unknown'}</div>
-                  <div style="font-size:0.75rem; opacity:0.6; word-break:break-all; max-width: 250px;">${log.deviceDetails || '-'}</div>
+                  <div style="font-weight:600;"><i class="fa-solid fa-laptop-code" style="color: #a78bfa; margin-right: 6px;"></i> ${nameText}</div>
+                  <div style="font-size:0.75rem; opacity:0.6; word-break:break-all; max-width: 250px;">${detailsText}</div>
                 </td>
-                <td><strong>${log.employeeEmail || 'anonymous'}</strong></td>
+                <td><strong>${emailText}</strong></td>
               `;
               tbody.appendChild(row);
             });

@@ -6,10 +6,7 @@ import com.sonixhr.enums.UserStatus;
 import com.sonixhr.enums.TenantDataStatus;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.repository.tenant.TenantRepository;
-import com.sonixhr.repository.tenant.TenantSubscriptionRepository;
-import com.sonixhr.security.TenantRLSService;
-import com.sonixhr.service.EmailService;
-import com.sonixhr.service.common.CacheEvictionService;
+import com.sonixhr.service.tenant.TenantSubscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -28,10 +25,6 @@ import static org.mockito.Mockito.*;
 public class TenantSubscriptionValidationServiceTest {
 
     @Mock private TenantRepository tenantRepository;
-    @Mock private TenantSubscriptionRepository subscriptionRepository;
-    @Mock private CacheEvictionService cacheEvictionService;
-    @Mock private TenantRLSService tenantRLSService;
-    @Mock private EmailService emailService;
 
     private TenantSubscriptionValidationService validationService;
 
@@ -39,11 +32,7 @@ public class TenantSubscriptionValidationServiceTest {
     public void setUp() {
         MockitoAnnotations.openMocks(this);
         validationService = new TenantSubscriptionValidationService(
-                tenantRepository,
-                subscriptionRepository,
-                cacheEvictionService,
-                tenantRLSService,
-                emailService
+                tenantRepository
         );
     }
 
