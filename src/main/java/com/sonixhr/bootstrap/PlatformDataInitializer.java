@@ -124,31 +124,30 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 // Drop obsolete state enum check constraints dynamically if they exist
                 try {
                         log.info("Dropping obsolete state CHECK constraints dynamically...");
-                        jdbcTemplate.execute(
-                                        """
-                                                        DO $$
-                                                        DECLARE
-                                                            r RECORD;
-                                                        BEGIN
-                                                            FOR r IN (
-                                                                SELECT tc.table_name, tc.constraint_name
-                                                                FROM information_schema.table_constraints tc
-                                                                JOIN information_schema.constraint_column_usage ccu
-                                                                    ON tc.constraint_name = ccu.constraint_name
-                                                                    AND tc.table_schema = ccu.table_schema
-                                                                WHERE tc.constraint_type = 'CHECK'
-                                                                  AND tc.table_schema = 'public'
-                                                                  AND (
-                                                                    (tc.table_name = 'employees' AND ccu.column_name = 'state') OR
-                                                                    (tc.table_name = 'tenants' AND ccu.column_name = 'state') OR
-                                                                    (tc.table_name = 'tenant_leave_settings' AND ccu.column_name = 'state') OR
-                                                                    (tc.table_name = 'platform_state_pt_configs' AND ccu.column_name = 'state_code')
-                                                                  )
-                                                            ) LOOP
-                                                                EXECUTE 'ALTER TABLE ' || quote_ident(r.table_name) || ' DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
-                                                            END LOOP;
-                                                        END $$;
-                                                        """);
+                        jdbcTemplate.execute("""
+                                        DO $$
+                                        DECLARE
+                                            r RECORD;
+                                        BEGIN
+                                            FOR r IN (
+                                                SELECT tc.table_name, tc.constraint_name
+                                                FROM information_schema.table_constraints tc
+                                                JOIN information_schema.constraint_column_usage ccu 
+                                                    ON tc.constraint_name = ccu.constraint_name 
+                                                    AND tc.table_schema = ccu.table_schema
+                                                WHERE tc.constraint_type = 'CHECK'
+                                                  AND tc.table_schema = 'public'
+                                                  AND (
+                                                    (tc.table_name = 'employees' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'tenants' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'tenant_leave_settings' AND ccu.column_name = 'state') OR
+                                                    (tc.table_name = 'platform_state_pt_configs' AND ccu.column_name = 'state_code')
+                                                  )
+                                            ) LOOP
+                                                EXECUTE 'ALTER TABLE ' || quote_ident(r.table_name) || ' DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
+                                            END LOOP;
+                                        END $$;
+                                        """);
                         log.info("Successfully dropped obsolete state CHECK constraints.");
                 } catch (Exception e) {
                         log.warn("Could not drop state CHECK constraints: {}", e.getMessage());
@@ -169,21 +168,20 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 // Step 6: Seed Statutory Rates and PT Configs
                 seedStatutoryRatesAndPtConfigs();
 
-                // Step 7: Sync existing Tenant Admin roles with all Tenant Permissions to
-                // prevent 403 authorization issues
+                // Step 7: Sync existing Tenant Admin roles with all Tenant Permissions to prevent 403 authorization issues
                 try {
                         log.info("Syncing Tenant Admin roles with all Tenant Permissions...");
                         jdbcTemplate.execute("""
-                                        INSERT INTO role_tenant_permissions (role_id, permission_id)
-                                        SELECT r.id, p.id
-                                        FROM tenant_roles r
-                                        CROSS JOIN tenant_permissions p
-                                        WHERE r.name = 'Admin'
-                                          AND NOT EXISTS (
-                                              SELECT 1 FROM role_tenant_permissions rtp
-                                              WHERE rtp.role_id = r.id AND rtp.permission_id = p.id
-                                          )
-                                        """);
+                                INSERT INTO role_tenant_permissions (role_id, permission_id)
+                                SELECT r.id, p.id
+                                FROM tenant_roles r
+                                CROSS JOIN tenant_permissions p
+                                WHERE r.name = 'Admin'
+                                  AND NOT EXISTS (
+                                      SELECT 1 FROM role_tenant_permissions rtp
+                                      WHERE rtp.role_id = r.id AND rtp.permission_id = p.id
+                                  )
+                                """);
                         log.info("Successfully synced Tenant Admin roles with all permissions.");
                 } catch (Exception e) {
                         log.warn("Failed to sync Tenant Admin roles: {}", e.getMessage());
