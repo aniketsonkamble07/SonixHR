@@ -4105,13 +4105,13 @@
       openModal('subscription-upgrade-modal');
 
       try {
-        const res = await fetch(`${API_BASE}/platform/subscription-plans`, { headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/public/plans`, { headers: getHeaders() });
         if (res.ok) {
           const plans = await res.json();
-          const availablePlans = plans.filter(p => p.active && parseFloat(p.price || 0) > 0);
+          const availablePlans = plans.filter(p => p.isActive && parseFloat(p.price || 0) > 0);
           if (availablePlans.length > 0) {
             select.innerHTML = availablePlans.map(p => `
-              <option value="${p.code}">${p.name} - ₹${parseFloat(p.price || p.monthlyPrice || 0).toFixed(2)}/mo (${p.validityMonths || 1} months)</option>
+              <option value="${p.code}">${p.name} - ₹${parseFloat(p.price || 0).toFixed(2)}/mo (${p.validityMonths || 1} months)</option>
             `).join('');
           } else {
             select.innerHTML = '<option value="">No other plans available</option>';
