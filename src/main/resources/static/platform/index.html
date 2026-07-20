@@ -604,6 +604,20 @@
               </button>
             </div>
 
+            <!-- Filter Bar for Pricing Plans -->
+            <div class="filter-bar" style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+              <div class="search-input-wrapper" style="position: relative; flex: 1; min-width: 250px; max-width: 360px;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #94a3b8);"></i>
+                <input type="text" id="plan-search-input" class="search-input" placeholder="Search by plan code or name..." style="padding-left: 36px; width: 100%; height: 38px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #fff;" oninput="filterPlans()">
+              </div>
+
+              <select id="plan-status-filter" class="select-input" style="height: 38px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #fff; padding: 0 12px; min-width: 140px;" onchange="filterPlans()">
+                <option value="ALL">All Statuses</option>
+                <option value="ACTIVE">Active Only</option>
+                <option value="DISABLED">Disabled Only</option>
+              </select>
+            </div>
+
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
@@ -618,7 +632,7 @@
                 </thead>
                 <tbody id="plans-list-tbody">
                   <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
                       subscription plans...</td>
                   </tr>
                 </tbody>
@@ -4208,7 +4222,7 @@
         checkResponseStatus(res);
         if (res.ok) {
           globalSubscriptionPlans = await res.json();
-          renderPlansTable(globalSubscriptionPlans);
+          filterPlans();
           populatePlanSelects(globalSubscriptionPlans);
         }
       } catch (err) {
@@ -4221,15 +4235,16 @@
       if (!tbody) return;
 
       if (!plans || plans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = plans.map(p => `
         <tr>
-          <td style="font-weight: 600;">${p.name}</td>
-          <td>INR ${(p.price || 0).toFixed(2)}</td>
-          <td>${p.validityMonths || 1} months</td>
+          <td style="font-family: monospace; font-weight: 600; color: #6366f1;">${escapeHtml(p.code || p.name.toUpperCase().replace(/\s+/g, '_'))}</td>
+          <td style="font-weight: 600;">${escapeHtml(p.name)}</td>
+          <td>INR ${(p.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td>${p.validityMonths || 1} month${(p.validityMonths || 1) > 1 ? 's' : ''}</td>
           <td>
             <span class="status-indicator ${p.isActive ? 'active' : 'inactive'}"></span>
             <span style="font-size: 0.85rem;">${p.isActive ? 'Active' : 'Disabled'}</span>
@@ -4239,13 +4254,36 @@
               <button class="btn btn-secondary btn-icon" title="Edit Plan" onclick="openEditPlanModal(${p.id})">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button class="btn btn-secondary btn-icon text-danger" title="Delete Plan" onclick="deleteSubscriptionPlan(${p.id}, '${p.name}')">
+              <button class="btn btn-secondary btn-icon text-danger" title="Delete Plan" onclick="deleteSubscriptionPlan(${p.id}, '${escapeHtml(p.name)}')">
                 <i class="fa-solid fa-trash"></i>
               </button>
             </div>
           </td>
         </tr>
       `).join('');
+    }
+
+    function filterPlans() {
+      const searchTerm = (document.getElementById('plan-search-input')?.value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('plan-status-filter')?.value || 'ALL';
+
+      let filtered = globalSubscriptionPlans || [];
+
+      if (searchTerm) {
+        filtered = filtered.filter(p =>
+          (p.name && p.name.toLowerCase().includes(searchTerm)) ||
+          (p.code && p.code.toLowerCase().includes(searchTerm)) ||
+          (p.description && p.description.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      if (statusFilter === 'ACTIVE') {
+        filtered = filtered.filter(p => p.isActive);
+      } else if (statusFilter === 'DISABLED') {
+        filtered = filtered.filter(p => !p.isActive);
+      }
+
+      renderPlansTable(filtered);
     }
 
     function populatePlanSelects(plans) {
