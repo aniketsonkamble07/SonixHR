@@ -36,14 +36,14 @@ public class TenantSubscriptionValidationService {
     public CachedTenantDetails getTenantDetails(Long tenantId) {
         log.debug("Loading tenant details from database for caching: {}", tenantId);
         return tenantRepository.findById(tenantId)
-                .map(tenant -> CachedTenantDetails.builder()
-                        .tenantId(tenant.getId())
-                        .isActive(tenant.getIsActive())
-                        .status(tenant.getStatus())
-                        .planStatus(tenant.getPlanStatus())
-                        .billingPeriodEnd(tenant.getEndsAt())
-                        .dataStatus(tenant.getDataStatus())
-                        .build())
+                .map(tenant -> new CachedTenantDetails(
+                        tenant.getId(),
+                        tenant.getIsActive(),
+                        tenant.getStatus(),
+                        tenant.getPlanStatus(),
+                        tenant.getEndsAt(),
+                        tenant.getDataStatus()
+                ))
                 .orElse(null);
     }
 
