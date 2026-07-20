@@ -70,7 +70,7 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
         @Query("SELECT t FROM Tenant t WHERE " +
                         "(CAST(:companyName AS string) IS NULL OR LOWER(t.companyName) LIKE LOWER(CONCAT('%', CAST(:companyName AS string), '%'))) AND "
                         +
-                        "(CAST(:status AS string) IS NULL OR CAST(t.status AS string) = :status) AND " +
+                        "(CAST(:status AS string) IS NULL OR CAST(t.status AS string) = :status OR CAST(t.planStatus AS string) = :status) AND " +
                         "(:isActive IS NULL OR t.isActive = :isActive)")
         Page<Tenant> searchTenants(@Param("companyName") String companyName,
                         @Param("status") String status,
