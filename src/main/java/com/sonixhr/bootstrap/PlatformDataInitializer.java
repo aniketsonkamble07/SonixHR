@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +56,6 @@ public class PlatformDataInitializer implements ApplicationRunner {
         private final PlatformRoleRepository roleRepository;
         private final PlatformUserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
-        private final JdbcTemplate jdbcTemplate;
         private final StatutoryRateConfigRepository statutoryRateConfigRepo;
         private final StateProfessionalTaxConfigRepository statePtConfigRepo;
         private final TaxRegimeSlabConfigRepository taxSlabConfigRepo;
@@ -92,44 +90,6 @@ public class PlatformDataInitializer implements ApplicationRunner {
 
                 // Step 6: Seed Statutory Rates and PT Configs
                 seedStatutoryRatesAndPtConfigs();
-
-                // Step 7: Sync existing Platform Admin & Tenant Admin roles with all Permissions to prevent 403 authorization issues
-                try {
-                        log.info("Syncing Platform Admin and Tenant Admin roles with all Permissions...");
-                        jdbcTemplate.execute("""
-                                INSERT INTO platform_role_permissions (role_id, permission_id)
-                                SELECT r.id, p.id
-                                FROM platform_roles r
-                                CROSS JOIN platform_permissions p
-                                WHERE r.name = 'Admin'
-                                  AND NOT EXISTS (
-                                      SELECT 1 FROM platform_role_permissions prp
-                                      WHERE prp.role_id = r.id AND prp.permission_id = p.id
-                                  );
-
-                                INSERT INTO role_tenant_permissions (role_id, permission_id)
-                                SELECT r.id, p.id
-                                FROM tenant_roles r
-                                CROSS JOIN tenant_permissions p
-                                WHERE r.name = 'Admin'
-                                  AND NOT EXISTS (
-                                      SELECT 1 FROM role_tenant_permissions rtp
-                                      WHERE rtp.role_id = r.id AND rtp.permission_id = p.id
-                                  );
-                                """);
-                        log.info("Successfully synced Platform Admin and Tenant Admin roles with all permissions.");
-                } catch (Exception e) {
-                        log.warn("Failed to sync Platform/Tenant Admin roles: {}", e.getMessage());
-                }
-
-                try {
-                        log.info("Dropping legacy plan_status check constraints if they exist...");
-                        jdbcTemplate.execute("ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_plan_status_check;");
-                        jdbcTemplate.execute("ALTER TABLE tenant_subscriptions DROP CONSTRAINT IF EXISTS tenant_subscriptions_plan_status_check;");
-                        log.info("Successfully dropped legacy plan_status check constraints.");
-                } catch (Exception e) {
-                        log.warn("Failed to drop legacy plan_status check constraints: {}", e.getMessage());
-                }
 
                 log.info(AppConstants.DIVIDER);
                 log.info("Platform Data Initializer Completed");
