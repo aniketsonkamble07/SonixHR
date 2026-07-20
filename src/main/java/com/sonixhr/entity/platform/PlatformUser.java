@@ -271,6 +271,54 @@ public class PlatformUser extends BaseUser {
         return getClass().hashCode();
     }
 
+    public String getDesignation() {
+        return designation;
+    }
+
+    public void setDesignation(String designation) {
+        this.designation = designation;
+    }
+
+    public LocalDateTime getPasswordLastChanged() {
+        return passwordLastChanged;
+    }
+
+    public void setPasswordLastChanged(LocalDateTime passwordLastChanged) {
+        this.passwordLastChanged = passwordLastChanged;
+    }
+
+    public String getResetToken() {
+        return resetToken;
+    }
+
+    public void setResetToken(String resetToken) {
+        this.resetToken = resetToken;
+    }
+
+    public LocalDateTime getResetTokenExpiry() {
+        return resetTokenExpiry;
+    }
+
+    public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
+        this.resetTokenExpiry = resetTokenExpiry;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatus status) {
+        this.status = status;
+    }
+
+    public Set<PlatformRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<PlatformRole> roles) {
+        this.roles = roles;
+    }
+
     @Override
     public String toString() {
         return "PlatformUser{" +

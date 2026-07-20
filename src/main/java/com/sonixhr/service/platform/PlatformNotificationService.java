@@ -32,12 +32,17 @@ import java.util.stream.Collectors;
  * By moving these methods into a separate @Service bean, all calls go through
  * Spring's proxy and @Async is actually honoured.
  */
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class PlatformNotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformNotificationService.class);
 
     private final PlatformNotificationRepository notificationRepository;
     private final PlatformUserRepository userRepository;

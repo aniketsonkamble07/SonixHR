@@ -9,7 +9,9 @@ public enum UserStatus {
     INACTIVE("Inactive", "secondary", "User cannot log in"),
     SUSPENDED("Suspended", "danger", "Temporarily blocked"),
     DELETED("Deleted", "danger", "Account has been permanently deleted"),
-    PENDING_VERIFICATION("Pending Verification", "warning", "User needs to verify email before logging in");    private final String displayName;
+    PENDING_VERIFICATION("Pending Verification", "warning", "User needs to verify email before logging in");
+
+    private final String displayName;
     private final String badgeColor;
     private final String description;
 
@@ -17,6 +19,18 @@ public enum UserStatus {
         this.displayName = displayName;
         this.badgeColor = badgeColor;
         this.description = description;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public String getBadgeColor() {
+        return badgeColor;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     // =====================================================

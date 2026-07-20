@@ -99,4 +99,61 @@ public abstract class BaseUser extends BaseEntity implements UserDetails {
     public boolean isEnabled() {
         return super.isActive();  // Use BaseEntity's active field
     }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public LocalDateTime getLastLogin() {
+        return lastLogin;
+    }
+
+    public void setLastLogin(LocalDateTime lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+
+    public Integer getRolesVersion() {
+        return rolesVersion;
+    }
+
+    public void setRolesVersion(Integer rolesVersion) {
+        this.rolesVersion = rolesVersion;
+    }
+
+    public Collection<? extends GrantedAuthority> getCachedAuthorities() {
+        return cachedAuthorities;
+    }
+
+    public void setCachedAuthorities(Collection<? extends GrantedAuthority> cachedAuthorities) {
+        this.cachedAuthorities = cachedAuthorities;
+    }
+
+    public Integer getCachedRolesVersion() {
+        return cachedRolesVersion;
+    }
+
+    public void setCachedRolesVersion(Integer cachedRolesVersion) {
+        this.cachedRolesVersion = cachedRolesVersion;
+    }
 }
