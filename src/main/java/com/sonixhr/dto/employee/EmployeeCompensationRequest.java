@@ -1,5 +1,6 @@
 package com.sonixhr.dto.employee;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import java.math.BigDecimal;
@@ -11,8 +12,10 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class EmployeeCompensationRequest {
 
+    private Long employeeId;
     private BigDecimal monthlyCtc;
     private String currency; // Defaults to "INR"
     private String taxRegime; // e.g. "NEW_REGIME" / "OLD_REGIME"
@@ -26,6 +29,7 @@ public class EmployeeCompensationRequest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ComponentOverrideRequest {
         @NotNull(message = "Component code is required")
         private String componentCode;

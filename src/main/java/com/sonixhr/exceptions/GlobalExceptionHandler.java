@@ -251,11 +251,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleMalformedJson(
             HttpMessageNotReadableException ex) {
 
+        String message = "Invalid request format. Please check your JSON syntax.";
+        Throwable cause = ex.getCause();
+        if (cause instanceof com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException upe) {
+            message = "Unrecognized property '" + upe.getPropertyName() + "'";
+        } else if (cause instanceof com.fasterxml.jackson.databind.JsonMappingException jme) {
+            message = jme.getOriginalMessage();
+        } else if (ex.getMessage() != null) {
+            message = ex.getMessage();
+        }
+
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "success", false,
-                        "message", "Invalid request format. Please check your JSON syntax.",
+                        "message", message,
                         "timestamp", LocalDateTime.now()
                 ));
     }
