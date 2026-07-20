@@ -92,7 +92,7 @@ public class EmployeeDetailsService implements UserDetailsService {
                 if (!cachedEmployee.isActive()) {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
                     employeeCache.invalidate(email);
-                } else if (cachedEmployee.getTenant() != null && !cachedEmployee.getTenant().getIsActive()) {
+                } else if (isTenantInactive(cachedEmployee)) {
                     if (!hasBillingAccess(cachedEmployee)) {
                         log.warn("Cached employee tenant is inactive or suspended, removing from cache: {}", email);
                         employeeCache.invalidate(email);
@@ -123,7 +123,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         }
 
         // Check if employee's tenant is active/suspended
-        if (employee.getTenant() != null && !employee.getTenant().getIsActive()) {
+        if (isTenantInactive(employee)) {
             if (!hasBillingAccess(employee)) {
                 log.warn("Employee tenant is inactive or suspended for email: {}", email);
                 throw new DisabledException("Tenant account is suspended or inactive");
@@ -478,5 +478,15 @@ public class EmployeeDetailsService implements UserDetailsService {
                 
         employee.setCachedAuthorities(billingOnly);
         employee.setCachedRolesVersion(employee.getRolesVersion());
+    }
+
+    private boolean isTenantInactive(Employee emp) {
+        if (emp == null) return false;
+        try {
+            return emp.getTenant() != null && Boolean.FALSE.equals(emp.getTenant().getIsActive());
+        } catch (Exception e) {
+            log.warn("Could not check tenant active status due to lazy proxy initialization: {}", e.getMessage());
+            return false;
+        }
     }
 }

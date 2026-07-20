@@ -349,11 +349,21 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("""
     SELECT DISTINCT e FROM Employee e
+    LEFT JOIN FETCH e.tenant
     LEFT JOIN FETCH e.roles r
     LEFT JOIN FETCH r.permissions
     WHERE e.email IN :emails
     """)
     List<Employee> findAllByEmailsWithRolesAndPermissions(@Param("emails") List<String> emails);
+
+    @Query("""
+    SELECT DISTINCT e FROM Employee e
+    LEFT JOIN FETCH e.tenant
+    LEFT JOIN FETCH e.roles r
+    LEFT JOIN FETCH r.permissions
+    WHERE e.isActive = true
+    """)
+    List<Employee> findTop100ByIsActiveTrue(Pageable pageable);
 
     // =====================================================
     // FIND BY EMAIL AND TENANT WITH ROLES (For tenant-specific auth)
