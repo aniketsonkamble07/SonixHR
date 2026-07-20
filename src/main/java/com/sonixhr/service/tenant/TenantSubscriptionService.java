@@ -632,12 +632,11 @@ public class TenantSubscriptionService {
 
     // ✅✅✅ FIXED: Upgrade by PLAN CODE (not name!) ✅✅✅
     @Transactional
-    public TenantSubscriptionResponseDTO upgradeSubscription(Long tenantId, String planCode) {
-        log.info("Upgrading tenant ID: {} to plan code: {}", tenantId, planCode);
+    public TenantSubscriptionResponseDTO upgradeSubscription(Long tenantId, String planName) {
+        log.info("Upgrading tenant ID: {} to plan name: {}", tenantId, planName);
 
-        // ✅ FIX: Search by CODE, not NAME
-        SubscriptionPlan plan = subscriptionPlanRepository.findByCodeIgnoreCase(planCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found with code: " + planCode));
+        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(planName)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription plan not found: " + planName));
 
         return activateSubscription(tenantId, plan.getId());
     }

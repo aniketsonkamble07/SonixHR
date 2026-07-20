@@ -92,12 +92,11 @@ public class PlatformSubscriptionPlanController {
         if (dto.getEnabledFeatures() != null) {
             for (String code : dto.getEnabledFeatures()) {
                 plan.getPlanFeatures().add(
-                    com.sonixhr.entity.platform.PlanFeature.builder()
-                        .subscriptionPlan(plan)
-                        .featureCode(code)
-                        .enabled(true)
-                        .build()
-                );
+                        com.sonixhr.entity.platform.PlanFeature.builder()
+                                .subscriptionPlan(plan)
+                                .featureCode(code)
+                                .enabled(true)
+                                .build());
             }
         }
 
@@ -133,7 +132,6 @@ public class PlatformSubscriptionPlanController {
         }
         return SubscriptionPlanDTO.builder()
                 .id(plan.getId())
-                .code(plan.getCode())
                 .name(plan.getName())
                 .price(plan.getPrice())
                 .validityMonths(plan.getValidityMonths())
@@ -149,7 +147,6 @@ public class PlatformSubscriptionPlanController {
         if (dto == null)
             return null;
         SubscriptionPlan plan = SubscriptionPlan.builder()
-                .code(dto.getCode())
                 .name(dto.getName())
                 .price(dto.getPrice())
                 .validityMonths(dto.getValidityMonths())

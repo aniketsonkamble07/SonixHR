@@ -43,7 +43,6 @@ public class TenantRegistrationController {
                 .filter(p -> p.isActive())
                 .map(p -> com.sonixhr.dto.platform.SubscriptionPlanDTO.builder()
                         .id(p.getId())
-                        .code(p.getCode())
                         .name(p.getName())
                         .description(p.getDescription())
                         .price(p.getPrice())

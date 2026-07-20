@@ -4239,13 +4239,12 @@
       if (!tbody) return;
 
       if (!plans || plans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = plans.map(p => `
         <tr>
-          <td><code>${p.code}</code></td>
           <td style="font-weight: 600;">${p.name}</td>
           <td>INR ${(p.price || 0).toFixed(2)}</td>
           <td>${p.validityMonths || 1} months</td>
@@ -4278,7 +4277,7 @@
       const overrideSelect = document.getElementById('override-plan-type');
       if (overrideSelect) {
         overrideSelect.innerHTML = plans.map(p => `
-          <option value="${p.name}">${p.name} (${p.code})</option>
+          <option value="${p.name}">${p.name}</option>
         `).join('');
       }
 
@@ -4293,8 +4292,7 @@
     function openCreatePlanModal() {
       document.getElementById('plan-modal-title').textContent = 'Create Subscription Plan';
       document.getElementById('plan-id').value = '';
-      document.getElementById('plan-code').value = '';
-      document.getElementById('plan-code').disabled = false;
+      if (document.getElementById('plan-code')) document.getElementById('plan-code').value = '';
       document.getElementById('plan-name').value = '';
       document.getElementById('plan-monthly-price').value = '0.00';
       document.getElementById('plan-trial-days').value = '1';
@@ -4310,8 +4308,7 @@
 
       document.getElementById('plan-modal-title').textContent = 'Edit Subscription Plan';
       document.getElementById('plan-id').value = plan.id;
-      document.getElementById('plan-code').value = plan.code;
-      document.getElementById('plan-code').disabled = true;
+      if (document.getElementById('plan-code')) document.getElementById('plan-code').value = plan.code || '';
       document.getElementById('plan-name').value = plan.name;
       document.getElementById('plan-monthly-price').value = plan.price || 0;
       document.getElementById('plan-trial-days').value = plan.validityMonths || 1;
@@ -4330,7 +4327,6 @@
       const url = isEdit ? `${API_BASE}/platform/subscription-plans/${id}` : `${API_BASE}/platform/subscription-plans`;
 
       const payload = {
-        code: document.getElementById('plan-code').value,
         name: document.getElementById('plan-name').value,
         price: parseFloat(document.getElementById('plan-monthly-price').value),
         validityMonths: parseInt(document.getElementById('plan-trial-days').value),

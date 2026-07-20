@@ -63,7 +63,7 @@ public class PlatformDashboardService {
         long suspendedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.SUSPENDED).count();
         long deletedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.DELETED).count();
         long trialTenants = allTenants.stream()
-                .filter(t -> t.getStatus() != UserStatus.DELETED && t.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(t.getSubscriptionPlan().getCode()))
+                .filter(t -> t.getStatus() != UserStatus.DELETED && t.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(t.getSubscriptionPlan().getName()))
                 .count();
 
         Map<String, Long> planDistribution = allTenants.stream()
@@ -81,10 +81,10 @@ public class PlatformDashboardService {
 
         // 2. Subscription Summary
         long activeTrials = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(sub.getSubscriptionPlan().getCode()))
+                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(sub.getSubscriptionPlan().getName()))
                 .count();
         long activePaidSubscriptions = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && !"trial".equalsIgnoreCase(sub.getSubscriptionPlan().getCode()))
+                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && !"trial".equalsIgnoreCase(sub.getSubscriptionPlan().getName()))
                 .count();
 
         // Expired Subscriptions

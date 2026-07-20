@@ -17,7 +17,6 @@ import java.util.Set;
 
 @Entity
 @Table(name = "subscription_plans", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_plan_code", columnNames = "code"),
         @UniqueConstraint(name = "uk_plan_name", columnNames = "name")
 }, indexes = {
         @Index(name = "idx_plan_is_active", columnList = "is_active"),
@@ -43,10 +42,6 @@ public class SubscriptionPlan {
     @Size(min = 2, max = 100, message = "Plan name must be between 2 and 100 characters")
     @Column(nullable = false, length = 100)
     private String name;
-
-    @Size(max = 50, message = "Plan code cannot exceed 50 characters")
-    @Column(length = 50)
-    private String code;
 
     @Size(max = 500, message = "Plan description cannot exceed 500 characters")
     @Column(length = 500)
@@ -214,13 +209,6 @@ public class SubscriptionPlan {
             this.price = BigDecimal.ZERO;
         }
         this.price = this.price.setScale(2, RoundingMode.HALF_UP);
-
-        // Set default code from name if not provided
-        if ((this.code == null || this.code.isEmpty()) && this.name != null) {
-            this.code = this.name.toUpperCase()
-                    .replaceAll("[^A-Z0-9]", "_")
-                    .replaceAll("_+", "_");
-        }
     }
 
     public void setActive(boolean active) {
@@ -243,7 +231,7 @@ public class SubscriptionPlan {
 
     @Override
     public String toString() {
-        return String.format("SubscriptionPlan{id=%d, name='%s', code='%s', price=%s, active=%s}",
-                id, name, code, price, isActive);
+        return String.format("SubscriptionPlan{id=%d, name='%s', price=%s, active=%s}",
+                id, name, price, isActive);
     }
 }

@@ -1,5 +1,7 @@
 package com.sonixhr.dto.platform;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -17,8 +19,6 @@ public class SubscriptionPlanDTO {
 
     private Long id;
 
-    @NotBlank(message = "Plan code is required")
-    @Size(min = 2, max = 50, message = "Plan code must be between 2 and 50 characters")
     private String code;
 
     @NotBlank(message = "Plan name is required")
@@ -35,6 +35,8 @@ public class SubscriptionPlanDTO {
     @Min(value = 1, message = "Validity months must be at least 1")
     private int validityMonths;
 
+    @JsonProperty("isActive")
+    @JsonAlias({"isActive", "active"})
     private boolean isActive;
 
     @Size(max = 500, message = "Description must not exceed 500 characters")
