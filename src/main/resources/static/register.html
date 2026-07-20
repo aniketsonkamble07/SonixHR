@@ -404,7 +404,7 @@
           const plans = await response.json();
           if (plans && plans.length > 0) {
             select.innerHTML = plans.map(p => `
-              <option value="${p.code}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
+              <option value="${p.name}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
             `).join('');
             submitBtn.disabled = false;
             return;
