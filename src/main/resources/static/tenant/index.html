@@ -1320,6 +1320,39 @@
       <main class="content-body">
 
         <!-- ==========================================
+                 TAB: SUBSCRIPTION EXPIRED / SUSPENDED (PLATFORM NOTICE)
+                 ========================================== -->
+        <section id="tab-subscription-expired" class="view-panel">
+          <div class="card" style="max-width: 620px; margin: 60px auto; text-align: center; padding: 48px; border-top: 4px solid var(--accent-violet); background: var(--bg-secondary); border-radius: 16px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);">
+            <div style="width: 80px; height: 80px; background: rgba(139, 92, 246, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto;">
+              <i class="fa-solid fa-building-circle-exclamation" style="font-size: 2.2rem; color: var(--accent-violet);"></i>
+            </div>
+            
+            <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; margin-bottom: 12px; color: #fff;">Sonix<span style="color: var(--accent-violet);">HR</span> Platform Notice</h2>
+            
+            <p id="platform-notice-message" style="color: var(--text-secondary); font-size: 1rem; line-height: 1.7; margin-bottom: 24px;">
+              Access to your organization's SonixHR workspace is currently paused. Please contact your company's HR department or System Administrator to restore access.
+            </p>
+
+            <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 24px;">
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fa-solid fa-headset" style="font-size: 1.2rem; color: var(--accent-emerald); margin-top: 2px;"></i>
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 4px;">Need Assistance?</h4>
+                  <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                    If you believe this is an error or need immediate access to urgent documents, please reach out to SonixHR Platform Support at <a href="mailto:support@sonixhr.com" style="color: var(--accent-violet); font-weight: 600; text-decoration: none;">support@sonixhr.com</a>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              <i class="fa-solid fa-shield-halved"></i> Secured by SonixHR SaaS Platform
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
                  TAB 1: OVERVIEW
                  ========================================== -->
         <section id="tab-overview" class="view-panel active">
@@ -1405,7 +1438,8 @@
                  TAB: DEPARTMENTS
                  ========================================== -->
         <section id="tab-departments" class="view-panel">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
             <button class="btn btn-primary btn-sm" onclick="openCreateDepartmentModal()">
               <i class="fa-solid fa-plus"></i> Add Department
             </button>
@@ -1440,7 +1474,8 @@
                  TAB: SHIFTS
                  ========================================== -->
         <section id="tab-shifts" class="view-panel">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
             <button class="btn btn-primary btn-sm" onclick="openCreateShiftModal()">
               <i class="fa-solid fa-plus"></i> Add Shift
             </button>
@@ -1476,7 +1511,8 @@
                  TAB: ROLES
                  ========================================== -->
         <section id="tab-roles" class="view-panel">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
             <button class="btn btn-primary btn-sm" onclick="openCreateRoleModal()">
               <i class="fa-solid fa-plus"></i> Add Role
             </button>
@@ -1627,16 +1663,18 @@
           </div>
 
           <div class="card" style="margin-top: 24px;">
-            <div class="card-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 12px;">
+            <div class="card-header"
+              style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 class="card-title"><i class="fa-solid fa-receipt" style="color: var(--accent-violet);"></i> Salary Structure Components</h3>
+                <h3 class="card-title"><i class="fa-solid fa-receipt" style="color: var(--accent-violet);"></i> Salary
+                  Structure Components</h3>
                 <p class="card-subtitle">Define individual earnings, allowances, and deduction rules</p>
               </div>
               <button class="btn btn-primary btn-sm" onclick="openCreateComponentModal()">
                 <i class="fa-solid fa-plus"></i> Add Component
               </button>
             </div>
-            
+
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
@@ -1653,7 +1691,8 @@
                 </thead>
                 <tbody id="config-components-tbody">
                   <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted);">No salary components configured.</td>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted);">No salary components
+                      configured.</td>
                   </tr>
                 </tbody>
               </table>
@@ -2579,7 +2618,9 @@
       </div>
       <div class="modal-body">
         <form id="profile-edit-form">
-          <h4 style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">Personal Information</h4>
+          <h4
+            style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">
+            Personal Information</h4>
           <div class="form-grid" style="margin-bottom: 12px;">
             <div class="form-group">
               <label class="form-label" for="edit-profile-phone">Phone Number</label>
@@ -2632,7 +2673,9 @@
             </div>
           </div>
 
-          <h4 style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">Address details</h4>
+          <h4
+            style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">
+            Address details</h4>
           <div class="form-group" style="margin-bottom: 12px;">
             <label class="form-label" for="edit-profile-address">Address</label>
             <input type="text" id="edit-profile-address" class="form-input">
@@ -2658,7 +2701,9 @@
             </div>
           </div>
 
-          <h4 style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">Emergency Contact</h4>
+          <h4
+            style="font-family: var(--font-display); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.95rem; color: var(--accent-violet);">
+            Emergency Contact</h4>
           <div class="form-grid" style="margin-bottom: 12px;">
             <div class="form-group">
               <label class="form-label" for="edit-profile-emergency-name">Contact Name</label>
@@ -2680,7 +2725,8 @@
             </div>
           </div>
 
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+          <div class="modal-footer"
+            style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
             <button type="button" class="btn btn-secondary" onclick="closeModal('profile-edit-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Changes</button>
           </div>
@@ -2703,24 +2749,28 @@
           <input type="hidden" id="comp-index">
           <div class="form-grid" style="margin-bottom: 12px;">
             <div class="form-group">
-              <label class="form-label" for="comp-code">Component Code <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="comp-code">Component Code <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="text" id="comp-code" class="form-input" placeholder="e.g. BASIC, HRA, SPECIAL" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="comp-name">Component Name <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="comp-name">Component Name <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="text" id="comp-name" class="form-input" placeholder="e.g. Basic Salary" required>
             </div>
           </div>
           <div class="form-grid" style="margin-bottom: 12px;">
             <div class="form-group">
-              <label class="form-label" for="comp-type">Component Type <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="comp-type">Component Type <span
+                  style="color: var(--accent-rose);">*</span></label>
               <select id="comp-type" class="select-input" required>
                 <option value="ALLOWANCE">ALLOWANCE / EARNING</option>
                 <option value="DEDUCTION">DEDUCTION</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="comp-calc-type">Calculation Type <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="comp-calc-type">Calculation Type <span
+                  style="color: var(--accent-rose);">*</span></label>
               <select id="comp-calc-type" class="select-input" onchange="toggleCompCalcFields(this.value)" required>
                 <option value="PERCENTAGE_OF_CTC">% of Monthly CTC</option>
                 <option value="PERCENTAGE_OF_BASIC">% of Basic</option>
@@ -2739,7 +2789,8 @@
           </div>
           <div class="form-grid" style="margin-bottom: 12px;">
             <div class="form-group">
-              <label class="form-label" for="comp-order">Evaluation Order <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="comp-order">Evaluation Order <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="number" id="comp-order" class="form-input" value="1" required>
             </div>
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 24px;">
@@ -2767,8 +2818,10 @@
               <label class="form-label" for="comp-override" style="margin: 0; cursor: pointer;">Allow Override</label>
             </div>
           </div>
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('config-component-modal')">Cancel</button>
+          <div class="modal-footer"
+            style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary"
+              onclick="closeModal('config-component-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Component</button>
           </div>
         </form>
@@ -2789,18 +2842,21 @@
         <form id="department-form">
           <input type="hidden" id="department-id">
           <div class="form-group" style="margin-bottom: 15px;">
-            <label class="form-label" for="department-name">Department Name <span style="color: var(--accent-rose);">*</span></label>
+            <label class="form-label" for="department-name">Department Name <span
+                style="color: var(--accent-rose);">*</span></label>
             <input type="text" id="department-name" class="form-input" required>
           </div>
           <div class="form-group" style="margin-bottom: 15px;">
-            <label class="form-label" for="department-code">Department Code <span style="color: var(--accent-rose);">*</span></label>
+            <label class="form-label" for="department-code">Department Code <span
+                style="color: var(--accent-rose);">*</span></label>
             <input type="text" id="department-code" class="form-input" required>
           </div>
           <div class="form-group" style="margin-bottom: 15px;">
             <label class="form-label" for="department-desc">Description</label>
             <textarea id="department-desc" class="form-input" style="height: 80px; resize: vertical;"></textarea>
           </div>
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+          <div class="modal-footer"
+            style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
             <button type="button" class="btn btn-secondary" onclick="closeModal('department-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save</button>
           </div>
@@ -2823,21 +2879,25 @@
           <input type="hidden" id="shift-id">
           <div class="form-grid" style="margin-bottom: 15px;">
             <div class="form-group">
-              <label class="form-label" for="shift-name">Shift Name <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="shift-name">Shift Name <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="text" id="shift-name" class="form-input" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="shift-code">Shift Code <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="shift-code">Shift Code <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="text" id="shift-code" class="form-input" required>
             </div>
           </div>
           <div class="form-grid" style="margin-bottom: 15px;">
             <div class="form-group">
-              <label class="form-label" for="shift-start">Start Time <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="shift-start">Start Time <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="time" id="shift-start" class="form-input" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="shift-end">End Time <span style="color: var(--accent-rose);">*</span></label>
+              <label class="form-label" for="shift-end">End Time <span
+                  style="color: var(--accent-rose);">*</span></label>
               <input type="time" id="shift-end" class="form-input" required>
             </div>
           </div>
@@ -2851,7 +2911,8 @@
               <input type="number" step="0.5" id="shift-fullday-min" class="form-input" value="8.0">
             </div>
           </div>
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+          <div class="modal-footer"
+            style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
             <button type="button" class="btn btn-secondary" onclick="closeModal('shift-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save</button>
           </div>
@@ -2873,7 +2934,8 @@
         <form id="role-form">
           <input type="hidden" id="role-id">
           <div class="form-group" style="margin-bottom: 15px;">
-            <label class="form-label" for="role-name">Role Name <span style="color: var(--accent-rose);">*</span></label>
+            <label class="form-label" for="role-name">Role Name <span
+                style="color: var(--accent-rose);">*</span></label>
             <input type="text" id="role-name" class="form-input" required>
           </div>
           <div class="form-group" style="margin-bottom: 15px;">
@@ -2882,11 +2944,13 @@
           </div>
           <div class="form-group" style="margin-bottom: 15px;">
             <label class="form-label">Permissions</label>
-            <div id="role-permissions-list" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div id="role-permissions-list"
+              style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <span class="loading-spinner"></span> Loading permissions...
             </div>
           </div>
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+          <div class="modal-footer"
+            style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
             <button type="button" class="btn btn-secondary" onclick="closeModal('role-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save</button>
           </div>
@@ -3169,12 +3233,117 @@
             await fetchUserProfile();
             await fetchGlobalComponents();
             loadTab('tab-overview');
+            await checkSubscriptionStatus();
             return;
           }
         }
         handleLogout();
       } catch (err) {
         handleLogout();
+      }
+    }
+
+    async function checkSubscriptionStatus() {
+      const banner = document.getElementById('subscription-status-banner');
+      const bannerText = document.getElementById('subscription-status-banner-text');
+      const actionBtn = document.getElementById('subscription-banner-action-btn');
+      
+      if (banner) banner.style.display = 'none';
+
+      try {
+        const res = await fetch(`${API_BASE}/tenant/subscriptions/current`, { headers: getHeaders() });
+        if (res.ok) {
+          const sub = await res.json();
+          const status = sub.planStatus;
+          const isAdmin = currentUserAuthorities.includes('ROLE_SUPER_ADMIN') ||
+                          currentUserAuthorities.includes('ROLE_ADMIN') ||
+                          currentUserAuthorities.includes('VIEW_BILLING') ||
+                          currentUserAuthorities.includes('MANAGE_SUBSCRIPTION');
+
+          if (status === 'EXPIRED' || status === 'SUSPENDED') {
+            if (isAdmin) {
+              // Admin: Show top banner and redirect directly to Billing & Subscriptions
+              if (banner && bannerText && actionBtn) {
+                banner.style.display = 'flex';
+                banner.style.background = 'rgba(244, 63, 94, 0.15)';
+                banner.style.borderBottom = '1px solid rgba(244, 63, 94, 0.3)';
+                banner.style.color = '#fb7185';
+                bannerText.textContent = `Your organization's subscription is ${status.toLowerCase()}. Please renew or change your plan to restore full system features.`;
+                actionBtn.style.display = 'inline-flex';
+                actionBtn.textContent = 'Go to Billing';
+              }
+
+              // Lock non-billing sidebar tabs
+              document.querySelectorAll('.sidebar-item').forEach(item => {
+                const tabId = item.getAttribute('data-tab');
+                if (tabId === 'tab-billing') {
+                  item.style.opacity = '1';
+                  item.style.pointerEvents = 'auto';
+                } else {
+                  item.style.opacity = '0.4';
+                  item.style.pointerEvents = 'none';
+                }
+              });
+
+              // Redirect Admin directly to Billing Tab
+              loadTab('tab-billing');
+              document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
+              const billingItem = document.querySelector('[data-tab="tab-billing"]');
+              if (billingItem) billingItem.classList.add('active');
+
+            } else {
+              // Other Employees: Redirect to SonixHR Platform Notice page
+              const noticeEl = document.getElementById('platform-notice-message');
+              if (noticeEl) {
+                if (status === 'SUSPENDED') {
+                  noticeEl.textContent = "Access to your organization's SonixHR workspace is currently suspended by your administrator. Please contact your HR department for assistance.";
+                } else {
+                  noticeEl.textContent = "Access to your organization's SonixHR workspace is currently paused. Please contact your company's HR department or System Administrator to restore access.";
+                }
+              }
+
+              // Lock all sidebar tabs for employees
+              document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.style.opacity = '0.4';
+                item.style.pointerEvents = 'none';
+              });
+
+              // Redirect to Full-Page Platform Notice View
+              loadTab('tab-subscription-expired');
+              document.querySelectorAll('.sidebar-item').forEach(t => t.classList.remove('active'));
+            }
+          } else if (status === 'PAST_DUE') {
+            if (banner && bannerText && actionBtn) {
+              banner.style.display = 'flex';
+              banner.style.background = 'rgba(245, 158, 11, 0.15)';
+              banner.style.borderBottom = '1px solid rgba(245, 158, 11, 0.3)';
+              banner.style.color = '#fbbf24';
+              
+              if (isAdmin) {
+                bannerText.textContent = `Your payment is past due (grace period). Please review your subscription to avoid account suspension.`;
+                actionBtn.style.display = 'inline-flex';
+                actionBtn.textContent = 'Go to Billing';
+              } else {
+                bannerText.textContent = `Your organization's subscription payment is past due.`;
+                actionBtn.style.display = 'none';
+              }
+            }
+
+            // Restore normal access
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+              item.style.opacity = '1';
+              item.style.pointerEvents = 'auto';
+            });
+          } else {
+            // Normal status - keep banner hidden and restore normal access
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+              item.style.opacity = '1';
+              item.style.pointerEvents = 'auto';
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error checking subscription status', err);
       }
     }
 
@@ -3221,6 +3390,7 @@
           await fetchUserProfile();
           await fetchGlobalComponents();
           loadTab('tab-overview');
+          await checkSubscriptionStatus();
         } else {
           const err = await res.json();
           showToast('Login Failed', err.message || 'Invalid credentials.', 'error');
@@ -5286,7 +5456,7 @@
 
     document.getElementById('profile-edit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const payload = {
         phone: document.getElementById('edit-profile-phone').value || null,
         personalEmail: document.getElementById('edit-profile-personal-email').value || null,
@@ -5524,11 +5694,11 @@
           document.getElementById('shift-id').value = shift.id;
           document.getElementById('shift-name').value = shift.shiftName;
           document.getElementById('shift-code').value = shift.shiftCode || '';
-          
+
           // time inputs expect "HH:mm"
           document.getElementById('shift-start').value = (shift.startTime || '').substring(0, 5);
           document.getElementById('shift-end').value = (shift.endTime || '').substring(0, 5);
-          
+
           document.getElementById('shift-halfday-min').value = shift.halfDayHours || '4.0';
           document.getElementById('shift-fullday-min').value = shift.fullDayHours || '8.0';
           document.getElementById('shift-modal-title').textContent = 'Edit Shift Configuration';
@@ -5546,13 +5716,13 @@
       const id = document.getElementById('shift-id').value;
       const name = document.getElementById('shift-name').value.trim();
       const code = document.getElementById('shift-code').value.trim();
-      
+
       const formatTime = (timeStr) => {
         if (!timeStr) return null;
         if (timeStr.length === 5) return `${timeStr}:00`;
         return timeStr;
       };
-      
+
       const startTime = formatTime(document.getElementById('shift-start').value);
       const endTime = formatTime(document.getElementById('shift-end').value);
       const halfdayMin = document.getElementById('shift-halfday-min').value;
@@ -5675,7 +5845,7 @@
         if (res.ok) {
           const list = await res.json();
           container.innerHTML = '';
-          
+
           list.forEach(p => {
             const label = document.createElement('label');
             label.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer; background:var(--bg-secondary); padding:6px 10px; border-radius:6px; border:1px solid var(--border-color);';
@@ -5739,9 +5909,9 @@
       document.getElementById('role-id').value = '';
       document.getElementById('role-name').value = '';
       document.getElementById('role-desc').value = '';
-      
+
       await fetchPermissionsList();
-      
+
       document.getElementById('role-modal-title').textContent = 'Add Role';
       openModal('role-modal');
     }
@@ -5749,14 +5919,14 @@
     async function openEditRoleModal(id) {
       try {
         await fetchPermissionsList();
-        
+
         const res = await fetch(`${API_BASE}/tenant/roles/${id}`, { headers: getHeaders() });
         if (res.ok) {
           const role = await res.json();
           document.getElementById('role-id').value = role.id;
           document.getElementById('role-name').value = role.name;
           document.getElementById('role-desc').value = role.description || '';
-          
+
           const assignedPermIds = (role.permissions || []).map(p => p.id);
           document.querySelectorAll('.role-permission-checkbox').forEach(cb => {
             cb.checked = assignedPermIds.includes(parseInt(cb.value));
@@ -5777,7 +5947,7 @@
       const id = document.getElementById('role-id').value;
       const name = document.getElementById('role-name').value.trim();
       const description = document.getElementById('role-desc').value.trim();
-      
+
       const permissionIds = [];
       document.querySelectorAll('.role-permission-checkbox:checked').forEach(cb => {
         permissionIds.push(parseInt(cb.value));
@@ -5807,7 +5977,7 @@
               body: JSON.stringify(permissionIds)
             });
           }
-          
+
           showToast('Success', 'Role saved successfully!', 'success');
           closeModal('role-modal');
           fetchRoles();
@@ -5868,12 +6038,12 @@
 
       currentConfigSalaryStructures.forEach((s, index) => {
         const tr = document.createElement('tr');
-        
+
         const pf = s.isPartOfPfWages ? '<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">PF</span>' : '';
         const esi = s.isPartOfEsiWages ? '<span class="badge badge-success" style="font-size: 0.7rem; padding: 2px 6px;">ESI</span>' : '';
         const tax = s.isTaxable ? '<span class="badge badge-warning" style="font-size: 0.7rem; padding: 2px 6px;">TAX</span>' : '';
         const badges = [pf, esi, tax].filter(Boolean).join(' ') || '<span style="color:var(--text-muted); font-size: 0.8rem;">None</span>';
-        
+
         const calcDisp = (s.calculationType || '').replace(/_/g, ' ');
         const valDisp = s.calculationType === 'FORMULA' ? `<code>${escapeHtml(s.formulaExpression || s.value || '')}</code>` : (s.calculationType.includes('PERCENTAGE') ? `${s.value}%` : `₹${parseFloat(s.value || 0).toFixed(2)}`);
 
@@ -5907,7 +6077,7 @@
       document.getElementById('comp-value').value = '';
       document.getElementById('comp-formula').value = '';
       document.getElementById('comp-order').value = (currentConfigSalaryStructures.length + 1);
-      
+
       document.getElementById('comp-taxable').checked = true;
       document.getElementById('comp-pf').checked = true;
       document.getElementById('comp-esi').checked = false;
@@ -5931,7 +6101,7 @@
       document.getElementById('comp-value').value = s.value || '';
       document.getElementById('comp-formula').value = s.formulaExpression || '';
       document.getElementById('comp-order').value = s.evaluationOrder || 1;
-      
+
       document.getElementById('comp-taxable').checked = s.isTaxable;
       document.getElementById('comp-pf').checked = s.isPartOfPfWages;
       document.getElementById('comp-esi').checked = s.isPartOfEsiWages;

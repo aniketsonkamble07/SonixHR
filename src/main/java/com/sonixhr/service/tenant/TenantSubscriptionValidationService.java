@@ -82,10 +82,12 @@ public class TenantSubscriptionValidationService {
                 .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
                         || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
 
-        // If a Company Admin attempts to access a self-serve renewal/billing path, do
+        boolean isReadGraceRequest = isAllowedGrace && "GET".equalsIgnoreCase(method);
+
+        // If a Company Admin attempts to access a self-serve renewal/billing path, or any user reads status/tickets, do
         // not block on suspended/inactive status
-        boolean isSelfServeRenewalAttempt = isAllowedGrace && isAdmin &&
-                (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE) &&
+        boolean isSelfServeRenewalAttempt = isAllowedGrace && (isAdmin || isReadGraceRequest) &&
+                (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE || details.getPlanStatus() == PlanStatus.SUSPENDED) &&
                 (details.getDataStatus() == null || details.getDataStatus() == TenantDataStatus.RETAINED);
 
         if (details.getStatus() == UserStatus.DELETED) {
@@ -109,7 +111,9 @@ public class TenantSubscriptionValidationService {
         }
 
         if (details.getPlanStatus() == PlanStatus.SUSPENDED) {
-            throw new BusinessException("Subscription is suspended");
+            if (!isSelfServeRenewalAttempt) {
+                throw new BusinessException("Subscription is suspended");
+            }
         }
 
         if (details.getPlanStatus() == PlanStatus.CANCELLED) {

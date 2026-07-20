@@ -253,7 +253,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Collection<? extends GrantedAuthority> authorities = extractAuthorities(claims, userDetails);
 
                     // Validate tenant subscription status in real-time
-                    if ("EMPLOYEE".equals(userType) && !isReadOnlyAllowedSuspendedRequest(request)) {
+                    if ("EMPLOYEE".equals(userType) && !path.startsWith("/api/tenant/auth/") && !isReadOnlyAllowedSuspendedRequest(request)) {
                         Long tenantId = Long.parseLong(claims.get("tenantId", String.class));
                         tenantSubscriptionValidationService.validateSubscription(tenantId, path, method, authorities,
                                 request);
@@ -483,6 +483,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // Prefix matches
         if (path.startsWith("/api/billing/") ||
                 path.startsWith("/api/subscriptions/") ||
+                path.startsWith("/api/tenant/subscriptions/") ||
                 path.startsWith("/api/export/") ||
                 path.startsWith("/api/employees/export/")) {
             return true;
