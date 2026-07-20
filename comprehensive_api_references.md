@@ -96,6 +96,12 @@ SonixHR isolates security contexts by request prefix:
 | `PUT` | `/{id}/activate` | Reactivate employee status | `EMPLOYEE_EDIT` | `EmployeeResponse` |
 | `PUT` | `/{id}/deactivate`| Deactivate employee status | `EMPLOYEE_EDIT` | `EmployeeResponse` |
 
+#### `EmployeeCreateRequest` / `EmployeeUpdateRequest` Payload Structure:
+* **Required Fields** (Creation): `firstName`, `lastName`, `email`, `departmentId`, `position`, `hireDate`
+* **Optional HR Fields**: `phone`, `workLocation`, `workState` (`IndianState`), `workStateText`, `workCountry`, `managerId`, `managerCode`, `employmentType` (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERN`), `roleIds`
+* **Schedule & Shift**: `shiftId`, `weekendConfig` (`SATURDAY_SUNDAY`, `SUNDAY_ONLY`, `CUSTOM`), `customWeekendDays`
+* **Salary & Tax**: `salary`, `salaryType` (`MONTHLY`, `YEARLY`), `currency`, `taxRegime`, `bankDetails` (`accountNumber`, `ifscCode`, `bankName`, `branchName`, `accountHolderName`)
+
 ### Tenant Roles & Permissions (`/api/roles` & `/api/permissions`)
 | Method | Path | Description | Payload / Authority | Response DTO |
 |---|---|---|---|---|
@@ -124,6 +130,12 @@ SonixHR isolates security contexts by request prefix:
 | `GET` | `/profile` | Get logged-in employee profile | - | `EmployeeResponse` |
 | `PUT` | `/profile` | Update own contact/address | `EmployeeProfileUpdateRequest`| `EmployeeResponse` |
 | `GET` | `/organization-chart`| Fetch reporting structure | - | `MyOrgChartResponse` |
+
+#### `EmployeeProfileUpdateRequest` Payload Structure:
+* **Personal Info**: `phone`, `personalEmail`, `dateOfBirth`, `gender`, `maritalStatus`, `bloodGroup`, `nationality`
+* **Address Info**: `address`, `city`, `state` (`IndianState`), `stateText`, `country`, `postalCode`
+* **Emergency Contacts**: `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelation`, `emergencyContactEmail`, `secondaryEmergencyName`, `secondaryEmergencyPhone`
+* **Social Profile Links**: `linkedinUrl`, `githubUrl`, `twitterUrl`
 
 ---
 
