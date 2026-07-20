@@ -5,6 +5,129 @@
 
 This document lists all API endpoints across all controllers, including mapped request/response DTO structures.
 
+## EmployeeController
+
+### POST `/api/employees`
+- **Handler Method**: `createEmployee`
+- **Description**: Creates/Onboards a new employee in the tenant organization.
+- **Request Body Type**: `EmployeeCreateRequest`
+#### Request JSON Example:
+```json
+{
+  "firstName": "Rahul",
+  "lastName": "Sharma",
+  "email": "rahul.sharma@company.com",
+  "departmentId": 2,
+  "position": "Software Engineer",
+  "hireDate": "2026-01-15",
+  "phone": "+919876543210",
+  "workLocation": "Mumbai Office",
+  "workState": "MAHARASHTRA",
+  "workStateText": "Maharashtra",
+  "workCountry": "India",
+  "managerId": 1,
+  "managerCode": "EMP001",
+  "employmentType": "FULL_TIME",
+  "roleIds": [3],
+  "weekendConfig": "SATURDAY_SUNDAY",
+  "customWeekendDays": "SATURDAY,SUNDAY",
+  "salary": 75000.00,
+  "salaryType": "MONTHLY",
+  "currency": "INR",
+  "taxRegime": "NEW_REGIME",
+  "shiftId": 1,
+  "bankDetails": {
+    "accountNumber": "123456789012",
+    "ifscCode": "SBIN0001234",
+    "bankName": "State Bank of India",
+    "branchName": "Andheri East",
+    "accountHolderName": "Rahul Sharma"
+  }
+}
+```
+- **Response Type**: `EmployeeResponse`
+
+---
+
+### PUT `/api/employees/{id}`
+- **Handler Method**: `updateEmployee`
+- **Description**: Updates an existing employee's organizational, shift, and compensation details.
+- **Request Body Type**: `EmployeeUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "firstName": "Rahul",
+  "lastName": "Sharma",
+  "email": "rahul.sharma@company.com",
+  "departmentId": 2,
+  "position": "Senior Software Engineer",
+  "hireDate": "2026-01-15",
+  "phone": "+919876543210",
+  "workLocation": "Mumbai Office",
+  "workState": "MAHARASHTRA",
+  "workStateText": "Maharashtra",
+  "workCountry": "India",
+  "managerId": 1,
+  "managerCode": "EMP001",
+  "employmentType": "FULL_TIME",
+  "roleIds": [3],
+  "weekendConfig": "SATURDAY_SUNDAY",
+  "customWeekendDays": "SATURDAY,SUNDAY",
+  "salary": 90000.00,
+  "salaryType": "MONTHLY",
+  "currency": "INR",
+  "taxRegime": "NEW_REGIME",
+  "shiftId": 1,
+  "bankDetails": {
+    "accountNumber": "123456789012",
+    "ifscCode": "SBIN0001234",
+    "bankName": "State Bank of India",
+    "branchName": "Andheri East",
+    "accountHolderName": "Rahul Sharma"
+  }
+}
+```
+- **Response Type**: `EmployeeResponse`
+
+---
+
+## EmployeeSelfServiceController
+
+### PUT `/api/employees/me/profile`
+- **Handler Method**: `updateMyProfile`
+- **Description**: Allows logged-in employee to update personal, address, emergency contact, and social profile details.
+- **Request Body Type**: `EmployeeProfileUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "phone": "+919876543210",
+  "personalEmail": "rahul.personal@gmail.com",
+  "dateOfBirth": "1995-05-20",
+  "gender": "MALE",
+  "maritalStatus": "SINGLE",
+  "bloodGroup": "O_POSITIVE",
+  "nationality": "Indian",
+  "address": "Flat 402, Green Heights",
+  "city": "Mumbai",
+  "state": "MAHARASHTRA",
+  "stateText": "Maharashtra",
+  "country": "India",
+  "postalCode": "400069",
+  "emergencyContactName": "Anita Sharma",
+  "emergencyContactPhone": "+919876543211",
+  "emergencyContactRelation": "Mother",
+  "emergencyContactEmail": "anita.sharma@gmail.com",
+  "secondaryEmergencyName": "Vikram Sharma",
+  "secondaryEmergencyPhone": "+919876543212",
+  "linkedinUrl": "https://linkedin.com/in/rahulsharma",
+  "githubUrl": "https://github.com/rahulsharma",
+  "twitterUrl": "https://twitter.com/rahulsharma"
+}
+```
+- **Response Type**: `EmployeeResponse`
+
+---
+
 ## AdminTenantController
 
 ### POST `/api/admin/tenants/{id}/restore`
