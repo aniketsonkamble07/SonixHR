@@ -99,7 +99,7 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
         /**
          * Count tenants by plan type
          */
-        @Query("SELECT t.subscriptionPlan.code, COUNT(t) FROM Tenant t GROUP BY t.subscriptionPlan.code")
+        @Query("SELECT t.subscriptionPlan.name, COUNT(t) FROM Tenant t GROUP BY t.subscriptionPlan.name")
         List<Object[]> countByPlanType();
 
         /**
