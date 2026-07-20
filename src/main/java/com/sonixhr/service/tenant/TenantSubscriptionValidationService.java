@@ -87,7 +87,6 @@ public class TenantSubscriptionValidationService {
         // If a Company Admin attempts to access a self-serve renewal/billing path, or any user reads status/tickets, do
         // not block on suspended/inactive status
         boolean isSelfServeRenewalAttempt = isAllowedGrace && (isAdmin || isReadGraceRequest) &&
-                (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE || details.getPlanStatus() == PlanStatus.SUSPENDED || details.getPlanStatus() == PlanStatus.CANCELLED) &&
                 (details.getDataStatus() == null || details.getDataStatus() == TenantDataStatus.RETAINED);
 
         if (details.getStatus() == UserStatus.DELETED) {
@@ -95,7 +94,8 @@ public class TenantSubscriptionValidationService {
         }
 
         // Check plan status
-        if (details.getPlanStatus() == PlanStatus.EXPIRED) {
+        PlanStatus planStatus = details.getPlanStatus();
+        if (planStatus == PlanStatus.EXPIRED) {
             if (details.getDataStatus() == TenantDataStatus.ARCHIVED) {
                 throw new BusinessException(
                         "Subscription has expired and the workspace is archived. Please contact support to restore and renew.");
@@ -104,28 +104,31 @@ public class TenantSubscriptionValidationService {
                 throw new BusinessException(
                         "Subscription has expired and the workspace is marked for deletion. Please contact support.");
             }
-            // EXPIRED stage (Day 0-30): RETAINED data status
             if (!isSelfServeRenewalAttempt) {
                 throw new BusinessException("Subscription has expired. Please log in and renew online.");
             }
-        }
-
-        if (details.getPlanStatus() == PlanStatus.SUSPENDED) {
+        } else if (planStatus == PlanStatus.SUSPENDED) {
             if (!isSelfServeRenewalAttempt) {
-                throw new BusinessException("Subscription is suspended");
+                throw new BusinessException("Subscription is suspended.");
             }
-        }
-
-        if (details.getPlanStatus() == PlanStatus.CANCELLED) {
+        } else if (planStatus == PlanStatus.CANCELLED) {
             if (!isSelfServeRenewalAttempt) {
                 throw new BusinessException("Subscription is cancelled. Please log in and renew online.");
+            }
+        } else if (planStatus == PlanStatus.TERMINATED) {
+            throw new BusinessException("Subscription is terminated. Please contact support.");
+        } else if (planStatus == PlanStatus.FROZEN || planStatus == PlanStatus.PAUSED || planStatus == PlanStatus.NOT_ACTIVATED) {
+            if (!isSelfServeRenewalAttempt) {
+                throw new BusinessException("Subscription is " + planStatus.name().toLowerCase() + ". Access is restricted.");
             }
         }
 
         // Real-time expiration check
         if (details.getBillingPeriodEnd() != null && details.getBillingPeriodEnd().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
-            if (details.getPlanStatus() != PlanStatus.PAST_DUE && details.getPlanStatus() != PlanStatus.EXPIRED) {
-                throw new BusinessException("Subscription has expired. Please log in and renew online.");
+            if (planStatus != PlanStatus.PAST_DUE && planStatus != PlanStatus.EXPIRED && planStatus != PlanStatus.SUSPENDED && planStatus != PlanStatus.CANCELLED) {
+                if (!isSelfServeRenewalAttempt) {
+                    throw new BusinessException("Subscription has expired. Please log in and renew online.");
+                }
             }
         }
 
