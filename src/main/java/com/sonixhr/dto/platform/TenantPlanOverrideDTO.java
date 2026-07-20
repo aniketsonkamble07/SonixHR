@@ -19,8 +19,4 @@ public class TenantPlanOverrideDTO {
     @NotNull(message = "Max employees limit is required")
     @Positive(message = "Max employees must be a positive number")
     private Integer maxEmployees;
-
-    @NotNull(message = "Max storage limit (MB) is required")
-    @Positive(message = "Max storage limit must be a positive number")
-    private Integer maxStorageMb;
 }

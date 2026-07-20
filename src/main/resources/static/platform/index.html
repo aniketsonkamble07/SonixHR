@@ -4162,12 +4162,6 @@
       document.getElementById('override-plan-type').value = planType;
       document.getElementById('override-max-employees').value = maxEmployees;
 
-      let defStorage = 1024;
-      if (planType === 'MODERATE') defStorage = 5120;
-      if (planType === 'PREMIUM') defStorage = 20480;
-      if (planType === 'ENTERPRISE') defStorage = 102400;
-      document.getElementById('override-max-storage').value = defStorage;
-
       openModal('override-tenant-modal');
     }
 
@@ -4176,8 +4170,7 @@
       const id = document.getElementById('override-tenant-id').value;
       const payload = {
         planType: document.getElementById('override-plan-type').value,
-        maxEmployees: parseInt(document.getElementById('override-max-employees').value),
-        maxStorageMb: parseInt(document.getElementById('override-max-storage').value)
+        maxEmployees: parseInt(document.getElementById('override-max-employees').value)
       };
 
       try {

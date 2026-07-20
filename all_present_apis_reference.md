@@ -27,7 +27,6 @@ This document lists all API endpoints across all controllers, including mapped r
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -80,7 +79,6 @@ This document lists all API endpoints across all controllers, including mapped r
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -5161,8 +5159,7 @@ This document lists all API endpoints across all controllers, including mapped r
 ```json
 {
   "planType": "",
-  "maxEmployees": 0,
-  "maxStorageMb": 0
+  "maxEmployees": 0
 }
 ```
 - **Response Type**: `PlatformTenantResponseDTO`
@@ -8681,7 +8678,6 @@ false
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -8711,7 +8707,6 @@ false
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -8742,7 +8737,6 @@ false
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -8773,7 +8767,6 @@ false
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
@@ -8803,7 +8796,6 @@ false
   "planName": "",
   "planStatus": "PlanStatus",
   "maxEmployees": 0,
-  "maxStorageMb": 0,
   "startedAt": "2026-06-17",
   "endsAt": "2026-06-17",
   "amount": 0,
