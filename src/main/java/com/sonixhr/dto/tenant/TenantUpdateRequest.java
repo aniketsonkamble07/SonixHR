@@ -7,12 +7,14 @@ import com.sonixhr.enums.IndianState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.NoArgsConstructor;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TenantUpdateRequest {
 
     @Size(min = 2, max = 200, message = "Company name must be between 2 and 200 characters")
