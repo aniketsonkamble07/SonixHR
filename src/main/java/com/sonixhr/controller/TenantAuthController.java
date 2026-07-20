@@ -37,11 +37,16 @@ import com.sonixhr.security.TenantRLSService;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/tenant/auth")
 @SuppressWarnings("null")
 public class TenantAuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantAuthController.class);
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String KEY_USER_TYPE = "userType";

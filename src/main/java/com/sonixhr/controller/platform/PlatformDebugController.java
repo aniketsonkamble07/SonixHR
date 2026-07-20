@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
 // Run with: -Dspring.profiles.active=dev
 // Or set spring.profiles.active=dev in application-dev.yml.
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Profile("dev")
 @RestController
@@ -34,6 +37,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyAuthority('VIEW_SYSTEM_METRICS', 'VIEW_SYSTEM_SETTINGS', 'VIEW_PLATFORM_ROLES', 'VIEW_PLATFORM_ADMINS')")
 public class PlatformDebugController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformDebugController.class);
 
     private final PlatformUserRepository platformUserRepository;
     private final PlatformPermissionRepository permissionRepository;

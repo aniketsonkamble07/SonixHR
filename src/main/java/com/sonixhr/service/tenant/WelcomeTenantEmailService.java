@@ -14,11 +14,16 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class WelcomeTenantEmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(WelcomeTenantEmailService.class);
 
     private final JavaMailSender mailSender;
 

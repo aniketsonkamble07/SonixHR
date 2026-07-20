@@ -24,12 +24,17 @@ import java.util.Set;
 //    Page<PlatformUserResponse>. Page<T> does not deserialize cleanly from
 //    Redis/Jackson. PageResult is a plain serializable record.
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/platform/users")
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PlatformUserController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformUserController.class);
 
     private final PlatformUserService platformUserService;
 

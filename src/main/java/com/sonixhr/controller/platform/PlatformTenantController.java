@@ -16,11 +16,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/platform/tenants")
 @RequiredArgsConstructor
 public class PlatformTenantController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformTenantController.class);
 
     private final PlatformTenantService tenantService;
 

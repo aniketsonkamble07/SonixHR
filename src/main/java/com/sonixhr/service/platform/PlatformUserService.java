@@ -58,12 +58,17 @@ import java.util.stream.Collectors;
 // 8. clearAllCaches — added @Transactional so partial eviction failures don't
 //    leave Redis and Caffeine in inconsistent states.
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @SuppressWarnings("null")
 public class PlatformUserService {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformUserService.class);
 
     private static final java.util.regex.Pattern UPPERCASE_PAT = java.util.regex.Pattern.compile("[A-Z]");
     private static final java.util.regex.Pattern LOWERCASE_PAT = java.util.regex.Pattern.compile("[a-z]");

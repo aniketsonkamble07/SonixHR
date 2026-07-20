@@ -27,12 +27,17 @@ import java.security.SecureRandom;
 
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/platform/auth")
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PlatformAuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformAuthController.class);
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 

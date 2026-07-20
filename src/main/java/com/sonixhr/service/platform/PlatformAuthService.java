@@ -34,9 +34,14 @@ import java.time.LocalDateTime;
 // 4. DisabledException and LockedException are caught in login() and re-thrown as
 //    BadCredentialsException so @ControllerAdvice maps them to 401, not 500.
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 public class PlatformAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformAuthService.class);
 
     private final AuthenticationManager platformAuthenticationManager;
     private final PlatformUserRepository platformUserRepository;

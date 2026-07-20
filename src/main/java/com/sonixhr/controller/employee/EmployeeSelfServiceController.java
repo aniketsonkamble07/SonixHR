@@ -16,11 +16,16 @@ import org.springframework.web.bind.annotation.*;
 
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/employee")
 @RequiredArgsConstructor
 public class EmployeeSelfServiceController {
+
+    private static final Logger log = LoggerFactory.getLogger(EmployeeSelfServiceController.class);
 
     private final EmployeeSelfService employeeSelfService;
 

@@ -22,11 +22,16 @@ import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 public class TenantRegistrationController {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantRegistrationController.class);
 
     private final TenantRegistrationService registrationService;
     private final ActivationTokenService activationTokenService;
