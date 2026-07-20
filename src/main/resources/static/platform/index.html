@@ -464,7 +464,7 @@
               </select>
             </div>
 
-            <button class="btn btn-primary" onclick="openModal('register-tenant-modal')">
+            <button class="btn btn-primary" onclick="openRegisterTenantModal()">
               <i class="fa-solid fa-plus"></i>
               <span>Create Organization</span>
             </button>
@@ -2998,6 +2998,11 @@
 
     function openModal(id) {
       document.getElementById(id).classList.add('active');
+    }
+
+    function openRegisterTenantModal() {
+      fetchSubscriptionPlans();
+      openModal('register-tenant-modal');
     }
 
     function closeModal(id) {

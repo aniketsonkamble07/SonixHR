@@ -4454,6 +4454,7 @@
         const res = await fetch(`${API_BASE}/tenant/subscriptions/current`, { headers: getHeaders() });
         if (res.ok) {
           const sub = await res.json();
+          window.currentSubscriptionId = sub.id;
           document.getElementById('billing-plan-name').textContent = sub.planName || sub.planType || 'None';
 
           const statusEl = document.getElementById('billing-plan-status');
@@ -4549,10 +4550,21 @@
     async function cancelSubscription() {
       if (!confirm('Are you sure you want to cancel your subscription auto-renewal? This will terminate the subscription immediately.')) return;
 
+      if (!window.currentSubscriptionId) {
+        showToast('Error', 'No active subscription found to cancel.', 'error');
+        return;
+      }
+
+      const payload = {
+        subscriptionId: window.currentSubscriptionId,
+        reason: 'Cancelled via billing dashboard'
+      };
+
       try {
         const res = await fetch(`${API_BASE}/tenant/subscriptions/cancel`, {
           method: 'POST',
-          headers: getHeaders()
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
         });
         if (res.ok) {
           showToast('Success', 'Subscription successfully cancelled.', 'warning');
