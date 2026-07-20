@@ -38,12 +38,17 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class TenantSubscriptionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantSubscriptionService.class);
 
     private final TenantSubscriptionRepository subscriptionRepository;
     private final TenantRepository tenantRepository;

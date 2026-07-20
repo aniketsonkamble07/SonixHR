@@ -19,10 +19,15 @@ import java.util.Collection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TenantSubscriptionValidationService {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantSubscriptionValidationService.class);
 
     private final TenantRepository tenantRepository;
     private final com.sonixhr.service.platform.FeatureAccessService featureAccessService;

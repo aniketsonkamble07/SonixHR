@@ -44,11 +44,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class TenantRegistrationService {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantRegistrationService.class);
 
     private final TenantRepository tenantRepository;
     private final TenantSubscriptionRepository subscriptionRepository;

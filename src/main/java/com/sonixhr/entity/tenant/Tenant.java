@@ -290,6 +290,22 @@ public class Tenant {
                 '}';
     }
 
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getTenantCode() { return tenantCode; }
+    public void setTenantCode(String tenantCode) { this.tenantCode = tenantCode; }
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
+    public UserStatus getStatus() { return status; }
+    public void setStatus(UserStatus status) { this.status = status; }
+    public boolean getIsActive() { return isActive; }
+    public void setIsActive(boolean isActive) { this.isActive = isActive; }
+    public PlanStatus getPlanStatus() { return planStatus; }
+    public void setPlanStatus(PlanStatus planStatus) { this.planStatus = planStatus; }
+    public LocalDateTime getEndsAt() { return endsAt; }
+    public void setEndsAt(LocalDateTime endsAt) { this.endsAt = endsAt; }
+    public TenantDataStatus getDataStatus() { return dataStatus; }
+    public void setDataStatus(TenantDataStatus dataStatus) { this.dataStatus = dataStatus; }
     public Integer getMaxEmployees() { return maxEmployees; }
     public void setMaxEmployees(Integer maxEmployees) { this.maxEmployees = maxEmployees; }
 }

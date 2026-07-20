@@ -25,11 +25,16 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PlatformDashboardService {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformDashboardService.class);
 
     private final TenantRepository tenantRepository;
     private final TenantSubscriptionRepository subscriptionRepository;

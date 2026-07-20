@@ -31,12 +31,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class PlatformTenantService {
+
+        private static final Logger log = LoggerFactory.getLogger(PlatformTenantService.class);
 
         private final TenantRepository tenantRepository;
         private final TenantSubscriptionRepository subscriptionRepository;
