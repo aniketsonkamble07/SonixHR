@@ -16,7 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
- 
+
 import com.sonixhr.service.tenant.TenantSubscriptionValidationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -116,7 +116,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
             }
-            // Note: token from URL query params (?token=...) is intentionally NOT supported.
+            // Note: token from URL query params (?token=...) is intentionally NOT
+            // supported.
             // URL tokens are logged by servers, proxies, and stored in browser history.
 
             if (token == null || token.isEmpty() || "null".equals(token) || "undefined".equals(token)) {
@@ -224,9 +225,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         filterChain.doFilter(request, response);
                         return;
                     }
-                    
-                    
-                    
+
                     TenantContext.setCurrentTenant(tenantId);
                     tenantRLSService.setCurrentTenantInDB(tenantId);
 
@@ -238,9 +237,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     }
                 }
 
-                // Check roles version for ALL users (Platform & Employee) - if changed, reload user
+                // Check roles version for ALL users (Platform & Employee) - if changed, reload
+                // user
                 if (userDetails != null && needRolesReload(userDetails, tokenRolesVersion)) {
-                    Long tenantId = "EMPLOYEE".equals(userType) ? Long.parseLong(claims.get("tenantId", String.class)) : null;
+                    Long tenantId = "EMPLOYEE".equals(userType) ? Long.parseLong(claims.get("tenantId", String.class))
+                            : null;
                     userDetails = reloadUserDetails(username, userType, tenantId);
                     if (cacheEnabled && userDetails != null) {
                         userDetailsCache.put(cacheKey, userDetails);
@@ -254,7 +255,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     // Validate tenant subscription status in real-time
                     if ("EMPLOYEE".equals(userType) && !isReadOnlyAllowedSuspendedRequest(request)) {
                         Long tenantId = Long.parseLong(claims.get("tenantId", String.class));
-                        tenantSubscriptionValidationService.validateSubscription(tenantId, path, method, authorities, request);
+                        tenantSubscriptionValidationService.validateSubscription(tenantId, path, method, authorities,
+                                request);
                     }
 
                     // Create authentication token
@@ -286,15 +288,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 log.warn("Tenant subscription validation failed for user {}: {}", username, ex.getMessage());
                 SecurityContextHolder.clearContext();
                 cleanupTenantContext();
-                
+
                 response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                
+
                 Map<String, Object> body = new HashMap<>();
                 body.put("success", false);
                 body.put("message", ex.getMessage());
                 body.put("timestamp", java.time.LocalDateTime.now().toString());
-                
+
                 objectMapper.writeValue(response.getOutputStream(), body);
                 return;
             } catch (Exception e) {
@@ -325,10 +327,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      */
     private boolean isPublicPathOptimized(String path) {
         // Exclude authenticated tenant and platform auth endpoints
-        if ("/api/tenant/auth/me".equals(path) || 
-            "/api/tenant/auth/logout".equals(path) || 
-            "/api/tenant/auth/test-auth".equals(path) ||
-            "/api/platform/auth/logout".equals(path)) {
+        if ("/api/tenant/auth/me".equals(path) ||
+                "/api/tenant/auth/logout".equals(path) ||
+                "/api/tenant/auth/test-auth".equals(path) ||
+                "/api/platform/auth/logout".equals(path)) {
             return false;
         }
 
@@ -471,21 +473,21 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return false;
         }
         String path = request.getRequestURI();
-        
+
         // Exact matches
-        if ("/api/tenants/current/subscription".equals(path) || 
-            "/api/tenants/my-tenant".equals(path)) {
+        if ("/api/tenants/current/subscription".equals(path) ||
+                "/api/tenants/my-tenant".equals(path)) {
             return true;
         }
-        
+
         // Prefix matches
-        if (path.startsWith("/api/billing/") || 
-            path.startsWith("/api/subscriptions/") || 
-            path.startsWith("/api/export/") || 
-            path.startsWith("/api/employees/export/")) {
+        if (path.startsWith("/api/billing/") ||
+                path.startsWith("/api/subscriptions/") ||
+                path.startsWith("/api/export/") ||
+                path.startsWith("/api/employees/export/")) {
             return true;
         }
-        
+
         return false;
     }
 }

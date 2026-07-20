@@ -262,53 +262,7 @@ public class PlatformRole extends BaseRole<PlatformPermission> {
         return getClass().hashCode();
     }
 
-    public String getName() {
-        return name;
-    }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public boolean isSystemRole() {
-        return systemRole;
-    }
-
-    public void setSystemRole(boolean systemRole) {
-        this.systemRole = systemRole;
-    }
-
-    public Integer getPriority() {
-        return priority;
-    }
-
-    public void setPriority(Integer priority) {
-        this.priority = priority;
-    }
-
-    public Set<PlatformPermission> getPermissions() {
-        return permissions;
-    }
-
-    public void setPermissions(Set<PlatformPermission> permissions) {
-        this.permissions = permissions;
-    }
-
-    public Set<PlatformUser> getUsers() {
-        return users;
-    }
-
-    public void setUsers(Set<PlatformUser> users) {
-        this.users = users;
-    }
 
     @Override
     public String toString() {

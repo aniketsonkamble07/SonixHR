@@ -98,23 +98,7 @@ public enum PlatformPermissionEnum {
     private final String category;
     private final int order;
 
-    PlatformPermissionEnum(String description, String category, int order) {
-        this.description = description;
-        this.category = category;
-        this.order = order;
-    }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public int getOrder() {
-        return order;
-    }
 
     // =====================================================
     // HELPER METHODS
