@@ -4578,7 +4578,7 @@
           const availablePlans = plans.filter(p => p.isActive && parseFloat(p.price || 0) > 0);
           if (availablePlans.length > 0) {
             select.innerHTML = availablePlans.map(p => `
-              <option value="${p.code}">${p.name} - ₹${parseFloat(p.price || 0).toFixed(2)}/mo (${p.validityMonths || 1} months)</option>
+              <option value="${p.name}">${p.name} - ₹${parseFloat(p.price || 0).toFixed(2)}/mo (${p.validityMonths || 1} months)</option>
             `).join('');
           } else {
             select.innerHTML = '<option value="">No other plans available</option>';

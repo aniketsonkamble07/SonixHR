@@ -1091,12 +1091,6 @@
               required>
           </div>
 
-          <div class="form-group" style="margin-top: 15px;">
-            <label class="form-label" for="override-max-storage">Storage Quota (MB)</label>
-            <input type="number" id="override-max-storage" class="form-input" min="128" placeholder="e.g. 10240"
-              required>
-          </div>
-
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary"
               onclick="closeModal('override-tenant-modal')">Cancel</button>
@@ -1163,15 +1157,9 @@
         <form id="subscription-plan-form">
           <input type="hidden" id="plan-id">
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label" for="plan-code">Plan Code (Unique ID)</label>
-              <input type="text" id="plan-code" class="form-input" placeholder="e.g. basic" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="plan-name">Plan Name</label>
-              <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="plan-name">Plan Name</label>
+            <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
           </div>
 
           <div class="form-grid" style="margin-top: 15px;">
@@ -1181,8 +1169,8 @@
                 required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="plan-trial-days">Trial Days</label>
-              <input type="number" id="plan-trial-days" class="form-input" placeholder="e.g. 0" required>
+              <label class="form-label" for="plan-trial-days">Validity (Months)</label>
+              <input type="number" id="plan-trial-days" class="form-input" placeholder="e.g. 1" min="1" required>
             </div>
           </div>
 
@@ -1191,18 +1179,7 @@
               <label class="form-label" for="plan-max-employees">Max Employee Seats</label>
               <input type="number" id="plan-max-employees" class="form-input" placeholder="e.g. 100" required>
             </div>
-            <div class="form-group">
-              <label class="form-label" for="plan-max-storage">Max Storage (MB)</label>
-              <input type="number" id="plan-max-storage" class="form-input" placeholder="e.g. 1024" required>
-            </div>
-          </div>
-
-          <div class="form-grid" style="margin-top: 15px; grid-template-columns: 1fr 1fr;">
-            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
-              <input type="checkbox" id="plan-is-trial" style="width: 18px; height: 18px; cursor: pointer;">
-              <label class="form-label" for="plan-is-trial" style="margin: 0; cursor: pointer;">Is Trial Plan?</label>
-            </div>
-            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 25px;">
               <input type="checkbox" id="plan-is-active" style="width: 18px; height: 18px; cursor: pointer;" checked>
               <label class="form-label" for="plan-is-active" style="margin: 0; cursor: pointer;">Is Plan Active?</label>
             </div>
@@ -4292,10 +4269,10 @@
     function openCreatePlanModal() {
       document.getElementById('plan-modal-title').textContent = 'Create Subscription Plan';
       document.getElementById('plan-id').value = '';
-      if (document.getElementById('plan-code')) document.getElementById('plan-code').value = '';
       document.getElementById('plan-name').value = '';
       document.getElementById('plan-monthly-price').value = '0.00';
       document.getElementById('plan-trial-days').value = '1';
+      document.getElementById('plan-max-employees').value = '50';
       document.getElementById('plan-is-active').checked = true;
       document.getElementById('plan-description').value = '';
 
@@ -4308,10 +4285,10 @@
 
       document.getElementById('plan-modal-title').textContent = 'Edit Subscription Plan';
       document.getElementById('plan-id').value = plan.id;
-      if (document.getElementById('plan-code')) document.getElementById('plan-code').value = plan.code || '';
       document.getElementById('plan-name').value = plan.name;
       document.getElementById('plan-monthly-price').value = plan.price || 0;
       document.getElementById('plan-trial-days').value = plan.validityMonths || 1;
+      document.getElementById('plan-max-employees').value = plan.maxEmployees || 50;
       document.getElementById('plan-is-active').checked = plan.active;
       document.getElementById('plan-description').value = plan.description || '';
 
@@ -4330,6 +4307,7 @@
         name: document.getElementById('plan-name').value,
         price: parseFloat(document.getElementById('plan-monthly-price').value),
         validityMonths: parseInt(document.getElementById('plan-trial-days').value),
+        maxEmployees: parseInt(document.getElementById('plan-max-employees').value),
         isActive: document.getElementById('plan-is-active').checked,
         description: document.getElementById('plan-description').value
       };

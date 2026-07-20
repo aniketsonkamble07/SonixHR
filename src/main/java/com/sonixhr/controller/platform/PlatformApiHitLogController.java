@@ -25,7 +25,7 @@ public class PlatformApiHitLogController {
      * Accessible only to platform-level administrators.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority('API_LOG_VIEW')")
+    @PreAuthorize("hasAnyAuthority('API_LOG_VIEW', 'VIEW_SYSTEM_METRICS', 'VIEW_TENANTS')")
     public ResponseEntity<Page<ApiHitLog>> getAllApiLogs(Pageable pageable) {
         log.info("REST request by platform team to fetch all API hit logs");
         Page<ApiHitLog> logs = apiHitLogService.getAllLogs(pageable);

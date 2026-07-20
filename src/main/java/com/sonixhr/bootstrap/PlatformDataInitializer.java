@@ -93,10 +93,20 @@ public class PlatformDataInitializer implements ApplicationRunner {
                 // Step 6: Seed Statutory Rates and PT Configs
                 seedStatutoryRatesAndPtConfigs();
 
-                // Step 7: Sync existing Tenant Admin roles with all Tenant Permissions to prevent 403 authorization issues
+                // Step 7: Sync existing Platform Admin & Tenant Admin roles with all Permissions to prevent 403 authorization issues
                 try {
-                        log.info("Syncing Tenant Admin roles with all Tenant Permissions...");
+                        log.info("Syncing Platform Admin and Tenant Admin roles with all Permissions...");
                         jdbcTemplate.execute("""
+                                INSERT INTO platform_role_permissions (role_id, permission_id)
+                                SELECT r.id, p.id
+                                FROM platform_roles r
+                                CROSS JOIN platform_permissions p
+                                WHERE r.name = 'Admin'
+                                  AND NOT EXISTS (
+                                      SELECT 1 FROM platform_role_permissions prp
+                                      WHERE prp.role_id = r.id AND prp.permission_id = p.id
+                                  );
+
                                 INSERT INTO role_tenant_permissions (role_id, permission_id)
                                 SELECT r.id, p.id
                                 FROM tenant_roles r
@@ -105,11 +115,11 @@ public class PlatformDataInitializer implements ApplicationRunner {
                                   AND NOT EXISTS (
                                       SELECT 1 FROM role_tenant_permissions rtp
                                       WHERE rtp.role_id = r.id AND rtp.permission_id = p.id
-                                  )
+                                  );
                                 """);
-                        log.info("Successfully synced Tenant Admin roles with all permissions.");
+                        log.info("Successfully synced Platform Admin and Tenant Admin roles with all permissions.");
                 } catch (Exception e) {
-                        log.warn("Failed to sync Tenant Admin roles: {}", e.getMessage());
+                        log.warn("Failed to sync Platform/Tenant Admin roles: {}", e.getMessage());
                 }
 
                 try {
