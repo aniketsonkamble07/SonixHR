@@ -4231,8 +4231,8 @@
           <td>INR ${(p.price || 0).toFixed(2)}</td>
           <td>${p.validityMonths || 1} months</td>
           <td>
-            <span class="status-indicator ${p.active ? 'active' : 'inactive'}"></span>
-            <span style="font-size: 0.85rem;">${p.active ? 'Active' : 'Disabled'}</span>
+            <span class="status-indicator ${p.isActive ? 'active' : 'inactive'}"></span>
+            <span style="font-size: 0.85rem;">${p.isActive ? 'Active' : 'Disabled'}</span>
           </td>
           <td style="text-align: right;">
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -4251,7 +4251,7 @@
     function populatePlanSelects(plans) {
       const regSelect = document.getElementById('reg-plan-type');
       if (regSelect) {
-        regSelect.innerHTML = plans.filter(p => p.active).map(p => `
+        regSelect.innerHTML = plans.filter(p => p.isActive).map(p => `
           <option value="${p.name}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
         `).join('');
       }
@@ -4265,7 +4265,7 @@
 
       const sandboxSelect = document.getElementById('sandbox-plan-select');
       if (sandboxSelect) {
-        sandboxSelect.innerHTML = plans.filter(p => p.active).map(p => `
+        sandboxSelect.innerHTML = plans.filter(p => p.isActive).map(p => `
           <option value="${p.name}">${p.name}</option>
         `).join('');
       }
@@ -4294,7 +4294,7 @@
       document.getElementById('plan-monthly-price').value = plan.price || 0;
       document.getElementById('plan-trial-days').value = plan.validityMonths || 1;
       document.getElementById('plan-max-employees').value = plan.maxEmployees || 50;
-      document.getElementById('plan-is-active').checked = plan.active;
+      document.getElementById('plan-is-active').checked = plan.isActive;
       document.getElementById('plan-description').value = plan.description || '';
 
       openModal('subscription-plan-modal');
