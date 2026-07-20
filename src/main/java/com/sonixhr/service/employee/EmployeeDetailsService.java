@@ -30,11 +30,16 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service("employeeDetailsService")
 @Primary
 @Transactional(readOnly = true)
 public class EmployeeDetailsService implements UserDetailsService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmployeeDetailsService.class);
 
     private final EmployeeRepository employeeRepository;
     private final TenantRoleRepository roleRepository;

@@ -42,4 +42,11 @@ public abstract class BaseRole<P extends BasePermission> extends BaseEntity {
     public void setPermissionsWildcard(Set<? extends BasePermission> permissions) {
         this.setPermissions((Set<P>) permissions);
     }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public boolean isSystemRole() { return systemRole; }
+    public void setSystemRole(boolean systemRole) { this.systemRole = systemRole; }
 }
