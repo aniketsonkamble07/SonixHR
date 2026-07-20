@@ -791,6 +791,66 @@ public class Employee implements UserDetails {
         }
     }
 
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Tenant getTenant() { return tenant; }
+    public void setTenant(Tenant tenant) { this.tenant = tenant; }
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
+    public String getEmployeeCode() { return employeeCode; }
+    public void setEmployeeCode(String employeeCode) { this.employeeCode = employeeCode; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public LocalDate getDateOfBirth() { return dateOfBirth; }
+    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+    public Gender getGender() { return gender; }
+    public void setGender(Gender gender) { this.gender = gender; }
+    public MaritalStatus getMaritalStatus() { return maritalStatus; }
+    public void setMaritalStatus(MaritalStatus maritalStatus) { this.maritalStatus = maritalStatus; }
+    public BloodGroup getBloodGroup() { return bloodGroup; }
+    public void setBloodGroup(BloodGroup bloodGroup) { this.bloodGroup = bloodGroup; }
+    public String getNationality() { return nationality; }
+    public void setNationality(String nationality) { this.nationality = nationality; }
+    public String getPersonalEmail() { return personalEmail; }
+    public void setPersonalEmail(String personalEmail) { this.personalEmail = personalEmail; }
+    public Department getDepartment() { return department; }
+    public void setDepartment(Department department) { this.department = department; }
+    public ShiftConfiguration getShift() { return shift; }
+    public void setShift(ShiftConfiguration shift) { this.shift = shift; }
+    public String getPosition() { return position; }
+    public void setPosition(String position) { this.position = position; }
+    public Employee getManager() { return manager; }
+    public void setManager(Employee manager) { this.manager = manager; }
+    public EmploymentType getEmploymentType() { return employmentType; }
+    public void setEmploymentType(EmploymentType employmentType) { this.employmentType = employmentType; }
+    public String getWorkLocation() { return workLocation; }
+    public void setWorkLocation(String workLocation) { this.workLocation = workLocation; }
+    public IndianState getWorkState() { return workState; }
+    public void setWorkState(IndianState workState) { this.workState = workState; }
+    public String getWorkStateText() { return workStateText; }
+    public void setWorkStateText(String workStateText) { this.workStateText = workStateText; }
+    public String getWorkCountry() { return workCountry; }
+    public void setWorkCountry(String workCountry) { this.workCountry = workCountry; }
+    public LocalDate getHireDate() { return hireDate; }
+    public void setHireDate(LocalDate hireDate) { this.hireDate = hireDate; }
+    public LocalDate getConfirmationDate() { return confirmationDate; }
+    public void setConfirmationDate(LocalDate confirmationDate) { this.confirmationDate = confirmationDate; }
+    public EmployeeStatus getStatus() { return status; }
+    public void setStatus(EmployeeStatus status) { this.status = status; }
+    public Map<String, Object> getBankDetails() { return bankDetails; }
+    public void setBankDetails(Map<String, Object> bankDetails) { this.bankDetails = bankDetails; }
+    public Set<TenantRole> getRoles() { return roles; }
+    public void setRoles(Set<TenantRole> roles) { this.roles = roles; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
     public String getCity() { return city; }

@@ -50,11 +50,17 @@ import org.springframework.lang.NonNull;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class EmployeeService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmployeeService.class);
 
     private final EmployeeRepository employeeRepository;
     private final TenantRepository tenantRepository;

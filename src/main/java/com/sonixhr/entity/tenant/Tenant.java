@@ -289,4 +289,7 @@ public class Tenant {
                 ", createdAt=" + createdAt +
                 '}';
     }
+
+    public Integer getMaxEmployees() { return maxEmployees; }
+    public void setMaxEmployees(Integer maxEmployees) { this.maxEmployees = maxEmployees; }
 }
