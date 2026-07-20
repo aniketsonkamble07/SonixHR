@@ -390,7 +390,7 @@
   <script>
     // Base URL of the SonixHR backend. Automatically detects if hosted or local.
     const API_BASE_URL = (window.location.protocol === 'file:' || !window.location.hostname)
-      ? 'https://sonixhr.onrender.com'
+      ? 'http://localhost:8081'
       : (window.location.port && window.location.port !== '8081')
         ? `${window.location.protocol}//${window.location.hostname}:8081`
         : '';
@@ -404,7 +404,7 @@
           const plans = await response.json();
           if (plans && plans.length > 0) {
             select.innerHTML = plans.map(p => `
-              <option value="${p.name}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
+              <option value="${p.code}">${p.name} (INR ${(p.price || 0).toFixed(2)} / ${p.validityMonths || 1}m)</option>
             `).join('');
             submitBtn.disabled = false;
             return;

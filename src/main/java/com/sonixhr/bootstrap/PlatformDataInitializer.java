@@ -112,6 +112,15 @@ public class PlatformDataInitializer implements ApplicationRunner {
                         log.warn("Failed to sync Tenant Admin roles: {}", e.getMessage());
                 }
 
+                try {
+                        log.info("Dropping legacy plan_status check constraints if they exist...");
+                        jdbcTemplate.execute("ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_plan_status_check;");
+                        jdbcTemplate.execute("ALTER TABLE tenant_subscriptions DROP CONSTRAINT IF EXISTS tenant_subscriptions_plan_status_check;");
+                        log.info("Successfully dropped legacy plan_status check constraints.");
+                } catch (Exception e) {
+                        log.warn("Failed to drop legacy plan_status check constraints: {}", e.getMessage());
+                }
+
                 log.info(AppConstants.DIVIDER);
                 log.info("Platform Data Initializer Completed");
                 log.info(AppConstants.DIVIDER);

@@ -434,6 +434,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         log.debug("Invalidated cache for user: {} ({})", username, userType);
     }
 
+    @org.springframework.context.event.EventListener
+    public void handleEmployeeUpdated(com.sonixhr.events.EmployeeUpdatedEvent event) {
+        log.info("Employee updated event received in JwtAuthFilter: {}, invalidating JWT auth cache", event.getEmail());
+        invalidateUserCache(event.getEmail(), "EMPLOYEE");
+    }
+
     /**
      * Clear all caches (for testing or admin operations)
      */

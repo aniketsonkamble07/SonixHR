@@ -11,7 +11,7 @@ import java.util.Optional;
 
 @Repository
 public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPlan, Long> {
-    
+
     @Query("SELECT p FROM SubscriptionPlan p WHERE LOWER(p.name) = LOWER(:name) AND p.deletedAt IS NULL")
     Optional<SubscriptionPlan> findByNameIgnoreCase(@Param("name") String name);
 
@@ -24,4 +24,3 @@ public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPl
     @Query("SELECT p FROM SubscriptionPlan p WHERE (LOWER(p.code) = LOWER(:codeOrName) OR LOWER(p.name) = LOWER(:codeOrName)) AND p.deletedAt IS NULL")
     Optional<SubscriptionPlan> findByCodeOrNameIgnoreCase(@Param("codeOrName") String codeOrName);
 }
-

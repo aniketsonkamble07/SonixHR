@@ -27,12 +27,6 @@ import java.util.Objects;
 @EntityListeners(AuditingEntityListener.class)
 public class TenantPermission extends BasePermission {
 
-    /**
-     * Transient field for enum representation (not stored in DB)
-     */
-    @Transient
-    private TenantPermissionEnum permissionEnum;
-
     @Column(name = "is_active")
     @Builder.Default
     private boolean active = true;
@@ -45,7 +39,6 @@ public class TenantPermission extends BasePermission {
      * Set permission from enum (stores the enum name as String)
      */
     public void setPermissionEnum(TenantPermissionEnum permissionEnum) {
-        this.permissionEnum = permissionEnum;
         super.setPermission(permissionEnum != null ? permissionEnum.name() : null);
         if (super.getDescription() == null && permissionEnum != null) {
             super.setDescription(permissionEnum.getDescription());
@@ -62,14 +55,14 @@ public class TenantPermission extends BasePermission {
      * Get permission as enum
      */
     public TenantPermissionEnum getPermissionEnum() {
-        if (permissionEnum == null && super.getPermission() != null) {
+        if (super.getPermission() != null) {
             try {
-                permissionEnum = TenantPermissionEnum.valueOf(super.getPermission());
+                return TenantPermissionEnum.valueOf(super.getPermission());
             } catch (IllegalArgumentException e) {
                 // Ignore - return null if not found
             }
         }
-        return permissionEnum;
+        return null;
     }
 
     /**

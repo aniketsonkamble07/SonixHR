@@ -31,6 +31,7 @@ public class TenantRoleServiceTest {
     @Mock private TenantDynamicRoleService dynamicRoleService;
     @Mock private EmployeeService employeeService;
     @Mock private AuditLogService auditLogService;
+    @Mock private com.sonixhr.service.platform.FeatureAccessService featureAccessService;
 
     private TenantRoleService roleService;
 
@@ -43,7 +44,8 @@ public class TenantRoleServiceTest {
                 employeeRepository,
                 dynamicRoleService,
                 employeeService,
-                auditLogService
+                auditLogService,
+                featureAccessService
         );
     }
 

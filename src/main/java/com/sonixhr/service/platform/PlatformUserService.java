@@ -279,6 +279,7 @@ public class PlatformUserService {
         PlatformUser updated = platformUserRepository.save(user);
         // Evict new email key too (it may have been cached from a prior lookup)
         platformUserDetailsService.invalidateCache(updated.getEmail());
+        platformUserCacheEvictionService.evictByEmailCache(updated.getEmail());
         return toResponse(updated);
     }
 

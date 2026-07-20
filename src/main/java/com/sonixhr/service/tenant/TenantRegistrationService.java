@@ -62,6 +62,7 @@ public class TenantRegistrationService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final TenantLeaveSettingsRepository tenantLeaveSettingsRepository;
     private final TenantRLSService tenantRLSService;
+    private final SubscriptionEventLogService subscriptionEventLogService;
 
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
@@ -317,7 +318,8 @@ public class TenantRegistrationService {
                 "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
                 "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN", "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
                 "ATTENDANCE_VIEW_TEAM", "DEPARTMENT_VIEW", "REPORT_VIEW_DEPARTMENT",
-                "TASK_CREATE", "TASK_VIEW_ALL", "TASK_VIEW_TEAM", "TASK_VIEW_OWN", "TASK_EDIT", "TASK_ACKNOWLEDGE", "TASK_UPDATE_STATUS");
+                "TASK_CREATE", "TASK_VIEW_ALL", "TASK_VIEW_TEAM", "TASK_VIEW_OWN", "TASK_EDIT", "TASK_ACKNOWLEDGE",
+                "TASK_UPDATE_STATUS");
         Set<TenantPermission> managerPermissions = allPermissions.stream()
                 .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
                 .collect(java.util.stream.Collectors.toSet());
@@ -414,14 +416,24 @@ public class TenantRegistrationService {
                 .planName(plan.getName())
                 .planStatus(initialPlanStatus)
                 .startedAt(startedAt)
-                .endsAt(endsAt)
                 .billingPeriodStart(startedAt)
                 .billingPeriodEnd(endsAt)
                 .amount(plan.getPrice())
                 .currency("INR")
                 .isActive(true)
                 .build();
-        subscriptionRepository.save(subscription);
+        TenantSubscription saved = subscriptionRepository.save(subscription);
+
+        // Record audit event
+        subscriptionEventLogService.recordEvent(
+                tenant,
+                saved,
+                null,
+                initialPlanStatus.name(),
+                com.sonixhr.enums.TriggerSource.SYSTEM,
+                null,
+                "Initial subscription created on onboarding"
+        );
     }
 
     // =====================================================

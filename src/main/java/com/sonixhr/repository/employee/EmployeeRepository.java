@@ -162,6 +162,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.isActive = true")
     long countByIsActiveTrue();
 
+    @Query("SELECT e FROM Employee e WHERE e.isActive = true AND e.lastWorkingDate IS NOT NULL AND e.lastWorkingDate < :today")
+    List<Employee> findActiveEmployeesWithExpiredLastWorkingDate(@Param("today") LocalDate today);
+
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.status IN :statuses")
     long countByTenantIdAndStatuses(@Param("tenantId") Long tenantId,
                                     @Param("statuses") Set<EmployeeStatus> statuses);
@@ -498,4 +501,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                                  @Param("query") String query,
                                                  Pageable pageable);
 
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = 'INVITED' ORDER BY e.createdAt ASC")
+    List<Employee> findPendingInvitedEmployeesOrderByCreatedAt(@Param("tenantId") Long tenantId);
 }

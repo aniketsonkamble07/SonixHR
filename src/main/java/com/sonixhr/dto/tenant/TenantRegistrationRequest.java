@@ -22,7 +22,6 @@ public class TenantRegistrationRequest {
     @Size(min = 2, max = 200, message = "Company name must be between 2 and 200 characters")
     private String companyName;
 
-
     @NotBlank(message = "Admin email is required")
     @Email(message = "Invalid email format")
     private String adminEmail;

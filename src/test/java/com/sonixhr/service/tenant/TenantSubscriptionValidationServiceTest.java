@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 public class TenantSubscriptionValidationServiceTest {
 
     @Mock private TenantRepository tenantRepository;
+    @Mock private com.sonixhr.service.platform.FeatureAccessService featureAccessService;
 
     private TenantSubscriptionValidationService validationService;
 
@@ -32,8 +33,10 @@ public class TenantSubscriptionValidationServiceTest {
     public void setUp() {
         MockitoAnnotations.openMocks(this);
         validationService = new TenantSubscriptionValidationService(
-                tenantRepository
+                tenantRepository,
+                featureAccessService
         );
+        lenient().when(featureAccessService.hasFeature(any(), any())).thenReturn(true);
     }
 
     @Test
@@ -153,7 +156,7 @@ public class TenantSubscriptionValidationServiceTest {
         BusinessException exception1 = assertThrows(BusinessException.class, () -> {
             validationService.validateSubscription(tenantId, "/api/webhooks/trigger", "POST", authorities, null);
         });
-        assertTrue(exception1.getMessage().contains("API access and webhooks are blocked"));
+        assertTrue(exception1.getMessage().contains("Webhook access is blocked"));
 
         // Request with X-API-Key header should be blocked
         jakarta.servlet.http.HttpServletRequest mockRequest = mock(jakarta.servlet.http.HttpServletRequest.class);
@@ -162,7 +165,7 @@ public class TenantSubscriptionValidationServiceTest {
         BusinessException exception2 = assertThrows(BusinessException.class, () -> {
             validationService.validateSubscription(tenantId, "/api/tenant/subscriptions/current", "GET", authorities, mockRequest);
         });
-        assertTrue(exception2.getMessage().contains("API access and webhooks are blocked"));
+        assertTrue(exception2.getMessage().contains("API access is blocked"));
     }
 
     @Test
@@ -241,5 +244,115 @@ public class TenantSubscriptionValidationServiceTest {
             validationService.validateSubscription(tenantId, "/api/tenant/subscriptions/current", "GET", authorities, null);
         });
         assertTrue(exception.getMessage().contains("workspace is marked for deletion"));
+    }
+
+    @Test
+    public void testValidateSubscription_ApiAccess_FeatureBlocked() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setActive(true);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(LocalDateTime.now().plusDays(10));
+        tenant.setDataStatus(TenantDataStatus.RETAINED);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(featureAccessService.hasFeature(tenantId, "API_ACCESS")).thenReturn(false);
+
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            validationService.validateSubscription(tenantId, "/api/public/some-endpoint", "GET", authorities, null);
+        });
+        assertTrue(exception.getMessage().contains("API access is not enabled"));
+    }
+
+    @Test
+    public void testValidateSubscription_WebhookAccess_FeatureBlocked() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setActive(true);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(LocalDateTime.now().plusDays(10));
+        tenant.setDataStatus(TenantDataStatus.RETAINED);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(featureAccessService.hasFeature(tenantId, "WEBHOOK_ACCESS")).thenReturn(false);
+
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            validationService.validateSubscription(tenantId, "/api/webhooks/trigger", "POST", authorities, null);
+        });
+        assertTrue(exception.getMessage().contains("Webhook access is not enabled"));
+    }
+
+    @Test
+    public void testValidateSubscription_Payroll_FeatureBlocked() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setActive(true);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(LocalDateTime.now().plusDays(10));
+        tenant.setDataStatus(TenantDataStatus.RETAINED);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(featureAccessService.hasFeature(tenantId, "PAYROLL")).thenReturn(false);
+
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            validationService.validateSubscription(tenantId, "/api/payroll/payruns", "POST", authorities, null);
+        });
+        assertTrue(exception.getMessage().contains("Payroll feature is not enabled"));
+    }
+
+    @Test
+    public void testValidateSubscription_Leave_FeatureBlocked() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setActive(true);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(LocalDateTime.now().plusDays(10));
+        tenant.setDataStatus(TenantDataStatus.RETAINED);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(featureAccessService.hasFeature(tenantId, "LEAVE_MANAGEMENT")).thenReturn(false);
+
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            validationService.validateSubscription(tenantId, "/api/employees/leaves/settings", "GET", authorities, null);
+        });
+        assertTrue(exception.getMessage().contains("Leave Management feature is not enabled"));
+    }
+
+    @Test
+    public void testValidateSubscription_Attendance_FeatureBlocked() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setActive(true);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+        tenant.setEndsAt(LocalDateTime.now().plusDays(10));
+        tenant.setDataStatus(TenantDataStatus.RETAINED);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(featureAccessService.hasFeature(tenantId, "ATTENDANCE")).thenReturn(false);
+
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            validationService.validateSubscription(tenantId, "/api/attendance/checkin", "POST", authorities, null);
+        });
+        assertTrue(exception.getMessage().contains("Attendance tracking feature is not enabled"));
     }
 }

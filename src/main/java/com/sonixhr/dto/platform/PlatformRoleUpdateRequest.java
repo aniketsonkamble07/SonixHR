@@ -23,4 +23,6 @@ public class PlatformRoleUpdateRequest {
     private String description;
 
     private Set<Long> permissionIds;
+
+    private Boolean active;
 }

@@ -46,6 +46,7 @@ public class TenantRoleService {
     private final TenantDynamicRoleService dynamicRoleService;
     private final EmployeeService employeeService;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
+    private final com.sonixhr.service.platform.FeatureAccessService featureAccessService;
 
     @Value("${app.tenant.role.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -72,6 +73,10 @@ public class TenantRoleService {
     public TenantRoleResponse createRole(TenantRoleCreateRequest request, Long tenantId, Long createdBy) {
         long startTime = System.nanoTime();
         log.info("Creating tenant role: {} for tenant: {}", request.getName(), tenantId);
+
+        if (!featureAccessService.hasFeature(tenantId, "CUSTOM_ROLES")) {
+            throw new BusinessException("Custom role creation is not enabled for your subscription plan. Please upgrade your plan.");
+        }
 
         if (roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
             throw new ValidationException("name", "Role name already exists for this tenant");

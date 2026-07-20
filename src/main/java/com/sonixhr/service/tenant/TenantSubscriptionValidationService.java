@@ -25,6 +25,7 @@ import java.time.ZoneId;
 public class TenantSubscriptionValidationService {
 
     private final TenantRepository tenantRepository;
+    private final com.sonixhr.service.platform.FeatureAccessService featureAccessService;
 
     @Cacheable(value = "tenantDetails", key = "#tenantId", unless = "#result == null")
     public CachedTenantDetails getTenantDetails(Long tenantId) {
@@ -35,7 +36,7 @@ public class TenantSubscriptionValidationService {
                         .isActive(tenant.getIsActive())
                         .status(tenant.getStatus())
                         .planStatus(tenant.getPlanStatus())
-                        .endsAt(tenant.getEndsAt())
+                        .billingPeriodEnd(tenant.getEndsAt())
                         .dataStatus(tenant.getDataStatus())
                         .build())
                 .orElse(null);
@@ -54,11 +55,13 @@ public class TenantSubscriptionValidationService {
         validateSubscription(tenantId, null, "GET", null, null);
     }
 
-    public void validateSubscription(Long tenantId, String requestPath, Collection<? extends GrantedAuthority> authorities) {
+    public void validateSubscription(Long tenantId, String requestPath,
+            Collection<? extends GrantedAuthority> authorities) {
         validateSubscription(tenantId, requestPath, "GET", authorities, null);
     }
 
-    public void validateSubscription(Long tenantId, String requestPath, String method, Collection<? extends GrantedAuthority> authorities, jakarta.servlet.http.HttpServletRequest request) {
+    public void validateSubscription(Long tenantId, String requestPath, String method,
+            Collection<? extends GrantedAuthority> authorities, jakarta.servlet.http.HttpServletRequest request) {
         if (tenantId == null) {
             return;
         }
@@ -74,8 +77,9 @@ public class TenantSubscriptionValidationService {
                 .anyMatch(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
                         || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())));
 
-        // If a Company Admin attempts to access a self-serve renewal/billing path, do not block on suspended/inactive status
-        boolean isSelfServeRenewalAttempt = isAllowedGrace && isAdmin && 
+        // If a Company Admin attempts to access a self-serve renewal/billing path, do
+        // not block on suspended/inactive status
+        boolean isSelfServeRenewalAttempt = isAllowedGrace && isAdmin &&
                 (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE) &&
                 (details.getDataStatus() == null || details.getDataStatus() == TenantDataStatus.RETAINED);
 
@@ -86,10 +90,12 @@ public class TenantSubscriptionValidationService {
         // Check plan status
         if (details.getPlanStatus() == PlanStatus.EXPIRED) {
             if (details.getDataStatus() == TenantDataStatus.ARCHIVED) {
-                throw new BusinessException("Subscription has expired and the workspace is archived. Please contact support to restore and renew.");
+                throw new BusinessException(
+                        "Subscription has expired and the workspace is archived. Please contact support to restore and renew.");
             }
             if (details.getDataStatus() == TenantDataStatus.ELIGIBLE_FOR_DELETION) {
-                throw new BusinessException("Subscription has expired and the workspace is marked for deletion. Please contact support.");
+                throw new BusinessException(
+                        "Subscription has expired and the workspace is marked for deletion. Please contact support.");
             }
             // EXPIRED stage (Day 0-30): RETAINED data status
             if (!isSelfServeRenewalAttempt) {
@@ -102,13 +108,13 @@ public class TenantSubscriptionValidationService {
         }
 
         if (details.getPlanStatus() == PlanStatus.CANCELLED) {
-            if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
+            if (details.getBillingPeriodEnd() != null && details.getBillingPeriodEnd().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
                 throw new BusinessException("Subscription has expired. Please log in and renew online.");
             }
         }
 
         // Real-time expiration check
-        if (details.getEndsAt() != null && details.getEndsAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
+        if (details.getBillingPeriodEnd() != null && details.getBillingPeriodEnd().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
             if (details.getPlanStatus() != PlanStatus.PAST_DUE && details.getPlanStatus() != PlanStatus.EXPIRED) {
                 throw new BusinessException("Subscription has expired. Please log in and renew online.");
             }
@@ -123,51 +129,99 @@ public class TenantSubscriptionValidationService {
             }
         }
 
+        // Enforce plan-level Webhook access restrictions
+        if (isWebhookRequest(request, requestPath)) {
+            if (!featureAccessService.hasFeature(tenantId, "WEBHOOK_ACCESS")) {
+                throw new BusinessException("Webhook access is not enabled for your subscription plan. Please upgrade your plan.");
+            }
+            if (details.getPlanStatus() == PlanStatus.PAST_DUE) {
+                throw new BusinessException("Webhook access is blocked during the grace period.");
+            }
+        }
+
+        // Enforce plan-level API access restrictions
+        if (isApiRequest(request, requestPath)) {
+            if (!featureAccessService.hasFeature(tenantId, "API_ACCESS")) {
+                throw new BusinessException("API access is not enabled for your subscription plan. Please upgrade your plan.");
+            }
+            if (details.getPlanStatus() == PlanStatus.PAST_DUE) {
+                throw new BusinessException("API access is blocked during the grace period.");
+            }
+        }
+
+        // Enforce plan-level module feature access restrictions
+        if (requestPath != null) {
+            String lowerPath = requestPath.toLowerCase();
+            
+            // 1. Payroll feature check
+            if (lowerPath.startsWith("/api/payroll")) {
+                if (!featureAccessService.hasFeature(tenantId, "PAYROLL")) {
+                    throw new BusinessException("Payroll feature is not enabled for your subscription plan. Please upgrade your plan.");
+                }
+            }
+            
+            // 2. Leave Management feature check
+            if (lowerPath.contains("/leaves") || lowerPath.contains("/leave")) {
+                if (!featureAccessService.hasFeature(tenantId, "LEAVE_MANAGEMENT")) {
+                    throw new BusinessException("Leave Management feature is not enabled for your subscription plan. Please upgrade your plan.");
+                }
+            }
+            
+            // 3. Attendance feature check
+            if (lowerPath.startsWith("/api/attendance") || lowerPath.startsWith("/api/shifts")) {
+                if (!featureAccessService.hasFeature(tenantId, "ATTENDANCE")) {
+                    throw new BusinessException("Attendance tracking feature is not enabled for your subscription plan. Please upgrade your plan.");
+                }
+            }
+        }
+
         // Check grace period PAST_DUE restrictions
         if (details.getPlanStatus() == PlanStatus.PAST_DUE) {
-            // Block API access and webhooks
-            if (isApiOrWebhook(request, requestPath)) {
-                throw new BusinessException("API access and webhooks are blocked during the grace period.");
-            }
 
             if (authorities != null && requestPath != null && method != null) {
                 if (isAdmin) {
-                    // Allow Company Admin to access Billing, Renewal, Invoices, Data Export, and Contact Support only
+                    // Allow Company Admin to access Billing, Renewal, Invoices, Data Export, and
+                    // Contact Support only
                     if (!isAllowedGrace) {
-                        throw new BusinessException("Company Admin can only access Billing, Renewal, Invoices, Data Export, and Contact Support pages during the grace period.");
+                        throw new BusinessException(
+                                "Company Admin can only access Billing, Renewal, Invoices, Data Export, and Contact Support pages during the grace period.");
                     }
                 } else {
                     // Make the workspace read-only (no create, update, or delete operations)
                     if (!"GET".equalsIgnoreCase(method)) {
-                        throw new BusinessException("The workspace is read-only during the grace period. Create, update, and delete operations are blocked.");
+                        throw new BusinessException(
+                                "The workspace is read-only during the grace period. Create, update, and delete operations are blocked.");
                     }
                 }
             }
         }
     }
 
-    private boolean isApiOrWebhook(jakarta.servlet.http.HttpServletRequest request, String path) {
+    private boolean isWebhookRequest(jakarta.servlet.http.HttpServletRequest request, String path) {
+        if (path != null && path.toLowerCase().contains("webhook")) {
+            return true;
+        }
+        if (request != null) {
+            return request.getHeader("X-Webhook-Signature") != null ||
+                   request.getHeader("X-Webhook-Event") != null ||
+                   request.getHeader("X-Webhook-Token") != null;
+        }
+        return false;
+    }
+
+    private boolean isApiRequest(jakarta.servlet.http.HttpServletRequest request, String path) {
         if (path != null) {
-            String lowerPath = path.toLowerCase();
-            if (lowerPath.contains("webhook")) {
-                return true;
-            }
-            if (path.startsWith("/api/public/") && 
-                !path.startsWith("/api/public/register") && 
-                !path.startsWith("/api/public/set-password") && 
-                !path.startsWith("/api/public/check-email")) {
+            if (path.startsWith("/api/public/") &&
+                    !path.startsWith("/api/public/register") &&
+                    !path.startsWith("/api/public/set-password") &&
+                    !path.startsWith("/api/public/check-email")) {
                 return true;
             }
         }
         if (request != null) {
-            if (request.getHeader("X-API-Key") != null || 
-                request.getHeader("X-Api-Key") != null || 
-                request.getHeader("api-key") != null ||
-                request.getHeader("X-Webhook-Signature") != null ||
-                request.getHeader("X-Webhook-Event") != null ||
-                request.getHeader("X-Webhook-Token") != null) {
-                return true;
-            }
+            return request.getHeader("X-API-Key") != null ||
+                   request.getHeader("X-Api-Key") != null ||
+                   request.getHeader("api-key") != null;
         }
         return false;
     }
@@ -185,6 +239,5 @@ public class TenantSubscriptionValidationService {
                 path.equals("/api/tenants/current/subscription") ||
                 path.equals("/api/tenants/my-tenant");
     }
-
 
 }

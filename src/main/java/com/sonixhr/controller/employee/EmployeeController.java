@@ -556,4 +556,16 @@ public class EmployeeController {
         List<EmployeeSummaryResponse> employees = employeeService.getEmployeesWithNoManager(tenantId);
         return ResponseEntity.ok(employees);
     }
+
+    @PostMapping("/process-offboarding")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT')")
+    @Operation(summary = "Process offboarded employees manually",
+            description = "Deactivates all employees whose notice periods or last working dates have passed")
+    public ResponseEntity<Void> processOffboarding(
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to process offboarded employees for tenant: {}", tenantId);
+        employeeService.processOffboardedEmployees(tenantId);
+        return ResponseEntity.ok().build();
+    }
 }

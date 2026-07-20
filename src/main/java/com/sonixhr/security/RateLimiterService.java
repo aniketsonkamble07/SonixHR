@@ -49,7 +49,7 @@ public class RateLimiterService {
     // Set to false if you prefer to reject requests when Redis is unavailable.
     private static final boolean FAIL_OPEN = true;
 
-    @Value("${app.rate-limiting.enabled:true}")
+    @Value("${app.rate-limit.enabled:true}")
     private boolean rateLimitingEnabled;
 
     @Value("${app.rate-limiting.test-mode:false}")

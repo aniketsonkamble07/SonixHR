@@ -64,7 +64,7 @@ public class PlatformSubscriptionService {
                     })
                     .filter(sub -> {
                         LocalDateTime start = sub.getStartedAt() != null ? sub.getStartedAt() : sub.getCreatedAt();
-                        LocalDateTime end = sub.getEndsAt();
+                        LocalDateTime end = sub.getBillingPeriodEnd();
                         if (start == null)
                             return false;
                         boolean startedBeforeOrDuring = !start.isAfter(monthEnd);
@@ -94,7 +94,7 @@ public class PlatformSubscriptionService {
             long activeCount = allSubs.stream()
                     .filter(sub -> {
                         LocalDateTime start = sub.getStartedAt() != null ? sub.getStartedAt() : sub.getCreatedAt();
-                        LocalDateTime end = sub.getEndsAt();
+                        LocalDateTime end = sub.getBillingPeriodEnd();
                         if (start == null)
                             return false;
                         boolean startedBeforeOrDuring = !start.isAfter(monthEnd);

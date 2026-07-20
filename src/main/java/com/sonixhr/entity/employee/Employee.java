@@ -8,6 +8,7 @@ import com.sonixhr.entity.attendance.ShiftConfiguration;
 import com.sonixhr.enums.*;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
+import com.sonixhr.enums.employee.ResignationStatus;
 import com.sonixhr.enums.leave.WeekendConfig;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -202,6 +203,23 @@ public class Employee implements UserDetails {
     @Column(name = "last_working_date")
     private LocalDate lastWorkingDate;
 
+    @Column(name = "resignation_reason", length = 1000)
+    private String resignationReason;
+
+    @Column(name = "is_resignation_accepted", nullable = false)
+    @Builder.Default
+    private boolean isResignationAccepted = false;
+
+    @Column(name = "proposed_last_working_date")
+    private LocalDate proposedLastWorkingDate;
+
+    @Column(name = "approved_last_working_date")
+    private LocalDate approvedLastWorkingDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resignation_status", length = 50)
+    private ResignationStatus resignationStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default
@@ -363,7 +381,13 @@ public class Employee implements UserDetails {
         if (tenantId != null) {
             return tenantId;
         }
-        return tenant != null ? tenant.getId() : null;
+        if (tenant == null) {
+            return null;
+        }
+        if (tenant instanceof org.hibernate.proxy.HibernateProxy proxy) {
+            return (Long) proxy.getHibernateLazyInitializer().getIdentifier();
+        }
+        return tenant.getId();
     }
 
     public int getTenureInMonths() {
@@ -500,10 +524,55 @@ public class Employee implements UserDetails {
         if (resignationDate == null || lastWorkingDate == null) {
             throw new IllegalArgumentException("Resignation date and last working date are required");
         }
-        this.isActive = false;
+        this.isActive = !lastWorkingDate.isBefore(LocalDate.now());
         this.status = EmployeeStatus.RESIGNED;
         this.resignationDate = resignationDate;
         this.lastWorkingDate = lastWorkingDate;
+    }
+
+    public void submitResignation(String reason, LocalDate proposedLWD) {
+        if (this.status != EmployeeStatus.ACTIVE && this.status != EmployeeStatus.PROBATION && this.status != EmployeeStatus.ON_LEAVE) {
+            throw new IllegalStateException("Employee is not in an active status to resign");
+        }
+        this.status = EmployeeStatus.RESIGNED;
+        this.resignationStatus = ResignationStatus.SUBMITTED;
+        this.resignationReason = reason;
+        this.resignationDate = LocalDate.now();
+        this.proposedLastWorkingDate = proposedLWD;
+        this.isResignationAccepted = false;
+    }
+
+    public void acceptResignation(LocalDate approvedLWD) {
+        if (this.resignationStatus != ResignationStatus.SUBMITTED) {
+            throw new IllegalStateException("Resignation has not been submitted");
+        }
+        this.resignationStatus = ResignationStatus.APPROVED;
+        this.isResignationAccepted = true;
+        this.approvedLastWorkingDate = approvedLWD;
+        this.lastWorkingDate = approvedLWD;
+        this.isActive = !approvedLWD.isBefore(LocalDate.now());
+    }
+
+    public void rejectOrWithdrawResignation(ResignationStatus newStatus) {
+        if (newStatus != ResignationStatus.REJECTED && newStatus != ResignationStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("Invalid status for rejection or withdrawal");
+        }
+        if (this.resignationStatus != ResignationStatus.SUBMITTED && this.resignationStatus != ResignationStatus.APPROVED) {
+            throw new IllegalStateException("No active resignation to reject or withdraw");
+        }
+        this.status = EmployeeStatus.ACTIVE;
+        this.resignationStatus = newStatus;
+        this.isResignationAccepted = false;
+        this.resignationReason = null;
+        this.resignationDate = null;
+        this.proposedLastWorkingDate = null;
+        this.approvedLastWorkingDate = null;
+        this.lastWorkingDate = null;
+    }
+
+    public void releaseEmployee() {
+        this.isActive = false;
+        this.lastWorkingDate = LocalDate.now();
     }
 
     public void terminate() {
@@ -609,7 +678,7 @@ public class Employee implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive && status == EmployeeStatus.ACTIVE;
+        return isActive && (status == EmployeeStatus.ACTIVE || status == EmployeeStatus.PROBATION || status == EmployeeStatus.ON_LEAVE || status == EmployeeStatus.INVITED || status == EmployeeStatus.RESIGNED);
     }
 
     // =====================================================

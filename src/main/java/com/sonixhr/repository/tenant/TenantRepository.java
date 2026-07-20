@@ -136,4 +136,9 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
                 @Param("dataStatus") TenantDataStatus dataStatus,
                 @Param("dateTime") LocalDateTime dateTime,
                 Pageable pageable);
+
+        @Query("SELECT t FROM Tenant t WHERE t.dataStatus = :dataStatus AND t.legalHold = false")
+        Page<Tenant> findTenantsEligibleForPurge(
+                @Param("dataStatus") TenantDataStatus dataStatus,
+                Pageable pageable);
 }

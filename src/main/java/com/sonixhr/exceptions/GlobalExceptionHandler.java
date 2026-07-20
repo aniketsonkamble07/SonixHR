@@ -175,7 +175,7 @@ public class GlobalExceptionHandler {
             } else if (errorMsg.contains("uk_tenant_code")) {
                 errors.put("companyName", "This company name / tenant code already exists");
                 message = "Validation failed: Company name already registered";
-            } else if (errorMsg.contains("email") || errorMsg.contains("uk_employees_email") || errorMsg.contains("uk_employee_email") || errorMsg.contains("uk_platform_user_email")) {
+            } else if (errorMsg.contains("uk_employee_email_tenant") || errorMsg.contains("uk_employees_email") || errorMsg.contains("uk_employee_email") || errorMsg.contains("uk_platform_user_email")) {
                 errors.put("email", "This email address is already registered");
                 errors.put("adminEmail", "This email address is already registered");
                 message = "Validation failed: Email already registered";

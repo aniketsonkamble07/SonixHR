@@ -211,7 +211,8 @@ public interface TenantRoleRepository extends JpaRepository<TenantRole, Long> {
     @Query("SELECT r FROM TenantRole r WHERE r.tenantId = :tenantId AND r.active = true")
     List<TenantRole> findByTenantIdAndActiveTrue(@Param("tenantId") Long tenantId);
 
-
+    @Query("SELECT DISTINCT r FROM TenantRole r LEFT JOIN FETCH r.permissions WHERE r.tenantId IN :tenantIds")
+    List<TenantRole> findAllByTenantIdInWithPermissions(@Param("tenantIds") List<Long> tenantIds);
 
     @Query("SELECT COUNT(r) FROM TenantRole r WHERE r.tenantId = :tenantId AND r.active = true")
     long countByTenantIdAndActiveTrue(@Param("tenantId") Long tenantId);

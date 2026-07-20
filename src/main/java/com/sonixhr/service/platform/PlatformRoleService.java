@@ -143,7 +143,10 @@ public class PlatformRoleService {
             changed = true;
         }
 
-
+        if (request.getActive() != null && request.getActive() != role.isActive()) {
+            role.setActive(request.getActive());
+            changed = true;
+        }
 
         if (request.getPermissionIds() != null) {
             Set<PlatformPermission> permissions = fetchPermissions(request.getPermissionIds());

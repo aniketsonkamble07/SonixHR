@@ -29,6 +29,7 @@ public class SubscriptionSchedulerServiceTest {
     @Mock private EmailService emailService;
     @Mock private com.sonixhr.repository.tenant.TenantSubscriptionRepository subscriptionRepository;
     @Mock private PlatformTenantService platformTenantService;
+    @Mock private com.sonixhr.service.tenant.SubscriptionEventLogService eventLogService;
 
     private SubscriptionSchedulerService schedulerService;
 
@@ -40,7 +41,8 @@ public class SubscriptionSchedulerServiceTest {
                 subscriptionService,
                 emailService,
                 tenantRepository,
-                platformTenantService
+                platformTenantService,
+                eventLogService
         );
         ReflectionTestUtils.setField(schedulerService, "batchSize", 100);
     }

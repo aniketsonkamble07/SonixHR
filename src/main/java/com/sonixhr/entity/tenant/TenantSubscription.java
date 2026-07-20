@@ -17,19 +17,18 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tenant_subscriptions", 
-       indexes = {
-           @Index(name = "idx_subscriptions_tenant_id", columnList = "tenant_id"),
-           @Index(name = "idx_subscriptions_plan_id", columnList = "subscription_plan_id"),
-           @Index(name = "idx_subscriptions_status", columnList = "plan_status"),
-           @Index(name = "idx_subscriptions_is_active", columnList = "is_active"),
-           @Index(name = "idx_subscriptions_ends_at", columnList = "ends_at"),
-           @Index(name = "idx_subscriptions_tenant_status", columnList = "tenant_id, plan_status"),
-           @Index(name = "idx_sub_billing_period_end", columnList = "billing_period_end"),
-           @Index(name = "idx_sub_is_current", columnList = "is_current"),
-           @Index(name = "idx_sub_status_period_end", columnList = "plan_status, billing_period_end"),
-           @Index(name = "idx_sub_original_id", columnList = "original_subscription_id")
-       })
+@Table(name = "tenant_subscriptions", indexes = {
+        @Index(name = "idx_subscriptions_tenant_id", columnList = "tenant_id"),
+        @Index(name = "idx_subscriptions_plan_id", columnList = "subscription_plan_id"),
+        @Index(name = "idx_subscriptions_status", columnList = "plan_status"),
+        @Index(name = "idx_subscriptions_is_active", columnList = "is_active"),
+        @Index(name = "idx_subscriptions_ends_at", columnList = "ends_at"),
+        @Index(name = "idx_subscriptions_tenant_status", columnList = "tenant_id, plan_status"),
+        @Index(name = "idx_sub_billing_period_end", columnList = "billing_period_end"),
+        @Index(name = "idx_sub_is_current", columnList = "is_current"),
+        @Index(name = "idx_sub_status_period_end", columnList = "plan_status, billing_period_end"),
+        @Index(name = "idx_sub_original_id", columnList = "original_subscription_id")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -54,8 +53,7 @@ public class TenantSubscription {
 
     @NotNull(message = "Subscription plan cannot be null")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subscription_plan_id", nullable = false, 
-                foreignKey = @ForeignKey(name = "fk_subscription_plan"))
+    @JoinColumn(name = "subscription_plan_id", nullable = false, foreignKey = @ForeignKey(name = "fk_subscription_plan"))
     private SubscriptionPlan subscriptionPlan;
 
     // =====================================================
@@ -71,6 +69,9 @@ public class TenantSubscription {
     @Column(name = "plan_status", nullable = false, length = 20)
     @Builder.Default
     private PlanStatus planStatus = PlanStatus.ACTIVE;
+
+    @Column(name = "max_employees")
+    private Integer maxEmployees;
 
     // =====================================================
     // SUBSCRIPTION DATES
@@ -224,19 +225,20 @@ public class TenantSubscription {
     }
 
     public boolean isActiveSubscription() {
-        return Boolean.TRUE.equals(isActive) && 
-               planStatus == PlanStatus.ACTIVE && 
-               !isExpired();
+        return Boolean.TRUE.equals(isActive) &&
+                planStatus == PlanStatus.ACTIVE &&
+                !isExpired();
     }
 
     public boolean isAboutToExpire(int days) {
-        return billingPeriodEnd != null && 
-               billingPeriodEnd.isBefore(LocalDateTime.now().plusDays(days)) && 
-               billingPeriodEnd.isAfter(LocalDateTime.now());
+        return billingPeriodEnd != null &&
+                billingPeriodEnd.isBefore(LocalDateTime.now().plusDays(days)) &&
+                billingPeriodEnd.isAfter(LocalDateTime.now());
     }
 
     public long getDaysUntilExpiry() {
-        if (billingPeriodEnd == null) return 0;
+        if (billingPeriodEnd == null)
+            return 0;
         return java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), billingPeriodEnd);
     }
 
@@ -250,8 +252,10 @@ public class TenantSubscription {
         this.startedAt = LocalDateTime.now();
         this.billingPeriodStart = this.startedAt;
         if (this.subscriptionPlan != null) {
-            int validity = (this.subscriptionPlan.getValidityMonths() != null && this.subscriptionPlan.getValidityMonths() > 0)
-                    ? this.subscriptionPlan.getValidityMonths() : 1;
+            int validity = (this.subscriptionPlan.getValidityMonths() != null
+                    && this.subscriptionPlan.getValidityMonths() > 0)
+                            ? this.subscriptionPlan.getValidityMonths()
+                            : 1;
             this.billingPeriodEnd = this.startedAt.plusMonths(validity);
             this.endsAt = this.billingPeriodEnd;
             this.amount = this.subscriptionPlan.getPrice();
@@ -288,13 +292,15 @@ public class TenantSubscription {
         if (this.subscriptionPlan != null && newPlan.getId().equals(this.subscriptionPlan.getId())) {
             return; // Same plan, no change needed
         }
-        
+
         this.subscriptionPlan = newPlan;
         this.planName = newPlan.getName();
         this.amount = newPlan.getPrice();
         this.startedAt = LocalDateTime.now();
         this.billingPeriodStart = this.startedAt;
-        int validity = (newPlan.getValidityMonths() != null && newPlan.getValidityMonths() > 0) ? newPlan.getValidityMonths() : 1;
+        int validity = (newPlan.getValidityMonths() != null && newPlan.getValidityMonths() > 0)
+                ? newPlan.getValidityMonths()
+                : 1;
         this.billingPeriodEnd = this.startedAt.plusMonths(validity);
         this.endsAt = this.billingPeriodEnd;
         this.planStatus = PlanStatus.ACTIVE;
@@ -309,11 +315,13 @@ public class TenantSubscription {
         if (this.subscriptionPlan == null) {
             throw new IllegalStateException("Cannot renew subscription without a plan");
         }
-        
+
         LocalDateTime now = LocalDateTime.now();
-        int months = (this.subscriptionPlan.getValidityMonths() != null && this.subscriptionPlan.getValidityMonths() > 0) 
-            ? this.subscriptionPlan.getValidityMonths() : 1;
-            
+        int months = (this.subscriptionPlan.getValidityMonths() != null
+                && this.subscriptionPlan.getValidityMonths() > 0)
+                        ? this.subscriptionPlan.getValidityMonths()
+                        : 1;
+
         if (this.billingPeriodEnd != null && this.billingPeriodEnd.isAfter(now)) {
             // Subscription still active - preserve remaining time and stack the new period
             this.billingPeriodEnd = this.billingPeriodEnd.plusMonths(months);
@@ -324,7 +332,7 @@ public class TenantSubscription {
             this.billingPeriodEnd = now.plusMonths(months);
         }
         this.endsAt = this.billingPeriodEnd;
-        
+
         this.planStatus = PlanStatus.ACTIVE;
         this.isActive = true;
         this.cancelledAt = null;
@@ -362,7 +370,7 @@ public class TenantSubscription {
         if (billingPeriodStart != null && billingPeriodEnd != null && billingPeriodStart.isAfter(billingPeriodEnd)) {
             throw new IllegalStateException("Start date cannot be after end date");
         }
-        
+
         // Set default values
         if (currency == null) {
             currency = "INR";
@@ -382,7 +390,7 @@ public class TenantSubscription {
         if (cancelledAtEndOfPeriod == null) {
             cancelledAtEndOfPeriod = false;
         }
-        
+
         // Sync dates
         if (billingPeriodEnd != null) {
             this.endsAt = billingPeriodEnd;
@@ -392,12 +400,12 @@ public class TenantSubscription {
         if (billingPeriodStart == null && startedAt != null) {
             this.billingPeriodStart = startedAt;
         }
-        
+
         // Sync amount with plan price if not set
         if (amount == null && subscriptionPlan != null) {
             amount = subscriptionPlan.getPrice();
         }
-        
+
         // Sync plan name with plan if not set
         if (planName == null && subscriptionPlan != null) {
             planName = subscriptionPlan.getName();
@@ -406,7 +414,7 @@ public class TenantSubscription {
 
     @Override
     public String toString() {
-        return String.format("TenantSubscription{id=%d, tenantId=%d, planName='%s', status='%s', active=%s}", 
-            id, tenant != null ? tenant.getId() : null, planName, planStatus, isActive);
+        return String.format("TenantSubscription{id=%d, tenantId=%d, planName='%s', status='%s', active=%s}",
+                id, tenant != null ? tenant.getId() : null, planName, planStatus, isActive);
     }
 }

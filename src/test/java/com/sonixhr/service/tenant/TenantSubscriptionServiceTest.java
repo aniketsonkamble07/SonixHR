@@ -43,6 +43,7 @@ public class TenantSubscriptionServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformUserRepository platformUserRepository;
+    @Mock private com.sonixhr.service.tenant.SubscriptionEventLogService subscriptionEventLogService;
 
     private TenantSubscriptionService subscriptionService;
 
@@ -58,7 +59,8 @@ public class TenantSubscriptionServiceTest {
                 emailService,
                 eventPublisher,
                 auditLogService,
-                platformUserRepository
+                platformUserRepository,
+                subscriptionEventLogService
         );
     }
 
@@ -247,11 +249,77 @@ public class TenantSubscriptionServiceTest {
         TenantSubscriptionResponseDTO result = subscriptionService.cancelSubscription(tenantId);
         
         assertNotNull(result);
-        assertEquals(PlanStatus.TERMINATED, result.getPlanStatus());
+        assertEquals(PlanStatus.CANCELLED, result.getPlanStatus());
         assertEquals(UserStatus.INACTIVE, tenant.getStatus());
         assertFalse(tenant.getIsActive());
+        assertEquals(PlanStatus.EXPIRED, tenant.getPlanStatus());
         
         verify(subscriptionRepository, times(1)).save(sub);
         verify(tenantRepository, times(1)).save(tenant);
+        verify(subscriptionEventLogService, times(1)).recordEvent(
+                eq(tenant), eq(sub), eq("ACTIVE"), eq("CANCELLED"), any(), any(), anyString()
+        );
+    }
+
+    @Test
+    public void testActivateSubscription_AuditEventsAndUpgrade() {
+        Long tenantId = 1L;
+        Long planId = 2L;
+
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setStatus(UserStatus.ACTIVE);
+        tenant.setActive(true);
+
+        SubscriptionPlan plan = new SubscriptionPlan();
+        plan.setId(planId);
+        plan.setName("Gold Plan");
+        plan.setPrice(BigDecimal.valueOf(99));
+        plan.setValidityMonths(12);
+
+        TenantSubscription currentSub = new TenantSubscription();
+        currentSub.setId(5L);
+        currentSub.setTenant(tenant);
+        currentSub.setStatus(PlanStatus.ACTIVE);
+        currentSub.setIsActive(true);
+        currentSub.setIsCurrent(true);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(subscriptionPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
+        when(subscriptionRepository.findByTenantIdAndIsCurrentTrue(tenantId)).thenReturn(Optional.of(currentSub));
+        when(subscriptionRepository.save(any(TenantSubscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TenantSubscriptionResponseDTO result = subscriptionService.activateSubscription(tenantId, planId);
+
+        assertNotNull(result);
+        // Verify old sub superseded to TERMINATED
+        assertEquals(PlanStatus.TERMINATED, currentSub.getStatus());
+        assertFalse(currentSub.getIsCurrent());
+        assertFalse(currentSub.getIsActive());
+
+        // Verify old sub event logged
+        verify(subscriptionEventLogService, times(1)).recordEvent(
+                eq(tenant), eq(currentSub), eq("ACTIVE"), eq("TERMINATED"), any(), any(), anyString()
+        );
+
+        // Verify new sub event logged
+        verify(subscriptionEventLogService, times(1)).recordEvent(
+                eq(tenant), any(TenantSubscription.class), eq(null), eq("ACTIVE"), any(), any(), anyString()
+        );
+    }
+
+    @Test
+    public void testRenewSubscription_BlockedOnCancelled() {
+        Long subId = 20L;
+        TenantSubscription sub = new TenantSubscription();
+        sub.setId(subId);
+        sub.setStatus(PlanStatus.CANCELLED);
+
+        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(sub));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            subscriptionService.renewSubscription(subId);
+        });
+        assertTrue(exception.getMessage().contains("Cannot renew a cancelled or terminated subscription"));
     }
 }

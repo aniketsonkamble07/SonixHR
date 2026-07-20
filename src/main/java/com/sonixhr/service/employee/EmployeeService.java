@@ -34,6 +34,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import com.sonixhr.events.EmployeeUpdatedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -65,6 +67,7 @@ public class EmployeeService {
     private final ShiftConfigurationRepository shiftConfigurationRepository;
     private final com.sonixhr.service.common.AuditLogService auditLogService;
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -159,7 +162,8 @@ public class EmployeeService {
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Employee created successfully with code: {} and {} roles", employeeCode, roles.size());
 
-        // Generate activation token & send activation email (disabled for development testing)
+        // Generate activation token & send activation email (disabled for development
+        // testing)
 
         if (request.getSalary() != null) {
             java.math.BigDecimal monthlyCtc;
@@ -197,7 +201,7 @@ public class EmployeeService {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean hasEditAuthority = auth != null && auth.getPrincipal() instanceof Employee 
+        boolean hasEditAuthority = auth != null && auth.getPrincipal() instanceof Employee
                 && ((Employee) auth.getPrincipal()).hasPermission("EMPLOYEE_EDIT");
 
         if (!hasEditAuthority) {
@@ -302,7 +306,8 @@ public class EmployeeService {
             employee.setWorkStateText(request.getWorkStateText());
         }
         if (request.getWorkCountry() != null) {
-            employee.setWorkCountry(com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getWorkCountry()));
+            employee.setWorkCountry(
+                    com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getWorkCountry()));
         }
         if (employee.getWorkCountry() != null) {
             if ("IN".equalsIgnoreCase(employee.getWorkCountry())) {
@@ -342,14 +347,16 @@ public class EmployeeService {
 
         if (employee.getWeekendConfig() == WeekendConfig.CUSTOM) {
             if (employee.getCustomWeekendDays() == null || employee.getCustomWeekendDays().trim().isEmpty()) {
-                throw new com.sonixhr.exceptions.ValidationException("customWeekendDays", "Custom weekend days must be specified when weekend config is CUSTOM");
+                throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
+                        "Custom weekend days must be specified when weekend config is CUSTOM");
             }
             String[] days = employee.getCustomWeekendDays().split(",");
             for (String day : days) {
                 try {
                     java.time.DayOfWeek.valueOf(day.trim().toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays", "Invalid custom weekend day name: " + day);
+                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
+                            "Invalid custom weekend day name: " + day);
                 }
             }
         }
@@ -411,6 +418,8 @@ public class EmployeeService {
             }
         }
 
+        eventPublisher
+                .publishEvent(new EmployeeUpdatedEvent(updatedEmployee.getEmail(), updatedEmployee.getId(), "UPDATE"));
         return convertToResponse(updatedEmployee);
     }
 
@@ -651,6 +660,15 @@ public class EmployeeService {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         EmployeeStatus oldStatus = employee.getStatus();
 
+        if ((newStatus == EmployeeStatus.ACTIVE || newStatus == EmployeeStatus.PROBATION) && !employee.isActive()) {
+            Tenant tenant = tenantRepository.findById(tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+            long activeEmployeeCount = employeeRepository.countActiveByTenantId(tenantId);
+            if (tenant.getMaxEmployees() != null && tenant.getMaxEmployees() > 0 && activeEmployeeCount >= tenant.getMaxEmployees()) {
+                throw new BusinessException("Active employee limit of " + tenant.getMaxEmployees() + " reached for your subscription. Please upgrade your plan.");
+            }
+        }
+
         switch (newStatus) {
             case ACTIVE:
                 employee.activate();
@@ -670,8 +688,9 @@ public class EmployeeService {
             default:
                 employee.setStatus(newStatus);
         }
-        employeeRepository.save(employee);
+        Employee saved = employeeRepository.save(employee);
         log.info("Employee status updated from {} to {}", oldStatus, newStatus);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "STATUS_CHANGE"));
     }
 
     // =====================================================
@@ -715,11 +734,11 @@ public class EmployeeService {
         employee.setStatus(EmployeeStatus.TERMINATED);
         employee.setLastWorkingDate(LocalDate.now());
         employee.setActive(false);
-        employeeRepository.save(employee);
+        Employee saved = employeeRepository.save(employee);
 
         Long performedBy = com.sonixhr.security.TenantContext.getCurrentUserId();
         auditLogService.log(
-                employee.getTenant(),
+                saved.getTenant(),
                 "EMPLOYEE_DELETED",
                 "status",
                 oldStatus,
@@ -727,6 +746,7 @@ public class EmployeeService {
                 performedBy,
                 "{\"employeeId\":" + id + "}");
 
+        eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
         log.info("Employee soft deleted successfully: {}", id);
     }
 
@@ -812,7 +832,8 @@ public class EmployeeService {
 
         String workLocation = request.getWorkLocation();
         if (workLocation == null || workLocation.trim().isEmpty()) {
-            workLocation = tenant.getCity() != null && !tenant.getCity().trim().isEmpty() ? tenant.getCity() : "Head Office";
+            workLocation = tenant.getCity() != null && !tenant.getCity().trim().isEmpty() ? tenant.getCity()
+                    : "Head Office";
         }
         WeekendConfig weekendConfig = request.getWeekendConfig();
         String customWeekendDays = request.getCustomWeekendDays();
@@ -820,14 +841,16 @@ public class EmployeeService {
         if (weekendConfig != null) {
             if (weekendConfig == WeekendConfig.CUSTOM) {
                 if (customWeekendDays == null || customWeekendDays.trim().isEmpty()) {
-                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays", "Custom weekend days must be specified when weekend config is CUSTOM");
+                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
+                            "Custom weekend days must be specified when weekend config is CUSTOM");
                 }
                 String[] days = customWeekendDays.split(",");
                 for (String day : days) {
                     try {
                         java.time.DayOfWeek.valueOf(day.trim().toUpperCase());
                     } catch (IllegalArgumentException e) {
-                        throw new com.sonixhr.exceptions.ValidationException("customWeekendDays", "Invalid custom weekend day name: " + day);
+                        throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
+                                "Invalid custom weekend day name: " + day);
                     }
                 }
             } else {
@@ -1374,5 +1397,84 @@ public class EmployeeService {
                     .ifPresent(employee::setShift);
         }
         employeeRepository.save(employee);
+    }
+
+    @Transactional
+    public void processOffboardedEmployees(Long tenantId) {
+        log.info("Processing offboarded employees for tenant: {}", tenantId);
+        LocalDate today = LocalDate.now();
+        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
+        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
+
+        for (Employee employee : offboardedEmployees) {
+            try {
+                employee.setActive(false);
+                Employee saved = employeeRepository.save(employee);
+
+                // Evict cache and publish event for JWT/userDetails deactivation
+                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
+
+                log.info("Manually deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
+                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
+            } catch (Exception e) {
+                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
+            }
+        }
+    }
+
+    @Transactional
+    public void submitResignation(Long id, Long tenantId, String reason, LocalDate proposedLWD) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.submitResignation(reason, proposedLWD);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_SUBMITTED"));
+    }
+
+    @Transactional
+    public void acceptResignation(Long id, Long tenantId, LocalDate approvedLWD) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.acceptResignation(approvedLWD);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_ACCEPTED"));
+    }
+
+    @Transactional
+    public void rejectResignation(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.REJECTED);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_REJECTED"));
+    }
+
+    @Transactional
+    public void withdrawResignation(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.WITHDRAWN);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_WITHDRAWN"));
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 5 1 * * ?")
+    @Transactional
+    public void deactivateOffboardedEmployees() {
+        log.info("Running daily deactivation of offboarded employees");
+        LocalDate today = LocalDate.now();
+        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
+        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
+
+        for (Employee employee : offboardedEmployees) {
+            try {
+                employee.setActive(false);
+                Employee saved = employeeRepository.save(employee);
+
+                // Evict cache and publish event for JWT/userDetails deactivation
+                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
+
+                log.info("Deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
+                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
+            } catch (Exception e) {
+                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
+            }
+        }
     }
 }

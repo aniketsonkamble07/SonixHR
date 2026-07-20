@@ -27,9 +27,6 @@ public class PlatformPermission extends BasePermission {
 
     // This field overrides the permission field from BasePermission
     // But we need to handle it differently
-    @Transient
-    private PlatformPermissionEnum permissionEnum;
-
     @Column(name = "is_active")
     @Builder.Default
     private boolean active = true;
@@ -44,7 +41,6 @@ public class PlatformPermission extends BasePermission {
      * Set permission from enum (stores the enum name as String in the parent class)
      */
     public void setPermissionEnum(PlatformPermissionEnum permissionEnum) {
-        this.permissionEnum = permissionEnum;
         // Store the enum name as String in the parent class
         super.setPermission(permissionEnum != null ? permissionEnum.name() : null);
         super.setDescription(permissionEnum != null ? permissionEnum.getDescription() : null);
@@ -58,14 +54,14 @@ public class PlatformPermission extends BasePermission {
      * Get permission as enum
      */
     public PlatformPermissionEnum getPermissionEnum() {
-        if (permissionEnum == null && super.getPermission() != null) {
+        if (super.getPermission() != null) {
             try {
-                permissionEnum = PlatformPermissionEnum.valueOf(super.getPermission());
+                return PlatformPermissionEnum.valueOf(super.getPermission());
             } catch (IllegalArgumentException e) {
                 // Ignore
             }
         }
-        return permissionEnum;
+        return null;
     }
 
     /**

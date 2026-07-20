@@ -16,15 +16,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "subscription_plans",
-       uniqueConstraints = {
-           @UniqueConstraint(name = "uk_plan_code", columnNames = "code"),
-           @UniqueConstraint(name = "uk_plan_name", columnNames = "name")
-       },
-       indexes = {
-           @Index(name = "idx_plan_is_active", columnList = "is_active"),
-           @Index(name = "idx_plan_price", columnList = "price")
-       })
+@Table(name = "subscription_plans", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_plan_code", columnNames = "code"),
+        @UniqueConstraint(name = "uk_plan_name", columnNames = "name")
+}, indexes = {
+        @Index(name = "idx_plan_is_active", columnList = "is_active"),
+        @Index(name = "idx_plan_price", columnList = "price")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -88,9 +86,6 @@ public class SubscriptionPlan {
     @PositiveOrZero(message = "Max employees must be zero or positive")
     private Integer maxEmployees;
 
-    @Column(name = "features", columnDefinition = "jsonb")
-    private String features; // JSON string for flexible feature management
-
     @Column(name = "is_custom", nullable = false)
     @Builder.Default
     private Boolean isCustom = false;
@@ -135,6 +130,11 @@ public class SubscriptionPlan {
     @Builder.Default
     private Set<TenantSubscription> subscriptions = new HashSet<>();
 
+    @JsonIgnore
+    @OneToMany(mappedBy = "subscriptionPlan", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<PlanFeature> planFeatures = new HashSet<>();
+
     // =====================================================
     // HELPER METHODS
     // =====================================================
@@ -162,11 +162,14 @@ public class SubscriptionPlan {
     }
 
     public boolean hasFeature(String featureKey) {
-        if (this.features == null || this.features.isEmpty() || featureKey == null) {
+        if (featureKey == null || this.planFeatures == null) {
             return false;
         }
-        return this.features.contains("\"" + featureKey + "\":true") ||
-               this.features.contains("\"" + featureKey + "\":\"true\"");
+        return this.planFeatures.stream()
+                .filter(pf -> featureKey.equalsIgnoreCase(pf.getFeatureCode()))
+                .map(PlanFeature::isEnabled)
+                .findFirst()
+                .orElse(false);
     }
 
     @Transient
@@ -215,8 +218,8 @@ public class SubscriptionPlan {
         // Set default code from name if not provided
         if ((this.code == null || this.code.isEmpty()) && this.name != null) {
             this.code = this.name.toUpperCase()
-                                 .replaceAll("[^A-Z0-9]", "_")
-                                 .replaceAll("_+", "_");
+                    .replaceAll("[^A-Z0-9]", "_")
+                    .replaceAll("_+", "_");
         }
     }
 
@@ -226,8 +229,10 @@ public class SubscriptionPlan {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof SubscriptionPlan that)) return false;
+        if (this == o)
+            return true;
+        if (!(o instanceof SubscriptionPlan that))
+            return false;
         return id != null && id.equals(that.id);
     }
 
@@ -239,6 +244,6 @@ public class SubscriptionPlan {
     @Override
     public String toString() {
         return String.format("SubscriptionPlan{id=%d, name='%s', code='%s', price=%s, active=%s}",
-            id, name, code, price, isActive);
+                id, name, code, price, isActive);
     }
 }

@@ -13,6 +13,12 @@ import com.sonixhr.service.common.AuditLogService;
 import com.sonixhr.service.common.CacheEvictionService;
 import com.sonixhr.service.employee.EmployeeDetailsService;
 import com.sonixhr.service.tenant.TenantRegistrationService;
+import com.sonixhr.dto.platform.TenantPlanOverrideDTO;
+import com.sonixhr.dto.platform.PlatformTenantResponseDTO;
+import com.sonixhr.entity.platform.SubscriptionPlan;
+import com.sonixhr.entity.tenant.TenantSubscription;
+import com.sonixhr.enums.PlanStatus;
+import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +58,8 @@ public class PlatformTenantServiceTest {
     private TenantDeletionLogRepository tenantDeletionLogRepository;
     @Mock
     private EntityManager entityManager;
+    @Mock
+    private com.sonixhr.service.tenant.SubscriptionEventLogService subscriptionEventLogService;
 
     private PlatformTenantService platformTenantService;
 
@@ -69,7 +77,8 @@ public class PlatformTenantServiceTest {
                 cacheEvictionService,
                 platformUserRepository,
                 tenantDeletionLogRepository,
-                entityManager);
+                entityManager,
+                subscriptionEventLogService);
     }
 
     @Test
@@ -129,5 +138,49 @@ public class PlatformTenantServiceTest {
 
         // Verify delete called on tenant
         verify(tenantRepository, times(1)).delete(tenant);
+    }
+
+    @Test
+    public void testOverrideTenantPlan() {
+        Long tenantId = 1L;
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setMaxEmployees(10);
+        tenant.setPlanStatus(PlanStatus.ACTIVE);
+
+        SubscriptionPlan plan = new SubscriptionPlan();
+        plan.setName("ENTERPRISE");
+        plan.setPrice(BigDecimal.valueOf(500.0));
+        plan.setValidityMonths(12);
+
+        TenantPlanOverrideDTO dto = new TenantPlanOverrideDTO();
+        dto.setPlanType("ENTERPRISE");
+        dto.setMaxEmployees(200);
+
+        TenantSubscription existingSub = new TenantSubscription();
+        existingSub.setId(10L);
+        existingSub.setTenant(tenant);
+        existingSub.setIsActive(true);
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(subscriptionPlanRepository.findByNameIgnoreCase("ENTERPRISE")).thenReturn(Optional.of(plan));
+        when(subscriptionRepository.findByTenantIdAndIsActiveTrue(tenantId)).thenReturn(Optional.of(existingSub));
+        when(tenantRepository.save(any(Tenant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(subscriptionRepository.save(any(TenantSubscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlatformTenantResponseDTO response = platformTenantService.overrideTenantPlan(tenantId, dto);
+
+        assertNotNull(response);
+        assertEquals(200, tenant.getMaxEmployees());
+        assertEquals(PlanStatus.ACTIVE, tenant.getPlanStatus());
+        assertFalse(existingSub.getIsActive());
+        assertEquals(PlanStatus.TERMINATED, existingSub.getStatus());
+
+        verify(tenantRepository, times(1)).save(tenant);
+        verify(subscriptionRepository, times(2)).save(any(TenantSubscription.class)); // once for old, once for new
+        verify(subscriptionEventLogService, times(1)).recordEvent(
+                eq(tenant), eq(existingSub), any(), eq("TERMINATED"), any(), any(), anyString()
+        );
     }
 }

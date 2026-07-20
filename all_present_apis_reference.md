@@ -8928,3 +8928,260 @@ false
 ```
 
 ---
+
+# Additional Endpoints Mapped
+
+## platform-payroll-controller
+
+### PUT `/api/platform/payroll/tax-slabs/{id}`
+- **Handler Method**: `updateTaxSlab`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### DELETE `/api/platform/payroll/tax-slabs/{id}`
+- **Handler Method**: `deleteTaxSlab`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/platform/payroll/tax-slabs`
+- **Handler Method**: `getAllTaxSlabs`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### POST `/api/platform/payroll/tax-slabs`
+- **Handler Method**: `createTaxSlab`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## Employee Compensation Management
+
+### GET `/api/employees/{id}/compensation`
+- **Handler Method**: `getCompensation`
+- **Description**: Retrieves active salary profile, components overrides, bank details, and history for an employee
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### PUT `/api/employees/{id}/compensation`
+- **Handler Method**: `updateCompensation`
+- **Description**: Registers or updates the employee salary profile, overrides, and bank details
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/{id}/compensation/period`
+- **Handler Method**: `getCompensationForPeriod`
+- **Description**: Retrieves salary profiles and components overrides active during a given start-to-end date range
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## Employee Management
+
+### PUT `/api/employees/by-code/{employeeCode}/manager`
+- **Handler Method**: `assignManagerByCode`
+- **Description**: Assigns a manager to an employee using their employee codes
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### DELETE `/api/employees/by-code/{employeeCode}/manager`
+- **Handler Method**: `removeManager`
+- **Description**: Removes the manager from an employee
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/{managerId}/team/list`
+- **Handler Method**: `getTeamMembersList`
+- **Description**: Retrieves all direct reports of a manager
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/{employeeId}/manager-chain`
+- **Handler Method**: `getManagerChain`
+- **Description**: Retrieves the complete reporting chain of an employee
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/{employeeId}/is-manager`
+- **Handler Method**: `isManager`
+- **Description**: Returns true if the employee has direct reports
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/search/assignment`
+- **Handler Method**: `searchEmployeesForAssignment`
+- **Description**: Searches employees by name, email, or code for assignment dropdown
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/no-manager`
+- **Handler Method**: `getEmployeesWithNoManager`
+- **Description**: Retrieves all employees who don't report to anyone
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## api-hit-log-controller
+
+### PUT `/api/api-logs/toggle`
+- **Handler Method**: `toggleApiLogging`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/api-logs`
+- **Handler Method**: `getTenantApiLogs`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## tenant-registration-controller
+
+### GET `/api/public/debug-db`
+- **Handler Method**: `debugDb`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## platform-api-hit-log-controller
+
+### GET `/api/platform/api-logs`
+- **Handler Method**: `getAllApiLogs`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+## data-export-controller
+
+### GET `/api/export/employees`
+- **Handler Method**: `exportEmployees`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/employees/export`
+- **Handler Method**: `exportEmployees_1`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: Object
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+

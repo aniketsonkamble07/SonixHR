@@ -21,6 +21,6 @@ public class CachedTenantDetails implements Serializable {
     private boolean isActive;
     private UserStatus status;
     private PlanStatus planStatus;
-    private LocalDateTime endsAt;
+    private LocalDateTime billingPeriodEnd;
     private com.sonixhr.enums.TenantDataStatus dataStatus;
 }

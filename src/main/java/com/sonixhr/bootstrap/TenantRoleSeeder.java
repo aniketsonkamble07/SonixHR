@@ -21,6 +21,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -78,9 +79,23 @@ public class TenantRoleSeeder implements ApplicationRunner {
 
             do {
                 tenants = tenantRepository.findAll(PageRequest.of(page++, PAGE_SIZE)).getContent();
+                List<Long> tenantIds = tenants.stream()
+                        .map(Tenant::getId)
+                        .collect(Collectors.toList());
+
+                List<TenantRole> existingRoles = List.of();
+                if (!tenantIds.isEmpty()) {
+                    existingRoles = roleRepository.findAllByTenantIdInWithPermissions(tenantIds);
+                }
+
+                Map<Long, List<TenantRole>> rolesByTenant = existingRoles.stream()
+                        .filter(r -> r.getTenantId() != null)
+                        .collect(Collectors.groupingBy(TenantRole::getTenantId));
+
                 for (Tenant tenant : tenants) {
                     log.debug("Creating roles for tenant: {} (ID: {})", tenant.getCompanyName(), tenant.getId());
-                    createRolesForTenant(tenant.getId(), allPermissions);
+                    List<TenantRole> tenantRoles = rolesByTenant.getOrDefault(tenant.getId(), List.of());
+                    createRolesForTenant(tenant.getId(), tenantRoles, allPermissions);
                 }
                 totalProcessed += tenants.size();
             } while (tenants.size() == PAGE_SIZE);
@@ -103,14 +118,16 @@ public class TenantRoleSeeder implements ApplicationRunner {
         }
     }
 
-    private void createRolesForTenant(Long tenantId, List<TenantPermission> allPermissions) {
-        createAdminRole(tenantId, allPermissions);
-        createManagerRole(tenantId, allPermissions);
-        createEmployeeRole(tenantId, allPermissions);
+    private void createRolesForTenant(Long tenantId, List<TenantRole> tenantRoles, List<TenantPermission> allPermissions) {
+        createAdminRole(tenantId, tenantRoles, allPermissions);
+        createManagerRole(tenantId, tenantRoles, allPermissions);
+        createEmployeeRole(tenantId, tenantRoles, allPermissions);
     }
 
-    private void createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Admin");
+    private void createAdminRole(Long tenantId, List<TenantRole> tenantRoles, List<TenantPermission> allPermissions) {
+        Optional<TenantRole> existingRole = tenantRoles.stream()
+                .filter(r -> "Admin".equalsIgnoreCase(r.getName()))
+                .findFirst();
         if (existingRole.isPresent()) {
             log.debug("Admin role already exists for tenant: {}", tenantId);
             TenantRole adminRole = existingRole.get();
@@ -135,7 +152,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
         log.info("Created Admin role for tenant {} with {} permissions", tenantId, allPermissions.size());
     }
 
-    private void createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
+    private void createEmployeeRole(Long tenantId, List<TenantRole> tenantRoles, List<TenantPermission> allPermissions) {
         // Define employee permissions as Strings (enum names)
         Set<String> employeePermissionNames = Set.of(
                 TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
@@ -152,7 +169,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
 
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Employee");
+        Optional<TenantRole> existingRole = tenantRoles.stream()
+                .filter(r -> "Employee".equalsIgnoreCase(r.getName()))
+                .findFirst();
         if (existingRole.isPresent()) {
             TenantRole employeeRole = existingRole.get();
             if (employeeRole.getPermissions() == null || !employeeRole.getPermissions().containsAll(employeePermissions)) {
@@ -179,7 +198,7 @@ public class TenantRoleSeeder implements ApplicationRunner {
         log.info("Created Employee role for tenant {} with {} permissions", tenantId, employeePermissions.size());
     }
 
-    private void createManagerRole(Long tenantId, List<TenantPermission> allPermissions) {
+    private void createManagerRole(Long tenantId, List<TenantRole> tenantRoles, List<TenantPermission> allPermissions) {
         // Define manager permissions as Strings (enum names)
         Set<String> managerPermissionNames = Set.of(
                 TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
@@ -206,7 +225,9 @@ public class TenantRoleSeeder implements ApplicationRunner {
                 .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
                 .collect(Collectors.toSet());
 
-        Optional<TenantRole> existingRole = roleRepository.findByTenantIdAndName(tenantId, "Manager");
+        Optional<TenantRole> existingRole = tenantRoles.stream()
+                .filter(r -> "Manager".equalsIgnoreCase(r.getName()))
+                .findFirst();
         if (existingRole.isPresent()) {
             TenantRole managerRole = existingRole.get();
             if (managerRole.getPermissions() == null || !managerRole.getPermissions().containsAll(managerPermissions)) {

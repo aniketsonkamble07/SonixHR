@@ -205,9 +205,7 @@ public class ActivationTokenService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
-        if (employee.isActive()) {
-            throw new BusinessException("Invalid or expired activation token");
-        }
+        // Allow activation even if active flag is already true (e.g. dev mode auto-activation)
 
         employee.setPasswordHash(passwordEncoder.encode(password));
         employee.setActive(true);
@@ -478,9 +476,7 @@ public class ActivationTokenService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
-        if (employee.isActive()) {
-            throw new BusinessException("Invalid or expired activation token");
-        }
+        // Allow password setting even if active flag is already true (e.g. dev mode auto-activation)
 
         // Set password and activate
         employee.setPasswordHash(passwordEncoder.encode(newPassword));

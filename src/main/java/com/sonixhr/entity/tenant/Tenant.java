@@ -100,6 +100,14 @@ public class Tenant {
     @Column(name = "suspension_reason", length = 500)
     private String suspensionReason;
 
+    @Column(name = "suspended", nullable = false)
+    @Builder.Default
+    private boolean suspended = false;
+
+    @Column(name = "legal_hold", nullable = false)
+    @Builder.Default
+    private boolean legalHold = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -170,6 +178,7 @@ public class Tenant {
         this.isActive = false;
         this.suspendedAt = LocalDateTime.now();
         this.suspensionReason = reason;
+        this.suspended = true;
     }
 
     public void expire(String reason) {
@@ -204,6 +213,7 @@ public class Tenant {
         this.deletedAt = null;
         this.suspendedAt = null;
         this.suspensionReason = null;
+        this.suspended = false;
     }
 
     public void deactivate() {
@@ -212,7 +222,7 @@ public class Tenant {
     }
 
     public boolean isSuspended() {
-        return this.status == UserStatus.SUSPENDED;
+        return this.suspended;
     }
 
     public boolean isDeleted() {
