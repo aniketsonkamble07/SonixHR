@@ -87,7 +87,7 @@ public class TenantSubscriptionValidationService {
         // If a Company Admin attempts to access a self-serve renewal/billing path, or any user reads status/tickets, do
         // not block on suspended/inactive status
         boolean isSelfServeRenewalAttempt = isAllowedGrace && (isAdmin || isReadGraceRequest) &&
-                (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE || details.getPlanStatus() == PlanStatus.SUSPENDED) &&
+                (details.getPlanStatus() == PlanStatus.EXPIRED || details.getPlanStatus() == PlanStatus.PAST_DUE || details.getPlanStatus() == PlanStatus.SUSPENDED || details.getPlanStatus() == PlanStatus.CANCELLED) &&
                 (details.getDataStatus() == null || details.getDataStatus() == TenantDataStatus.RETAINED);
 
         if (details.getStatus() == UserStatus.DELETED) {
@@ -117,8 +117,8 @@ public class TenantSubscriptionValidationService {
         }
 
         if (details.getPlanStatus() == PlanStatus.CANCELLED) {
-            if (details.getBillingPeriodEnd() != null && details.getBillingPeriodEnd().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
-                throw new BusinessException("Subscription has expired. Please log in and renew online.");
+            if (!isSelfServeRenewalAttempt) {
+                throw new BusinessException("Subscription is cancelled. Please log in and renew online.");
             }
         }
 

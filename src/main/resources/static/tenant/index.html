@@ -3260,7 +3260,8 @@
                           currentUserAuthorities.includes('VIEW_BILLING') ||
                           currentUserAuthorities.includes('MANAGE_SUBSCRIPTION');
 
-          if (status === 'EXPIRED' || status === 'SUSPENDED') {
+          const blockedStatuses = ['EXPIRED', 'SUSPENDED', 'CANCELLED', 'TERMINATED', 'FROZEN', 'PAUSED', 'NOT_ACTIVATED'];
+          if (blockedStatuses.includes(status)) {
             if (isAdmin) {
               // Admin: Show top banner and redirect directly to Billing & Subscriptions
               if (banner && bannerText && actionBtn) {

@@ -29,7 +29,7 @@ public class TenantSubscriptionController {
      * Get current active subscription for the authenticated tenant
      */
     @GetMapping("/current")
-    @PreAuthorize("hasAuthority('VIEW_BILLING')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TenantSubscriptionResponseDTO> getCurrentSubscription(
             @AuthenticationPrincipal Employee currentEmployee) {
         log.info("REST request to get current subscription for tenant: {}", currentEmployee.getTenantId());
