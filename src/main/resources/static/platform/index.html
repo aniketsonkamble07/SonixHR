@@ -626,7 +626,6 @@
               <table class="responsive-table">
                 <thead>
                   <tr>
-                    <th>Code</th>
                     <th>Name</th>
                     <th>Price (INR)</th>
                     <th>Validity Period</th>
@@ -636,7 +635,7 @@
                 </thead>
                 <tbody id="plans-list-tbody">
                   <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">Loading
                       subscription plans...</td>
                   </tr>
                 </tbody>
@@ -4239,13 +4238,12 @@
       if (!tbody) return;
 
       if (!plans || plans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = plans.map(p => `
         <tr>
-          <td style="font-family: monospace; font-weight: 600; color: #6366f1;">${escapeHtml(p.code || p.name.toUpperCase().replace(/\s+/g, '_'))}</td>
           <td style="font-weight: 600;">${escapeHtml(p.name)}</td>
           <td>INR ${(p.price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           <td>${p.validityMonths || 1} month${(p.validityMonths || 1) > 1 ? 's' : ''}</td>
