@@ -123,7 +123,7 @@ public class TenantAuthService {
 
                 return LoginResponse.builder()
                         .success(false)
-                        .message("Password change required. Please reset your password before logging in.")
+                        .message("First-time password setup required. Please update your password to complete your initial login.")
                         .errorCode("AUTH_004")
                         .requiresPasswordChange(true)
                         .resetToken(resetToken)
@@ -192,7 +192,7 @@ public class TenantAuthService {
 
                     return LoginResponse.builder()
                             .success(false)
-                            .message("Password change required. Please reset your password before logging in.")
+                            .message("First-time password setup required. Please update your password to complete your initial login.")
                             .errorCode("AUTH_004")
                             .requiresPasswordChange(true)
                             .resetToken(resetToken)
@@ -206,7 +206,7 @@ public class TenantAuthService {
                 log.warn("Failed to generate reset token for expired credentials: {}", ex.getMessage());
             }
 
-            throw new BadCredentialsException("Password change required. Please reset your password.");
+            throw new BadCredentialsException("First-time password setup required. Please set a new password to continue.");
 
         } catch (BadCredentialsException e) {
             log.warn("Login failed for employee: {} - {}", email, e.getMessage());

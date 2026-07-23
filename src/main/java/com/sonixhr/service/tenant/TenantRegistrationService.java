@@ -81,8 +81,7 @@ public class TenantRegistrationService {
             TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
             TenantPermissionEnum.TASK_VIEW_OWN.name(),
             TenantPermissionEnum.TASK_ACKNOWLEDGE.name(),
-            TenantPermissionEnum.TASK_UPDATE_STATUS.name()
-    );
+            TenantPermissionEnum.TASK_UPDATE_STATUS.name());
 
     private static final Set<String> MANAGER_PERMISSIONS = new HashSet<>();
     static {
@@ -97,8 +96,7 @@ public class TenantRegistrationService {
                 TenantPermissionEnum.TASK_CREATE.name(),
                 TenantPermissionEnum.TASK_VIEW_ALL.name(),
                 TenantPermissionEnum.TASK_VIEW_TEAM.name(),
-                TenantPermissionEnum.TASK_EDIT.name()
-        ));
+                TenantPermissionEnum.TASK_EDIT.name()));
     }
 
     @Transactional
@@ -191,7 +189,8 @@ public class TenantRegistrationService {
             log.info("Default shift 'General 9-5' created successfully for tenant: {}", tenantId);
 
         } catch (Exception e) {
-            // Log but don't throw - shift creation failure shouldn't break tenant registration
+            // Log but don't throw - shift creation failure shouldn't break tenant
+            // registration
             log.error("Failed to create default shift for tenant {}: {}", tenantId, e.getMessage(), e);
         }
     }
@@ -229,8 +228,8 @@ public class TenantRegistrationService {
             List<SubscriptionPlan> availablePlans = subscriptionPlanRepository.findAllActivePlans();
             throw new BusinessException("Subscription plan not found: " + code +
                     ". Available plans: " + availablePlans.stream()
-                    .map(SubscriptionPlan::getCode)
-                    .collect(Collectors.joining(", ")));
+                            .map(SubscriptionPlan::getCode)
+                            .collect(Collectors.joining(", ")));
         }
 
         SubscriptionPlan plan = planOpt.get();
@@ -262,7 +261,7 @@ public class TenantRegistrationService {
     }
 
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
-                                SubscriptionPlan plan) {
+            SubscriptionPlan plan) {
         String validatedCountry = CountryUtils.normalizeAndValidateCountry(request.getCountry());
         boolean isIndia = "IN".equalsIgnoreCase(validatedCountry);
 
@@ -288,7 +287,7 @@ public class TenantRegistrationService {
                 .country(validatedCountry)
                 .status(UserStatus.ACTIVE)
                 .isActive(true)
-                .planStatus(PlanStatus.ACTIVE)  // ✅ PlanStatus enum
+                .planStatus(PlanStatus.ACTIVE) // ✅ PlanStatus enum
                 .endsAt(endsAt)
                 .maxEmployees(plan.getMaxEmployees() != null ? plan.getMaxEmployees() : 100)
                 .build();
@@ -386,7 +385,7 @@ public class TenantRegistrationService {
     // =====================================================
 
     private Employee createAdminEmployee(Tenant tenant, TenantRegistrationRequest request,
-                                         TenantRole adminRole) {
+            TenantRole adminRole) {
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
 
         String firstName = request.getAdminFirstName() != null ? request.getAdminFirstName() : "Admin";
@@ -411,7 +410,8 @@ public class TenantRegistrationService {
                 .state(tenant.getState())
                 .stateText(tenant.getStateText())
                 .country(tenant.getCountry())
-                .workLocation(tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
+                .workLocation(
+                        tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
                 .passwordHash(passwordHash)
                 .roles(new HashSet<>(Set.of(adminRole)))
                 .mustChangePassword(true)
@@ -434,7 +434,7 @@ public class TenantRegistrationService {
                     .tenant(tenant)
                     .subscriptionPlan(plan)
                     .planName(plan.getName())
-                    .planStatus(PlanStatus.ACTIVE)  // ✅ PlanStatus enum
+                    .planStatus(PlanStatus.ACTIVE) // ✅ PlanStatus enum
                     .startedAt(startedAt)
                     .billingPeriodStart(startedAt)
                     .billingPeriodEnd(endsAt)
@@ -450,12 +450,11 @@ public class TenantRegistrationService {
             subscriptionEventLogService.recordEvent(
                     tenant,
                     saved,
-                    null,                    // previousStatus (PlanStatus)
-                    PlanStatus.ACTIVE,       // newStatus (PlanStatus) - NOT .name()
+                    null, // previousStatus (PlanStatus)
+                    PlanStatus.ACTIVE, // newStatus (PlanStatus) - NOT .name()
                     com.sonixhr.enums.TriggerSource.SYSTEM,
                     null,
-                    "Initial subscription created with plan: " + plan.getName()
-            );
+                    "Initial subscription created with plan: " + plan.getName());
 
         } catch (Exception e) {
             log.error("Failed to create subscription for tenant {}: {}", tenant.getId(), e.getMessage());
@@ -492,7 +491,7 @@ public class TenantRegistrationService {
     // =====================================================
 
     private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken,
-                                                     Employee adminEmployee) {
+            Employee adminEmployee) {
         return TenantRegistrationResponse.builder()
                 .success(true)
                 .message("Registration successful! Please check your email to activate your account.")
