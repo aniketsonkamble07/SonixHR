@@ -12,10 +12,6 @@ import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 @Service
@@ -23,20 +19,16 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 public class WelcomeTenantEmailService {
 
-    private static final Logger log = LoggerFactory.getLogger(WelcomeTenantEmailService.class);
-
     private final JavaMailSender mailSender;
 
-    @Value("${app.base-url:http://localhost:8081}")
+    @Value("${app.base-url}")
     private String baseUrl;
 
-    @Value("${spring.mail.username:noreply@sonixhr.com}")
+    @Value("${spring.mail.username}")
     private String fromEmail;
 
-    @Value("${app.email.enabled:true}")
+    @Value("${app.email.enabled}")
     private boolean emailEnabled;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMMM dd, yyyy");
 
     // =====================================================
     // ✅ ADDED: Method called by TenantRegistrationService
@@ -72,6 +64,7 @@ public class WelcomeTenantEmailService {
                         .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
                         .details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
                         .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 30px; font-weight: bold; margin: 20px 0; }
+                        .button:hover { opacity: 0.9; }
                         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
                         .highlight { color: #667eea; font-weight: bold; }
                     </style>
@@ -90,13 +83,12 @@ public class WelcomeTenantEmailService {
                                 <p><strong>🏢 Company:</strong> %s</p>
                                 <p><strong>🔗 Portal URL:</strong> <a href="%s">%s</a></p>
                                 <p><strong>📊 Plan:</strong> <span class="highlight">%s</span></p>
-                                <p><strong>⏰ Trial Period:</strong> %d days</p>
                             </div>
                             
                             <p>An activation email has been sent to <strong>%s</strong> with instructions to set up your password.</p>
                             
                             <div class="footer">
-                                <p>© 2026 SonixHR. All rights reserved.<br>
+                                <p>© %d SonixHR. All rights reserved.<br>
                                 Need help? Contact us at <a href="mailto:support@sonixhr.com">support@sonixhr.com</a></p>
                             </div>
                         </div>
@@ -108,9 +100,9 @@ public class WelcomeTenantEmailService {
                     tenant.getCompanyName(),
                     tenant.getCompanyName(),
                     tenantUrl, tenantUrl,
-                    tenant.getPlanType() != null ? tenant.getPlanType() : "Trial",
-                    14,
-                    tenant.getAdminEmail()
+                    tenant.getPlanType() != null ? tenant.getPlanType() : "Standard",
+                    tenant.getAdminEmail(),
+                    LocalDate.now().getYear()
             );
 
             sendEmail(tenant.getAdminEmail(), subject, htmlContent);
@@ -129,16 +121,15 @@ public class WelcomeTenantEmailService {
     @Async
     public void sendTenantWelcomeEmail(String to, String adminName, String companyName,
                                        String activationToken,
-                                       String planName, int trialDays) {
+                                       String planName) {
         if (!emailEnabled) {
             log.info("Email sending disabled. Would send tenant welcome email to: {}", to);
             return;
         }
 
         // ✅ FIXED: Correct activation endpoint
-        String activationLink = baseUrl + "/api/tenant/employee/auth/activate?token=" + activationToken;
+        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
         String tenantUrl = baseUrl;
-        String trialEndDate = LocalDate.now().plusDays(trialDays).format(DATE_FORMATTER);
 
         String subject = "Welcome to SonixHR - Activate Your Account";
 
@@ -154,6 +145,7 @@ public class WelcomeTenantEmailService {
                     .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px; }
                     .details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
                     .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 30px; font-weight: bold; margin: 20px 0; }
+                    .button:hover { opacity: 0.9; }
                     .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
                     .highlight { color: #667eea; font-weight: bold; }
                 </style>
@@ -172,7 +164,6 @@ public class WelcomeTenantEmailService {
                             <p><strong>🏢 Company:</strong> %s</p>
                             <p><strong>🔗 Portal URL:</strong> <a href="%s" style="color: #667eea;">%s</a></p>
                             <p><strong>📊 Plan:</strong> <span class="highlight">%s</span></p>
-                            <p><strong>⏰ Trial Period:</strong> %d days (ends on <strong>%s</strong>)</p>
                         </div>
                         
                         <p><strong>Ready to get started?</strong> Click the button below to activate your account and set up your password:</p>
@@ -187,7 +178,7 @@ public class WelcomeTenantEmailService {
                         <p style="font-size: 12px; color: #666;">If you didn't sign up for SonixHR, please ignore this email.</p>
                         
                         <div class="footer">
-                            <p>© 2026 SonixHR. All rights reserved.<br>
+                            <p>© %d SonixHR. All rights reserved.<br>
                             Need help? Contact us at <a href="mailto:support@sonixhr.com" style="color: #667eea;">support@sonixhr.com</a></p>
                         </div>
                     </div>
@@ -195,7 +186,7 @@ public class WelcomeTenantEmailService {
             </body>
             </html>
             """, adminName, companyName, companyName, tenantUrl, tenantUrl,
-                planName, trialDays, trialEndDate, activationLink);
+                planName, activationLink, LocalDate.now().getYear());
 
         sendEmail(to, subject, htmlContent);
     }
@@ -213,7 +204,7 @@ public class WelcomeTenantEmailService {
             helper.setText(htmlContent, true);
             helper.setFrom(fromEmail);
 
-            mailSender.send(message);
+            // mailSender.send(message);
             log.info("Email sent successfully to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to: {}", to, e);

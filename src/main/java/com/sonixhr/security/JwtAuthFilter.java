@@ -17,7 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.sonixhr.service.tenant.TenantSubscriptionValidationService;
+import com.sonixhr.service.subscription.TenantSubscriptionValidationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
     private final TenantRLSService tenantRLSService;
@@ -90,10 +89,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 .build();
     }
 
+    /**
+     * Set of paths that are explicitly excluded from public access
+     * even if they match a public prefix.
+     */
+    private static final Set<String> EXCLUDED_PUBLIC_PATHS = Set.of(
+            "/api/tenant/auth/me",
+            "/api/tenant/auth/logout",
+            "/api/tenant/auth/test-auth",
+            "/api/tenant/auth/change-password",
+            "/api/platform/auth/me",
+            "/api/platform/auth/logout",
+            "/api/platform/auth/change-password"
+    );
+
     @Override
     protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,
-            @org.springframework.lang.NonNull HttpServletResponse response,
-            @org.springframework.lang.NonNull FilterChain filterChain)
+                                    @org.springframework.lang.NonNull HttpServletResponse response,
+                                    @org.springframework.lang.NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         long startTime = System.nanoTime();
@@ -326,11 +339,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      * Optimized public path checking with caching
      */
     private boolean isPublicPathOptimized(String path) {
-        // Exclude authenticated tenant and platform auth endpoints
-        if ("/api/tenant/auth/me".equals(path) ||
-                "/api/tenant/auth/logout".equals(path) ||
-                "/api/tenant/auth/test-auth".equals(path) ||
-                "/api/platform/auth/logout".equals(path)) {
+        // ✅ Explicitly exclude authenticated endpoints that might match public patterns
+        if (EXCLUDED_PUBLIC_PATHS.contains(path)) {
             return false;
         }
 

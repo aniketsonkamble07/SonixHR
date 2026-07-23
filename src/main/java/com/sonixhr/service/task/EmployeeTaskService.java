@@ -95,13 +95,13 @@ public class EmployeeTaskService {
 
         // Send Email Notification to assignee
         if (assignee.getEmail() != null) {
-            emailService.sendTaskNotification(
-                    assignee.getEmail(),
-                    assignee.getFullName(),
-                    saved.getTitle(),
-                    "ASSIGNED",
-                    assigner.getFullName()
-            );
+       //     emailService.sendTaskNotification(
+        //            assignee.getEmail(),
+         //           assignee.getFullName(),
+          //          saved.getTitle(),
+           //         "ASSIGNED",
+            //        assigner.getFullName()
+            //);
         }
 
         // Send In-App Notification to assignee
@@ -145,15 +145,15 @@ public class EmployeeTaskService {
         Employee assigner = saved.getAssignedBy();
         Employee assignee = saved.getAssignedTo();
 
-        if (assigner.getEmail() != null) {
-            emailService.sendTaskNotification(
-                    assigner.getEmail(),
-                    assigner.getFullName(),
-                    saved.getTitle(),
-                    "ACKNOWLEDGED",
-                    assignee.getFullName()
-            );
-        }
+//        if (assigner.getEmail() != null) {
+//            emailService.sendTaskNotification(
+//                    assigner.getEmail(),
+//                    assigner.getFullName(),
+//                    saved.getTitle(),
+//                    "ACKNOWLEDGED",
+//                    assignee.getFullName()
+//            );
+//        }
 
         notificationService.sendNotification(
                 assigner,
@@ -249,15 +249,15 @@ public class EmployeeTaskService {
         Employee assignee = task.getAssignedTo();
 
         // Email Notification
-        if (assigner.getEmail() != null) {
-            emailService.sendTaskNotification(
-                    assigner.getEmail(),
-                    assigner.getFullName(),
-                    task.getTitle(),
-                    "ACCEPTED",
-                    assignee.getFullName()
-            );
-        }
+//        if (assigner.getEmail() != null) {
+//            emailService.sendTaskNotification(
+//                    assigner.getEmail(),
+//                    assigner.getFullName(),
+//                    task.getTitle(),
+//                    "ACCEPTED",
+//                    assignee.getFullName()
+//            );
+//        }
 
         // In-App Notification
         notificationService.sendNotification(
@@ -304,15 +304,15 @@ public class EmployeeTaskService {
         Employee assignee = task.getAssignedTo();
 
         // Email Notification
-        if (assigner.getEmail() != null) {
-            emailService.sendTaskNotification(
-                    assigner.getEmail(),
-                    assigner.getFullName(),
-                    task.getTitle(),
-                    "DECLINED",
-                    assignee.getFullName()
-            );
-        }
+//        if (assigner.getEmail() != null) {
+//            emailService.sendTaskNotification(
+//                    assigner.getEmail(),
+//                    assigner.getFullName(),
+//                    task.getTitle(),
+//                    "DECLINED",
+//                    assignee.getFullName()
+//            );
+//        }
 
         // In-App Notification
         notificationService.sendNotification(

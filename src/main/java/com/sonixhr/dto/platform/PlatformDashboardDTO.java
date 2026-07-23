@@ -34,8 +34,8 @@ public class PlatformDashboardDTO {
         private long activeTenants;
         private long suspendedTenants;
         private long deletedTenants;
-        private long trialTenants;
         private Map<String, Long> planDistribution;
+        private Map<String, Long> dataStatusDistribution;
     }
 
     @Data
@@ -43,11 +43,18 @@ public class PlatformDashboardDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SubscriptionSummary {
-        private long activePaidSubscriptions;
-        private long activeTrials;
-        private BigDecimal totalMrr;
-        private Map<String, Long> planStatusDistribution;
+        private long totalSubscriptions;
+        private long activeSubscriptions;
         private long expiredSubscriptions;
+        private long cancelledSubscriptions;
+        private BigDecimal totalMrr;
+        private BigDecimal averageMrr;
+        private long newThisMonth;
+        private double growthRate;
+        private double churnRate;
+        private double retentionRate;
+        private long activePaidSubscriptions;
+        private Map<String, Long> planStatusDistribution;
     }
 
     @Data

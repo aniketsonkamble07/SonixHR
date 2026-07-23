@@ -5,7 +5,6 @@ import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.MyOrgChartResponse;
 import com.sonixhr.service.employee.EmployeeSelfService;
 import com.sonixhr.security.TenantContext;
-// Force re-indexing of imports
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,18 +13,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/employee")
 @RequiredArgsConstructor
 public class EmployeeSelfServiceController {
-
-    private static final Logger log = LoggerFactory.getLogger(EmployeeSelfServiceController.class);
 
     private final EmployeeSelfService employeeSelfService;
 

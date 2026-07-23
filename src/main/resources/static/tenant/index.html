@@ -1225,6 +1225,12 @@
             <span>Leave Management</span>
           </a>
         </li>
+        <li class="sidebar-item" data-tab="tab-resignations">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-user-slash"></i>
+            <span>Resignations & Offboarding</span>
+          </a>
+        </li>
         <li class="sidebar-item" data-tab="tab-employees">
           <a class="sidebar-link">
             <i class="fa-solid fa-users"></i>
@@ -1396,12 +1402,121 @@
         <!-- ==========================================
                  TAB 2: EMPLOYEES
                  ========================================== -->
+        <!-- ==========================================
+                 TAB: RESIGNATIONS & OFFBOARDING
+                 ========================================== -->
+        <section id="tab-resignations" class="view-panel">
+          <div class="card-header" style="margin-bottom: 24px;">
+            <div>
+              <h2 class="card-title" style="font-size: 1.5rem;"><i class="fa-solid fa-user-slash" style="color: var(--accent-rose);"></i> Resignation & Notice Period Governance</h2>
+              <p class="card-subtitle">Manage employee resignations, notice periods, HR approvals, last working date (LWD) scheduling, and statutory offboarding.</p>
+            </div>
+            <button class="btn btn-primary" onclick="handleRunOffboardingProcessor()">
+              <i class="fa-solid fa-user-check"></i> Run Offboarding Processor
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px;">
+            
+            <!-- Card 1: Submit / Withdraw Resignation -->
+            <div class="card" style="margin: 0;">
+              <h3 class="card-title" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <i class="fa-solid fa-paper-plane" style="color: var(--accent-violet);"></i> Employee Resignation Actions
+              </h3>
+              <form id="resignation-submit-form" onsubmit="handleResignationSubmitForm(event)">
+                <div class="form-group">
+                  <label class="form-label" for="res-submit-emp-id">Target Employee ID</label>
+                  <input type="number" id="res-submit-emp-id" class="form-input" placeholder="e.g. 47" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="res-submit-reason">Resignation Reason</label>
+                  <textarea id="res-submit-reason" class="form-input" style="height: 80px; resize: vertical;" placeholder="Reason for resignation..." required></textarea>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="res-submit-proposed-lwd">Proposed Last Working Date (LWD)</label>
+                  <input type="date" id="res-submit-proposed-lwd" class="form-input" required>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 20px;">
+                  <button type="submit" class="btn btn-primary" style="flex: 1;">
+                    <i class="fa-solid fa-check"></i> Submit Resignation
+                  </button>
+                  <button type="button" class="btn btn-secondary" onclick="handleResignationWithdrawForm()" style="flex: 1;">
+                    <i class="fa-solid fa-undo"></i> Withdraw
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Card 2: HR Manager Approval & Abscond Actions -->
+            <div class="card" style="margin: 0;">
+              <h3 class="card-title" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <i class="fa-solid fa-user-gear" style="color: var(--accent-emerald);"></i> HR / Manager Actions
+              </h3>
+              <form id="resignation-hr-form" onsubmit="handleResignationAcceptForm(event)">
+                <div class="form-group">
+                  <label class="form-label" for="res-hr-emp-id">Employee ID</label>
+                  <input type="number" id="res-hr-emp-id" class="form-input" placeholder="e.g. 47" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="res-hr-approved-lwd">Approved Last Working Date (LWD)</label>
+                  <input type="date" id="res-hr-approved-lwd" class="form-input" required>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 20px;">
+                  <button type="submit" class="btn btn-success" style="flex: 1;">
+                    <i class="fa-solid fa-user-check"></i> Accept Resignation
+                  </button>
+                  <button type="button" class="btn btn-logout" onclick="handleResignationRejectForm()" style="flex: 1;">
+                    <i class="fa-solid fa-user-xmark"></i> Reject
+                  </button>
+                </div>
+                <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                  <button type="button" class="btn btn-logout" style="width: 100%;" onclick="handleMarkAbscondedForm()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Mark Employee Absconded
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Card 3: Resignation Audit & Lookup -->
+            <div class="card" style="margin: 0; grid-column: 1 / -1;">
+              <h3 class="card-title" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <i class="fa-solid fa-magnifying-glass-chart" style="color: var(--accent-violet);"></i> Resignation Details & Audit Lookup
+              </h3>
+              <div style="display: flex; gap: 12px; margin-bottom: 20px; max-width: 450px;">
+                <input type="number" id="res-lookup-emp-id" class="form-input" placeholder="Enter Employee ID to inspect...">
+                <button class="btn btn-primary" onclick="handleGetResignationDetailsForm()">
+                  <i class="fa-solid fa-search"></i> Inspect Details
+                </button>
+              </div>
+              <div id="resignation-details-result" style="display: none; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                  <div><strong>Employee ID:</strong> <span id="res-detail-id">-</span></div>
+                  <div><strong>Name:</strong> <span id="res-detail-name">-</span></div>
+                  <div><strong>Status:</strong> <span id="res-detail-status" class="badge">-</span></div>
+                  <div><strong>Resignation Status:</strong> <span id="res-detail-res-status">-</span></div>
+                  <div><strong>Submission Date:</strong> <span id="res-detail-date">-</span></div>
+                  <div><strong>Proposed LWD:</strong> <span id="res-detail-prop-lwd">-</span></div>
+                  <div><strong>Approved LWD:</strong> <span id="res-detail-app-lwd">-</span></div>
+                  <div><strong>HR Accepted:</strong> <span id="res-detail-accepted">-</span></div>
+                </div>
+                <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                  <strong>Reason:</strong> <p id="res-detail-reason" style="margin-top: 4px; color: var(--text-secondary);"></p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
         <section id="tab-employees" class="view-panel">
           <div class="filter-bar">
             <div class="search-input-wrapper">
               <i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" id="employee-search" class="form-input search-input" placeholder="Search employees...">
             </div>
+            <button class="btn btn-primary btn-sm" onclick="openAddEmployeeModal()">
+              <i class="fa-solid fa-plus"></i> Add Employee
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="fetchEmployees()">
               <i class="fa-solid fa-rotate"></i> Refresh
             </button>
@@ -2866,6 +2981,78 @@
   </div>
 
   <!-- ==========================================
+     MODAL: EMPLOYEE CREATE & UPDATE
+     ========================================== -->
+  <div id="employee-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 id="employee-modal-title">Add Employee</h3>
+        <button class="modal-close" onclick="closeModal('employee-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="employee-form" onsubmit="handleEmployeeFormSubmit(event)">
+          <input type="hidden" id="emp-id">
+          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-first-name">First Name <span style="color: var(--accent-rose);">*</span></label>
+              <input type="text" id="emp-first-name" class="form-input" required placeholder="John">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-last-name">Last Name <span style="color: var(--accent-rose);">*</span></label>
+              <input type="text" id="emp-last-name" class="form-input" required placeholder="Doe">
+            </div>
+          </div>
+
+          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-email">Email <span style="color: var(--accent-rose);">*</span></label>
+              <input type="email" id="emp-email" class="form-input" required placeholder="john.doe@company.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-department">Department <span style="color: var(--accent-rose);">*</span></label>
+              <select id="emp-department" class="form-input" required>
+                <option value="">Select Department</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-position">Position / Title <span style="color: var(--accent-rose);">*</span></label>
+              <input type="text" id="emp-position" class="form-input" required placeholder="Software Engineer">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-hire-date">Hire Date <span style="color: var(--accent-rose);">*</span></label>
+              <input type="date" id="emp-hire-date" class="form-input" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-employment-type">Employment Type</label>
+              <select id="emp-employment-type" class="form-input">
+                <option value="FULL_TIME">Full Time</option>
+                <option value="PART_TIME">Part Time</option>
+                <option value="CONTRACT">Contract</option>
+                <option value="INTERN">Intern</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-monthly-ctc">Monthly CTC (INR)</label>
+              <input type="number" step="0.01" id="emp-monthly-ctc" class="form-input" placeholder="50000">
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('employee-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Employee</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
      MODAL: SHIFT CRUD
      ========================================== -->
   <div id="shift-modal" class="modal-overlay">
@@ -3626,6 +3813,11 @@
               <td><span class="badge ${statusClass}">${emp.status || 'ACTIVE'}</span></td>
               <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end;">
                 <button class="btn btn-secondary btn-sm"
+                        onclick="openEditEmployeeModal(${emp.id})"
+                        style="padding: 6px 12px; font-size: 0.75rem;" title="Edit Employee">
+                  <i class="fa-solid fa-pen"></i> Edit
+                </button>
+                <button class="btn btn-secondary btn-sm"
                         onclick="openOvertimeModal(${emp.id}, '${emp.fullName || ''}')"
                         style="padding: 6px 12px; font-size: 0.75rem;">
                   <i class="fa-solid fa-clock"></i> Log Overtime
@@ -3655,6 +3847,108 @@
         r.style.display = text.includes(q) ? '' : 'none';
       });
     });
+
+    async function populateDepartmentSelect() {
+      try {
+        const res = await fetch(`${API_BASE}/departments`, { headers: getHeaders() });
+        if (res.ok) {
+          const depts = await res.json();
+          const select = document.getElementById('emp-department');
+          if (select) {
+            select.innerHTML = '<option value="">Select Department</option>' +
+              depts.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading departments', err);
+      }
+    }
+
+    async function openAddEmployeeModal() {
+      await populateDepartmentSelect();
+      document.getElementById('employee-modal-title').textContent = 'Add New Employee';
+      document.getElementById('emp-id').value = '';
+      document.getElementById('emp-first-name').value = '';
+      document.getElementById('emp-last-name').value = '';
+      document.getElementById('emp-email').value = '';
+      document.getElementById('emp-email').disabled = false;
+      document.getElementById('emp-department').value = '';
+      document.getElementById('emp-position').value = '';
+      document.getElementById('emp-hire-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('emp-employment-type').value = 'FULL_TIME';
+      document.getElementById('emp-monthly-ctc').value = '';
+      openModal('employee-modal');
+    }
+
+    async function openEditEmployeeModal(employeeId) {
+      await populateDepartmentSelect();
+      try {
+        const res = await fetch(`${API_BASE}/employees/${employeeId}`, { headers: getHeaders() });
+        if (res.ok) {
+          const emp = await res.json();
+          document.getElementById('employee-modal-title').textContent = 'Edit Employee';
+          document.getElementById('emp-id').value = emp.id;
+          document.getElementById('emp-first-name').value = emp.firstName || '';
+          document.getElementById('emp-last-name').value = emp.lastName || '';
+          document.getElementById('emp-email').value = emp.email || '';
+          document.getElementById('emp-email').disabled = true;
+          document.getElementById('emp-department').value = emp.departmentId || '';
+          document.getElementById('emp-position').value = emp.position || '';
+          document.getElementById('emp-hire-date').value = emp.hireDate || new Date().toISOString().split('T')[0];
+          document.getElementById('emp-employment-type').value = emp.employmentType || 'FULL_TIME';
+          document.getElementById('emp-monthly-ctc').value = emp.monthlyCtc || '';
+          openModal('employee-modal');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to fetch employee details', 'error');
+      }
+    }
+
+    async function handleEmployeeFormSubmit(event) {
+      event.preventDefault();
+      const id = document.getElementById('emp-id').value;
+      const firstName = document.getElementById('emp-first-name').value.trim();
+      const lastName = document.getElementById('emp-last-name').value.trim();
+      const email = document.getElementById('emp-email').value.trim();
+      const departmentId = document.getElementById('emp-department').value;
+      const position = document.getElementById('emp-position').value.trim();
+      const hireDate = document.getElementById('emp-hire-date').value;
+      const employmentType = document.getElementById('emp-employment-type').value;
+      const monthlyCtcVal = document.getElementById('emp-monthly-ctc').value;
+
+      const payload = {
+        firstName,
+        lastName,
+        email,
+        departmentId: parseInt(departmentId, 10),
+        position,
+        hireDate,
+        employmentType,
+        monthlyCtc: monthlyCtcVal ? parseFloat(monthlyCtcVal) : null
+      };
+
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_BASE}/employees/${id}` : `${API_BASE}/employees`;
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', id ? 'Employee updated successfully' : 'Employee created successfully', 'success');
+          closeModal('employee-modal');
+          fetchEmployees();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          showToast('Error', errData.message || 'Failed to save employee', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'API error while saving employee', 'error');
+      }
+    }
 
     // ==========================================
     // EMPLOYEE SALARY MODAL
@@ -6177,6 +6471,9 @@
     window.cancelSubscription = cancelSubscription;
     window.openUpgradeModal = openUpgradeModal;
     window.exportEmployees = exportEmployees;
+    window.openAddEmployeeModal = openAddEmployeeModal;
+    window.openEditEmployeeModal = openEditEmployeeModal;
+    window.handleEmployeeFormSubmit = handleEmployeeFormSubmit;
     window.exportPayroll = exportPayroll;
     window.toggleWorkingDaysInput = toggleWorkingDaysInput;
     window.toggleOvertimeFields = toggleOvertimeFields;
@@ -6216,6 +6513,137 @@
     window.toggleCompCalcFields = toggleCompCalcFields;
     window.openCreateComponentModal = openCreateComponentModal;
     window.openEditComponentModal = openEditComponentModal;
+    
+    async function handleResignationSubmitForm(e) {
+      e.preventDefault();
+      const empId = document.getElementById('res-submit-emp-id').value;
+      const reason = encodeURIComponent(document.getElementById('res-submit-reason').value.trim());
+      const proposedLWD = document.getElementById('res-submit-proposed-lwd').value;
+      try {
+        const res = await authFetch(`/api/employees/${empId}/resignation/submit?reason=${reason}&proposedLWD=${proposedLWD}`, { method: 'POST' });
+        if (res.ok) {
+          alert('Resignation submitted successfully!');
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Error submitting resignation'));
+        }
+      } catch (err) {
+        alert('Network Error submitting resignation');
+      }
+    }
+
+    async function handleResignationWithdrawForm() {
+      const empId = document.getElementById('res-submit-emp-id').value;
+      if (!empId) { alert('Please enter Target Employee ID'); return; }
+      try {
+        const res = await authFetch(`/api/employees/${empId}/resignation/withdraw`, { method: 'POST' });
+        if (res.ok) {
+          alert('Resignation withdrawn successfully!');
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Error withdrawing resignation'));
+        }
+      } catch (err) {
+        alert('Network Error withdrawing resignation');
+      }
+    }
+
+    async function handleResignationAcceptForm(e) {
+      e.preventDefault();
+      const empId = document.getElementById('res-hr-emp-id').value;
+      const approvedLWD = document.getElementById('res-hr-approved-lwd').value;
+      try {
+        const res = await authFetch(`/api/employees/${empId}/resignation/accept?approvedLWD=${approvedLWD}`, { method: 'POST' });
+        if (res.ok) {
+          alert('Resignation accepted successfully!');
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Error accepting resignation'));
+        }
+      } catch (err) {
+        alert('Network Error accepting resignation');
+      }
+    }
+
+    async function handleResignationRejectForm() {
+      const empId = document.getElementById('res-hr-emp-id').value;
+      if (!empId) { alert('Please enter Employee ID'); return; }
+      try {
+        const res = await authFetch(`/api/employees/${empId}/resignation/reject`, { method: 'POST' });
+        if (res.ok) {
+          alert('Resignation rejected successfully!');
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Error rejecting resignation'));
+        }
+      } catch (err) {
+        alert('Network Error rejecting resignation');
+      }
+    }
+
+    async function handleMarkAbscondedForm() {
+      const empId = document.getElementById('res-hr-emp-id').value;
+      if (!empId) { alert('Please enter Employee ID'); return; }
+      if (!confirm(`Are you sure you want to mark Employee ID ${empId} as ABSCONDED?`)) return;
+      try {
+        const res = await authFetch(`/api/employees/${empId}/abscond`, { method: 'POST' });
+        if (res.ok) {
+          alert('Employee marked as ABSCONDED successfully!');
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Error marking absconded'));
+        }
+      } catch (err) {
+        alert('Network Error marking absconded');
+      }
+    }
+
+    async function handleGetResignationDetailsForm() {
+      const empId = document.getElementById('res-lookup-emp-id').value;
+      if (!empId) { alert('Please enter Employee ID'); return; }
+      try {
+        const res = await authFetch(`/api/employees/${empId}/resignation`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('resignation-details-result').style.display = 'block';
+          document.getElementById('res-detail-id').textContent = data.employeeId || empId;
+          document.getElementById('res-detail-name').textContent = data.employeeName || '-';
+          document.getElementById('res-detail-status').textContent = data.status || '-';
+          document.getElementById('res-detail-res-status').textContent = data.resignationStatus || 'NONE';
+          document.getElementById('res-detail-date').textContent = data.resignationDate || '-';
+          document.getElementById('res-detail-prop-lwd').textContent = data.proposedLastWorkingDate || '-';
+          document.getElementById('res-detail-app-lwd').textContent = data.approvedLastWorkingDate || '-';
+          document.getElementById('res-detail-accepted').textContent = data.isResignationAccepted ? 'YES' : 'NO';
+          document.getElementById('res-detail-reason').textContent = data.resignationReason || 'None provided';
+        } else {
+          const data = await res.json();
+          alert('Failed: ' + (data.message || 'Resignation details not found'));
+        }
+      } catch (err) {
+        alert('Network Error retrieving resignation details');
+      }
+    }
+
+    async function handleRunOffboardingProcessor() {
+      try {
+        const res = await authFetch('/api/employees/process-offboarding', { method: 'POST' });
+        if (res.ok) {
+          alert('Offboarding processor completed successfully!');
+        } else {
+          alert('Error executing offboarding processor');
+        }
+      } catch (err) {
+        alert('Network Error executing offboarding processor');
+      }
+    }
+    
+    window.handleResignationSubmitForm = handleResignationSubmitForm;
+    window.handleResignationWithdrawForm = handleResignationWithdrawForm;
+    window.handleResignationAcceptForm = handleResignationAcceptForm;
+    window.handleResignationRejectForm = handleResignationRejectForm;
+    window.handleMarkAbscondedForm = handleMarkAbscondedForm;
+    window.handleGetResignationDetailsForm = handleGetResignationDetailsForm;
+    window.handleRunOffboardingProcessor = handleRunOffboardingProcessor;
     window.deleteConfigComponent = deleteConfigComponent;
 
     // ==========================================

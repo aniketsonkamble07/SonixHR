@@ -14,13 +14,16 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "subscription_plans", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_plan_name", columnNames = "name")
+        @UniqueConstraint(name = "uk_plan_name", columnNames = "name"),
+        @UniqueConstraint(name = "uk_plan_code", columnNames = "code")
 }, indexes = {
         @Index(name = "idx_plan_is_active", columnList = "is_active"),
-        @Index(name = "idx_plan_price", columnList = "price")
+        @Index(name = "idx_plan_price", columnList = "price"),
+        @Index(name = "idx_plan_code", columnList = "code")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
@@ -37,6 +40,11 @@ public class SubscriptionPlan {
     // =====================================================
     // BASIC PLAN INFORMATION
     // =====================================================
+
+    @NotBlank(message = "Plan code cannot be blank")
+    @Size(min = 2, max = 50, message = "Plan code must be between 2 and 50 characters")
+    @Column(nullable = false, unique = true, length = 50)
+    private String code;
 
     @NotBlank(message = "Plan name cannot be blank")
     @Size(min = 2, max = 100, message = "Plan name must be between 2 and 100 characters")
@@ -131,6 +139,138 @@ public class SubscriptionPlan {
     private Set<PlanFeature> planFeatures = new HashSet<>();
 
     // =====================================================
+    // FEATURE MANAGEMENT METHODS
+    // =====================================================
+
+    /**
+     * Check if the plan has a specific feature
+     */
+    public boolean hasFeature(String featureCode) {
+        if (featureCode == null || this.planFeatures == null) {
+            return false;
+        }
+        return this.planFeatures.stream()
+                .filter(PlanFeature::isEnabled)
+                .anyMatch(f -> featureCode.equalsIgnoreCase(f.getFeatureCode()));
+    }
+
+    /**
+     * Get all enabled feature codes
+     */
+    public Set<String> getEnabledFeatureCodes() {
+        if (this.planFeatures == null) {
+            return new HashSet<>();
+        }
+        return this.planFeatures.stream()
+                .filter(PlanFeature::isEnabled)
+                .map(PlanFeature::getFeatureCode)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get all feature codes (including disabled)
+     */
+    public Set<String> getAllFeatureCodes() {
+        if (this.planFeatures == null) {
+            return new HashSet<>();
+        }
+        return this.planFeatures.stream()
+                .map(PlanFeature::getFeatureCode)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Add a feature to the plan
+     */
+    public void addFeature(String featureCode, String description) {
+        if (this.planFeatures == null) {
+            this.planFeatures = new HashSet<>();
+        }
+
+        // Check if feature already exists
+        boolean exists = this.planFeatures.stream()
+                .anyMatch(f -> f.getFeatureCode().equalsIgnoreCase(featureCode));
+
+        if (!exists) {
+            PlanFeature feature = PlanFeature.builder()
+                    .subscriptionPlan(this)
+                    .featureCode(featureCode)
+                    .description(description)
+                    .isEnabled(true)
+                    .build();
+            this.planFeatures.add(feature);
+        }
+    }
+
+    /**
+     * Remove a feature from the plan
+     */
+    public void removeFeature(String featureCode) {
+        if (this.planFeatures == null) {
+            return;
+        }
+        this.planFeatures.removeIf(f -> f.getFeatureCode().equalsIgnoreCase(featureCode));
+    }
+
+    /**
+     * Enable a feature
+     */
+    public void enableFeature(String featureCode) {
+        if (this.planFeatures == null) {
+            return;
+        }
+        this.planFeatures.stream()
+                .filter(f -> f.getFeatureCode().equalsIgnoreCase(featureCode))
+                .findFirst()
+                .ifPresent(PlanFeature::enable);
+    }
+
+    /**
+     * Disable a feature
+     */
+    public void disableFeature(String featureCode) {
+        if (this.planFeatures == null) {
+            return;
+        }
+        this.planFeatures.stream()
+                .filter(f -> f.getFeatureCode().equalsIgnoreCase(featureCode))
+                .findFirst()
+                .ifPresent(PlanFeature::disable);
+    }
+
+    /**
+     * Replace all features with a new set
+     */
+    public void setFeatures(Set<String> featureCodes) {
+        if (this.planFeatures == null) {
+            this.planFeatures = new HashSet<>();
+        }
+
+        // Clear existing features
+        this.planFeatures.clear();
+
+        // Add new features
+        if (featureCodes != null) {
+            for (String featureCode : featureCodes) {
+                PlanFeature feature = PlanFeature.builder()
+                        .subscriptionPlan(this)
+                        .featureCode(featureCode)
+                        .isEnabled(true)
+                        .build();
+                this.planFeatures.add(feature);
+            }
+        }
+    }
+
+    /**
+     * Get features as a list of strings (for DTO conversion)
+     */
+    @Transient
+    public Set<String> getFeatures() {
+        return getEnabledFeatureCodes();
+    }
+
+    // =====================================================
     // HELPER METHODS
     // =====================================================
 
@@ -154,17 +294,6 @@ public class SubscriptionPlan {
     public void restore() {
         this.deletedAt = null;
         this.isActive = true;
-    }
-
-    public boolean hasFeature(String featureKey) {
-        if (featureKey == null || this.planFeatures == null) {
-            return false;
-        }
-        return this.planFeatures.stream()
-                .filter(pf -> featureKey.equalsIgnoreCase(pf.getFeatureCode()))
-                .map(PlanFeature::isEnabled)
-                .findFirst()
-                .orElse(false);
     }
 
     @Transient
@@ -209,7 +338,24 @@ public class SubscriptionPlan {
             this.price = BigDecimal.ZERO;
         }
         this.price = this.price.setScale(2, RoundingMode.HALF_UP);
+
+        // Generate code from name if code is not set
+        if (this.code == null || this.code.trim().isEmpty()) {
+            this.code = generateCodeFromName(this.name);
+        }
     }
+
+    private String generateCodeFromName(String name) {
+        if (name == null) return "PLAN_" + System.currentTimeMillis();
+        return name.toUpperCase()
+                .replaceAll("[^A-Z0-9]", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+    }
+
+    // =====================================================
+    // GETTERS AND SETTERS
+    // =====================================================
 
     public Long getId() {
         return id;
@@ -217,6 +363,14 @@ public class SubscriptionPlan {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getName() {
@@ -311,6 +465,46 @@ public class SubscriptionPlan {
         this.displayOrder = displayOrder;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public Set<TenantSubscription> getSubscriptions() {
+        return subscriptions;
+    }
+
+    public void setSubscriptions(Set<TenantSubscription> subscriptions) {
+        this.subscriptions = subscriptions;
+    }
+
+    public Set<PlanFeature> getPlanFeatures() {
+        return planFeatures;
+    }
+
+    public void setPlanFeatures(Set<PlanFeature> planFeatures) {
+        this.planFeatures = planFeatures;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -327,7 +521,8 @@ public class SubscriptionPlan {
 
     @Override
     public String toString() {
-        return String.format("SubscriptionPlan{id=%d, name='%s', price=%s, active=%s}",
-                id, name, price, isActive);
+        return String.format("SubscriptionPlan{id=%d, code='%s', name='%s', price=%s, active=%s, features=%d}",
+                id, code, name, price, isActive,
+                planFeatures != null ? planFeatures.size() : 0);
     }
 }

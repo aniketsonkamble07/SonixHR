@@ -1,0 +1,478 @@
+<USER_REQUEST>
+Complete Subscription Plan Flow for Tenant and Admin
+Overview Diagram
+text
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          SUBSCRIPTION PLAN MANAGEMENT FLOW                          │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         ADMIN FLOW (Platform Team)                           │   │
+│  │                                                                             │   │
+│  │  1. Create Plan ──► 2. Configure Features ──► 3. Set Pricing ──► 4. Publish │   │
+│  │                                                                             │   │
+│  │  5. Update Plan ──► 6. Toggle Active/Inactive ──► 7. Delete/Restore        │   │
+│  │                                                                             │   │
+│  │  8. View Statistics ──► 9. View Plan History ──► 10. Bulk Operations        │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                         │                                           │
+│                                         ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         TENANT FLOW (Customer)                               │   │
+│  │                                                                             │   │
+│  │  1. View Plans ──► 2. Select Plan ──► 3. Activate ──► 4. Use Features      │   │
+│  │                                                                             │   │
+│  │  5. Renew ──► 6. Upgrade/Downgrade ──► 7. Cancel ──► 8. Reactivate        │   │
+│  │                                                                             │   │
+│  │  9. View History ──► 10. Check Status ──► 11. Receive Notifications        │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+1. ADMIN FLOW - Platform Subscription Plan Management
+1.1 Create Plan
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CREATE PLAN FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  POST /api/platform/subscription-plans                                     │
+│  {                                                                         │
+│    "code": "PREMIUM",                                                      │
+│    "name": "Premium Plan",                                                 │
+│    "description": "Full feature set for growing businesses",              │
+│    "price": 7999.00,                                                       │
+│    "currency": "INR",                                                      │
+│    "validityMonths": 1,                                                    │
+│    "maxEmployees": 100,                                                    │
+│    "isActive": true,                                                       │
+│    "isPublic": true,                                                       │
+│    "features": ["PAYROLL", "API_ACCESS", "LEAVE_MANAGEMENT"]              │
+│  }                                                                         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.createPlan()                        │   │
+│  │                                                                     │   │
+│  │  1. Validate uniqueness (name, code)                               │   │
+│  │  2. Convert DTO to Entity                                          │   │
+│  │  3. Save to database                                               │   │
+│  │  4. Log to SubscriptionHistory (PLAN_CREATED)                     │   │
+│  │  5. Clear cache (@CacheEvict)                                     │   │
+│  │  6. Return created plan                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 1,                                                                │
+│    "code": "PREMIUM",                                                      │
+│    "name": "Premium Plan",                                                 │
+│    "price": 7999.00,                                                       │
+│    "createdAt": "2026-07-22T10:00:00"                                     │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.2 Update Plan
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           UPDATE PLAN FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  PUT /api/platform/subscription-plans/{id}                                 │
+│  {                                                                         │
+│    "code": "PREMIUM",                                                      │
+│    "name": "Premium Plus Plan",  // Changed                               │
+│    "price": 9999.00,               // Increased                           │
+│    "features": ["PAYROLL", "API_ACCESS", "LEAVE_MANAGEMENT", "ATTENDANCE"] │
+│  }                                                                         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.updatePlan()                        │   │
+│  │                                                                     │   │
+│  │  1. Find existing plan                                             │   │
+│  │  2. Track changes (old vs new)                                     │   │
+│  │  3. Update fields                                                  │   │
+│  │  4. Update features                                                │   │
+│  │  5. Save to database                                               │   │
+│  │  6. Log to SubscriptionHistory (PLAN_UPDATED)                     │   │
+│  │  7. Clear cache                                                    │   │
+│  │  8. Return updated plan                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  SubscriptionHistory Entry:                                                │
+│  {                                                                         │
+│    "eventType": "PLAN_UPDATED",                                            │
+│    "fieldChanged": "name,price,features",                                 │
+│    "oldValue": "Premium Plan, 7999.00, [PAYROLL, API_ACCESS]",           │
+│    "newValue": "Premium Plus Plan, 9999.00, [PAYROLL, API_ACCESS, ...]"  │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.3 Toggle Plan Active/Inactive
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        TOGGLE PLAN ACTIVE FLOW                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  PATCH /api/platform/subscription-plans/{id}/toggle-active                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.togglePlanActive()                  │   │
+│  │                                                                     │   │
+│  │  1. Find plan                                                      │   │
+│  │  2. Check if deleted                                               │   │
+│  │  3. Toggle isActive flag                                           │   │
+│  │  4. Save to database                                               │   │
+│  │  5. Log to SubscriptionHistory (PLAN_TOGGLED)                     │   │
+│  │  6. Clear cache                                                    │   │
+│  │  7. Return updated plan                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 1,                                                                │
+│    "code": "PREMIUM",                                                      │
+│    "isActive": false,  // Now inactive                                    │
+│    "message": "Plan deactivated"                                          │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.4 Delete Plan (Soft Delete)
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DELETE PLAN FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  DELETE /api/platform/subscription-plans/{id}                              │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.deletePlan()                        │   │
+│  │                                                                     │   │
+│  │  1. Find plan                                                      │   │
+│  │  2. Check if already deleted                                       │   │
+│  │  3. Set deletedAt = now                                            │   │
+│  │  4. Set isActive = false                                           │   │
+│  │  5. Save to database                                               │   │
+│  │  6. Log to SubscriptionHistory (PLAN_DELETED)                     │   │
+│  │  7. Clear cache                                                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response: 204 No Content                                                   │
+│                                                                             │
+│  SubscriptionHistory Entry:                                                │
+│  {                                                                         │
+│    "eventType": "PLAN_DELETED",                                            │
+│    "deletedAt": "2026-07-22T10:30:00",                                    │
+│    "wasActive": true                                                       │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.5 Restore Plan
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         RESTORE PLAN FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  PATCH /api/platform/subscription-plans/{id}/restore                      │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.restorePlan()                       │   │
+│  │                                                                     │   │
+│  │  1. Find deleted plan                                              │   │
+│  │  2. Remove deletedAt                                               │   │
+│  │  3. Set isActive = true                                            │   │
+│  │  4. Save to database                                               │   │
+│  │  5. Log to SubscriptionHistory (PLAN_RESTORED)                    │   │
+│  │  6. Clear cache                                                    │   │
+│  │  7. Return restored plan                                           │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 1,                                                                │
+│    "code": "PREMIUM",                                                      │
+│    "isActive": true,                                                       │
+│    "deletedAt": null                                                       │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.6 Manage Features
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       MANAGE PLAN FEATURES FLOW                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Add Feature:                                                               │
+│  POST /api/platform/subscription-plans/{id}/features?featureCode=PAYROLL   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.addFeatureToPlan()                  │   │
+│  │                                                                     │   │
+│  │  1. Find plan                                                      │   │
+│  │  2. Check if feature exists                                        │   │
+│  │  3. Create PlanFeature entity                                      │   │
+│  │  4. Add to plan                                                    │   │
+│  │  5. Save to database                                               │   │
+│  │  6. Log as PLAN_UPDATED                                            │   │
+│  │  7. Clear cache                                                    │   │
+│  │  8. Return updated plan                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Remove Feature:                                                            │
+│  DELETE /api/platform/subscription-plans/{id}/features/{featureCode}       │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.removeFeatureFromPlan()             │   │
+│  │                                                                     │   │
+│  │  1. Find plan                                                      │   │
+│  │  2. Remove feature from plan                                       │   │
+│  │  3. Save to database                                               │   │
+│  │  4. Log as PLAN_UPDATED                                            │   │
+│  │  5. Clear cache                                                    │   │
+│  │  6. Return updated plan                                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+1.7 View Plan Statistics (Admin Dashboard)
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       PLAN STATISTICS FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Admin Request                                                              │
+│  GET /api/platform/subscription-plans/statistics/overview                  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.getPlanStatistics()                  │   │
+│  │                                                                     │   │
+│  │  1. Fetch all plans                                                │   │
+│  │  2. Count total/active/deleted plans                               │   │
+│  │  3. Calculate average/min/max price                                │   │
+│  │  4. Count public/custom/free plans                                 │   │
+│  │  5. Return statistics                                              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "totalPlans": 5,                                                        │
+│    "activePlans": 4,                                                       │
+│    "deletedPlans": 1,                                                      │
+│    "publicPlans": 3,                                                       │
+│    "customPlans": 1,                                                       │
+│    "freePlans": 1,                                                         │
+│    "averagePrice": 4999.00,                                                │
+│    "minPrice": 0.00,                                                       │
+│    "maxPrice": 9999.00                                                     │
+│  }                                                                         │
+│                                                                             │
+│  Plan Usage Statistics:                                                    │
+│  GET /api/platform/subscription-plans/statistics/usage                    │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "planCreated": 10,                                                      │
+│    "planUpdated": 25,                                                      │
+│    "planDeleted": 3,                                                       │
+│    "planRestored": 2,                                                      │
+│    "planToggled": 5,                                                       │
+│    "totalPlanOperations": 45,                                              │
+│    "planActivity": {                                                       │
+│      "PREMIUM": 15,                                                        │
+│      "STANDARD": 10,                                                       │
+│      "BASIC": 8                                                            │
+│    },                                                                      │
+│    "mostActivePlan": "PREMIUM"                                             │
+│  }                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+2. TENANT FLOW - Subscription Management
+2.1 View Available Plans
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        VIEW PLANS FLOW                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Tenant Request                                                             │
+│  GET /api/tenant/billing/plans                                             │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ PlatformSubscriptionPlanService.getPublicPlans()                    │   │
+│  │                                                                     │   │
+│  │  1. Fetch active & public plans                                    │   │
+│  │  2. Convert to DTO                                                  │   │
+│  │  3. Return list                                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  [                                                                         │
+│    {                                                                       │
+│      "id": 1,                                                              │
+│      "code": "BASIC",                                                      │
+│      "name": "Basic Plan",                                                 │
+│      "description": "Essential features for small businesses",            │
+│      "price": 2499.00,                                                     │
+│      "currency": "INR",                                                    │
+│      "validityMonths": 1,                                                  │
+│      "maxEmployees": 25,                                                   │
+│      "features": ["EMPLOYEE_MANAGEMENT", "BASIC_ATTENDANCE"]              │
+│    },                                                                      │
+│    {                                                                       │
+│      "id": 2,                                                              │
+│      "code": "STANDARD",                                                   │
+│      "name": "Standard Plan",                                              │
+│      "price": 4999.00,                                                     │
+│      "features": ["EMPLOYEE_MANAGEMENT", "ADVANCED_ATTENDANCE", ...]      │
+│    }                                                                       │
+│  ]                                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+2.2 Activate Subscription
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      ACTIVATE SUBSCRIPTION FLOW                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Tenant Request                                                             │
+│  POST /api/tenant/billing/subscription/activate?planId=2                   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ TenantSubscriptionService.activateSubscription()                    │   │
+│  │                                                                     │   │
+│  │  1. Find tenant                                                    │   │
+│  │  2. Find plan                                                      │   │
+│  │  3. Close existing active subscription                             │   │
+│  │  4. Create new subscription with:                                  │   │
+│  │     - Plan details                                                 │   │
+│  │     - Status: ACTIVE                                               │   │
+│  │     - Billing period start: now                                   │   │
+│  │     - Billing period end: now + validityMonths                    │   │
+│  │  5. Save subscription                                              │   │
+│  │  6. Update tenant:                                                 │   │
+│  │     - PlanStatus: ACTIVE                                           │   │
+│  │     - EndsAt: new billing end                                     │   │
+│  │     - Status: ACTIVE                                              │   │
+│  │     - DataStatus: RETAINED                                        │   │
+│  │  7. Log to SubscriptionEventLog                                    │   │
+│  │  8. Publish SubscriptionActivatedEvent                             │   │
+│  │  9. Invalidate caches                                              │   │
+│  │ 10. Send activation email                                          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 123,                                                              │
+│    "planType": "STANDARD",                                                 │
+│    "planName": "Standard Plan",                                            │
+│    "planStatus": "ACTIVE",                                                 │
+│    "startedAt": "2026-07-22T10:00:00",                                    │
+│    "endsAt": "2026-08-22T10:00:00",                                       │
+│    "amount": 4999.00,                                                      │
+│    "currency": "INR",                                                      │
+│    "isActive": true                                                        │
+│  }                                                                         │
+│                                                                             │
+│  Email Sent:                                                               │
+│  Subject: "Welcome! Your Standard Plan subscription is now active"        │
+└─────────────────────────────────────────────────────────────────────────────┘
+2.3 Renew Subscription
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        RENEW SUBSCRIPTION FLOW                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Tenant Request (Manual)                                                   │
+│  POST /api/tenant/billing/subscription/renew                               │
+│                                                                             │
+│  OR Auto-Renew (Scheduler)                                                 │
+│  Daily at 1:00 AM - SubscriptionSchedulerService.renewSubscriptions()     │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ TenantSubscriptionService.renewSubscription()                       │   │
+│  │                                                                     │   │
+│  │  1. Find current subscription                                      │   │
+│  │  2. Check if can renew:                                            │   │
+│  │     - Not terminated                                               │   │
+│  │     - Not cancelled                                                │   │
+│  │     - Not already active (unless expiring soon)                   │   │
+│  │  3. If expired, call reactivateExpiredSubscription()               │   │
+│  │  4. Create new subscription with extended period                   │   │
+│  │  5. Deactivate old subscription                                    │   │
+│  │  6. Update tenant:                                                 │   │
+│  │     - End date: new billing end                                   │   │
+│  │     - Status: ACTIVE                                              │   │
+│  │  7. Log to SubscriptionEventLog                                    │   │
+│  │  8. Publish SubscriptionRenewedEvent                               │   │
+│  │  9. Invalidate caches                                              │   │
+│  │ 10. Send renewal email                                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 124,                                                              │
+│    "planName": "Standard Plan",                                            │
+│    "planStatus": "ACTIVE",                                                 │
+│    "billingPeriodEnd": "2026-09-22T10:00:00",                             │
+│    "isActive": true                                                        │
+│  }                                                                         │
+│                                                                             │
+│  Email Sent:                                                               │
+│  Subject: "Your Standard Plan subscription has been renewed"              │
+└─────────────────────────────────────────────────────────────────────────────┘
+2.4 Upgrade/Downgrade Subscription
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      UPGRADE SUBSCRIPTION FLOW                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Tenant Request                                                             │
+│  POST /api/tenant/billing/subscription/upgrade                             │
+│  {                                                                         │
+│    "planType": "PREMIUM"                                                   │
+│  }                                                                         │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ TenantSubscriptionService.upgradeSubscription()                     │   │
+│  │                                                                     │   │
+│  │  1. Find new plan by name                                          │   │
+│  │  2. Get current subscription                                       │   │
+│  │  3. Store old plan name                                            │   │
+│  │  4. Call activateSubscription with new plan                        │   │
+│  │  5. Send upgrade email                                             │   │
+│  │  6. Send plan change notification                                  │   │
+│  │  7. Log to history                                                 │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Response:                                                                  │
+│  {                                                                         │
+│    "id": 125,                                                              │
+│    "planName": "Premium Plan",                                             │
+│    "planStatus": "ACTIVE",                                                 │
+│    "amount": 7999.00,                                                      │
+│    "message": "Successfully upgraded from Standard to Premium"            │
+│  }                                                                         │
+│                                                                             │
+│  Emails Sent:                                                               │
+│  1. Subject: "Subscription upgraded to Premium Plan!"                      │
+│  2. Subject: "Plan UPGRADE: Standard → Premium"                            │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ DOWNGRADE FLOW (Same as upgrade but different email)                │   │
+│  │                                                                     │   │
+│  │  TenantSubscriptionService.downgradeSubscription()                  │   │
+│  │  1. Find new plan (lower tier)                                     │   │
+│  │  2. Activate new subscription                                      │   │
+│  │  3. Send downgrade email                                           │   │
+│  │  4. Send plan change notification                                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+2.5 Cancel Subscription
+text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        CANCEL SUBSCRIPTION FLOW                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Tenant Request                                                             │
+│  POST /api/tenant/billing/subscription/cancel?reason=NOT_NEEDED           │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ TenantSubscriptionService.cancelSubscription()                      │   │
+│  │                                                                     │   │
+│  │  1. Find subscription                                              │   │
+│  │  2. Check if active                          
+<truncated 40758 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

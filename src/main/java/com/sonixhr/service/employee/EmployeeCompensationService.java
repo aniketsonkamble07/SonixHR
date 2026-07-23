@@ -21,17 +21,12 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @SuppressWarnings("null")
 public class EmployeeCompensationService {
-
-    private static final Logger log = LoggerFactory.getLogger(EmployeeCompensationService.class);
 
     private final EmployeeRepository employeeRepository;
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepo;

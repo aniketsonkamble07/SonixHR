@@ -12,16 +12,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/platform")
 @RequiredArgsConstructor
 public class PlatformDashboardController {
-
-    private static final Logger log = LoggerFactory.getLogger(PlatformDashboardController.class);
 
     private final PlatformDashboardService dashboardService;
 

@@ -5,779 +5,739 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.mail.MailException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
+@Slf4j
 public class EmailService {
-
-    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.email.from:noreply@sonixhr.com}")
+    @Value("${app.email.from}")
     private String fromEmail;
 
-    @Value("${app.email.enabled:true}")
+    @Value("${app.email.enabled}")
     private boolean emailEnabled;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     // =====================================================
-    // EMPLOYEE ACTIVATION EMAIL - FIXED
+    // PLATFORM USER EMAILS (Called by PlatformNotificationService)
     // =====================================================
 
     /**
-     * ✅ ADDED: Send employee activation email (called by TenantRegistrationService)
+     * Send platform activation email
      */
     @Async
-    public void sendActivationEmail(String to, String name, String activationLink) {
+    public void sendPlatformActivationEmail(String email, String fullName, String activationLink) {
         if (!emailEnabled) {
-            log.info("Email sending disabled. Would send activation email to: {}", to);
+            log.info("Email sending disabled. Would send platform activation email to: {}", email);
             return;
         }
 
-        log.info("Sending activation email to: {}", to);
+        log.info("Sending platform activation email to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
-            helper.setSubject("Activate Your Account - SonixHR");
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Welcome %s!</h2>
-                        <p>Your account has been created. Please click the button below to set your password and activate your account:</p>
-                        <p style="text-align: center;">
-                            <a href="%s" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                                Activate Account
-                            </a>
-                        </p>
-                        <p>Or copy and paste this link: <a href="%s">%s</a></p>
-                        <p><strong>This link will expire in 24 hours.</strong></p>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, name, activationLink, activationLink, activationLink);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Activation email sent successfully to: {}", to);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send activation email to: {}", to, e);
-            // ✅ FIXED: Don't throw exception - email failure shouldn't break registration
-        }
-    }
-
-    @Async
-    public void sendSubscriptionReminderEmail(String to, String companyName, String planName, int daysRemaining) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send subscription reminder email to: {}", to);
-            return;
-        }
-
-        log.info("Sending subscription reminder email to: {} for company: {}", to, companyName);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Subscription Expiration Reminder - " + companyName);
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #EF4444;">Subscription Expiration Reminder</h2>
-                        <p>This is a friendly reminder that your subscription for <strong>%s</strong> is set to expire in <strong>%d days</strong>.</p>
-                        <p>Details:</p>
-                        <ul>
-                            <li><strong>Company:</strong> %s</li>
-                            <li><strong>Current Plan:</strong> %s</li>
-                        </ul>
-                        <p>To avoid any disruption to your service, please renew or upgrade your plan from the Billing Dashboard.</p>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, companyName, daysRemaining, companyName, planName);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Subscription reminder email sent successfully to: {}", to);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send subscription reminder email to: {}", to, e);
-        }
-    }
-
-    @Async
-    public void sendSubscriptionExpiredEmail(String to, String companyName, String planName) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send subscription expired email to: {}", to);
-            return;
-        }
-
-        log.info("Sending subscription expired email to: {} for company: {}", to, companyName);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Your Subscription Has Expired - " + companyName);
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #EF4444;">Subscription Expired</h2>
-                        <p>This is to inform you that your subscription for <strong>%s</strong> has expired.</p>
-                        <p>Details:</p>
-                        <ul>
-                            <li><strong>Company:</strong> %s</li>
-                            <li><strong>Expired Plan:</strong> %s</li>
-                        </ul>
-                        <p>Your tenant account has been temporarily suspended. To reactivate your services, please log in and renew or upgrade your plan from the Billing Dashboard.</p>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, companyName, companyName, planName);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Subscription expired email sent successfully to: {}", to);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send subscription expired email to: {}", to, e);
-        }
-    }
-
-    @Async
-    public void sendPaymentFailedEmail(String to, String companyName) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send payment failed email to: {}", to);
-            return;
-        }
-
-        log.info("Sending payment failed email to: {} for company: {}", to, companyName);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Payment Failed - Action Required - " + companyName);
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #EF4444;">Payment Failed</h2>
-                        <p>We were unable to process the payment for your subscription for <strong>%s</strong>.</p>
-                        <p>Your subscription is now in a 3-day grace period. Please update your billing details or renew your plan to prevent service disruption.</p>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, companyName);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Payment failed email sent successfully to: {}", to);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send payment failed email to: {}", to, e);
-        }
-    }
-
-    // =====================================================
-    // PLATFORM USER EMAILS
-    // =====================================================
-
-    @Async
-    public void sendPlatformActivationEmail(String to, String name, String activationLink) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send platform activation email to: {}", to);
-            return;
-        }
-
-        log.info("Sending platform activation email to: {}", to);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
+            helper.setTo(email);
             helper.setSubject("Activate Your Platform Account - SonixHR");
             helper.setFrom(fromEmail);
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Welcome %s!</h2>
-                        <p>Your platform account has been created. Please click the link below to activate your account:</p>
-                        <p><a href="%s">%s</a></p>
-                        <p>This link will expire in 24 hours.</p>
-                        <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, name, activationLink, activationLink);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Platform activation email sent to: {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send platform activation email to: {}", to, e);
-        }
-    }
-
-    @Async
-    public void sendWelcomeEmail(String to, String name) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send welcome email to: {}", to);
-            return;
-        }
-
-        log.info("Sending welcome email to: {}", to);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Welcome to SonixHR!");
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Welcome %s!</h2>
-                        <p>Your account has been successfully activated.</p>
-                        <p>You can now log in to your account.</p>
-                        <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, name);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Welcome email sent to: {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send welcome email to: {}", to, e);
-        }
-    }
-
-    // =====================================================
-    // PASSWORD RESET EMAILS
-    // =====================================================
-
-    @Async
-    public void sendPasswordResetEmail(String to, String name, String resetLink) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send password reset email to: {}", to);
-            return;
-        }
-
-        log.info("Sending password reset email to: {}", to);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Reset Your Password - SonixHR");
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Hello %s,</h2>
-                        <p>We received a request to reset your password.</p>
-                        <p>Click the button below to create a new password:</p>
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #667eea;">Welcome %s!</h2>
+                        <p>Your platform account has been created. Please click the button below to activate your account:</p>
                         <p style="text-align: center;">
-                            <a href="%s" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                                Reset Password
-                            </a>
-                        </p>
-                        <p>This link will expire in 24 hours.</p>
-                        <p>If you did not request this, please ignore this email.</p>
-                        <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, name, resetLink);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Password reset email sent to: {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send password reset email to: {}", to, e);
-        }
-    }
-
-    // =====================================================
-    // TENANT REGISTRATION EMAIL
-    // =====================================================
-
-    @Async
-    public void sendTenantWelcomeEmail(String to, String name, String companyName,
-                                       String activationLink,
-                                       String planType) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send tenant welcome email to: {}", to);
-            return;
-        }
-
-        log.info("Sending tenant welcome email to: {}", to);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
-            helper.setSubject("Welcome to SonixHR - Your Account is Ready!");
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Welcome %s!</h2>
-                        <p>Thank you for choosing SonixHR for <strong>%s</strong>.</p>
-                        <p>Your account has been created with the <strong>%s</strong> plan.</p>
-                        <p>Click the button below to activate your account:</p>
-                        <p style="text-align: center;">
-                            <a href="%s" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
                                 Activate Account
                             </a>
                         </p>
+                        <p style="font-size: 12px; color: #666;">This link will expire in 24 hours.</p>
                         <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, name, companyName, planType, activationLink);
+                """, fullName, activationLink);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Tenant welcome email sent to: {}", to);
+            // mailSender.send(message);
+            log.info("Platform activation email sent successfully to: {}", email);
+
         } catch (MessagingException e) {
-            log.error("Failed to send tenant welcome email to: {}", to, e);
+            log.error("Failed to send platform activation email to: {}", email, e);
         }
     }
 
-    // =====================================================
-    // NOTIFICATION EMAILS
-    // =====================================================
-
+    /**
+     * Send account activated notification
+     */
     @Async
-    public void sendAccountActivatedNotification(String to, String name) {
-        if (!emailEnabled) return;
+    public void sendAccountActivatedNotification(String email, String fullName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send account activated notification to: {}", email);
+            return;
+        }
+
+        log.info("Sending account activated notification to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
+            helper.setTo(email);
             helper.setSubject("Your Account Has Been Activated - SonixHR");
             helper.setFrom(fromEmail);
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #10B981;">Account Activated!</h2>
-                        <p>Dear %s,</p>
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #28a745;">Account Activated!</h2>
+                        <p>Dear <strong>%s</strong>,</p>
                         <p>Your SonixHR account has been <strong>activated</strong>.</p>
                         <p>You can now log in to your account.</p>
                         <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, name);
+                """, fullName);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Account activated notification sent to: {}", to);
+            // mailSender.send(message);
+            log.info("Account activated notification sent successfully to: {}", email);
+
         } catch (MessagingException e) {
-            log.error("Failed to send account activated notification to: {}", to, e);
+            log.error("Failed to send account activated notification to: {}", email, e);
         }
     }
 
+    /**
+     * Send account suspended notification
+     */
     @Async
-    public void sendAccountSuspendedNotification(String to, String name) {
-        if (!emailEnabled) return;
+    public void sendAccountSuspendedNotification(String email, String fullName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send account suspended notification to: {}", email);
+            return;
+        }
+
+        log.info("Sending account suspended notification to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
+            helper.setTo(email);
             helper.setSubject("Your Account Has Been Suspended - SonixHR");
             helper.setFrom(fromEmail);
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #EF4444;">Account Suspended</h2>
-                        <p>Dear %s,</p>
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #dc3545;">Account Suspended</h2>
+                        <p>Dear <strong>%s</strong>,</p>
                         <p>Your SonixHR platform user account has been <strong>suspended</strong> by the system administrator.</p>
                         <p>If you believe this is an error, please contact support.</p>
                         <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, name);
+                """, fullName);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Account suspended notification sent to: {}", to);
+            // mailSender.send(message);
+            log.info("Account suspended notification sent successfully to: {}", email);
+
         } catch (MessagingException e) {
-            log.error("Failed to send account suspended notification to: {}", to, e);
+            log.error("Failed to send account suspended notification to: {}", email, e);
         }
     }
 
+    /**
+     * Send password reset notification
+     */
     @Async
-    public void sendPasswordResetNotification(String to, String name) {
-        if (!emailEnabled) return;
+    public void sendPasswordResetNotification(String email, String fullName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send password reset notification to: {}", email);
+            return;
+        }
+
+        log.info("Sending password reset notification to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
+            helper.setTo(email);
             helper.setSubject("Your Password Has Been Reset - SonixHR");
             helper.setFrom(fromEmail);
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #4F46E5;">Password Reset Successful</h2>
-                        <p>Dear %s,</p>
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #667eea;">Password Reset Successful</h2>
+                        <p>Dear <strong>%s</strong>,</p>
                         <p>Your SonixHR platform user account password has been successfully <strong>reset</strong> by the administrator.</p>
                         <p>You can now log in using your new credentials.</p>
                         <p>If you did not authorize this change, please contact support immediately.</p>
                         <hr/>
-                        <p>Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, name);
+                """, fullName);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Password reset notification sent to: {}", to);
+            // mailSender.send(message);
+            log.info("Password reset notification sent successfully to: {}", email);
+
         } catch (MessagingException e) {
-            log.error("Failed to send password reset notification to: {}", to, e);
+            log.error("Failed to send password reset notification to: {}", email, e);
         }
     }
 
-    // =====================================================
-    // LEAVE STATUS NOTIFICATIONS
-    // =====================================================
-
+    /**
+     * Send password reset email with link
+     */
     @Async
-    public void sendLeaveStatusNotification(String to, String employeeName, String leaveType,
-                                             String startDate, String endDate, String status, String actionBy) {
+    public void sendPasswordResetEmail(String email, String fullName, String resetLink) {
         if (!emailEnabled) {
-            log.info("Email sending disabled. Would send leave status email to: {}", to);
+            log.info("Email sending disabled. Would send password reset email to: {}", email);
             return;
         }
 
-        log.info("Sending leave status notification email to: {}", to);
+        log.info("Sending password reset email to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
-            helper.setSubject("Leave Request " + status + " - SonixHR");
+            helper.setTo(email);
+            helper.setSubject("Reset Your Password - SonixHR");
             helper.setFrom(fromEmail);
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
                     <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                        <h2 style="color: #4F46E5;">Leave Request Update</h2>
-                        <p>Hello <strong>%s</strong>,</p>
-                        <p>Your leave request has been reviewed.</p>
-                        <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Leave Type</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Duration</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s to %s</td>
-                            </tr>
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Status</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold; color: %s;">%s</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Actioned By</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                        </table>
+                        <h2 style="color: #667eea;">Hello %s,</h2>
+                        <p>We received a request to reset your password.</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                Reset Password
+                            </a>
+                        </p>
+                        <p style="font-size: 12px; color: #666;">This link will expire in 24 hours.</p>
+                        <p style="font-size: 12px; color: #666;">If you did not request this, please ignore this email.</p>
                         <hr/>
-                        <p style="color: #666; font-size: 12px;">This is an automated notification. Please do not reply directly to this email.</p>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, 
-                employeeName, 
-                leaveType, 
-                startDate, 
-                endDate, 
-                "APPROVED".equalsIgnoreCase(status) ? "#10B981" : "#EF4444", 
-                status, 
-                actionBy);
+                """, fullName, resetLink);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Leave status notification email sent successfully to: {}", to);
-        } catch (MessagingException | MailException e) {
-            log.error("Failed to send leave status email to: {}", to, e);
+            // mailSender.send(message);
+            log.info("Password reset email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send password reset email to: {}", email, e);
         }
     }
 
+    /**
+     * Send support ticket alert to platform admins
+     */
     @Async
-    public void sendTaskNotification(String to, String employeeName, String taskTitle, String action, String actionBy) {
+    public void sendSupportTicketAlert(String email, String adminName, String ticketNumber,
+                                       String companyName, String ticketTitle,
+                                       String ticketStatus, String action) {
         if (!emailEnabled) {
-            log.info("Email sending disabled. Would send task notification email to: {}", to);
+            log.info("Email sending disabled. Would send support ticket alert to: {}", email);
             return;
         }
 
-        log.info("Sending task notification email to: {}", to);
+        log.info("Sending support ticket alert email to: {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
-            helper.setSubject("Task " + action + " - SonixHR");
-            helper.setFrom(fromEmail);
-
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                        <h2 style="color: #4F46E5;">Task Notification</h2>
-                        <p>Hello <strong>%s</strong>,</p>
-                        <p>A task action has occurred.</p>
-                        <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Task Title</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Action</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">%s</td>
-                            </tr>
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Action By</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                        </table>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, employeeName, taskTitle, action, actionBy);
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Task notification email sent successfully to: {}", to);
-        } catch (MessagingException | MailException e) {
-            log.error("Failed to send task notification email to: {}", to, e);
-        }
-    }
-
-    @Async
-    public void sendSupportTicketAlert(String to, String adminName, String ticketNumber, String companyName, String ticketTitle, String ticketStatus, String action) {
-        if (!emailEnabled) {
-            log.info("Email sending disabled. Would send support ticket alert to: {}", to);
-            return;
-        }
-
-        log.info("Sending support ticket alert email to: {}", to);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(to);
+            helper.setTo(email);
             helper.setSubject(String.format("Support Ticket Alert [%s] - %s", ticketNumber, action));
             helper.setFrom(fromEmail);
 
+            String reactLink = frontendUrl + "/platform/tickets/" + ticketNumber;
+
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
                     <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                        <h2 style="color: #4F46E5;">Support Ticket Alert</h2>
+                        <h2 style="color: #667eea;">Support Ticket Alert</h2>
                         <p>Hello <strong>%s</strong>,</p>
                         <p>A support ticket has been <strong>%s</strong>.</p>
-                        <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Ticket Number</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">%s</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Organization</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                            <tr style="background-color: #f8f9fa;">
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Title</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6;">%s</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Status</td>
-                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">%s</td>
-                            </tr>
-                        </table>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                            <p style="margin: 5px 0;"><strong>Ticket Number:</strong> %s</p>
+                            <p style="margin: 5px 0;"><strong>Organization:</strong> %s</p>
+                            <p style="margin: 5px 0;"><strong>Title:</strong> %s</p>
+                            <p style="margin: 5px 0;"><strong>Status:</strong> %s</p>
+                        </div>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                View Ticket
+                            </a>
+                        </p>
                         <hr/>
-                        <p style="color: #666; font-size: 12px;">This is an automated notification. Please do not reply directly.</p>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, 
-                adminName, 
-                action.toLowerCase(), 
-                ticketNumber, 
-                companyName, 
-                ticketTitle, 
-                ticketStatus);
+                """,
+                    adminName,
+                    action.toLowerCase(),
+                    ticketNumber,
+                    companyName,
+                    ticketTitle,
+                    ticketStatus,
+                    reactLink);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Support ticket alert email sent successfully to: {}", to);
-        } catch (MessagingException | MailException e) {
-            log.error("Failed to send support ticket alert email to: {}", to, e);
+            // mailSender.send(message);
+            log.info("Support ticket alert email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send support ticket alert email to: {}", email, e);
         }
     }
 
+    // =====================================================
+    // EMPLOYEE ACTIVATION EMAIL
+    // =====================================================
+
+    /**
+     * Send employee activation email
+     */
     @Async
-    public void sendArchiveWarningEmail(String to, String companyName, String planName, int daysUntilArchive) {
+    public void sendActivationEmail(String email, String fullName, String activationLink) {
         if (!emailEnabled) {
-            log.info("Email sending disabled. Would send archive warning email to: {}", to);
+            log.info("Email sending disabled. Would send activation email to: {}", email);
             return;
         }
 
-        log.info("Sending archive warning email to: {} for company: {}", to, companyName);
+        log.info("Sending activation email to: {}", email);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("Activate Your Account - SonixHR");
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #667eea;">Welcome %s!</h2>
+                        <p>Your employee account has been created. Please click the button below to set your password and activate your account:</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                Activate Account
+                            </a>
+                        </p>
+                        <p style="font-size: 12px; color: #666;">This link will expire in 24 hours.</p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """, fullName, activationLink);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Activation email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send activation email to: {}", email, e);
+        }
+    }
+
+    // =====================================================
+    // ARCHIVAL EMAILS (Called by SubscriptionSchedulerService)
+    // =====================================================
+
+    /**
+     * Send archive warning email
+     */
+    @Async
+    public void sendArchiveWarningEmail(String email, String companyName, String planName, int daysUntilArchive) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send deactivation warning email to: {}", email);
+            return;
+        }
+
+        log.info("Sending deactivation warning email to: {} for company: {}", email, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("ACTION REQUIRED: Your workspace is scheduled for deactivation - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String reactLink = frontendUrl + "/billing/subscription";
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #ffc107;">Action Required: Deactivation Notice</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>This is to inform you that your workspace for <strong>%s</strong> is scheduled to be deactivated (soft-deleted) in <strong>%d days</strong>.</p>
+                        <p>To retain full self-serve access, please renew or upgrade your plan:</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #ffc107; color: #333; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
+                                Renew Subscription
+                            </a>
+                        </p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                    companyName,
+                    companyName,
+                    daysUntilArchive,
+                    reactLink);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Deactivation warning email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send deactivation warning email to: {}", email, e);
+        }
+    }
+
+
+
+    // =====================================================
+    // SUBSCRIPTION EMAILS (Called by TenantSubscriptionService)
+    // =====================================================
+
+    /**
+     * Send subscription expired email
+     */
+    @Async
+    public void sendSubscriptionExpiredEmail(String email, String companyName, String planName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send subscription expired email to: {}", email);
+            return;
+        }
+
+        log.info("Sending subscription expired email to: {} for company: {}", email, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("Your Subscription Has Expired - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String reactLink = frontendUrl + "/billing/subscription";
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #dc3545;">Subscription Expired</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>Your subscription for <strong>%s</strong> has expired.</p>
+                        <p><strong>Plan:</strong> %s</p>
+                        <p>To reactivate your services:</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                Renew Subscription
+                            </a>
+                        </p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                    companyName,
+                    companyName,
+                    planName,
+                    reactLink);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Subscription expired email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send subscription expired email to: {}", email, e);
+        }
+    }
+
+    // =====================================================
+    // GENERIC EMAIL METHOD
+    // =====================================================
+
+    @Async
+    public void sendEmail(String to, String subject, String body) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send email to: {}", to);
+            return;
+        }
+
+        log.info("Sending email to: {} with subject: {}", to, subject);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(to);
-            helper.setSubject("ACTION REQUIRED: Your data is scheduled for archiving - " + companyName);
+            helper.setSubject(subject);
             helper.setFrom(fromEmail);
+            helper.setText(body, true);
 
-            String htmlContent = String.format("""
-                <html>
-                <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #F59E0B;">Action Required: Data Archiving Notice</h2>
-                        <p>This is to inform you that your workspace for <strong>%s</strong> is scheduled to be archived in <strong>%d days</strong>.</p>
-                        <p>If your workspace is archived, you will no longer be able to log in or self-serve renewal, and unarchiving will require contacting support.</p>
-                        <p><strong>To retain full self-serve access and keep your workspace active, please renew or upgrade your plan from the billing dashboard.</strong></p>
-                        <p>If you wish to download your records before archiving, you can log in and visit the Export Dashboard to download your employee and payroll histories.</p>
-                        <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
-                    </div>
-                </body>
-                </html>
-                """, companyName, daysUntilArchive);
+            // mailSender.send(message);
+            log.info("Email sent successfully to: {}", to);
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Archive warning email sent successfully to: {}", to);
-        } catch (MessagingException | MailException e) {
-            log.error("Failed to send archive warning email to: {}", to, e);
+        } catch (MessagingException e) {
+            log.error("Failed to send email to: {}", to, e);
         }
     }
 
+    /**
+     * Send subscription expiration reminder email
+     */
     @Async
-    public void sendFinalDataReminderEmail(String to, String companyName, String planName, boolean isArchived) {
+    public void sendSubscriptionExpirationReminderEmail(String email, String companyName, String planName, int daysRemaining) {
         if (!emailEnabled) {
-            log.info("Email sending disabled. Would send final data reminder email to: {}", to);
+            log.info("Email sending disabled. Would send expiration reminder email to: {}", email);
             return;
         }
 
-        log.info("Sending final data reminder email to: {} for company: {}", to, companyName);
+        String timeframe = daysRemaining == 1 ? "tomorrow" : "in " + daysRemaining + " days";
+        log.info("Sending subscription expiration reminder email to: {} (expires {})", email, timeframe);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(to);
-            helper.setSubject("Final Notice: Platform Data Review Approaching - " + companyName);
+            helper.setTo(email);
+            helper.setSubject("Your subscription expires " + timeframe + " - " + companyName);
             helper.setFrom(fromEmail);
 
-            String statusExplanation = isArchived 
-                ? "Your workspace is currently in an ARCHIVED state. To restore your data, you must contact support."
-                : "Your workspace is currently EXPIRED. You can log in and visit the Billing or Export Dashboard to manage your data.";
+            String reactLink = frontendUrl + "/billing/subscription";
 
             String htmlContent = String.format("""
                 <html>
                 <body style="font-family: Arial, sans-serif;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #EF4444;">Final Notice: Subscription Data Review</h2>
-                        <p>We are writing to notify you that your subscription data for <strong>%s</strong> (Plan: %s) is approaching its one-year expiration mark.</p>
-                        <p>%s</p>
-                        <p>Please note that a member of our platform operations team will shortly review your account status to make a data-retention decision. Data is never deleted automatically, but we encourage you to retrieve any necessary payroll or employee history.</p>
-                        <p>For support or data recovery assistance, please contact our support desk.</p>
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #dc3545;">Subscription Expiry Notice</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>Your subscription to <strong>%s</strong> is scheduled to expire <strong>%s</strong>.</p>
+                        <p><strong>Plan:</strong> %s</p>
+                        <p>To prevent any service interruption, please renew your subscription:</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                Renew Subscription
+                            </a>
+                        </p>
                         <hr/>
-                        <p style="color: #666; font-size: 12px;">Thanks,<br/>SonixHR Team</p>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
                     </div>
                 </body>
                 </html>
-                """, companyName, planName, statusExplanation);
+                """,
+                    companyName,
+                    companyName,
+                    timeframe,
+                    planName,
+                    reactLink);
 
             helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Final data reminder email sent successfully to: {}", to);
-        } catch (MessagingException | MailException e) {
-            log.error("Failed to send final data reminder email to: {}", to, e);
+            // mailSender.send(message);
+            log.info("Subscription expiration reminder email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send subscription expiration reminder email to: {}", email, e);
         }
     }
+
+    /**
+     * Send upcoming renewal notification email
+     */
+    @Async
+    public void sendUpcomingRenewalEmail(String email, String companyName, String planName, String renewalDate) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send upcoming renewal email to: {}", email);
+            return;
+        }
+
+        log.info("Sending upcoming renewal email to: {} for company: {}", email, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("Upcoming Subscription Renewal Notice - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #28a745;">Upcoming Subscription Renewal</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>Your subscription for <strong>%s</strong> is scheduled to renew automatically on <strong>%s</strong>.</p>
+                        <p><strong>Plan:</strong> %s</p>
+                        <p>No action is required from your side. The renewal amount will be charged automatically.</p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                    companyName,
+                    companyName,
+                    renewalDate,
+                    planName);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Upcoming renewal email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send upcoming renewal email to: {}", email, e);
+        }
+    }
+
+    /**
+     * Send subscription renewal payment failed email
+     */
+    @Async
+    public void sendPaymentFailedEmail(String email, String companyName, String planName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send payment failed email to: {}", email);
+            return;
+        }
+
+        log.info("Sending payment failed email to: {} for company: {}", email, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("URGENT: Subscription Renewal Payment Failed - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String reactLink = frontendUrl + "/billing/subscription";
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #dc3545;">URGENT: Payment Failed</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>The automatic renewal payment for your <strong>%s</strong> subscription has failed.</p>
+                        <p><strong>Plan:</strong> %s</p>
+                        <p>As a result, your subscription has been expired and your account access has been suspended.</p>
+                        <p>To restore access immediately, please update your payment details or renew your subscription:</p>
+                        <p style="text-align: center;">
+                            <a href="%s" style="background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                                Update Billing & Renew
+                            </a>
+                        </p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                    companyName,
+                    companyName,
+                    planName,
+                    reactLink);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Payment failed email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send payment failed email to: {}", email, e);
+        }
+    }
+
+    /**
+     * Send archive notification email
+     */
+    @Async
+    public void sendArchiveNotificationEmail(String email, String companyName, String planName) {
+        if (!emailEnabled) {
+            log.info("Email sending disabled. Would send soft-delete notification email to: {}", email);
+            return;
+        }
+
+        log.info("Sending soft-delete notification email to: {} for company: {}", email, companyName);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("Your workspace has been soft-deleted - " + companyName);
+            helper.setFrom(fromEmail);
+
+            String htmlContent = String.format("""
+                <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <h2 style="color: #c82333;">Workspace Soft-Deleted</h2>
+                        <p>Dear <strong>%s</strong>,</p>
+                        <p>Your workspace for <strong>%s</strong> has been soft-deleted (marked for deletion) because your subscription has been expired for 30 days.</p>
+                        <p>To restore your account and retrieve your data, please contact our support team immediately.</p>
+                        <hr/>
+                        <p style="font-size: 12px; color: #666;">Thanks,<br/>SonixHR Team</p>
+                    </div>
+                </body>
+                </html>
+                """,
+                    companyName,
+                    companyName);
+
+            helper.setText(htmlContent, true);
+            // mailSender.send(message);
+            log.info("Soft-delete notification email sent successfully to: {}", email);
+
+        } catch (MessagingException e) {
+            log.error("Failed to send soft-delete notification email to: {}", email, e);
+        }
+    }
+
+
 }

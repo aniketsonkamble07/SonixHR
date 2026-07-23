@@ -26,10 +26,16 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
             @org.springframework.lang.NonNull HttpServletResponse response,
             @org.springframework.lang.NonNull Object handler,
             @org.springframework.lang.Nullable Exception ex) throws Exception {
+
+        // Skip logging for certain paths to reduce load
+        String requestUri = request.getRequestURI();
+        if (shouldSkipLogging(requestUri)) {
+            return;
+        }
+
         try {
-            String requestUri = request.getRequestURI();
             String httpMethod = request.getMethod();
-            String ipAddress = request.getRemoteAddr();
+            String ipAddress = resolveClientIp(request);
             String userAgent = request.getHeader("User-Agent");
             String customDeviceName = request.getHeader("X-Device-Name");
 
@@ -59,7 +65,7 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
                 }
             }
 
-            // Derive Device Name (PC OS / Mobile model / Custom Header)
+            // Derive Device Name
             String deviceName = parseDeviceName(customDeviceName, userAgent);
             String deviceDetails = parseDeviceDetails(userAgent);
 
@@ -73,14 +79,49 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
                     .ipAddress(ipAddress)
                     .deviceDetails(deviceDetails)
                     .deviceName(deviceName)
+                    .hitTime(java.time.LocalDateTime.now())
                     .build();
 
-            // Trigger async save
+            // Save asynchronously with circuit breaker protection
             apiHitLogService.saveLog(apiLog);
 
         } catch (Exception e) {
-            log.error("Error creating API hit log in interceptor", e);
+            // Don't let logging failures affect the main request
+            log.debug("Error creating API hit log in interceptor: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Skip logging for certain paths to reduce load
+     */
+    private boolean shouldSkipLogging(String path) {
+        // Skip health checks and static resources
+        if (path == null) {
+            return true;
+        }
+
+        return path.startsWith("/actuator/") ||
+                path.startsWith("/api/health") ||
+                path.startsWith("/swagger-ui/") ||
+                path.startsWith("/v3/api-docs/") ||
+                path.equals("/error") ||
+                path.startsWith("/api/debug/") ||
+                path.startsWith("/api/public/");
+    }
+
+    /**
+     * Returns the real client IP, honouring X-Forwarded-For
+     */
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp;
+        }
+        return request.getRemoteAddr();
     }
 
     private String parseDeviceName(String customDeviceName, String userAgent) {
@@ -93,7 +134,6 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
 
         String ua = userAgent.toLowerCase();
 
-        // 1. Mobile & Tablet detection
         if (ua.contains("iphone")) return "Apple iPhone";
         if (ua.contains("ipad")) return "Apple iPad";
         if (ua.contains("android")) {
@@ -114,7 +154,6 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
             return "Android Mobile";
         }
 
-        // 2. Desktop OS detection
         if (ua.contains("windows")) return "Windows PC";
         if (ua.contains("macintosh") || ua.contains("mac os")) return "Mac Device";
         if (ua.contains("linux")) return "Linux PC";
@@ -131,7 +170,6 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
         String browser = "Unknown Browser";
         String ua = userAgent.toLowerCase();
 
-        // OS Detection
         if (ua.contains("windows")) {
             os = "Windows";
         } else if (ua.contains("macintosh") || ua.contains("mac os")) {
@@ -144,7 +182,6 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
             os = "Linux";
         }
 
-        // Browser Detection
         if (ua.contains("chrome") || ua.contains("crios")) {
             browser = "Chrome";
         } else if (ua.contains("firefox") || ua.contains("fxios")) {
@@ -157,6 +194,6 @@ public class ApiHitLogInterceptor implements HandlerInterceptor {
             browser = "Internet Explorer";
         }
 
-        return os + " / " + browser + " (Raw: " + userAgent + ")";
+        return os + " / " + browser;
     }
 }

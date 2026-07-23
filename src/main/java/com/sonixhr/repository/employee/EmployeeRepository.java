@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -397,7 +398,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query(value = "SELECT * FROM employees WHERE tenant_id = :tenantId " +
             "AND date_of_birth IS NOT NULL " +
-            "AND TO_CHAR(date_of_birth, 'MM-DD') BETWEEN TO_CHAR(:startDate, 'MM-DD') AND TO_CHAR(:endDate, 'MM-DD') " +
+            "AND TO_CHAR(date_of_birth, 'MM-DD') BETWEEN TO_CHAR(CAST(:startDate AS date), 'MM-DD') AND TO_CHAR(CAST(:endDate AS date), 'MM-DD') " +
             "ORDER BY TO_CHAR(date_of_birth, 'MM-DD')",
             nativeQuery = true)
     List<Employee> findEmployeesWithUpcomingBirthdays(@Param("tenantId") Long tenantId,
@@ -406,7 +407,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query(value = "SELECT * FROM employees WHERE tenant_id = :tenantId " +
             "AND hire_date IS NOT NULL " +
-            "AND TO_CHAR(hire_date, 'MM-DD') BETWEEN TO_CHAR(:startDate, 'MM-DD') AND TO_CHAR(:endDate, 'MM-DD') " +
+            "AND TO_CHAR(hire_date, 'MM-DD') BETWEEN TO_CHAR(CAST(:startDate AS date), 'MM-DD') AND TO_CHAR(CAST(:endDate AS date), 'MM-DD') " +
             "ORDER BY TO_CHAR(hire_date, 'MM-DD')",
             nativeQuery = true)
     List<Employee> findEmployeesWithUpcomingAnniversaries(@Param("tenantId") Long tenantId,
@@ -503,6 +504,68 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                                                  @Param("query") String query,
                                                  Pageable pageable);
 
+
+
+    // =====================================================
+    // SEAT REALLOCATION QUERIES
+    // =====================================================
+
+    /**
+     * Find pending/invited employees ordered by creation date (FIFO)
+     */
     @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = 'INVITED' ORDER BY e.createdAt ASC")
     List<Employee> findPendingInvitedEmployeesOrderByCreatedAt(@Param("tenantId") Long tenantId);
+
+    /**
+     * Count pending/invited employees for a tenant
+     */
+    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = 'INVITED'")
+    long countPendingInvitedEmployees(@Param("tenantId") Long tenantId);
+
+    /**
+     * Find employees by tenant ID and status
+     */
+    @EntityGraph(attributePaths = {"department", "manager"})
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = :status")
+    List<Employee> findByTenantIdAndStatus(@Param("tenantId") Long tenantId,
+                                           @Param("status") EmployeeStatus status);
+
+    /**
+     * Count employees by tenant ID and status
+     */
+    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = :status")
+    long countByTenantIdAndStatus(@Param("tenantId") Long tenantId,
+                                  @Param("status") EmployeeStatus status);
+
+    /**
+     * Find employees by tenant ID and multiple statuses
+     */
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.status IN :statuses")
+    List<Employee> findByTenantIdAndStatusIn(@Param("tenantId") Long tenantId,
+                                             @Param("statuses") Set<EmployeeStatus> statuses);
+
+    /**
+     * Find employees with pending invitations (older than given date)
+     */
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.status = 'INVITED' AND e.createdAt < :cutoffDate ORDER BY e.createdAt ASC")
+    List<Employee> findPendingInvitationsOlderThan(@Param("tenantId") Long tenantId,
+                                                   @Param("cutoffDate") LocalDateTime cutoffDate);
+
+    /**
+     * Find employees by tenant ID and active status
+     */
+    @Query("SELECT e FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = :isActive")
+    List<Employee> findByTenantIdAndIsActive(@Param("tenantId") Long tenantId,
+                                             @Param("isActive") boolean isActive);
+
+    /**
+     * Count employees by tenant ID and active status
+     */
+    @Query("SELECT COUNT(e) FROM Employee e WHERE e.tenant.id = :tenantId AND e.isActive = :isActive")
+    long countByTenantIdAndIsActive(@Param("tenantId") Long tenantId,
+                                    @Param("isActive") boolean isActive);
+
+    List<Employee> findAllByTenantId(Long tenantId);
+    @Query("SELECT e FROM Employee e WHERE e.tenantId IN :tenantIds")
+    List<Employee> findAllByTenantIdIn(@Param("tenantIds") List<Long> tenantIds);
 }

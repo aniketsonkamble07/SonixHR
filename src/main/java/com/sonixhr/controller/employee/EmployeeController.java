@@ -8,6 +8,7 @@ import com.sonixhr.dto.employee.EmployeeResponse;
 import com.sonixhr.dto.employee.EmployeeSearchResponse;
 import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.employee.EmployeeDropdownDTO;
+import com.sonixhr.dto.employee.ResignationResponse;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.service.employee.EmployeeService;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,9 +32,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
  
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/employees")
@@ -40,8 +39,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 @Tag(name = "Employee Management", description = "APIs for managing employees")
 public class EmployeeController {
-
-    private static final Logger log = LoggerFactory.getLogger(EmployeeController.class);
 
     private final EmployeeService employeeService;
 
@@ -571,6 +568,84 @@ public class EmployeeController {
         Long tenantId = currentEmployee.getTenantId();
         log.info("REST request to process offboarded employees for tenant: {}", tenantId);
         employeeService.processOffboardedEmployees(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    // =====================================================
+    // RESIGNATION & NOTICE PERIOD LIFECYCLE ENDPOINTS
+    // =====================================================
+
+    @PostMapping("/{id}/resignation/submit")
+    @PreAuthorize("#id == principal.id or hasAuthority('EMPLOYEE_EDIT')")
+    @Operation(summary = "Submit resignation", description = "Submits an employee resignation with reason and proposed last working date")
+    public ResponseEntity<Void> submitResignation(
+            @PathVariable Long id,
+            @RequestParam String reason,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate proposedLWD,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to submit resignation for employee: {} in tenant: {}", id, tenantId);
+        employeeService.submitResignation(id, tenantId, reason, proposedLWD);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/resignation/accept")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT') or hasAuthority('EMPLOYEE_VIEW_TEAM')")
+    @Operation(summary = "Accept resignation", description = "Accepts employee resignation and approves last working date")
+    public ResponseEntity<Void> acceptResignation(
+            @PathVariable Long id,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate approvedLWD,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to accept resignation for employee: {} in tenant: {}", id, tenantId);
+        employeeService.acceptResignation(id, tenantId, approvedLWD);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/resignation/reject")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT') or hasAuthority('EMPLOYEE_VIEW_TEAM')")
+    @Operation(summary = "Reject resignation", description = "Rejects employee resignation and restores active status")
+    public ResponseEntity<Void> rejectResignation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to reject resignation for employee: {} in tenant: {}", id, tenantId);
+        employeeService.rejectResignation(id, tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/resignation/withdraw")
+    @PreAuthorize("#id == principal.id or hasAuthority('EMPLOYEE_EDIT')")
+    @Operation(summary = "Withdraw resignation", description = "Employee withdraws their submitted resignation")
+    public ResponseEntity<Void> withdrawResignation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to withdraw resignation for employee: {} in tenant: {}", id, tenantId);
+        employeeService.withdrawResignation(id, tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/resignation")
+    @PreAuthorize("#id == principal.id or hasAuthority('EMPLOYEE_VIEW_ALL') or hasAuthority('EMPLOYEE_VIEW_TEAM')")
+    @Operation(summary = "Get resignation details", description = "Retrieves resignation details for an employee")
+    public ResponseEntity<ResignationResponse> getResignationDetails(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to get resignation details for employee: {} in tenant: {}", id, tenantId);
+        return ResponseEntity.ok(employeeService.getResignationDetails(id, tenantId));
+    }
+
+    @PostMapping("/{id}/abscond")
+    @PreAuthorize("hasAuthority('EMPLOYEE_EDIT')")
+    @Operation(summary = "Mark employee absconded", description = "Marks employee status as absconded and revokes system access")
+    public ResponseEntity<Void> markAbsconded(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Employee currentEmployee) {
+        Long tenantId = currentEmployee.getTenantId();
+        log.info("REST request to mark employee absconded: {} in tenant: {}", id, tenantId);
+        employeeService.markEmployeeAbsconded(id, tenantId);
         return ResponseEntity.ok().build();
     }
 }

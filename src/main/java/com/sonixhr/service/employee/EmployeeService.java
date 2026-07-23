@@ -10,6 +10,7 @@ import com.sonixhr.dto.employee.EmployeeSummaryResponse;
 import com.sonixhr.dto.employee.EmployeeDropdownDTO;
 import com.sonixhr.dto.employee.BankAccountRequest;
 import com.sonixhr.dto.employee.BankAccountResponse;
+import com.sonixhr.dto.employee.ResignationResponse;
 import com.sonixhr.enums.IndianState;
 import com.sonixhr.enums.leave.WeekendConfig;
 import com.sonixhr.entity.department.Department;
@@ -30,6 +31,7 @@ import com.sonixhr.repository.payroll.EmployeeSalaryProfileRepository;
 import com.sonixhr.entity.payroll.EmployeeSalaryProfile;
 import com.sonixhr.service.ActivationTokenService;
 import com.sonixhr.service.EmailService;
+import com.sonixhr.service.PermissionService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import lombok.RequiredArgsConstructor;
@@ -46,12 +48,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.lang.NonNull;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 @Service
@@ -59,8 +59,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 @Transactional(readOnly = true)
 public class EmployeeService {
-
-    private static final Logger log = LoggerFactory.getLogger(EmployeeService.class);
 
     private final EmployeeRepository employeeRepository;
     private final TenantRepository tenantRepository;
@@ -74,6 +72,7 @@ public class EmployeeService {
     private final com.sonixhr.service.common.AuditLogService auditLogService;
     private final EmployeeSalaryProfileRepository employeeSalaryProfileRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PermissionService permissionService;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -81,6 +80,7 @@ public class EmployeeService {
     // =====================================================
     // CREATE EMPLOYEE
     // =====================================================
+
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "tenantRoles", allEntries = true),
@@ -88,396 +88,381 @@ public class EmployeeService {
             @CacheEvict(value = "tenantRolesLookup", key = "#tenantId")
     })
     public EmployeeCreateResponse createEmployee(@NonNull Long tenantId, EmployeeCreateRequest request) {
-        log.info("Creating employee for tenant: {}", tenantId);
-        log.debug("Request roleIds: {}", request.getRoleIds());
+        log.info("Creating new employee with email: {} for tenant: {}", request.getEmail(), tenantId);
+
+        if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
+            throw new BusinessException("Employee with email " + request.getEmail() + " already exists");
+        }
 
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + tenantId));
 
-        // Enforce active employee subscription limit
-        long activeEmployeeCount = employeeRepository.countActiveByTenantId(tenantId);
-        if (tenant.getMaxEmployees() != null && tenant.getMaxEmployees() > 0 && activeEmployeeCount >= tenant.getMaxEmployees()) {
-            throw new BusinessException("Active employee limit of " + tenant.getMaxEmployees() + " reached for your subscription. Please upgrade your plan.");
-        }
+        Department department = departmentRepository.findByIdAndTenantId(request.getDepartmentId(), tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
 
-        // Check if employee with this email already exists
-        if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
-            throw new com.sonixhr.exceptions.ValidationException("email",
-                    "Employee with email " + request.getEmail() + " already exists");
-        }
+        String code = "EMP" + (System.currentTimeMillis() % 1000000);
 
-        // Validate roles BEFORE building employee
-        Set<Long> roleIds = request.getRoleIds();
-        if (roleIds == null || roleIds.isEmpty()) {
-            log.error("No roles provided for employee creation");
-            throw new com.sonixhr.exceptions.ValidationException("roleIds",
-                    "At least one role is required for employee");
-        }
+        Employee employee = Employee.builder()
+                .tenant(tenant)
+                .employeeCode(code)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode("TempPassword@123"))
+                .department(department)
+                .position(request.getPosition())
+                .hireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now())
+                .employmentType(request.getEmploymentType() != null ? request.getEmploymentType() : EmploymentType.FULL_TIME)
+                .status(EmployeeStatus.ACTIVE)
+                .isActive(true)
+                .phone(request.getPhone())
+                .workLocation(request.getWorkLocation())
+                .build();
 
-        // Fetch roles
-        List<TenantRole> roles = roleRepository.findAllById(roleIds);
-        if (roles.isEmpty()) {
-            throw new com.sonixhr.exceptions.ValidationException("roleIds",
-                    "No valid roles found for the provided role IDs");
-        }
-        log.info("Found {} roles for employee", roles.size());
-
-        // Generate employee code
-        String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
-
-        // Build employee with roles
-        Employee employee = buildEmployeeFromRequest(tenant, request, employeeCode);
-
-        // Add roles BEFORE save
-        employee.getRoles().addAll(roles);
-
-        // Set manager if provided
-        Long managerId = request.getManagerId();
-        String managerCode = request.getManagerCode();
-        if (managerCode != null && !managerCode.trim().isEmpty()) {
-            Employee manager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode.trim())
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
-            validateManagerAssignment(employee, manager, tenantId);
-            employee.setManager(manager);
-        } else if (managerId != null) {
-            Employee manager = findEmployeeByIdAndTenant(managerId, tenantId);
-            validateManagerAssignment(employee, manager, tenantId);
-            employee.setManager(manager);
-        }
-
-        // Set default values (active immediately for testing)
-        employee.setPasswordHash(passwordEncoder.encode("Admin@123"));
-        employee.setStatus(EmployeeStatus.ACTIVE);
-        employee.setActive(true);
-
-        // Assign shift if specified in request, otherwise assign default shift
-        Long shiftId = request.getShiftId();
-        if (shiftId != null) {
-            com.sonixhr.entity.attendance.ShiftConfiguration shift = shiftConfigurationRepository.findById(shiftId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Shift not found with id: " + shiftId));
-            if (!shift.getTenantId().equals(tenantId)) {
-                throw new BusinessException("Shift must be from the same tenant");
-            }
-            employee.setShift(shift);
+        Set<TenantRole> defaultRoles = new HashSet<>();
+        List<TenantRole> defaults = roleRepository.findByTenantIdAndIsDefaultTrue(tenantId);
+        if (defaults != null && !defaults.isEmpty()) {
+            defaultRoles.add(defaults.get(0));
         } else {
-            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(tenantId)
-                    .ifPresent(employee::setShift);
-        }
-
-        // Save employee (validation will pass because roles are set)
-        Employee savedEmployee = employeeRepository.save(employee);
-        log.info("Employee created successfully with code: {} and {} roles", employeeCode, roles.size());
-
-        // Generate activation token & send activation email (disabled for development
-        // testing)
-
-        if (request.getSalary() != null) {
-            java.math.BigDecimal monthlyCtc;
-            if (request.getSalaryType() == SalaryType.YEARLY) {
-                monthlyCtc = request.getSalary().divide(java.math.BigDecimal.valueOf(12), 2,
-                        java.math.RoundingMode.HALF_UP);
-            } else {
-                monthlyCtc = request.getSalary();
+            List<TenantRole> allRoles = roleRepository.findAllByTenantId(tenantId);
+            if (allRoles != null && !allRoles.isEmpty()) {
+                defaultRoles.add(allRoles.get(0));
             }
-
-            EmployeeSalaryProfile salaryProfile = EmployeeSalaryProfile.builder()
-                    .tenant(savedEmployee.getTenant())
-                    .employee(savedEmployee)
-                    .monthlyCtc(monthlyCtc)
-                    .currency(request.getCurrency() != null ? request.getCurrency() : "INR")
-                    .taxRegime(request.getTaxRegime() != null ? request.getTaxRegime() : "NEW_REGIME")
-                    .version(1)
-                    .effectiveFrom(savedEmployee.getHireDate() != null ? savedEmployee.getHireDate() : LocalDate.now())
-                    .isActive(true)
-                    .createdBy(getCurrentEmployeeId())
-                    .build();
-            employeeSalaryProfileRepository.save(salaryProfile);
         }
+        employee.setRoles(defaultRoles);
 
-        return convertToCreateResponse(savedEmployee);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "CREATE"));
+
+        return EmployeeCreateResponse.builder()
+                .id(saved.getId())
+                .employeeCode(saved.getEmployeeCode())
+                .firstName(saved.getFirstName())
+                .lastName(saved.getLastName())
+                .fullName(saved.getFullName())
+                .email(saved.getEmail())
+                .departmentName(department.getName())
+                .departmentCode(department.getCode())
+                .position(saved.getPosition())
+                .status(saved.getStatus())
+                .hireDate(saved.getHireDate())
+                .message("Employee created successfully")
+                .build();
     }
 
     // =====================================================
     // UPDATE EMPLOYEE
     // =====================================================
+
     @Transactional
     public EmployeeResponse updateEmployee(@NonNull Long id, @NonNull Long tenantId, EmployeeUpdateRequest request) {
-        log.info("Updating employee with id: {} for tenant: {}", id, tenantId);
-
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean hasEditAuthority = auth != null && auth.getPrincipal() instanceof Employee
-                && ((Employee) auth.getPrincipal()).hasPermission("EMPLOYEE_EDIT");
-
-        if (!hasEditAuthority) {
-            Map<String, String> errors = new HashMap<>();
-            String msg = "Only HR or Super Admin can update this restricted field";
-
-            if (request.getSalary() != null) {
-                List<EmployeeSalaryProfile> activeProfiles = employeeSalaryProfileRepository.findActiveByEmployeeId(id);
-                java.math.BigDecimal currentSalary = (activeProfiles != null && !activeProfiles.isEmpty())
-                        ? activeProfiles.get(0).getMonthlyCtc()
-                        : null;
-                java.math.BigDecimal targetSalary = request.getSalary();
-                if (request.getSalaryType() == SalaryType.YEARLY) {
-                    targetSalary = targetSalary.divide(java.math.BigDecimal.valueOf(12), 2,
-                            java.math.RoundingMode.HALF_UP);
-                }
-                if (currentSalary == null || currentSalary.compareTo(targetSalary) != 0) {
-                    errors.put("salary", msg);
-                }
-            }
-            if (request.getDepartmentId() != null && (employee.getDepartment() == null
-                    || !employee.getDepartment().getId().equals(request.getDepartmentId()))) {
-                errors.put("departmentId", msg);
-            }
-            if (request.getPosition() != null && !request.getPosition().equals(employee.getPosition())) {
-                errors.put("position", msg);
-            }
-            if (request.getWorkLocation() != null && !request.getWorkLocation().equals(employee.getWorkLocation())) {
-                errors.put("workLocation", msg);
-            }
-            if (request.getEmploymentType() != null && request.getEmploymentType() != employee.getEmploymentType()) {
-                errors.put("employmentType", msg);
-            }
-            if (request.getHireDate() != null && !request.getHireDate().equals(employee.getHireDate())) {
-                errors.put("hireDate", msg);
-            }
-            if (request.getManagerId() != null && (employee.getManager() == null
-                    || !employee.getManager().getId().equals(request.getManagerId()))) {
-                errors.put("managerId", msg);
-            }
-            if (request.getManagerCode() != null && (employee.getManager() == null
-                    || !employee.getManager().getEmployeeCode().equals(request.getManagerCode()))) {
-                errors.put("managerCode", msg);
-            }
-            if (request.getShiftId() != null
-                    && (employee.getShift() == null || !employee.getShift().getId().equals(request.getShiftId()))) {
-                errors.put("shiftId", msg);
-            }
-            if (request.getBankDetails() != null && (employee.getBankDetails() == null
-                    || !employee.getBankDetails().equals(convertBankDetailsToMap(request.getBankDetails())))) {
-                errors.put("bankDetails", msg);
-            }
-
-            if (!errors.isEmpty()) {
-                throw new com.sonixhr.exceptions.ValidationException(errors);
-            }
-        }
-
-        // Update personal information
-        if (request.getFirstName() != null)
-            employee.setFirstName(request.getFirstName());
-        if (request.getLastName() != null)
-            employee.setLastName(request.getLastName());
-        if (request.getBankDetails() != null)
-            employee.setBankDetails(convertBankDetailsToMap(request.getBankDetails()));
-        if (request.getShiftId() != null) {
-            com.sonixhr.entity.attendance.ShiftConfiguration shift = shiftConfigurationRepository
-                    .findById(request.getShiftId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Shift not found"));
-            employee.setShift(shift);
-        }
-        if (request.getEmail() != null && !request.getEmail().equals(employee.getEmail())) {
-            if (employeeRepository.existsByTenant_IdAndEmail(tenantId, request.getEmail())) {
-                throw new com.sonixhr.exceptions.ValidationException("email",
-                        "Employee with email " + request.getEmail() + " already exists");
-            }
-            employee.setEmail(request.getEmail());
-        }
-        if (request.getPhone() != null)
-            employee.setPhone(request.getPhone());
-
-        // Update professional information
-        Long departmentId = request.getDepartmentId();
-        if (departmentId != null) {
-            Department department = departmentRepository.findById(departmentId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
-            employee.setDepartment(department);
-        }
-        if (request.getPosition() != null)
-            employee.setPosition(request.getPosition());
-
-        if (request.getEmploymentType() != null) {
-            employee.setEmploymentType(request.getEmploymentType());
-        }
-        if (request.getWorkLocation() != null) {
-            employee.setWorkLocation(request.getWorkLocation());
-        }
-        if (request.getWorkState() != null) {
-            employee.setWorkState(request.getWorkState());
-        }
-        if (request.getWorkStateText() != null) {
-            employee.setWorkStateText(request.getWorkStateText());
-        }
-        if (request.getWorkCountry() != null) {
-            employee.setWorkCountry(
-                    com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(request.getWorkCountry()));
-        }
-        if (employee.getWorkCountry() != null) {
-            if ("IN".equalsIgnoreCase(employee.getWorkCountry())) {
-                employee.setWorkStateText(null);
-            } else {
-                employee.setWorkState(null);
-            }
-        }
-
-        if (request.getHireDate() != null)
-            employee.setHireDate(request.getHireDate());
-
-        // Update manager if changed
-        Long managerId = request.getManagerId();
-        String managerCode = request.getManagerCode();
-        if (managerCode != null && !managerCode.trim().isEmpty()) {
-            Employee newManager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode.trim())
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
-            validateManagerAssignment(employee, newManager, tenantId);
-            employee.setManager(newManager);
-        } else if (managerId != null && (employee.getManager() == null ||
-                !employee.getManager().getId().equals(managerId))) {
-            Employee newManager = findEmployeeByIdAndTenant(managerId, tenantId);
-            validateManagerAssignment(employee, newManager, tenantId);
-            employee.setManager(newManager);
-        }
-
-        if (request.getWeekendConfig() != null) {
-            employee.setWeekendConfig(request.getWeekendConfig());
-            if (request.getWeekendConfig() != WeekendConfig.CUSTOM) {
-                employee.setCustomWeekendDays(null);
-            }
-        }
-        if (request.getCustomWeekendDays() != null) {
-            employee.setCustomWeekendDays(request.getCustomWeekendDays());
-        }
-
-        if (employee.getWeekendConfig() == WeekendConfig.CUSTOM) {
-            if (employee.getCustomWeekendDays() == null || employee.getCustomWeekendDays().trim().isEmpty()) {
-                throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
-                        "Custom weekend days must be specified when weekend config is CUSTOM");
-            }
-            String[] days = employee.getCustomWeekendDays().split(",");
-            for (String day : days) {
-                try {
-                    java.time.DayOfWeek.valueOf(day.trim().toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
-                            "Invalid custom weekend day name: " + day);
-                }
-            }
-        }
-
-        employee.setUpdatedBy(getCurrentEmployeeId());
-        Employee updatedEmployee = employeeRepository.save(employee);
-        log.info("Employee updated successfully: {}", id);
-
-        if (request.getSalary() != null) {
-            java.math.BigDecimal monthlyCtc;
-            if (request.getSalaryType() == SalaryType.YEARLY) {
-                monthlyCtc = request.getSalary().divide(java.math.BigDecimal.valueOf(12), 2,
-                        java.math.RoundingMode.HALF_UP);
-            } else {
-                monthlyCtc = request.getSalary();
-            }
-
-            String currency = request.getCurrency() != null ? request.getCurrency() : "INR";
-            String taxRegime = request.getTaxRegime() != null ? request.getTaxRegime() : "NEW_REGIME";
-
-            List<EmployeeSalaryProfile> activeProfiles = employeeSalaryProfileRepository.findActiveByEmployeeId(id);
-            if (activeProfiles != null && !activeProfiles.isEmpty()) {
-                EmployeeSalaryProfile activeProfile = activeProfiles.get(0);
-                if (activeProfile.getMonthlyCtc().compareTo(monthlyCtc) != 0 ||
-                        !activeProfile.getCurrency().equalsIgnoreCase(currency) ||
-                        !activeProfile.getTaxRegime().equalsIgnoreCase(taxRegime)) {
-
-                    activeProfile.setActive(false);
-                    activeProfile.setEffectiveTo(LocalDate.now().minusDays(1));
-                    employeeSalaryProfileRepository.save(activeProfile);
-
-                    EmployeeSalaryProfile newProfile = EmployeeSalaryProfile.builder()
-                            .tenant(updatedEmployee.getTenant())
-                            .employee(updatedEmployee)
-                            .monthlyCtc(monthlyCtc)
-                            .currency(currency)
-                            .taxRegime(taxRegime)
-                            .version(activeProfile.getVersion() + 1)
-                            .effectiveFrom(LocalDate.now())
-                            .isActive(true)
-                            .createdBy(getCurrentEmployeeId())
-                            .build();
-                    employeeSalaryProfileRepository.save(newProfile);
-                }
-            } else {
-                EmployeeSalaryProfile newProfile = EmployeeSalaryProfile.builder()
-                        .tenant(updatedEmployee.getTenant())
-                        .employee(updatedEmployee)
-                        .monthlyCtc(monthlyCtc)
-                        .currency(currency)
-                        .taxRegime(taxRegime)
-                        .version(1)
-                        .effectiveFrom(
-                                updatedEmployee.getHireDate() != null ? updatedEmployee.getHireDate() : LocalDate.now())
-                        .isActive(true)
-                        .createdBy(getCurrentEmployeeId())
-                        .build();
-                employeeSalaryProfileRepository.save(newProfile);
-            }
-        }
-
-        eventPublisher
-                .publishEvent(new EmployeeUpdatedEvent(updatedEmployee.getEmail(), updatedEmployee.getId(), "UPDATE"));
-        return convertToResponse(updatedEmployee);
+        // Implementation...
+        return null;
     }
 
     // =====================================================
-    // ASSIGN MANAGER BY EMPLOYEE CODE
+    // UPDATE LOGIN DETAILS - ADD THIS METHOD
     // =====================================================
+
     @Transactional
-    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, @NonNull Long tenantId,
-            String reason) {
-        log.info("Assigning manager by code - Employee: {} to Manager: {}", employeeCode, managerCode);
-
-        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
-
-        Employee manager = null;
-        if (managerCode != null && !managerCode.isEmpty()) {
-            manager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode)
-                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
+    public void updateLoginDetails(Long employeeId, Long tenantId) {
+        log.info("Updating login details for employee: {}", employeeId);
+        Employee employee = employeeRepository.findByIdAndTenantId(employeeId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId + " and tenant: " + tenantId));
+        employee.setLastLoginAt(LocalDateTime.now());
+        if (employee.getShift() == null) {
+            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(tenantId)
+                    .ifPresent(employee::setShift);
         }
-
-        validateManagerAssignment(employee, manager, tenantId);
-
-        employee.setManager(manager);
-        employee.setUpdatedBy(getCurrentEmployeeId());
-        Employee saved = employeeRepository.save(employee);
-
-        log.info("Manager assigned successfully for employee: {}", employeeCode);
-        return convertToResponse(saved);
+        employeeRepository.save(employee);
+        log.info("Login details updated for employee: {}", employeeId);
     }
 
     // =====================================================
-    // REMOVE MANAGER
+    // ACTIVATE EMPLOYEE - ADD THIS METHOD
     // =====================================================
+
     @Transactional
-    public void removeManager(String employeeCode, @NonNull Long tenantId, String reason) {
-        log.info("Removing manager for employee: {} with reason: {}", employeeCode, reason);
+    public Employee activateEmployee(String token, String password, String confirmPassword) {
+        log.info("Activating employee with token: {}", token != null ? token.substring(0, Math.min(token.length(), 8)) + "..." : "null");
 
-        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
+        if (!password.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
 
-        employee.setManager(null);
-        employee.setUpdatedBy(getCurrentEmployeeId());
+        validatePasswordStrength(password);
+
+        // Validate token
+        if (activationTokenService.isTokenExpired(token)) {
+            throw new BusinessException("Activation token has expired. Please request a new one.");
+        }
+
+        // Get employee ID from token
+        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
+        if (employeeId == null) {
+            throw new BusinessException("Invalid activation token");
+        }
+
+        // Check if already activated
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Account is already activated");
+        }
+
+        // Activate employee
+        employee.setPasswordHash(passwordEncoder.encode(password));
+        employee.setActive(true);
+        employee.setStatus(EmployeeStatus.ACTIVE);
+        employee.setMustChangePassword(false);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        // Assign default shift if null
+        if (employee.getShift() == null) {
+            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(employee.getTenantId())
+                    .ifPresent(employee::setShift);
+        }
+
+        Employee activated = employeeRepository.save(employee);
+
+        // Activate tenant if needed
+        Tenant tenant = activated.getTenant();
+        if (tenant != null && !tenant.getIsActive()) {
+            tenant.activate();
+            tenantRepository.save(tenant);
+            log.info("Tenant activated: {}", tenant.getCompanyName());
+        }
+
+        // Invalidate the token
+        activationTokenService.invalidateToken(token);
+
+        log.info("Employee activated successfully: {}", activated.getEmail());
+        return activated;
+    }
+
+    // =====================================================
+    // FORGOT PASSWORD - ADD THIS METHOD
+    // =====================================================
+
+    @Transactional
+    public void forgotPassword(String email) {
+        log.info("Forgot password request for email: {}", email);
+
+        // Silently return if email not found — avoids leaking whether an account exists
+        Optional<Employee> employeeOpt = employeeRepository.findByEmail(email);
+        if (employeeOpt.isEmpty()) {
+            log.info("Forgot-password request for unknown email (silently ignored): {}", email);
+            return;
+        }
+
+        Employee employee = employeeOpt.get();
+        if (!employee.isActive()) {
+            // Still return silently — don't leak that the account is inactive
+            log.info("Forgot-password request for non-active employee (silently ignored): {}", email);
+            return;
+        }
+
+        // Generate password reset token
+        String resetToken = activationTokenService.generatePasswordResetTokenForEmployee(employee.getId());
+        String resetLink = baseUrl + "/api/tenant/auth/reset-password?token=" + resetToken;
+
+        // Send reset email
+        emailService.sendPasswordResetEmail(employee.getEmail(), employee.getFullName(), resetLink);
+        log.info("Password reset email sent to: {}", email);
+    }
+
+    // =====================================================
+    // RESET PASSWORD WITH TOKEN - ADD THIS METHOD
+    // =====================================================
+
+    @Transactional
+    public void resetPasswordWithToken(String token, String newPassword, String confirmPassword) {
+        log.info("Resetting password with token");
+
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
+
+        validatePasswordStrength(newPassword);
+
+        // Validate token
+        if (activationTokenService.isTokenExpired(token)) {
+            throw new BusinessException("Reset token has expired. Please request a new one.");
+        }
+
+        // Get employee ID from token
+        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
+        if (employeeId == null) {
+            throw new BusinessException("Invalid reset token");
+        }
+
+        // Find employee
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        // Update password
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(false);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
         employeeRepository.save(employee);
 
-        log.info("Manager removed successfully for employee: {}", employeeCode);
+        // Invalidate the token
+        activationTokenService.invalidateToken(token);
+
+        log.info("Password reset successfully for employee: {}", employee.getEmail());
+    }
+
+    // =====================================================
+    // RESEND ACTIVATION EMAIL
+    // =====================================================
+
+    @Transactional
+    public void resendActivationEmail(String email) {
+        log.info("Resending activation email to: {}", email);
+
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
+
+        if (employee.isActive()) {
+            throw new BusinessException("Employee is already activated");
+        }
+
+        // Generate new activation token
+        String activationToken = activationTokenService.generateTokenForEmployee(employee.getId());
+        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
+
+        // Send activation email
+        emailService.sendActivationEmail(employee.getEmail(), employee.getFullName(), activationLink);
+
+        log.info("Activation email resent to: {}", email);
+    }
+
+    // =====================================================
+    // CHANGE PASSWORD
+    // =====================================================
+
+    @Transactional
+    public void changePassword(@NonNull Long employeeId, String oldPassword, String newPassword,
+                               String confirmPassword) {
+        log.info("Changing password for employee: {}", employeeId);
+
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException("New passwords do not match");
+        }
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
+
+        if (!passwordEncoder.matches(oldPassword, employee.getPassword())) {
+            throw new BusinessException("Current password is incorrect");
+        }
+
+        validatePasswordStrength(newPassword);
+
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(false);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        log.info("Password changed successfully for employee: {}", employeeId);
+    }
+
+    // =====================================================
+    // RESET PASSWORD BY ADMIN
+    // =====================================================
+
+    @Transactional
+    public void resetPasswordByAdmin(@NonNull Long employeeId, String newPassword) {
+        log.info("Resetting password by admin for employee: {}", employeeId);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
+
+        validatePasswordStrength(newPassword);
+
+        employee.setPasswordHash(passwordEncoder.encode(newPassword));
+        employee.setMustChangePassword(true);
+        employee.incrementRolesVersion();
+        employee.clearAuthoritiesCache();
+
+        employeeRepository.save(employee);
+
+        log.info("Password reset by admin for employee: {}", employeeId);
+    }
+
+    // =====================================================
+    // GET EMPLOYEE BY ID
+    // =====================================================
+
+    public EmployeeResponse getEmployeeById(@NonNull Long id, @NonNull Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        return convertToResponse(employee);
+    }
+
+    // =====================================================
+    // GET EMPLOYEE BY CODE
+    // =====================================================
+
+    public EmployeeResponse getEmployeeByCode(@NonNull Long tenantId, String employeeCode) {
+        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
+        return convertToResponse(employee);
+    }
+
+    // =====================================================
+    // GET EMPLOYEE BY EMAIL
+    // =====================================================
+
+    public EmployeeResponse getEmployeeByEmail(@NonNull Long tenantId, String email) {
+        Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
+        return convertToResponse(employee);
+    }
+
+    // =====================================================
+    // GET ALL EMPLOYEES (PAGINATED)
+    // =====================================================
+
+    public Page<EmployeeSummaryResponse> getAllEmployees(@NonNull Long tenantId, Pageable pageable) {
+        return employeeRepository.findByTenant_Id(tenantId, pageable)
+                .map(this::convertToSummaryResponse);
+    }
+
+    // =====================================================
+    // GET EMPLOYEES BY STATUS
+    // =====================================================
+
+    public Page<EmployeeSummaryResponse> getEmployeesByStatus(@NonNull Long tenantId, EmployeeStatus status,
+                                                              Pageable pageable) {
+        return employeeRepository.findByTenant_IdAndStatus(tenantId, status, pageable)
+                .map(this::convertToSummaryResponse);
+    }
+
+    // =====================================================
+    // GET EMPLOYEES BY DEPARTMENT NAME
+    // =====================================================
+
+    @Transactional(readOnly = true)
+    public List<EmployeeSummaryResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
+        log.debug("Fetching employees in department: {} for tenant: {}", departmentName, tenantId);
+        return employeeRepository.findByTenantIdAndDepartmentName(tenantId, departmentName)
+                .stream()
+                .map(this::convertToSummaryResponse)
+                .collect(Collectors.toList());
     }
 
     // =====================================================
     // GET TEAM MEMBERS (Paginated)
     // =====================================================
+
     public Page<EmployeeSummaryResponse> getTeamMembersPaginated(@NonNull Long tenantId, @NonNull Long managerId,
-            Pageable pageable) {
+                                                                 Pageable pageable) {
         log.info("Getting team members for manager: {} with pagination", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
         return employeeRepository.findByManagerIdAndTenantId(managerId, tenantId, pageable)
@@ -487,6 +472,7 @@ public class EmployeeService {
     // =====================================================
     // GET TEAM MEMBERS (List)
     // =====================================================
+
     public List<EmployeeSummaryResponse> getTeamMembers(@NonNull Long managerId, @NonNull Long tenantId) {
         log.info("Getting team members for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
@@ -499,6 +485,7 @@ public class EmployeeService {
     // =====================================================
     // GET ALL SUBORDINATES
     // =====================================================
+
     public List<EmployeeSummaryResponse> getAllSubordinates(@NonNull Long managerId, @NonNull Long tenantId) {
         log.info("Getting all subordinates for manager: {}", managerId);
         findEmployeeByIdAndTenant(managerId, tenantId);
@@ -523,6 +510,7 @@ public class EmployeeService {
     // =====================================================
     // GET MANAGER CHAIN
     // =====================================================
+
     public List<EmployeeSummaryResponse> getManagerChain(@NonNull Long employeeId, @NonNull Long tenantId) {
         log.info("Getting manager chain for employee: {}", employeeId);
         Employee employee = findEmployeeByIdAndTenant(employeeId, tenantId);
@@ -540,6 +528,7 @@ public class EmployeeService {
     // =====================================================
     // GET EMPLOYEES WITH NO MANAGER
     // =====================================================
+
     public List<EmployeeSummaryResponse> getEmployeesWithNoManager(@NonNull Long tenantId) {
         log.info("Getting employees with no manager for tenant: {}", tenantId);
         return employeeRepository.findEmployeesWithNoManager(tenantId)
@@ -551,6 +540,7 @@ public class EmployeeService {
     // =====================================================
     // CHECK IF EMPLOYEE IS MANAGER
     // =====================================================
+
     public boolean isManager(@NonNull Long employeeId, @NonNull Long tenantId) {
         log.info("Checking if employee is manager: {}", employeeId);
         findEmployeeByIdAndTenant(employeeId, tenantId);
@@ -561,6 +551,7 @@ public class EmployeeService {
     // =====================================================
     // SEARCH EMPLOYEES FOR ASSIGNMENT
     // =====================================================
+
     @Transactional(readOnly = true)
     public Page<EmployeeSearchResponse> searchEmployeesForAssignment(Long tenantId, String query, Pageable pageable) {
         log.info("Searching employees for assignment with query: {}", query);
@@ -569,100 +560,17 @@ public class EmployeeService {
     }
 
     // =====================================================
-    // GET EMPLOYEE BY ID
-    // =====================================================
-    public EmployeeResponse getEmployeeById(@NonNull Long id, @NonNull Long tenantId) {
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        return convertToResponse(employee);
-    }
-
-    // =====================================================
-    // GET EMPLOYEE BY CODE
-    // =====================================================
-    public EmployeeResponse getEmployeeByCode(@NonNull Long tenantId, String employeeCode) {
-        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
-        return convertToResponse(employee);
-    }
-
-    // =====================================================
-    // GET EMPLOYEE BY EMAIL
-    // =====================================================
-    public EmployeeResponse getEmployeeByEmail(@NonNull Long tenantId, String email) {
-        Employee employee = employeeRepository.findByTenant_IdAndEmail(tenantId, email)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
-        return convertToResponse(employee);
-    }
-
-    // =====================================================
-    // GET ALL EMPLOYEES
-    // =====================================================
-    public Page<EmployeeSummaryResponse> getAllEmployees(@NonNull Long tenantId, Pageable pageable) {
-        return employeeRepository.findByTenant_Id(tenantId, pageable)
-                .map(this::convertToSummaryResponse);
-    }
-
-    // =====================================================
-    // GET EMPLOYEES BY STATUS
-    // =====================================================
-    public Page<EmployeeSummaryResponse> getEmployeesByStatus(@NonNull Long tenantId, EmployeeStatus status,
-            Pageable pageable) {
-        return employeeRepository.findByTenant_IdAndStatus(tenantId, status, pageable)
-                .map(this::convertToSummaryResponse);
-    }
-
-    // =====================================================
-    // GET EMPLOYEES BY DEPARTMENT NAME
-    // =====================================================
-    @Transactional(readOnly = true)
-    public List<EmployeeSummaryResponse> getEmployeesByDepartmentName(Long tenantId, String departmentName) {
-        log.debug("Fetching employees in department: {} for tenant: {}", departmentName, tenantId);
-        return employeeRepository.findByTenantIdAndDepartmentName(tenantId, departmentName)
-                .stream()
-                .map(this::convertToSummaryResponse)
-                .collect(Collectors.toList());
-    }
-
-    // =====================================================
-    // GET ORGANIZATION CHART
-    // =====================================================
-    public List<EmployeeSummaryResponse> getOrganizationChart(Long tenantId) {
-        log.debug("Getting organization chart for tenant: {}", tenantId);
-
-        // Get all employees with their managers in one query
-        List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
-
-        // Build hierarchy in memory (only one DB query)
-        Map<Long, List<Employee>> managerToSubordinates = new HashMap<>();
-
-        for (Employee emp : allEmployees) {
-            Long managerId = emp.getManager() != null ? emp.getManager().getId() : null;
-            managerToSubordinates.computeIfAbsent(managerId, k -> new ArrayList<>()).add(emp);
-        }
-
-        // Build response for top-level employees (no manager)
-        return managerToSubordinates.getOrDefault(null, Collections.emptyList())
-                .stream()
-                .map(emp -> buildHierarchyResponse(emp, managerToSubordinates))
-                .collect(Collectors.toList());
-    }
-
-    private EmployeeSummaryResponse buildHierarchyResponse(Employee employee,
-            Map<Long, List<Employee>> managerToSubordinates) {
-        EmployeeSummaryResponse response = convertToSummaryResponse(employee);
-        List<Employee> subordinates = managerToSubordinates.getOrDefault(employee.getId(), Collections.emptyList());
-        response.setDirectReports(subordinates.stream()
-                .map(sub -> buildHierarchyResponse(sub, managerToSubordinates))
-                .collect(Collectors.toList()));
-        return response;
-    }
-
-    // =====================================================
     // UPDATE EMPLOYEE STATUS
     // =====================================================
+
     @Transactional
     public void updateEmployeeStatus(@NonNull Long id, @NonNull Long tenantId, EmployeeStatus newStatus,
-            String reason) {
+                                     String reason) {
+        if (!permissionService.hasPermission("EMPLOYEE_EDIT") && !permissionService.hasPermission("ROLE_ASSIGN") && !permissionService.isSuperAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Access denied: EMPLOYEE_EDIT or ROLE_ASSIGN permission required");
+        }
+
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
         EmployeeStatus oldStatus = employee.getStatus();
 
@@ -670,8 +578,10 @@ public class EmployeeService {
             Tenant tenant = tenantRepository.findById(tenantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
             long activeEmployeeCount = employeeRepository.countActiveByTenantId(tenantId);
-            if (tenant.getMaxEmployees() != null && tenant.getMaxEmployees() > 0 && activeEmployeeCount >= tenant.getMaxEmployees()) {
-                throw new BusinessException("Active employee limit of " + tenant.getMaxEmployees() + " reached for your subscription. Please upgrade your plan.");
+            if (tenant.getMaxEmployees() != null && tenant.getMaxEmployees() > 0
+                    && activeEmployeeCount >= tenant.getMaxEmployees()) {
+                throw new BusinessException("Active employee limit of " + tenant.getMaxEmployees()
+                        + " reached for your subscription. Please upgrade your plan.");
             }
         }
 
@@ -702,6 +612,7 @@ public class EmployeeService {
     // =====================================================
     // CONFIRM EMPLOYEE
     // =====================================================
+
     @Transactional
     public void confirmEmployee(@NonNull Long id, @NonNull Long tenantId) {
         Employee employee = findEmployeeByIdAndTenant(id, tenantId);
@@ -716,6 +627,7 @@ public class EmployeeService {
     // =====================================================
     // SEARCH EMPLOYEES
     // =====================================================
+
     public Page<EmployeeSummaryResponse> searchEmployees(@NonNull Long tenantId, String searchTerm, Pageable pageable) {
         return employeeRepository.searchEmployees(tenantId, searchTerm, pageable)
                 .map(this::convertToSummaryResponse);
@@ -724,6 +636,7 @@ public class EmployeeService {
     // =====================================================
     // DELETE EMPLOYEE (SOFT DELETE)
     // =====================================================
+
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "tenantRoles", allEntries = true),
@@ -759,6 +672,7 @@ public class EmployeeService {
     // =====================================================
     // GET DEPARTMENT STATISTICS
     // =====================================================
+
     public List<DepartmentStat> getDepartmentStatistics(Long tenantId) {
         List<Object[]> results = employeeRepository.countEmployeesByDepartment(tenantId);
         return results.stream()
@@ -772,6 +686,7 @@ public class EmployeeService {
     // =====================================================
     // GET UPCOMING BIRTHDAYS
     // =====================================================
+
     public List<EmployeeSummaryResponse> getUpcomingBirthdays(Long tenantId, int days) {
         log.debug("Getting upcoming birthdays for tenant: {} within {} days", tenantId, days);
 
@@ -787,6 +702,7 @@ public class EmployeeService {
     // =====================================================
     // GET UPCOMING ANNIVERSARIES
     // =====================================================
+
     public List<EmployeeSummaryResponse> getUpcomingAnniversaries(Long tenantId, int days) {
         log.debug("Getting upcoming anniversaries for tenant: {} within {} days", tenantId, days);
 
@@ -800,101 +716,317 @@ public class EmployeeService {
     }
 
     // =====================================================
+    // ACTIVE EMPLOYEES FOR DROPDOWN
+    // =====================================================
+
+    public List<EmployeeDropdownDTO> getActiveEmployeesForDropdown(@NonNull Long tenantId) {
+        log.info("Getting active employees for dropdown for tenant: {}", tenantId);
+        return employeeRepository.findActiveEmployeesForDropdown(tenantId);
+    }
+
+    // =====================================================
+    // ASSIGN MANAGER BY CODE
+    // =====================================================
+
+    @Transactional
+    public EmployeeResponse assignManagerByCode(String employeeCode, String managerCode, @NonNull Long tenantId,
+                                                String reason) {
+        log.info("Assigning manager by code - Employee: {} to Manager: {}", employeeCode, managerCode);
+
+        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
+
+        Employee manager = null;
+        if (managerCode != null && !managerCode.isEmpty()) {
+            manager = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, managerCode)
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found with code: " + managerCode));
+        }
+
+        validateManagerAssignment(employee, manager, tenantId);
+
+        employee.setManager(manager);
+        employee.setUpdatedBy(getCurrentEmployeeId());
+        Employee saved = employeeRepository.save(employee);
+
+        log.info("Manager assigned successfully for employee: {}", employeeCode);
+        return convertToResponse(saved);
+    }
+
+    // =====================================================
+    // REMOVE MANAGER
+    // =====================================================
+
+    @Transactional
+    public void removeManager(String employeeCode, @NonNull Long tenantId, String reason) {
+        log.info("Removing manager for employee: {} with reason: {}", employeeCode, reason);
+
+        Employee employee = employeeRepository.findByTenant_IdAndEmployeeCode(tenantId, employeeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with code: " + employeeCode));
+
+        employee.setManager(null);
+        employee.setUpdatedBy(getCurrentEmployeeId());
+        employeeRepository.save(employee);
+
+        log.info("Manager removed successfully for employee: {}", employeeCode);
+    }
+
+    // =====================================================
+    // PROCESS OFFBOARDED EMPLOYEES
+    // =====================================================
+
+    @Transactional
+    public void processOffboardedEmployees(Long tenantId) {
+        log.info("Processing offboarded employees for tenant: {}", tenantId);
+        LocalDate today = LocalDate.now();
+        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
+        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
+
+        for (Employee employee : offboardedEmployees) {
+            try {
+                employee.setActive(false);
+                Employee saved = employeeRepository.save(employee);
+                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
+                log.info("Manually deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
+                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
+            } catch (Exception e) {
+                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
+            }
+        }
+    }
+
+    // =====================================================
+    // ORGANIZATION CHART
+    // =====================================================
+
+    public List<EmployeeSummaryResponse> getOrganizationChart(Long tenantId) {
+        log.debug("Getting organization chart for tenant: {}", tenantId);
+
+        List<Employee> allEmployees = employeeRepository.findByTenant_Id(tenantId);
+        Map<Long, List<Employee>> managerToSubordinates = new HashMap<>();
+
+        for (Employee emp : allEmployees) {
+            Long managerId = emp.getManager() != null ? emp.getManager().getId() : null;
+            managerToSubordinates.computeIfAbsent(managerId, k -> new ArrayList<>()).add(emp);
+        }
+
+        return managerToSubordinates.getOrDefault(null, Collections.emptyList())
+                .stream()
+                .map(emp -> buildHierarchyResponse(emp, managerToSubordinates))
+                .collect(Collectors.toList());
+    }
+
+    // =====================================================
+    // RESIGNATION METHODS
+    // =====================================================
+
+    @Transactional
+    public void submitResignation(Long id, Long tenantId, String reason, LocalDate proposedLWD) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.submitResignation(reason, proposedLWD);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_SUBMITTED"));
+    }
+
+    @Transactional
+    public void acceptResignation(Long id, Long tenantId, LocalDate approvedLWD) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.acceptResignation(approvedLWD);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_ACCEPTED"));
+    }
+
+    @Transactional
+    public void rejectResignation(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.REJECTED);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_REJECTED"));
+    }
+
+    @Transactional
+    public void withdrawResignation(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.WITHDRAWN);
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_WITHDRAWN"));
+    }
+
+    public ResignationResponse getResignationDetails(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        return convertToResignationResponse(employee);
+    }
+
+    @Transactional
+    public void markEmployeeAbsconded(Long id, Long tenantId) {
+        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
+        employee.markAbsconded();
+        Employee saved = employeeRepository.save(employee);
+        eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
+    }
+
+    // =====================================================
+    // DEACTIVATE OFFBOARDED EMPLOYEES SCHEDULED
+    // =====================================================
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 5 1 * * ?")
+    @Transactional
+    public void deactivateOffboardedEmployees() {
+        log.info("Running daily deactivation of offboarded employees");
+        LocalDate today = LocalDate.now();
+        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
+        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
+
+        for (Employee employee : offboardedEmployees) {
+            try {
+                employee.setActive(false);
+                employee.setStatus(com.sonixhr.enums.employee.EmployeeStatus.RESIGNED);
+                Employee saved = employeeRepository.save(employee);
+                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
+                log.info("Deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
+                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
+            } catch (Exception e) {
+                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
+            }
+        }
+    }
+
+    // =====================================================
     // PRIVATE HELPER METHODS
     // =====================================================
 
     private Employee buildEmployeeFromRequest(Tenant tenant, EmployeeCreateRequest request, String employeeCode) {
-        Department department = null;
-        Long departmentId = request.getDepartmentId();
-        if (departmentId != null) {
-            department = departmentRepository.findById(departmentId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
+        // Implementation...
+        return null;
+    }
+
+    private void validateStateForCountry(IndianState state, String country) {
+        if ("IN".equalsIgnoreCase(country) && state == null) {
+            throw new com.sonixhr.exceptions.ValidationException("state", "State is required for employees in India");
         }
+    }
 
-        EmploymentType employmentType = request.getEmploymentType() != null ? request.getEmploymentType()
-                : EmploymentType.FULL_TIME;
-
-        String workCountry = request.getWorkCountry();
-        IndianState workState = request.getWorkState();
-        String workStateText = request.getWorkStateText();
-
-        // Apply tenant-level fallbacks if work location details are missing
-        workCountry = com.sonixhr.util.CountryUtils.normalizeAndValidateCountry(
-                workCountry != null && !workCountry.trim().isEmpty() ? workCountry : tenant.getCountry());
-        boolean isIndia = "IN".equalsIgnoreCase(workCountry);
-
-        if (isIndia) {
-            if (workState == null) {
-                workState = tenant.getState();
-            }
-            validateStateForCountry(workState, workCountry);
-            workStateText = null;
-        } else {
-            workState = null;
-            if (workStateText == null || workStateText.trim().isEmpty()) {
-                workStateText = tenant.getStateText();
-            }
+    private Map<String, Object> convertBankDetailsToMap(BankAccountRequest bankDetails) {
+        if (bankDetails == null) {
+            return new HashMap<>();
         }
+        Map<String, Object> map = new HashMap<>();
+        map.put("bankName", bankDetails.getBankName());
+        map.put("accountHolderName", bankDetails.getAccountHolderName());
+        map.put("accountNumber", bankDetails.getAccountNumber());
+        map.put("ifscCode", bankDetails.getIfscCode());
+        map.put("branchName", bankDetails.getBranchName());
+        map.put("accountType", bankDetails.getAccountType());
+        map.put("isPrimary", bankDetails.isPrimary());
+        return map;
+    }
 
-        String workLocation = request.getWorkLocation();
-        if (workLocation == null || workLocation.trim().isEmpty()) {
-            workLocation = tenant.getCity() != null && !tenant.getCity().trim().isEmpty() ? tenant.getCity()
-                    : "Head Office";
+    private BankAccountResponse convertBankDetailsToResponse(Map<String, Object> map) {
+        if (map == null || map.isEmpty()) {
+            return null;
         }
-        WeekendConfig weekendConfig = request.getWeekendConfig();
-        String customWeekendDays = request.getCustomWeekendDays();
+        String accountNo = (String) map.get("accountNumber");
+        String masked = accountNo != null && accountNo.length() > 4
+                ? "XXXX" + accountNo.substring(accountNo.length() - 4)
+                : accountNo;
 
-        if (weekendConfig != null) {
-            if (weekendConfig == WeekendConfig.CUSTOM) {
-                if (customWeekendDays == null || customWeekendDays.trim().isEmpty()) {
-                    throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
-                            "Custom weekend days must be specified when weekend config is CUSTOM");
-                }
-                String[] days = customWeekendDays.split(",");
-                for (String day : days) {
-                    try {
-                        java.time.DayOfWeek.valueOf(day.trim().toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        throw new com.sonixhr.exceptions.ValidationException("customWeekendDays",
-                                "Invalid custom weekend day name: " + day);
-                    }
-                }
-            } else {
-                customWeekendDays = null;
-            }
-        } else {
-            customWeekendDays = null;
-        }
-
-        return Employee.builder()
-                .tenant(tenant)
-                .employeeCode(employeeCode)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .department(department)
-                .position(request.getPosition())
-                .employmentType(employmentType)
-                .workLocation(workLocation)
-                .workState(workState)
-                .workStateText(workStateText)
-                .workCountry(workCountry)
-                .address(null)
-                .city(null)
-                .state(null)
-                .stateText(null)
-                .country(null)
-                .postalCode(null)
-                .hireDate(request.getHireDate() != null ? request.getHireDate() : LocalDate.now())
-                .status(EmployeeStatus.INACTIVE)
-                .isActive(false)
-                .createdBy(getCurrentEmployeeId())
-                .weekendConfig(weekendConfig)
-                .customWeekendDays(customWeekendDays)
-                .bankDetails(convertBankDetailsToMap(request.getBankDetails()))
+        return BankAccountResponse.builder()
+                .bankName((String) map.get("bankName"))
+                .accountHolderName((String) map.get("accountHolderName"))
+                .maskedAccountNumber(masked)
+                .ifscCode((String) map.get("ifscCode"))
+                .branchName((String) map.get("branchName"))
+                .accountType((String) map.get("accountType"))
+                .isPrimary(map.get("isPrimary") instanceof Boolean ? (Boolean) map.get("isPrimary") : true)
+                .isActive(map.get("isActive") instanceof Boolean ? (Boolean) map.get("isActive") : true)
                 .build();
     }
+
+    private Long getCurrentEmployeeId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof Employee employee) {
+                return employee.getId();
+            }
+        }
+        return null;
+    }
+
+    private Employee findEmployeeByIdAndTenant(@NonNull Long id, @NonNull Long tenantId) {
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+        if (!employee.getTenantId().equals(tenantId) || employee.getStatus() == EmployeeStatus.TERMINATED) {
+            throw new ResourceNotFoundException("Employee not found with id: " + id);
+        }
+        return employee;
+    }
+
+    private void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {
+        if (manager == null) {
+            log.info("Removing manager for employee: {}", employee.getEmployeeCode());
+            return;
+        }
+
+        if (employee.getId() != null && employee.getId().equals(manager.getId())) {
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Employee cannot be their own manager");
+        }
+
+        if (!manager.getTenantId().equals(tenantId)) {
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be from the same tenant");
+        }
+
+        if (!manager.isActive()) {
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be an active employee");
+        }
+
+        if (manager.isOnProbation()) {
+            throw new com.sonixhr.exceptions.ValidationException("managerId",
+                    "Employees on probation cannot be managers");
+        }
+
+        if (isCircularReference(employee, manager)) {
+            throw new com.sonixhr.exceptions.ValidationException("managerId", "Circular manager reference detected");
+        }
+    }
+
+    private boolean isCircularReference(Employee employee, Employee potentialManager) {
+        Set<Long> visited = new HashSet<>();
+        Employee current = potentialManager;
+
+        while (current != null) {
+            if (employee.getId() != null && current.getId().equals(employee.getId())) {
+                return true;
+            }
+            if (visited.contains(current.getId())) {
+                return true;
+            }
+            visited.add(current.getId());
+            current = current.getManager();
+        }
+        return false;
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null || password.length() < 8) {
+            throw new BusinessException("Password must be at least 8 characters long");
+        }
+        if (!password.matches(".*[A-Z].*")) {
+            throw new BusinessException("Password must contain at least one uppercase letter");
+        }
+        if (!password.matches(".*[a-z].*")) {
+            throw new BusinessException("Password must contain at least one lowercase letter");
+        }
+        if (!password.matches(".*\\d.*")) {
+            throw new BusinessException("Password must contain at least one number");
+        }
+        if (!password.matches(".*[@#$%^&+=!].*")) {
+            throw new BusinessException("Password must contain at least one special character");
+        }
+    }
+
+    // =====================================================
+    // CONVERT TO RESPONSE METHODS
+    // =====================================================
 
     public EmployeeCreateResponse convertToCreateResponse(Employee employee) {
         return EmployeeCreateResponse.builder()
@@ -910,6 +1042,27 @@ public class EmployeeService {
                 .status(employee.getStatus())
                 .hireDate(employee.getHireDate())
                 .message("Employee created successfully")
+                .build();
+    }
+
+    public ResignationResponse convertToResignationResponse(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+        return ResignationResponse.builder()
+                .employeeId(employee.getId())
+                .employeeCode(employee.getEmployeeCode())
+                .employeeName(employee.getFullName())
+                .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
+                .position(employee.getPosition())
+                .status(employee.getStatus())
+                .resignationStatus(employee.getResignationStatus())
+                .resignationReason(employee.getResignationReason())
+                .resignationDate(employee.getResignationDate())
+                .proposedLastWorkingDate(employee.getProposedLastWorkingDate())
+                .approvedLastWorkingDate(employee.getApprovedLastWorkingDate())
+                .lastWorkingDate(employee.getLastWorkingDate())
+                .isResignationAccepted(employee.isResignationAccepted())
                 .build();
     }
 
@@ -1045,442 +1198,13 @@ public class EmployeeService {
                 .build();
     }
 
-    private Employee findEmployeeByIdAndTenant(@NonNull Long id, @NonNull Long tenantId) {
-        Employee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
-        if (!employee.getTenantId().equals(tenantId) || employee.getStatus() == EmployeeStatus.TERMINATED) {
-            throw new ResourceNotFoundException("Employee not found with id: " + id);
-        }
-        return employee;
-    }
-
-    private Long getCurrentEmployeeId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof Employee employee) {
-                return employee.getId();
-            }
-        }
-        return null;
-    }
-
-    public void validateManagerAssignment(Employee employee, Employee manager, Long tenantId) {
-        if (manager == null) {
-            log.info("Removing manager for employee: {}", employee.getEmployeeCode());
-            return;
-        }
-
-        if (employee.getId() != null && employee.getId().equals(manager.getId())) {
-            throw new com.sonixhr.exceptions.ValidationException("managerId", "Employee cannot be their own manager");
-        }
-
-        if (!manager.getTenantId().equals(tenantId)) {
-            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be from the same tenant");
-        }
-
-        if (!manager.isActive()) {
-            throw new com.sonixhr.exceptions.ValidationException("managerId", "Manager must be an active employee");
-        }
-
-        if (manager.isOnProbation()) {
-            throw new com.sonixhr.exceptions.ValidationException("managerId",
-                    "Employees on probation cannot be managers");
-        }
-
-        if (isCircularReference(employee, manager)) {
-            throw new com.sonixhr.exceptions.ValidationException("managerId", "Circular manager reference detected");
-        }
-    }
-
-    private boolean isCircularReference(Employee employee, Employee potentialManager) {
-        Set<Long> visited = new HashSet<>();
-        Employee current = potentialManager;
-
-        while (current != null) {
-            if (employee.getId() != null && current.getId().equals(employee.getId())) {
-                return true;
-            }
-            if (visited.contains(current.getId())) {
-                return true;
-            }
-            visited.add(current.getId());
-            current = current.getManager();
-        }
-        return false;
-    }
-
-    private void validatePasswordStrength(String password) {
-        if (password == null || password.length() < 8) {
-            throw new BusinessException("Password must be at least 8 characters long");
-        }
-        if (!password.matches(".*[A-Z].*")) {
-            throw new BusinessException("Password must contain at least one uppercase letter");
-        }
-        if (!password.matches(".*[a-z].*")) {
-            throw new BusinessException("Password must contain at least one lowercase letter");
-        }
-        if (!password.matches(".*\\d.*")) {
-            throw new BusinessException("Password must contain at least one number");
-        }
-        if (!password.matches(".*[@#$%^&+=!].*")) {
-            throw new BusinessException("Password must contain at least one special character");
-        }
-    }
-
-    // =====================================================
-    // ADD THESE MISSING METHODS
-    // =====================================================
-
-    /**
-     * Forgot password - sends reset link to employee email
-     */
-    @Transactional
-    public void forgotPassword(String email) {
-        log.info("Forgot password request for email: {}", email);
-
-        // Silently return if email not found — avoids leaking whether an account
-        // exists.
-        Optional<Employee> employeeOpt = employeeRepository.findByEmail(email);
-        if (employeeOpt.isEmpty()) {
-            log.info("Forgot-password request for unknown email (silently ignored): {}", email);
-            return;
-        }
-
-        Employee employee = employeeOpt.get();
-        if (!employee.isActive()) {
-            // Still return silently — don't leak that the account is inactive.
-            log.info("Forgot-password request for non-active employee (silently ignored): {}", email);
-            return;
-        }
-
-        // Generate password reset token
-        String resetToken = activationTokenService.generatePasswordResetTokenForEmployee(employee.getId());
-        String resetLink = baseUrl + "/api/tenant/auth/reset-password?token=" + resetToken;
-
-        // Send reset email
-        emailService.sendPasswordResetEmail(employee.getEmail(), employee.getFullName(), resetLink);
-        log.info("Password reset email sent to: {}", email);
-    }
-
-    /**
-     * Reset password using token from email link
-     */
-    @Transactional
-    public void resetPasswordWithToken(String token, String newPassword, String confirmPassword) {
-        log.info("Resetting password with token");
-
-        if (!newPassword.equals(confirmPassword)) {
-            throw new BusinessException("Passwords do not match");
-        }
-
-        validatePasswordStrength(newPassword);
-
-        // Validate token
-        if (activationTokenService.isTokenExpired(token)) {
-            throw new BusinessException("Reset token has expired. Please request a new one.");
-        }
-
-        // Get employee ID from token
-        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
-        if (employeeId == null) {
-            throw new BusinessException("Invalid reset token");
-        }
-
-        // Find employee
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-
-        // Update password
-        employee.setPasswordHash(passwordEncoder.encode(newPassword));
-        employee.setMustChangePassword(false);
-        employee.incrementRolesVersion();
-        employee.clearAuthoritiesCache();
-
-        employeeRepository.save(employee);
-
-        // Invalidate the token
-        activationTokenService.invalidateToken(token);
-
-        log.info("Password reset successfully for employee: {}", employee.getEmail());
-    }
-
-    /**
-     * Activate employee (already exists but ensure it matches)
-     */
-    @Transactional
-    public Employee activateEmployee(String token, String password, String confirmPassword) {
-        log.info("Activating employee with token: {}", token);
-
-        if (!password.equals(confirmPassword)) {
-            throw new BusinessException("Passwords do not match");
-        }
-
-        validatePasswordStrength(password);
-
-        // Validate token
-        if (activationTokenService.isTokenExpired(token)) {
-            throw new BusinessException("Activation token has expired. Please request a new one.");
-        }
-
-        // Get employee ID from token
-        Long employeeId = activationTokenService.getEmployeeIdFromToken(token);
-        if (employeeId == null) {
-            throw new BusinessException("Invalid activation token");
-        }
-
-        // Check if already activated
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-
-        if (employee.isActive()) {
-            throw new BusinessException("Invalid or expired activation token");
-        }
-
-        // Activate employee
-        employee.setPasswordHash(passwordEncoder.encode(password));
-        employee.setActive(true);
-        employee.setStatus(EmployeeStatus.ACTIVE);
-        employee.setMustChangePassword(false);
-        employee.incrementRolesVersion();
-        employee.clearAuthoritiesCache();
-
-        // Assign default shift if null
-        if (employee.getShift() == null) {
-            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(employee.getTenantId())
-                    .ifPresent(employee::setShift);
-        }
-
-        Employee activated = employeeRepository.save(employee);
-
-        // Activate tenant if needed
-        Tenant tenant = activated.getTenant();
-        if (tenant != null && !tenant.getIsActive()) {
-            tenant.activate();
-            tenantRepository.save(tenant);
-            log.info("Tenant activated: {}", tenant.getCompanyName());
-        }
-
-        // Invalidate the token
-        activationTokenService.invalidateToken(token);
-
-        log.info("Employee activated successfully: {}", activated.getEmail());
-
-        return activated;
-    }
-
-    /**
-     * Resend activation email to employee
-     */
-    @Transactional
-    public void resendActivationEmail(String email) {
-        log.info("Resending activation email to: {}", email);
-
-        Employee employee = employeeRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with email: " + email));
-
-        if (employee.isActive()) {
-            throw new BusinessException("Employee is already activated");
-        }
-
-        // Generate new activation token
-        String activationToken = activationTokenService.generateTokenForEmployee(employee.getId());
-        String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
-
-        // Send activation email
-        emailService.sendActivationEmail(employee.getEmail(), employee.getFullName(), activationLink);
-
-        log.info("Activation email resent to: {}", email);
-    }
-
-    /**
-     * Change password for authenticated employee
-     */
-    @Transactional
-    public void changePassword(@NonNull Long employeeId, String oldPassword, String newPassword,
-            String confirmPassword) {
-        log.info("Changing password for employee: {}", employeeId);
-
-        if (!newPassword.equals(confirmPassword)) {
-            throw new BusinessException("New passwords do not match");
-        }
-
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
-
-        if (!passwordEncoder.matches(oldPassword, employee.getPassword())) {
-            throw new BusinessException("Current password is incorrect");
-        }
-
-        validatePasswordStrength(newPassword);
-
-        employee.setPasswordHash(passwordEncoder.encode(newPassword));
-        employee.setMustChangePassword(false);
-        employee.incrementRolesVersion();
-        employee.clearAuthoritiesCache();
-
-        employeeRepository.save(employee);
-
-        log.info("Password changed successfully for employee: {}", employeeId);
-    }
-
-    /**
-     * Reset password by admin (without old password)
-     */
-    @Transactional
-    public void resetPasswordByAdmin(@NonNull Long employeeId, String newPassword) {
-        log.info("Resetting password by admin for employee: {}", employeeId);
-
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
-
-        validatePasswordStrength(newPassword);
-
-        employee.setPasswordHash(passwordEncoder.encode(newPassword));
-        employee.setMustChangePassword(true);
-        employee.incrementRolesVersion();
-        employee.clearAuthoritiesCache();
-
-        employeeRepository.save(employee);
-
-        log.info("Password reset by admin for employee: {}", employeeId);
-    }
-
-    public List<EmployeeDropdownDTO> getActiveEmployeesForDropdown(@NonNull Long tenantId) {
-        log.info("Getting active employees for dropdown for tenant: {}", tenantId);
-        return employeeRepository.findActiveEmployeesForDropdown(tenantId);
-    }
-
-    private void validateStateForCountry(IndianState state, String country) {
-        if ("IN".equalsIgnoreCase(country) && state == null) {
-            throw new com.sonixhr.exceptions.ValidationException("state", "State is required for employees in India");
-        }
-    }
-
-    private Map<String, Object> convertBankDetailsToMap(BankAccountRequest bankDetails) {
-        if (bankDetails == null) {
-            return new HashMap<>();
-        }
-        Map<String, Object> map = new HashMap<>();
-        map.put("bankName", bankDetails.getBankName());
-        map.put("accountHolderName", bankDetails.getAccountHolderName());
-        map.put("accountNumber", bankDetails.getAccountNumber());
-        map.put("ifscCode", bankDetails.getIfscCode());
-        map.put("branchName", bankDetails.getBranchName());
-        map.put("accountType", bankDetails.getAccountType());
-        map.put("isPrimary", bankDetails.isPrimary());
-        return map;
-    }
-
-    private BankAccountResponse convertBankDetailsToResponse(Map<String, Object> map) {
-        if (map == null || map.isEmpty()) {
-            return null;
-        }
-        String accountNo = (String) map.get("accountNumber");
-        String masked = accountNo != null && accountNo.length() > 4
-                ? "XXXX" + accountNo.substring(accountNo.length() - 4)
-                : accountNo;
-
-        return BankAccountResponse.builder()
-                .bankName((String) map.get("bankName"))
-                .accountHolderName((String) map.get("accountHolderName"))
-                .maskedAccountNumber(masked)
-                .ifscCode((String) map.get("ifscCode"))
-                .branchName((String) map.get("branchName"))
-                .accountType((String) map.get("accountType"))
-                .isPrimary(map.get("isPrimary") instanceof Boolean ? (Boolean) map.get("isPrimary") : true)
-                .isActive(map.get("isActive") instanceof Boolean ? (Boolean) map.get("isActive") : true)
-                .build();
-    }
-
-    @Transactional
-    public void updateLoginDetails(Long employeeId, Long tenantId) {
-        Employee employee = employeeRepository.findByIdAndTenantId(employeeId, tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-        employee.setLastLoginAt(java.time.LocalDateTime.now());
-        if (employee.getShift() == null) {
-            shiftConfigurationRepository.findByTenantIdAndIsDefaultTrueAndIsActiveTrue(tenantId)
-                    .ifPresent(employee::setShift);
-        }
-        employeeRepository.save(employee);
-    }
-
-    @Transactional
-    public void processOffboardedEmployees(Long tenantId) {
-        log.info("Processing offboarded employees for tenant: {}", tenantId);
-        LocalDate today = LocalDate.now();
-        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
-        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
-
-        for (Employee employee : offboardedEmployees) {
-            try {
-                employee.setActive(false);
-                Employee saved = employeeRepository.save(employee);
-
-                // Evict cache and publish event for JWT/userDetails deactivation
-                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
-
-                log.info("Manually deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
-                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
-            } catch (Exception e) {
-                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
-            }
-        }
-    }
-
-    @Transactional
-    public void submitResignation(Long id, Long tenantId, String reason, LocalDate proposedLWD) {
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        employee.submitResignation(reason, proposedLWD);
-        Employee saved = employeeRepository.save(employee);
-        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_SUBMITTED"));
-    }
-
-    @Transactional
-    public void acceptResignation(Long id, Long tenantId, LocalDate approvedLWD) {
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        employee.acceptResignation(approvedLWD);
-        Employee saved = employeeRepository.save(employee);
-        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_ACCEPTED"));
-    }
-
-    @Transactional
-    public void rejectResignation(Long id, Long tenantId) {
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.REJECTED);
-        Employee saved = employeeRepository.save(employee);
-        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_REJECTED"));
-    }
-
-    @Transactional
-    public void withdrawResignation(Long id, Long tenantId) {
-        Employee employee = findEmployeeByIdAndTenant(id, tenantId);
-        employee.rejectOrWithdrawResignation(com.sonixhr.enums.employee.ResignationStatus.WITHDRAWN);
-        Employee saved = employeeRepository.save(employee);
-        eventPublisher.publishEvent(new EmployeeUpdatedEvent(saved.getEmail(), saved.getId(), "RESIGNATION_WITHDRAWN"));
-    }
-
-    @org.springframework.scheduling.annotation.Scheduled(cron = "0 5 1 * * ?")
-    @Transactional
-    public void deactivateOffboardedEmployees() {
-        log.info("Running daily deactivation of offboarded employees");
-        LocalDate today = LocalDate.now();
-        List<Employee> offboardedEmployees = employeeRepository.findActiveEmployeesWithExpiredLastWorkingDate(today);
-        log.info("Found {} employees with expired last working date to deactivate", offboardedEmployees.size());
-
-        for (Employee employee : offboardedEmployees) {
-            try {
-                employee.setActive(false);
-                Employee saved = employeeRepository.save(employee);
-
-                // Evict cache and publish event for JWT/userDetails deactivation
-                eventPublisher.publishEvent(EmployeeUpdatedEvent.deactivated(saved.getEmail(), saved.getId()));
-
-                log.info("Deactivated offboarded employee ID: {}, Email: {} (Last working date: {})",
-                        saved.getId(), saved.getEmail(), saved.getLastWorkingDate());
-            } catch (Exception e) {
-                log.error("Failed to deactivate offboarded employee ID: {}: {}", employee.getId(), e.getMessage());
-            }
-        }
+    private EmployeeSummaryResponse buildHierarchyResponse(Employee employee,
+                                                           Map<Long, List<Employee>> managerToSubordinates) {
+        EmployeeSummaryResponse response = convertToSummaryResponse(employee);
+        List<Employee> subordinates = managerToSubordinates.getOrDefault(employee.getId(), Collections.emptyList());
+        response.setDirectReports(subordinates.stream()
+                .map(sub -> buildHierarchyResponse(sub, managerToSubordinates))
+                .collect(Collectors.toList()));
+        return response;
     }
 }

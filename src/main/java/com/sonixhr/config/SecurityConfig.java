@@ -37,8 +37,21 @@ import java.util.List;
 @SuppressWarnings("null")
 public class SecurityConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:8081}")
+    // ✅ NO DEFAULTS - MUST be defined in application.properties
+    @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
+
+    @Value("${app.cors.allowed-methods}")
+    private List<String> allowedMethods;
+
+    @Value("${app.cors.allowed-headers}")
+    private List<String> allowedHeaders;
+
+    @Value("${app.cors.exposed-headers}")
+    private List<String> exposedHeaders;
+
+    @Value("${app.cors.max-age}")
+    private long maxAge;
 
     private final UserDetailsService employeeDetailsService;
     private final UserDetailsService platformUserDetailsService;
@@ -69,11 +82,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // CSRF protection is disabled only for stateless REST API paths (/api/**, /actuator/**, etc.) 
-        // because they use JWT tokens in the Authorization header rather than session cookies.
-        // Since authentication for these endpoints never uses cookies, they are safe from CSRF.
-        // CSRF remains enabled for all other endpoints (such as static/browser-delivered HTML UI routes)
-        // to prevent potential cross-site request forgery attacks if session cookies are introduced.
         http
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/actuator/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui/**"))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -84,20 +92,53 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // =====================================================
+                        // PUBLIC ENDPOINTS - No authentication required
+                        // =====================================================
                         .requestMatchers(
+                                // Public auth endpoints
                                 "/api/auth/**",
-                                "/api/platform/auth/**",
-                                "/api/public/**",
-                                "/api/health",
-                                "/actuator/health",
-                                "/api/tenant/register",
+
+                                // Platform auth - PUBLIC ONLY
+                                "/api/platform/auth/login",
+                                "/api/platform/auth/activate",
+                                "/api/platform/auth/forgot-password",
+                                "/api/platform/auth/reset-password",
+                                "/api/platform/auth/resend-activation",
+                                "/api/platform/auth/refresh",
+                                "/api/platform/auth/verify-token",
+
+                                // Tenant auth - PUBLIC ONLY
+                                "/api/tenant/auth/login",
+                                "/api/tenant/auth/activate",
+                                "/api/tenant/auth/forgot-password",
+                                "/api/tenant/auth/reset-password",
+                                "/api/tenant/auth/resend-activation",
+                                "/api/tenant/auth/refresh",
+
+                                // Employee activation
                                 "/api/employee/auth/activate",
-                                "/api/tenant/auth/**",
+
+                                // Public endpoints
+                                "/api/public/**",
+                                "/api/tenant/register",
                                 "/api/forgot-password/**",
                                 "/api/reset-password/**",
+
+                                // Public plan endpoints
+                                "/api/platform/subscription-plans/public",
+
+                                // Health and monitoring
+                                "/api/health",
+                                "/actuator/health",
+                                "/actuator/**",
+
+                                // Swagger/OpenAPI
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/api-docs/**",
+
+                                // Static resources
                                 "/",
                                 "/error",
                                 "/api/debug/**",
@@ -108,6 +149,32 @@ public class SecurityConfig {
                                 "/*.js",
                                 "/favicon.ico")
                         .permitAll()
+
+                        // =====================================================
+                        // BILLING AND SUBSCRIPTION ENDPOINTS
+                        // =====================================================
+                        .requestMatchers(
+                                "/api/tenant/billing/**",
+                                "/api/tenant/subscriptions/**",
+                                "/api/tenant/subscription/**",
+                                "/api/tenant/subscription/history/**",
+                                "/api/platform/subscription-plans",
+                                "/api/platform/subscription-plans/{id}",
+                                "/api/platform/subscription-plans/code/{code}",
+                                "/api/platform/subscription-plans/{id}/history")
+                        .permitAll()
+
+                        // =====================================================
+                        // PLATFORM ADMIN - Require Platform Permissions
+                        // =====================================================
+                        .requestMatchers("/api/platform/admin/**")
+                        .hasAnyAuthority(Arrays.stream(com.sonixhr.enums.PlatformPermissionEnum.values())
+                                .map(Enum::name)
+                                .toArray(String[]::new))
+
+                        // =====================================================
+                        // AUTHENTICATED ENDPOINTS - Require valid JWT
+                        // =====================================================
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -148,11 +215,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization", "Content-Type", "X-Tenant-ID", "X-Request-ID", "Accept", "Origin"));
-        configuration.setExposedHeaders(List.of("X-Total-Count", "X-Tenant-ID"));
+        configuration.addAllowedOriginPattern("*");
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

@@ -31,17 +31,13 @@ public class TenantPermissionService {
 
         for (TenantPermissionEnum enumPermission : TenantPermissionEnum.values()) {
             try {
-                // Convert enum to String using .name()
                 if (permissionRepository.findByPermission(enumPermission.name()).isEmpty()) {
                     TenantPermission permission = TenantPermission.builder()
-                            .permission(enumPermission.name())  // Store as String
+                            .permission(enumPermission.name())
                             .description(enumPermission.getDescription())
                             .category(enumPermission.getCategory())
                             .displayOrder(enumPermission.getOrder())
                             .build();
-                    if (permission == null) {
-                        throw new IllegalStateException("Failed to build tenant permission");
-                    }
                     permissionRepository.save(permission);
                     log.info("Added permission: {}", enumPermission.name());
                 }
@@ -52,9 +48,299 @@ public class TenantPermissionService {
         log.info("Tenant permissions initialization completed. Total: {}", permissionRepository.count());
     }
 
+    // =====================================================
+    // PERMISSION CHECK METHODS
+    // =====================================================
+
     /**
-     * Get all permissions grouped by category (with caching)
+     * Check if a permission is a billing permission
      */
+    public boolean isBillingPermission(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isBillingPermission();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a permission should be accessible to expired tenants
+     */
+    public boolean isExpiredTenantAccessible(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isExpiredTenantAccessible();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a permission is a platform admin permission
+     */
+    public boolean isPlatformAdminPermission(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isPlatformAdminPermission();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a permission is a view permission
+     */
+    public boolean isViewPermission(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isViewPermission();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a permission is a write permission
+     */
+    public boolean isWritePermission(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isWritePermission();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a permission is an export permission
+     */
+    public boolean isExportPermission(String permissionName) {
+        if (permissionName == null) return false;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.isExportPermission();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return false;
+        }
+    }
+
+    /**
+     * Get the permission type for a permission
+     */
+    public String getPermissionType(String permissionName) {
+        if (permissionName == null) return null;
+        try {
+            TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permissionName);
+            return enumValue.getType().name();
+        } catch (IllegalArgumentException e) {
+            log.debug("Unknown permission: {}", permissionName);
+            return null;
+        }
+    }
+
+    /**
+     * Check if user has any billing permission (allowed for expired tenants)
+     */
+    public boolean hasBillingPermission(Set<String> userPermissions) {
+        if (userPermissions == null || userPermissions.isEmpty()) {
+            return false;
+        }
+
+        for (String permission : userPermissions) {
+            try {
+                TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permission);
+                if (enumValue.isBillingPermission()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore unknown permissions
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has any platform admin permission
+     */
+    public boolean hasPlatformAdminPermission(Set<String> userPermissions) {
+        if (userPermissions == null || userPermissions.isEmpty()) {
+            return false;
+        }
+
+        for (String permission : userPermissions) {
+            try {
+                TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permission);
+                if (enumValue.isPlatformAdminPermission()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore unknown permissions
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has any view permission
+     */
+    public boolean hasViewPermission(Set<String> userPermissions) {
+        if (userPermissions == null || userPermissions.isEmpty()) {
+            return false;
+        }
+
+        for (String permission : userPermissions) {
+            try {
+                TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permission);
+                if (enumValue.isViewPermission()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore unknown permissions
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has any write permission
+     */
+    public boolean hasWritePermission(Set<String> userPermissions) {
+        if (userPermissions == null || userPermissions.isEmpty()) {
+            return false;
+        }
+
+        for (String permission : userPermissions) {
+            try {
+                TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permission);
+                if (enumValue.isWritePermission()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore unknown permissions
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has any export permission
+     */
+    public boolean hasExportPermission(Set<String> userPermissions) {
+        if (userPermissions == null || userPermissions.isEmpty()) {
+            return false;
+        }
+
+        for (String permission : userPermissions) {
+            try {
+                TenantPermissionEnum enumValue = TenantPermissionEnum.valueOf(permission);
+                if (enumValue.isExportPermission()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore unknown permissions
+            }
+        }
+        return false;
+    }
+
+    // =====================================================
+    // PERMISSION LIST METHODS
+    // =====================================================
+
+    /**
+     * Get billing permissions only
+     */
+    public List<String> getBillingPermissions() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(TenantPermissionEnum::isBillingPermission)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get platform admin permissions
+     */
+    public List<String> getPlatformAdminPermissions() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(TenantPermissionEnum::isPlatformAdminPermission)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get view permissions
+     */
+    public List<String> getViewPermissions() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(TenantPermissionEnum::isViewPermission)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get write permissions
+     */
+    public List<String> getWritePermissions() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(TenantPermissionEnum::isWritePermission)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get export permissions
+     */
+    public List<String> getExportPermissions() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(TenantPermissionEnum::isExportPermission)
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all permission names as a set
+     */
+    public Set<String> getAllPermissionNames() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Get permission names by category (returns List<String>)
+     */
+    public List<String> getPermissionNamesByCategory(String category) {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .filter(p -> p.getCategory().equals(category))
+                .map(TenantPermissionEnum::name)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all categories
+     */
+    public Set<String> getAllCategories() {
+        return Arrays.stream(TenantPermissionEnum.values())
+                .map(TenantPermissionEnum::getCategory)
+                .collect(Collectors.toSet());
+    }
+
+    // =====================================================
+    // EXISTING METHODS (UPDATED WITH METADATA)
+    // =====================================================
+
     @Cacheable(value = "permissions", key = "'grouped'")
     public List<PermissionGroupDTO> getGroupedPermissions() {
         log.debug("Fetching grouped permissions from database");
@@ -80,7 +366,6 @@ public class TenantPermissionService {
 
         for (TenantPermission permission : allPermissions) {
             try {
-                // FIXED: getPermission() returns String, not Enum
                 String permissionName = permission.getPermission();
                 if (permissionName == null) {
                     nullPermissionCount++;
@@ -95,13 +380,27 @@ public class TenantPermissionService {
                     log.debug("Permission {} has null category, assigning to 'General'", permissionName);
                 }
 
+                // Get enum value for metadata
+                TenantPermissionEnum enumValue = null;
+                try {
+                    enumValue = TenantPermissionEnum.valueOf(permissionName);
+                } catch (IllegalArgumentException e) {
+                    log.debug("Permission {} not found in enum", permissionName);
+                }
+
                 PermissionGroupDTO.PermissionInfo info = PermissionGroupDTO.PermissionInfo.builder()
                         .id(permission.getId())
-                        .name(permissionName)  // Use the String directly
+                        .name(permissionName)
                         .description(permission.getDescription() != null ? permission.getDescription() : "")
                         .category(category)
                         .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)
                         .selected(false)
+                        .billingPermission(isBillingPermission(permissionName))
+                        .platformAdminPermission(isPlatformAdminPermission(permissionName))
+                        .viewPermission(enumValue != null && enumValue.isViewPermission())
+                        .writePermission(enumValue != null && enumValue.isWritePermission())
+                        .exportPermission(enumValue != null && enumValue.isExportPermission())
+                        .permissionType(enumValue != null ? enumValue.getType().name() : null)
                         .build();
 
                 groupedPermissions.computeIfAbsent(category, k -> new ArrayList<>()).add(info);
@@ -135,9 +434,6 @@ public class TenantPermissionService {
         return result;
     }
 
-    /**
-     * Get permissions for a specific role with selected status
-     */
     public List<PermissionGroupDTO> getPermissionsWithRoleSelection(@NonNull Long roleId, Set<Long> selectedPermissionIds) {
         log.debug("Getting permissions with role selection for roleId: {}", roleId);
 
@@ -154,7 +450,7 @@ public class TenantPermissionService {
     }
 
     /**
-     * Get permissions by category
+     * Get permissions by category with full metadata (returns List<PermissionGroupDTO.PermissionInfo>)
      */
     public List<PermissionGroupDTO.PermissionInfo> getPermissionsByCategory(String category) {
         log.debug("Getting permissions by category: {}", category);
@@ -180,13 +476,27 @@ public class TenantPermissionService {
         return permissions.stream()
                 .map(p -> {
                     try {
+                        String permissionName = p.getPermission();
+                        TenantPermissionEnum enumValue = null;
+                        try {
+                            enumValue = TenantPermissionEnum.valueOf(permissionName);
+                        } catch (IllegalArgumentException e) {
+                            // Ignore
+                        }
+
                         return PermissionGroupDTO.PermissionInfo.builder()
                                 .id(p.getId())
-                                .name(p.getPermission() != null ? p.getPermission() : "UNKNOWN")
+                                .name(permissionName != null ? permissionName : "UNKNOWN")
                                 .description(p.getDescription() != null ? p.getDescription() : "")
                                 .category(p.getCategory() != null ? p.getCategory() : category)
                                 .displayOrder(p.getDisplayOrder() != null ? p.getDisplayOrder() : 999)
                                 .selected(false)
+                                .billingPermission(isBillingPermission(permissionName))
+                                .platformAdminPermission(isPlatformAdminPermission(permissionName))
+                                .viewPermission(enumValue != null && enumValue.isViewPermission())
+                                .writePermission(enumValue != null && enumValue.isWritePermission())
+                                .exportPermission(enumValue != null && enumValue.isExportPermission())
+                                .permissionType(enumValue != null ? enumValue.getType().name() : null)
                                 .build();
                     } catch (Exception e) {
                         log.error("Error converting permission to DTO: {}", p.getId(), e);
@@ -202,13 +512,27 @@ public class TenantPermissionService {
             return null;
         }
 
+        String permissionName = permission.getPermission();
+        TenantPermissionEnum enumValue = null;
+        try {
+            enumValue = TenantPermissionEnum.valueOf(permissionName);
+        } catch (IllegalArgumentException e) {
+            // Ignore
+        }
+
         return PermissionDTO.builder()
                 .id(permission.getId())
-                .permission(permission.getPermission())  // This is already a String
+                .permission(permissionName)
                 .description(permission.getDescription() != null ? permission.getDescription() : "")
                 .category(permission.getCategory() != null ? permission.getCategory() : "General")
                 .displayOrder(permission.getDisplayOrder() != null ? permission.getDisplayOrder() : 999)
                 .selected(false)
+                .billingPermission(isBillingPermission(permissionName))
+                .platformAdminPermission(isPlatformAdminPermission(permissionName))
+                .viewPermission(enumValue != null && enumValue.isViewPermission())
+                .writePermission(enumValue != null && enumValue.isWritePermission())
+                .exportPermission(enumValue != null && enumValue.isExportPermission())
+                .permissionType(enumValue != null ? enumValue.getType().name() : null)
                 .build();
     }
 

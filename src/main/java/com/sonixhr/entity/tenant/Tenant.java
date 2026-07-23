@@ -34,20 +34,19 @@ public class Tenant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // =====================================================
+    // TENANT IDENTIFICATION
+    // =====================================================
+
     @Column(name = "tenant_code", unique = true, nullable = false, length = 50)
     private String tenantCode;
 
     @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    @Builder.Default
-    private UserStatus status = UserStatus.ACTIVE;
-
-    @Column(name = "is_active")
-    @Builder.Default
-    private boolean isActive = true;
+    // =====================================================
+    // ADMIN USER DETAILS (Matches DTO)
+    // =====================================================
 
     @Column(name = "admin_email", nullable = false, length = 255)
     private String adminEmail;
@@ -58,6 +57,10 @@ public class Tenant {
     @Column(name = "admin_phone", length = 20)
     private String adminPhone;
 
+    // =====================================================
+    // COMPANY ADDRESS DETAILS (Matches DTO)
+    // =====================================================
+
     @Column(name = "office_address", length = 500)
     private String officeAddress;
 
@@ -65,7 +68,7 @@ public class Tenant {
     private String city;
 
     @Column(name = "state", length = 50)
-    @jakarta.persistence.Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
+    @Convert(converter = com.sonixhr.enums.IndianStateConverter.class)
     private IndianState state;
 
     @Column(name = "state_text", length = 150)
@@ -74,13 +77,23 @@ public class Tenant {
     @Column(name = "country", length = 50)
     private String country;
 
+    // =====================================================
+    // COMPANY CONTACT (Extra fields not in DTO but useful)
+    // =====================================================
+
+    @Column(name = "company_email", length = 255)
+    private String companyEmail;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+
+    // =====================================================
+    // SUBSCRIPTION
+    // =====================================================
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subscription_plan_id")
     private SubscriptionPlan subscriptionPlan;
-
-    public String getPlanType() {
-        return this.subscriptionPlan != null ? this.subscriptionPlan.getName().toLowerCase() : null;
-    }
 
     @Column(name = "max_employees")
     @Builder.Default
@@ -94,19 +107,70 @@ public class Tenant {
     @Column(name = "ends_at")
     private LocalDateTime endsAt;
 
+    // =====================================================
+    // STATUS
+    // =====================================================
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private UserStatus status = UserStatus.ACTIVE;
+
+    @Column(name = "is_active")
+    @Builder.Default
+    private boolean isActive = true;
+
+    @Column(name = "suspended", nullable = false)
+    @Builder.Default
+    private boolean suspended = false;
+
     @Column(name = "suspended_at")
     private LocalDateTime suspendedAt;
 
     @Column(name = "suspension_reason", length = 500)
     private String suspensionReason;
 
-    @Column(name = "suspended", nullable = false)
-    @Builder.Default
-    private boolean suspended = false;
-
     @Column(name = "legal_hold", nullable = false)
     @Builder.Default
     private boolean legalHold = false;
+
+    // =====================================================
+    // DATA LIFECYCLE
+    // =====================================================
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_status", nullable = false, length = 50)
+    @Builder.Default
+    private TenantDataStatus dataStatus = TenantDataStatus.RETAINED;
+
+    @Column(name = "expired_at")
+    private LocalDateTime expiredAt;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by_admin_id")
+    private Long deletedByAdminId;
+
+    // =====================================================
+    // NOTIFICATIONS
+    // =====================================================
+
+    @Column(name = "expiration_notified_at")
+    private LocalDateTime expirationNotifiedAt;
+
+    @Column(name = "archive_warning_notified_at")
+    private LocalDateTime archiveWarningNotifiedAt;
+
+    @Column(name = "final_reminder_sent_at")
+    private LocalDateTime finalReminderSentAt;
+
+    // =====================================================
+    // AUDIT
+    // =====================================================
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -115,37 +179,6 @@ public class Tenant {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @Column(name = "expired_at")
-    private LocalDateTime expiredAt;
-
-    @Column(name = "archived_at")
-    private LocalDateTime archivedAt;
-
-    @Column(name = "archive_warning_notified_at")
-    private LocalDateTime archiveWarningNotifiedAt;
-
-    @Column(name = "final_reminder_sent_at")
-    private LocalDateTime finalReminderSentAt;
-
-    @Column(name = "expiration_notified_at")
-    private LocalDateTime expirationNotifiedAt;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "data_status", nullable = false, length = 50)
-    @Builder.Default
-    private TenantDataStatus dataStatus = TenantDataStatus.RETAINED;
-
-    @Column(name = "deleted_by_admin_id")
-    private Long deletedByAdminId;
-
-    @Transient
-    public LocalDateTime getDeletionEligibleAt() {
-        return expiredAt != null ? expiredAt.plusYears(1) : null;
-    }
 
     @Column(name = "created_by")
     private Long createdBy;
@@ -157,15 +190,49 @@ public class Tenant {
     @Builder.Default
     private Long version = 0L;
 
+    // =====================================================
+    // SETTINGS
+    // =====================================================
+
     @Column(name = "api_logging_enabled")
     @Builder.Default
     private Boolean apiLoggingEnabled = true;
+
+    // =====================================================
+    // HELPER METHODS
+    // =====================================================
+
+    public String getPlanType() {
+        return this.subscriptionPlan != null ? this.subscriptionPlan.getName().toLowerCase() : null;
+    }
 
     public boolean isApiLoggingEnabled() {
         return apiLoggingEnabled == null || apiLoggingEnabled;
     }
 
-    // ==================== Helper Methods ====================
+    @Transient
+    public LocalDateTime getDeletionEligibleAt() {
+        return expiredAt != null ? expiredAt.plusYears(1) : null;
+    }
+
+    public boolean isExpired() {
+        return this.endsAt != null && this.endsAt.isBefore(LocalDateTime.now());
+    }
+
+    public int getDaysLeft() {
+        if (this.endsAt == null) {
+            return 0;
+        }
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.endsAt);
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    // =====================================================
+    // STATE MANAGEMENT METHODS
+    // =====================================================
 
     public void softDelete() {
         this.status = UserStatus.DELETED;
@@ -229,23 +296,10 @@ public class Tenant {
         return this.status == UserStatus.DELETED;
     }
 
-    public boolean isExpired() {
-        return this.endsAt != null && this.endsAt.isBefore(LocalDateTime.now());
-    }
-
-    public int getDaysLeft() {
-        if (this.endsAt == null) {
-            return 0;
-        }
-        return (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.endsAt);
-    }
-
-    // Convenience method for template compatibility
-    public Boolean getIsActive() {
-        return isActive;
-    }
-
+    // =====================================================
     // JPA Lifecycle Validation
+    // =====================================================
+
     @PrePersist
     @PreUpdate
     private void validate() {
@@ -258,16 +312,23 @@ public class Tenant {
         if (adminEmail == null || !adminEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             throw new IllegalStateException("Valid admin email is required");
         }
+        // Set default values if null
+        if (apiLoggingEnabled == null) {
+            apiLoggingEnabled = true;
+        }
+        if (maxEmployees == null) {
+            maxEmployees = 100;
+        }
     }
 
-    // ==================== equals, hashCode, toString ====================
+    // =====================================================
+    // equals, hashCode, toString
+    // =====================================================
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Tenant tenant = (Tenant) o;
         return id != null && Objects.equals(id, tenant.id);
     }
@@ -283,12 +344,12 @@ public class Tenant {
                 "id=" + id +
                 ", tenantCode='" + tenantCode + '\'' +
                 ", companyName='" + companyName + '\'' +
+                ", adminEmail='" + adminEmail + '\'' +
+                ", adminName='" + adminName + '\'' +
                 ", status=" + status +
                 ", isActive=" + isActive +
                 ", planType=" + getPlanType() +
                 ", createdAt=" + createdAt +
                 '}';
     }
-
-
 }

@@ -4,5 +4,6 @@ public enum TenantDataStatus {
     RETAINED,
     ARCHIVED,
     ELIGIBLE_FOR_DELETION,
-    DELETED
+    DELETED,
+    EXPIRED
 }

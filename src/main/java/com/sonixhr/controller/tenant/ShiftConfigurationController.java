@@ -3,287 +3,398 @@ package com.sonixhr.controller.tenant;
 import com.sonixhr.dto.attendance.ShiftConfigurationDTO;
 import com.sonixhr.dto.attendance.ShiftConfigurationRequestDTO;
 import com.sonixhr.dto.attendance.ShiftConfigurationSummaryDTO;
-import com.sonixhr.entity.employee.Employee;
+import com.sonixhr.security.SecurityUtils;
+import com.sonixhr.security.TenantContext;
 import com.sonixhr.service.attendance.ShiftConfigurationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/shift-configurations")
+@RequestMapping({"/api/tenant/shift-configurations", "/api/shift-configurations"})
 @RequiredArgsConstructor
+@Tag(name = "Shift Configuration", description = "APIs for managing shift configurations")
+@SecurityRequirement(name = "bearerAuth")
 public class ShiftConfigurationController {
 
     private final ShiftConfigurationService shiftConfigurationService;
+    private final SecurityUtils securityUtils;
+
+    // =====================================================
+    // CRUD OPERATIONS - ADMIN ONLY
+    // =====================================================
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SHIFT_CREATE')")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_CREATE')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Create a new shift configuration",
+            description = "Creates a new shift configuration for the tenant. Requires SHIFT_CREATE permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Shift configuration created successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "409", description = "Shift configuration already exists or duplicate code")
+    })
     public ResponseEntity<ShiftConfigurationDTO> createShift(
-            @Valid @RequestBody ShiftConfigurationRequestDTO request,
-            @AuthenticationPrincipal Employee currentEmployee) {
+            @Valid @RequestBody ShiftConfigurationRequestDTO request) {
+        log.info("REST request to create shift configuration for tenant: {}", TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
 
-        log.info("Creating shift for tenant: {} by employee: {}", tenantId, employeeId);
-
-        ShiftConfigurationDTO created = shiftConfigurationService.createShiftConfiguration(
+        ShiftConfigurationDTO response = shiftConfigurationService.createShiftConfiguration(
                 request, tenantId, employeeId);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFT_UPDATE')")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_UPDATE')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Update an existing shift configuration",
+            description = "Updates an existing shift configuration. Requires SHIFT_UPDATE permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configuration updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found")
+    })
     public ResponseEntity<ShiftConfigurationDTO> updateShift(
+            @Parameter(description = "Shift configuration ID", required = true)
             @PathVariable Long id,
-            @Valid @RequestBody ShiftConfigurationRequestDTO request,
-            @AuthenticationPrincipal Employee currentEmployee) {
+            @Valid @RequestBody ShiftConfigurationRequestDTO request) {
+        log.info("REST request to update shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
 
-        log.info("Updating shift: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
-
-        ShiftConfigurationDTO updated = shiftConfigurationService.updateShiftConfiguration(
+        ShiftConfigurationDTO response = shiftConfigurationService.updateShiftConfiguration(
                 id, request, tenantId, employeeId);
-
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{id}/activate")
-    @PreAuthorize("hasAuthority('SHIFT_ADMIN')")
-    public ResponseEntity<Void> activateShift(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+    @GetMapping("/all")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_VIEW_ALL') or @securityUtils.hasPermission('SHIFT_VIEW')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Get all shift configurations",
+            description = "Retrieves all shift configurations for the current tenant. Requires SHIFT_VIEW_ALL or SHIFT_VIEW permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configurations retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized")
+    })
+    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllShifts() {
+        log.info("REST request to get all shift configurations for tenant: {}", TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
-
-        log.info("Activating shift: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
-        shiftConfigurationService.activateShift(id, tenantId, employeeId);
-        return ResponseEntity.ok().build();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        List<ShiftConfigurationSummaryDTO> response =
+                shiftConfigurationService.getAllShiftConfigurationsSummary(tenantId);
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasAuthority('SHIFT_ADMIN')")
-    public ResponseEntity<Void> deactivateShift(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+    @GetMapping("/active")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_VIEW')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Get all active shift configurations",
+            description = "Retrieves all active shift configurations for the current tenant. Requires SHIFT_VIEW permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Active shift configurations retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized")
+    })
+    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts() {
+        log.info("REST request to get all active shift configurations for tenant: {}", TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
-
-        log.info("Deactivating shift: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
-        shiftConfigurationService.deactivateShift(id, tenantId, employeeId);
-        return ResponseEntity.ok().build();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        List<ShiftConfigurationSummaryDTO> response =
+                shiftConfigurationService.getAllActiveShiftsSummary(tenantId);
+        return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{id}/set-default")
-    @PreAuthorize("hasAuthority('SHIFT_ADMIN')")
-    public ResponseEntity<Void> setDefaultShift(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+    @GetMapping("/{id}")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_VIEW') or @securityUtils.hasPermission('SHIFT_VIEW_ALL')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Get shift configuration by ID",
+            description = "Retrieves a specific shift configuration by ID. Requires SHIFT_VIEW or SHIFT_VIEW_ALL permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configuration retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found")
+    })
+    public ResponseEntity<ShiftConfigurationDTO> getShiftById(
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to get shift configuration by id: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        ShiftConfigurationDTO response =
+                shiftConfigurationService.getShiftConfigurationById(id, tenantId);
+        return ResponseEntity.ok(response);
+    }
 
-        log.info("Setting shift as default: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
-        shiftConfigurationService.setDefaultShift(id, tenantId, employeeId);
-        return ResponseEntity.ok().build();
+    @GetMapping("/code/{shiftCode}")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_VIEW') or @securityUtils.hasPermission('SHIFT_VIEW_ALL')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Get shift configuration by code",
+            description = "Retrieves a specific shift configuration by code. Requires SHIFT_VIEW or SHIFT_VIEW_ALL permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configuration retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found")
+    })
+    public ResponseEntity<ShiftConfigurationDTO> getShiftByCode(
+            @Parameter(description = "Shift configuration code", required = true)
+            @PathVariable String shiftCode) {
+        log.info("REST request to get shift configuration by code: {} for tenant: {}",
+                shiftCode, TenantContext.getCurrentTenant());
+
+        Long tenantId = securityUtils.getCurrentTenantId();
+        ShiftConfigurationDTO response =
+                shiftConfigurationService.getShiftByCode(shiftCode, tenantId);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFT_DELETE')")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_DELETE')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Soft delete shift configuration",
+            description = "Soft deletes a shift configuration (marks as inactive and deleted). Requires SHIFT_DELETE permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Shift configuration deleted successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found"),
+            @ApiResponse(responseCode = "409", description = "Cannot delete default shift")
+    })
     public ResponseEntity<Void> softDeleteShift(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to soft delete shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        Long employeeId = currentEmployee.getId();
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
 
-        log.info("Soft deleting shift: {} for tenant: {} by employee: {}", id, tenantId, employeeId);
         shiftConfigurationService.softDeleteShiftConfiguration(id, tenantId, employeeId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}/hard")
-    @PreAuthorize("hasAuthority('SHIFT_HARD_DELETE')")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_HARD_DELETE')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Hard delete shift configuration",
+            description = "Permanently deletes a shift configuration. Requires SHIFT_HARD_DELETE permission.",
+            hidden = true)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Shift configuration permanently deleted"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found"),
+            @ApiResponse(responseCode = "409", description = "Cannot delete default shift")
+    })
     public ResponseEntity<Void> hardDeleteShift(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to hard delete shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-
-        log.warn("Hard deleting shift: {} for tenant: {} by employee: {}", id, tenantId, currentEmployee.getId());
+        Long tenantId = securityUtils.getCurrentTenantId();
         shiftConfigurationService.hardDeleteShiftConfiguration(id, tenantId);
         return ResponseEntity.noContent().build();
     }
 
-    // GET endpoints
-    @GetMapping("/my-shift")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW')")
-    public ResponseEntity<ShiftConfigurationDTO> getMyShift(
-            @AuthenticationPrincipal Employee currentEmployee) {
+    // =====================================================
+    // ACTIVATION / DEACTIVATION - ADMIN ONLY
+    // =====================================================
 
-        Long tenantId = currentEmployee.getTenantId();
-        ShiftConfigurationDTO shift = shiftConfigurationService.getShiftConfiguration(tenantId);
-        return ResponseEntity.ok(shift);
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_UPDATE') or @securityUtils.hasPermission('SHIFT_ADMIN')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Activate shift configuration",
+            description = "Activates a shift configuration. Requires SHIFT_UPDATE or SHIFT_ADMIN permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configuration activated successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found")
+    })
+    public ResponseEntity<Void> activateShift(
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to activate shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
+
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
+
+        shiftConfigurationService.activateShift(id, tenantId, employeeId);
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW')")
-    public ResponseEntity<ShiftConfigurationDTO> getShiftById(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Employee currentEmployee) {
+    @PostMapping("/{id}/deactivate")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_UPDATE') or @securityUtils.hasPermission('SHIFT_ADMIN')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Deactivate shift configuration",
+            description = "Deactivates a shift configuration. Requires SHIFT_UPDATE or SHIFT_ADMIN permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Shift configuration deactivated successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found"),
+            @ApiResponse(responseCode = "409", description = "Cannot deactivate default shift")
+    })
+    public ResponseEntity<Void> deactivateShift(
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to deactivate shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        ShiftConfigurationDTO shift = shiftConfigurationService.getShiftConfigurationById(id, tenantId);
-        return ResponseEntity.ok(shift);
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
+
+        shiftConfigurationService.deactivateShift(id, tenantId, employeeId);
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/code/{shiftCode}")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW')")
-    public ResponseEntity<ShiftConfigurationDTO> getShiftByCode(
-            @PathVariable String shiftCode,
-            @AuthenticationPrincipal Employee currentEmployee) {
+    @PostMapping("/{id}/set-default")
+    @PreAuthorize("@securityUtils.hasPermission('SHIFT_UPDATE') or @securityUtils.hasPermission('SHIFT_ADMIN')")  // ✅ Using SecurityUtils bean
+    @Operation(summary = "Set default shift configuration",
+            description = "Sets a shift configuration as the default for the tenant. Requires SHIFT_UPDATE or SHIFT_ADMIN permission.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Default shift set successfully"),
+            @ApiResponse(responseCode = "403", description = "Not authorized"),
+            @ApiResponse(responseCode = "404", description = "Shift configuration not found")
+    })
+    public ResponseEntity<Void> setDefaultShift(
+            @Parameter(description = "Shift configuration ID", required = true)
+            @PathVariable Long id) {
+        log.info("REST request to set default shift configuration: {} for tenant: {}",
+                id, TenantContext.getCurrentTenant());
 
-        Long tenantId = currentEmployee.getTenantId();
-        ShiftConfigurationDTO shift = shiftConfigurationService.getShiftByCode(shiftCode, tenantId);
-        return ResponseEntity.ok(shift);
+        Long tenantId = securityUtils.getCurrentTenantId();
+        Long employeeId = securityUtils.getCurrentEmployeeId();
+
+        shiftConfigurationService.setDefaultShift(id, tenantId, employeeId);
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/all")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW_ALL')")
-    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllShifts(
-            @AuthenticationPrincipal Employee currentEmployee) {
-
-        Long tenantId = currentEmployee.getTenantId();
-        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllShiftConfigurationsSummary(tenantId);
-        return ResponseEntity.ok(shifts);
-    }
+    // =====================================================
+    // GET OPERATIONS WITH DATE - VIEW PERMISSION
+    // =====================================================
 
     @GetMapping("/effective")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW')")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get effective shift for a date",
+            description = "Retrieves the effective shift configuration for a specific date. Accessible to authenticated users.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Effective shift retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "No effective shift found")
+    })
     public ResponseEntity<ShiftConfigurationDTO> getEffectiveShift(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @Parameter(description = "Date to check (format: yyyy-MM-dd)", example = "2026-01-15")
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
 
-        Long tenantId = currentEmployee.getTenantId();
-        ShiftConfigurationDTO shift = shiftConfigurationService.getEffectiveShiftOnDate(tenantId, date);
-        return ResponseEntity.ok(shift);
+        if (date == null) {
+            date = LocalDate.now();
+        }
+
+        log.info("REST request to get effective shift for date: {} and tenant: {}", date, tenantId);
+
+        ShiftConfigurationDTO response =
+                shiftConfigurationService.getEffectiveShiftOnDate(tenantId, date);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/active")
-    @PreAuthorize("hasAuthority('SHIFT_VIEW_ALL')")
-    public ResponseEntity<List<ShiftConfigurationSummaryDTO>> getAllActiveShifts(
-            @AuthenticationPrincipal Employee currentEmployee) {
-        List<ShiftConfigurationSummaryDTO> shifts = shiftConfigurationService.getAllActiveShiftsSummary(currentEmployee.getTenantId());
-        return ResponseEntity.ok(shifts);
+    @GetMapping("/default")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get default shift configuration",
+            description = "Retrieves the default shift configuration for the current tenant. Accessible to authenticated users.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Default shift retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "No default shift found")
+    })
+    public ResponseEntity<ShiftConfigurationDTO> getDefaultShift() {
+        log.info("REST request to get default shift for tenant: {}", TenantContext.getCurrentTenant());
+
+        Long tenantId = securityUtils.getCurrentTenantId();
+        ShiftConfigurationDTO response =
+                shiftConfigurationService.getDefaultShift(tenantId);
+        return ResponseEntity.ok(response);
     }
 
-    // Utility endpoints
-    @GetMapping("/validate-checkin")
-    @PreAuthorize("hasAuthority('ATTENDANCE_MARK')")
-    public ResponseEntity<Boolean> isValidCheckinTime(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam LocalTime checkinTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    @GetMapping("/my-shift")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get current employee's shift",
+            description = "Retrieves the shift configuration for the currently authenticated employee. Accessible to authenticated users.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Employee's shift retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "No shift found")
+    })
+    public ResponseEntity<ShiftConfigurationDTO> getMyShift() {
+        Long employeeId = securityUtils.getCurrentEmployeeId();
+        Long tenantId = securityUtils.getCurrentTenantId();
 
-        Long tenantId = currentEmployee.getTenantId();
-        boolean isValid = shiftConfigurationService.isValidCheckinTime(tenantId, checkinTime, date);
-        return ResponseEntity.ok(isValid);
+        log.info("REST request to get shift for employee: {} and tenant: {}", employeeId, tenantId);
+
+        ShiftConfigurationDTO response =
+                shiftConfigurationService.getShiftConfiguration(tenantId);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/late-minutes")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
-    public ResponseEntity<Integer> calculateLateMinutes(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam LocalTime checkinTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        Long tenantId = currentEmployee.getTenantId();
-        int lateMinutes = shiftConfigurationService.calculateLateMinutes(tenantId, checkinTime, date);
-        return ResponseEntity.ok(lateMinutes);
-    }
-
-    @GetMapping("/early-exit-minutes")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
-    public ResponseEntity<Integer> calculateEarlyExitMinutes(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam LocalTime checkoutTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        Long tenantId = currentEmployee.getTenantId();
-        int earlyExitMinutes = shiftConfigurationService.calculateEarlyExitMinutes(tenantId, checkoutTime, date);
-        return ResponseEntity.ok(earlyExitMinutes);
-    }
+    // =====================================================
+    // UTILITY ENDPOINTS - EMPLOYEE ACCESS
+    // =====================================================
 
     @GetMapping("/is-weekoff")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Check if date is a week off",
+            description = "Checks if a specific date is a week off based on the shift configuration. Accessible to authenticated users.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Week off status retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
     public ResponseEntity<Boolean> isWeekOff(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @Parameter(description = "Date to check (format: yyyy-MM-dd)", example = "2026-01-17")
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
 
-        Long tenantId = currentEmployee.getTenantId();
-        boolean isWeekOff = shiftConfigurationService.isWeekOff(tenantId, date);
-        return ResponseEntity.ok(isWeekOff);
+        if (date == null) {
+            date = LocalDate.now();
+        }
+
+        log.info("REST request to check week off for date: {} and tenant: {}", date, tenantId);
+
+        Boolean response = shiftConfigurationService.isWeekOff(tenantId, date);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/expected-hours")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get expected working hours",
+            description = "Calculates the expected working hours for a specific date. Accessible to authenticated users.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Expected hours retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
     public ResponseEntity<Double> getExpectedWorkingHours(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @Parameter(description = "Date to calculate (format: yyyy-MM-dd)", example = "2026-01-15")
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
 
-        Long tenantId = currentEmployee.getTenantId();
-        double hours = shiftConfigurationService.getExpectedWorkingHours(tenantId, date);
-        return ResponseEntity.ok(hours);
+        if (date == null) {
+            date = LocalDate.now();
+        }
+
+        log.info("REST request to get expected working hours for date: {} and tenant: {}", date, tenantId);
+
+        Double response = shiftConfigurationService.getExpectedWorkingHours(tenantId, date);
+        return ResponseEntity.ok(response);
     }
-
-    @GetMapping("/working-hours")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
-    public ResponseEntity<Double> calculateWorkingHours(
-            @RequestParam LocalTime checkIn,
-            @RequestParam LocalTime checkOut,
-            @RequestParam(required = false) Integer breakMinutes) {
-
-        double hours = shiftConfigurationService.calculateWorkingHours(checkIn, checkOut, breakMinutes);
-        return ResponseEntity.ok(hours);
-    }
-
-    @GetMapping("/overtime")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
-    public ResponseEntity<Double> calculateOvertime(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam LocalTime checkoutTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        Long tenantId = currentEmployee.getTenantId();
-        double overtime = shiftConfigurationService.calculateOvertime(tenantId, checkoutTime, date);
-        return ResponseEntity.ok(overtime);
-    }
-
-    @GetMapping("/attendance-status")
-    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW')")
-    public ResponseEntity<String> getAttendanceStatus(
-            @AuthenticationPrincipal Employee currentEmployee,
-            @RequestParam(required = false) LocalTime checkinTime,
-            @RequestParam(required = false) Double workingHours,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        Long tenantId = currentEmployee.getTenantId();
-        String status = shiftConfigurationService.determineStatus(tenantId, checkinTime, date, workingHours);
-        return ResponseEntity.ok(status);
-    }
+    // Note: Micro-calculation endpoints for future real-time biometric/RFID hardware
+    // have been preserved in BiometricShiftControllerExtension.java.bak
 }

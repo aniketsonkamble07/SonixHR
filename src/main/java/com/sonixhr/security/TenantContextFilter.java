@@ -12,15 +12,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @Component
 @Order(1)
 public class TenantContextFilter extends OncePerRequestFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(TenantContextFilter.class);
 
     @Override
     protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,

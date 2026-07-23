@@ -8,6 +8,8 @@ public enum EmployeeStatus {
     TERMINATED("terminated", "Terminated", "danger"),
     ON_LEAVE("on_leave", "On Leave", "info"),
     SUSPENDED("suspended", "Suspended", "danger"),
+    NOTICE_PERIOD("notice_period", "Notice Period", "warning"),
+    ABSCONDED("absconded", "Absconded", "danger"),
     INVITED("invited", "Invited", "primary");
     private final String code;
     private final String displayName;

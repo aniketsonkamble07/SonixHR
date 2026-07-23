@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 @RequiredArgsConstructor
 public class PlatformTenantController {
 
-    private static final Logger log = LoggerFactory.getLogger(PlatformTenantController.class);
 
     private final PlatformTenantService tenantService;
 
@@ -104,6 +103,14 @@ public class PlatformTenantController {
     public ResponseEntity<PlatformTenantResponseDTO> deactivateTenant(@PathVariable Long id) {
         log.info("REST request to deactivate organization: {}", id);
         PlatformTenantResponseDTO tenant = tenantService.deactivateTenant(id);
+        return ResponseEntity.ok(tenant);
+    }
+
+    @PutMapping("/{id}/soft-delete")
+    @PreAuthorize("hasAuthority('DELETE_TENANT')")
+    public ResponseEntity<PlatformTenantResponseDTO> softDeleteTenant(@PathVariable Long id) {
+        log.info("REST request to soft delete organization: {}", id);
+        PlatformTenantResponseDTO tenant = tenantService.softDeleteTenant(id);
         return ResponseEntity.ok(tenant);
     }
 

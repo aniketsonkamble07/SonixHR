@@ -7,11 +7,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
- 
+
 @Repository
 public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfiguration, Long> {
 
@@ -33,11 +34,23 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
 
     List<ShiftConfiguration> findAllByTenantIdAndIsDeletedFalseOrderByEffectiveFromDesc(Long tenantId);
 
-    // this method - used in service
+    // Used in service
     Optional<ShiftConfiguration> findByIdAndTenantIdAndIsDeletedFalse(Long id, Long tenantId);
 
-    //  this method - used in service
-    Optional<ShiftConfiguration> findByShiftCodeAndTenantIdAndIsDeletedFalse(String shiftCode,Long tenantId);
+    // Used in service
+    Optional<ShiftConfiguration> findByShiftCodeAndTenantIdAndIsDeletedFalse(String shiftCode, Long tenantId);
+
+    // =====================================================
+    // FIND BY TENANT - ADDED MISSING METHODS
+    // =====================================================
+
+    List<ShiftConfiguration> findAllByTenantId(Long tenantId);
+
+    Optional<ShiftConfiguration> findByTenantIdAndIsDefaultTrue(Long tenantId);
+
+    Optional<ShiftConfiguration> findByTenantIdAndShiftCode(Long tenantId, String shiftCode);
+
+    Optional<ShiftConfiguration> findByIdAndTenantId(Long id, Long tenantId);
 
     // =====================================================
     // EXISTENCE CHECKS
@@ -49,8 +62,11 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
 
     boolean existsByShiftCode(String shiftCode);
 
-    // this method - used in service for uniqueness check
+    // Used in service for uniqueness check
     boolean existsByShiftCodeAndTenantIdAndIsDeletedFalse(String shiftCode, Long tenantId);
+
+    // ADDED: Check exists by tenant and shift code
+    boolean existsByTenantIdAndShiftCode(Long tenantId, String shiftCode);
 
     // =====================================================
     // DATE RANGE QUERIES
@@ -67,6 +83,14 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
     List<ShiftConfiguration> findEffectiveBetween(@Param("tenantId") Long tenantId,
                                                   @Param("startDate") LocalDate startDate,
                                                   @Param("endDate") LocalDate endDate);
+
+    // ADDED: Find effective shift by date and tenant
+    @Query("SELECT s FROM ShiftConfiguration s WHERE s.tenantId = :tenantId " +
+            "AND s.effectiveFrom <= :date AND (s.effectiveTo IS NULL OR s.effectiveTo >= :date) " +
+            "AND s.isDeleted = false")
+    Optional<ShiftConfiguration> findByTenantIdAndEffectiveFromLessThanEqualAndEffectiveToGreaterThanEqual(
+            @Param("tenantId") Long tenantId,
+            @Param("date") LocalDate date);
 
     // =====================================================
     // TIME-BASED QUERIES
@@ -100,7 +124,7 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
             "WHERE s.tenantId = :tenantId AND s.isActive = true")
     void deactivateAllShiftsForTenant(@Param("tenantId") Long tenantId);
 
-    //  this method - used in setDefaultShift
+    // Used in setDefaultShift
     @Modifying
     @Transactional
     @Query("UPDATE ShiftConfiguration s SET s.isDefault = false WHERE s.tenantId = :tenantId")
@@ -120,8 +144,10 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
 
     long countByTenantIdAndIsActiveTrue(Long tenantId);
 
-
     long countByTenantIdAndIsDeletedFalse(Long tenantId);
+
+    // ADDED: Count by tenant (without deleted filter)
+    long countByTenantId(Long tenantId);
 
     // =====================================================
     // DEFAULT SHIFT QUERIES
@@ -132,7 +158,6 @@ public interface ShiftConfigurationRepository extends JpaRepository<ShiftConfigu
 
     @Query("SELECT s FROM ShiftConfiguration s WHERE LOWER(s.shiftName) = LOWER(:shiftName) AND s.isActive = true")
     Optional<ShiftConfiguration> findByShiftNameIgnoreCase(@Param("shiftName") String shiftName);
-
 
     Optional<ShiftConfiguration> findTopByTenantIdAndIsDeletedFalseOrderByCreatedAtDesc(Long tenantId);
 }

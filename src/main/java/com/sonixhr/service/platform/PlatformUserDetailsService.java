@@ -8,7 +8,9 @@ import com.sonixhr.repository.platform.PlatformUserRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -19,18 +21,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-// No logic bugs in this file.
-// One note added below about loadUserByUsername and inactive users:
-// it throws UsernameNotFoundException for inactive accounts which causes
-// Spring Security to return a vague "Bad credentials" — this is correct
-// and intentional (don't leak whether the account is inactive vs non-existent).
-
 @Slf4j
 @Service("platformUserDetailsService")
 public class PlatformUserDetailsService implements UserDetailsService {
 
     private final PlatformUserRepository platformUserRepository;
-    private final org.springframework.cache.CacheManager cacheManager;
+    private final CacheManager cacheManager;
 
     @Value("${app.platform.cache.enabled:true}")
     private boolean cacheEnabled;
@@ -42,7 +38,7 @@ public class PlatformUserDetailsService implements UserDetailsService {
 
     public PlatformUserDetailsService(
             PlatformUserRepository platformUserRepository,
-            @org.springframework.beans.factory.annotation.Qualifier("caffeineCacheManager") org.springframework.cache.CacheManager cacheManager) {
+            @Qualifier("caffeineCacheManager") CacheManager cacheManager) {
         this.platformUserRepository = platformUserRepository;
         this.cacheManager = cacheManager;
     }

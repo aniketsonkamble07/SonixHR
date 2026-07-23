@@ -1,115 +1,59 @@
 package com.sonixhr.dto.tenant;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.sonixhr.enums.IndianState;
+import com.sonixhr.enums.PlanStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.sonixhr.enums.IndianState;
 import java.time.LocalDateTime;
- 
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class TenantRegistrationResponse {
 
-    // Success/Error info
     private boolean success;
     private String message;
 
-    // Tenant info
+    // Tenant details
     private Long tenantId;
     private String tenantCode;
     private String companyName;
-
-    // Plan info
     private String planType;
     private String planStatus;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime endsAt;
 
-    // Status
     private String status;
-    private Boolean isActive;
+    private boolean isActive;
 
-    // Admin info
+    // Admin details
     private String adminEmail;
     private String adminName;
     private String adminPhone;
-
-    // Address info
     private String officeAddress;
     private String city;
     private IndianState state;
     private String stateText;
     private String country;
 
-    // Activation info
-    private String activationToken;  // For development/testing
+    // Activation details
+    private String activationToken;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime activationTokenExpiry;
 
-    // =====================================================
-    // SUPER ADMIN EMPLOYEE INFO (ADD THIS)
-    // =====================================================
-    private Long superAdminEmployeeId;
-    private String superAdminEmployeeCode;
-    private String superAdminFullName;
-    private String superAdminEmail;
-    private String superAdminPosition;
+    // Admin Employee details (NOT Super Admin)
+    private Long adminEmployeeId;
+    private String adminEmployeeCode;
+    private String adminFullName;
+    private String adminPosition;
 
-    // Timestamps
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
-
-    // Helper method for success response
-    public static TenantRegistrationResponse success(String message, Long tenantId,
-                                                     String planType, LocalDateTime endsAt,
-                                                     String activationToken) {
-        return TenantRegistrationResponse.builder()
-                .success(true)
-                .message(message)
-                .tenantId(tenantId)
-                .planType(planType)
-                .planStatus("ACTIVE")
-                .endsAt(endsAt)
-                .status("ACTIVE")
-                .isActive(true)
-                .activationToken(activationToken)
-                .activationTokenExpiry(LocalDateTime.now().plusHours(24))
-                .build();
-    }
-
-    // NEW: Success response with Super Admin employee details
-    public static TenantRegistrationResponse successWithEmployee(String message, Long tenantId,
-                                                                 String planType,
-                                                                 LocalDateTime endsAt, String activationToken,
-                                                                 Long employeeId, String employeeCode,
-                                                                 String fullName, String email) {
-        return TenantRegistrationResponse.builder()
-                .success(true)
-                .message(message)
-                .tenantId(tenantId)
-                .planType(planType)
-                .planStatus("ACTIVE")
-                .endsAt(endsAt)
-                .status("ACTIVE")
-                .isActive(true)
-                .activationToken(activationToken)
-                .activationTokenExpiry(LocalDateTime.now().plusHours(24))
-                .superAdminEmployeeId(employeeId)
-                .superAdminEmployeeCode(employeeCode)
-                .superAdminFullName(fullName)
-                .superAdminEmail(email)
-                .superAdminPosition("Super Admin")
-                .build();
-    }
-
-    // Helper method for error response
-    public static TenantRegistrationResponse error(String message) {
-        return TenantRegistrationResponse.builder()
-                .success(false)
-                .message(message)
-                .build();
-    }
 }

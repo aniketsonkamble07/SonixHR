@@ -18,15 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
 
-// FIXES APPLIED:
-//
-// 1. getAllUsers now returns PageResult<PlatformUserResponse> instead of
-//    Page<PlatformUserResponse>. Page<T> does not deserialize cleanly from
-//    Redis/Jackson. PageResult is a plain serializable record.
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @RestController
 @RequestMapping("/api/platform/users")
@@ -34,9 +25,11 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 public class PlatformUserController {
 
-    private static final Logger log = LoggerFactory.getLogger(PlatformUserController.class);
-
     private final PlatformUserService platformUserService;
+
+    // =====================================================
+    // CREATE USER
+    // =====================================================
 
     @PostMapping
     @PreAuthorize("hasAuthority('CREATE_PLATFORM_ADMIN')")
@@ -48,6 +41,10 @@ public class PlatformUserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // =====================================================
+    // RESEND ACTIVATION
+    // =====================================================
+
     @PostMapping("/{id}/resend-activation")
     @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
     public ResponseEntity<Void> resendActivationEmail(@PathVariable Long id) {
@@ -57,8 +54,10 @@ public class PlatformUserController {
         return ResponseEntity.ok().build();
     }
 
-    // FIX 1: return type changed to PageResult to match service method and avoid
-    // Jackson/Redis serialization issues with Spring's Page interface.
+    // =====================================================
+    // GET ALL USERS
+    // =====================================================
+
     @GetMapping
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
     public ResponseEntity<PageResult<PlatformUserResponse>> getAllUsers(
@@ -67,6 +66,10 @@ public class PlatformUserController {
         return ResponseEntity.ok(platformUserService.getAllUsers(pageable));
     }
 
+    // =====================================================
+    // GET USER BY ID
+    // =====================================================
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
     public ResponseEntity<PlatformUserResponse> getUserById(@PathVariable Long id) {
@@ -74,12 +77,20 @@ public class PlatformUserController {
         return ResponseEntity.ok(platformUserService.getUserById(id));
     }
 
+    // =====================================================
+    // GET USER BY EMAIL
+    // =====================================================
+
     @GetMapping("/by-email/{email}")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_ADMINS')")
     public ResponseEntity<PlatformUserResponse> getUserByEmail(@PathVariable String email) {
         log.debug("REST request to get platform user by email: {}", email);
         return ResponseEntity.ok(platformUserService.getUserByEmail(email));
     }
+
+    // =====================================================
+    // UPDATE USER
+    // =====================================================
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
@@ -89,6 +100,24 @@ public class PlatformUserController {
         log.info("REST request to update platform user: {}", id);
         return ResponseEntity.ok(platformUserService.updateUser(id, request));
     }
+
+    // =====================================================
+    // UPDATE USER STATUS
+    // =====================================================
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
+    public ResponseEntity<PlatformUserResponse> updateUserStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateStatusRequest request) {
+        log.info("REST request to update status for user: {} to {}", id, request.getStatus());
+        PlatformUserResponse response = platformUserService.updateUserStatus(id, request.getStatus());
+        return ResponseEntity.ok(response);
+    }
+
+    // =====================================================
+    // UPDATE USER ROLES
+    // =====================================================
 
     @PutMapping("/{id}/roles")
     @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ADMIN_ROLES')")
@@ -103,6 +132,10 @@ public class PlatformUserController {
         return ResponseEntity.ok().build();
     }
 
+    // =====================================================
+    // ACTIVATE USER (Admin)
+    // =====================================================
+
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
     public ResponseEntity<Void> activateUserByAdmin(@PathVariable Long id) {
@@ -110,6 +143,10 @@ public class PlatformUserController {
         platformUserService.activateUserByAdmin(id);
         return ResponseEntity.ok().build();
     }
+
+    // =====================================================
+    // SUSPEND USER
+    // =====================================================
 
     @PatchMapping("/{id}/suspend")
     @PreAuthorize("hasAuthority('EDIT_PLATFORM_ADMIN')")
@@ -119,6 +156,10 @@ public class PlatformUserController {
         return ResponseEntity.ok().build();
     }
 
+    // =====================================================
+    // DELETE USER
+    // =====================================================
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('DELETE_PLATFORM_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
@@ -126,6 +167,10 @@ public class PlatformUserController {
         platformUserService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
+
+    // =====================================================
+    // RESET PASSWORD (Admin)
+    // =====================================================
 
     @PostMapping("/{id}/reset-password")
     @PreAuthorize("hasAuthority('RESET_PLATFORM_ADMIN_PASSWORD')")
@@ -137,6 +182,10 @@ public class PlatformUserController {
         return ResponseEntity.ok().build();
     }
 
+    // =====================================================
+    // GET STATISTICS
+    // =====================================================
+
     @GetMapping("/statistics")
     @PreAuthorize("hasAuthority('VIEW_SYSTEM_METRICS')")
     public ResponseEntity<PlatformUserStatistics> getUserStatistics() {
@@ -144,11 +193,27 @@ public class PlatformUserController {
         return ResponseEntity.ok(platformUserService.getUserStatistics());
     }
 
+    // =====================================================
+    // GET CURRENT USER
+    // =====================================================
+
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PlatformUserResponse> getCurrentUser(
             @AuthenticationPrincipal PlatformUser currentUser) {
         log.debug("REST request to get current platform user");
         return ResponseEntity.ok(platformUserService.getUserById(currentUser.getId()));
+    }
+
+    // =====================================================
+    // CLEAR CACHES (Admin Only)
+    // =====================================================
+
+    @DeleteMapping("/cache")
+    @PreAuthorize("hasAuthority('MANAGE_PLATFORM_ADMIN_ROLES')")
+    public ResponseEntity<Void> clearCaches() {
+        log.info("REST request to clear all platform user caches");
+        platformUserService.clearAllCaches();
+        return ResponseEntity.noContent().build();
     }
 }

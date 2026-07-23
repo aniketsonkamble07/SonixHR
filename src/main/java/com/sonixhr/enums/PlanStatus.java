@@ -6,7 +6,6 @@ import lombok.Getter;
 @Getter
 public enum PlanStatus {
     ACTIVE("active", "Active", "success"),
-    TRIAL("trial", "Trial", "info"),
     PAST_DUE("past_due", "Past Due", "warning"),
     EXPIRED("expired", "Expired", "danger"),
     SUSPENDED("suspended", "Suspended", "danger"),

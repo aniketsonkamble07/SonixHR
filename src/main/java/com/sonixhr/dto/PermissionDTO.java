@@ -10,35 +10,28 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PermissionDTO {
-
     private Long id;
-
-    private String permission;  // ✅ Changed from 'name' to 'permission' (matches entity)
-
+    private String permission;
     private String description;
-
     private String category;
+    private Integer displayOrder;
+    private Boolean selected;
 
-    private Integer displayOrder;  // ✅ Added for sorting
+    // Permission metadata flags
+    @Builder.Default
+    private boolean billingPermission = false;
 
-    private boolean selected;  // For role assignment UI
+    @Builder.Default
+    private boolean platformAdminPermission = false;
 
+    @Builder.Default
+    private boolean viewPermission = false;
 
+    @Builder.Default
+    private boolean writePermission = false;
 
+    @Builder.Default
+    private boolean exportPermission = false;
 
-
-    // For enum-based permissions
-    public static PermissionDTO fromEnum(com.sonixhr.enums.TenantPermissionEnum permissionEnum) {
-        if (permissionEnum == null) {
-            return null;
-        }
-
-        return PermissionDTO.builder()
-                .permission(permissionEnum.name())
-                .description(permissionEnum.getDescription())
-                .category(permissionEnum.getCategory())
-                .displayOrder(permissionEnum.getOrder())
-                .selected(false)
-                .build();
-    }
+    private String permissionType; // DATA_VIEW, DATA_CREATE, DATA_EDIT, etc.
 }

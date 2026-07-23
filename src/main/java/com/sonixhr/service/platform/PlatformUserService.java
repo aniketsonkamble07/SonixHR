@@ -13,6 +13,7 @@ import com.sonixhr.exceptions.ValidationException;
 import com.sonixhr.repository.platform.PlatformRoleRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.service.ActivationTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,42 +34,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// FIXES APPLIED:
-//
-// 1. pendingVerification was counting INACTIVE — now counts PENDING_VERIFICATION.
-//
-// 2. updateUser — old email Redis key is now evicted before the email is overwritten.
-//    evictByEmailCache() helper added for this purpose.
-//
-// 3. @Async on protected self-invocation — all notification methods moved to
-//    PlatformNotificationService (separate @Service bean). Self-calls bypass the
-//    Spring proxy so @Async was silently ignored.
-//
-// 4. forgotPassword — no longer throws NotFoundException (leaks user existence).
-//    Silently returns if email not found; caller returns a vague 200 either way.
-//
-// 5. updateUserStatus — now calls setActive() so the boolean field stays in sync
-//    with the status enum.
-//
-// 6. getAllUsers — cache key now includes sort so different orderings don't collide.
-//
-// 7. getAllUsers — returns PageResult<T> (a serializable wrapper) instead of
-//    Page<T> which does not round-trip cleanly through Jackson/Redis.
-//
-// 8. clearAllCaches — added @Transactional so partial eviction failures don't
-//    leave Redis and Caffeine in inconsistent states.
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @SuppressWarnings("null")
 public class PlatformUserService {
-
-    private static final Logger log = LoggerFactory.getLogger(PlatformUserService.class);
 
     private static final java.util.regex.Pattern UPPERCASE_PAT = java.util.regex.Pattern.compile("[A-Z]");
     private static final java.util.regex.Pattern LOWERCASE_PAT = java.util.regex.Pattern.compile("[a-z]");
@@ -80,7 +51,7 @@ public class PlatformUserService {
     private final ActivationTokenService activationTokenService;
     private final PasswordEncoder passwordEncoder;
     private final PlatformUserDetailsService platformUserDetailsService;
-    private final PlatformNotificationService notificationService; // FIX 3: replaces @Async self-calls
+    private final PlatformNotificationService notificationService;
     private final PlatformUserCacheEvictionService platformUserCacheEvictionService;
 
     @Value("${app.base-url:http://localhost:8081}")
@@ -124,29 +95,27 @@ public class PlatformUserService {
                 .roles(roles)
                 .build();
 
-        if (user != null) {
-            PlatformUser saved = platformUserRepository.save(user);
+        PlatformUser saved = platformUserRepository.save(user);
 
-            String token = activationTokenService.generateTokenForPlatformUser(saved.getId());
-            String activationLink = baseUrl + "/api/platform/auth/activate?token=" + token;
+        String token = activationTokenService.generateTokenForPlatformUser(saved.getId());
+        String activationLink = baseUrl + "/api/platform/auth/activate?token=" + token;
 
-            // FIX 3: call through a separate bean so @Async proxy is honoured
-            notificationService.sendActivationEmail(saved.getEmail(), saved.getFullName(), activationLink);
+        notificationService.sendActivationEmail(saved.getEmail(), saved.getFullName(), activationLink);
 
-            log.info("Platform user created (pending activation): {}", request.getEmail());
-            return toResponse(saved, activationLink, LocalDateTime.now().plusHours(24));
-        }
-        throw new BusinessException("Failed to construct platform user");
+        log.info("Platform user created (pending activation): {}", request.getEmail());
+        return toResponse(saved, activationLink, LocalDateTime.now().plusHours(24));
     }
 
+    // FIX: Added HttpServletRequest parameter
     @Transactional
-    public PlatformUser activateUser(String token, String password, String confirmPassword) {
-        if (!password.equals(confirmPassword)) throw new BusinessException("Passwords do not match");
+    public PlatformUser activateUser(String token, String password, String confirmPassword, HttpServletRequest request) {
+        if (!password.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
         validatePasswordStrength(password);
-        return activationTokenService.activatePlatformUser(token, password);
+        return activationTokenService.activatePlatformUser(token, password, request);
     }
 
-    // FIX 4: no longer throws when email is not found — avoids leaking user existence.
     @Transactional
     public void forgotPassword(String email) {
         Optional<PlatformUser> userOpt = platformUserRepository.findByEmail(email);
@@ -157,7 +126,6 @@ public class PlatformUserService {
 
         PlatformUser user = userOpt.get();
         if (user.getStatus() != UserStatus.ACTIVE) {
-            // Still return silently — don't leak that the account is inactive.
             log.info("Forgot-password request for non-active user (silently ignored): {}", email);
             return;
         }
@@ -167,25 +135,29 @@ public class PlatformUserService {
         notificationService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetLink);
     }
 
+    // FIX: Added HttpServletRequest parameter
     @Transactional
-    public void resetPasswordWithToken(String token, String newPassword, String confirmPassword) {
-        if (!newPassword.equals(confirmPassword)) throw new BusinessException("Passwords do not match");
+    public void resetPasswordWithToken(String token, String newPassword, String confirmPassword, HttpServletRequest request) {
+        if (!newPassword.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match");
+        }
         validatePasswordStrength(newPassword);
-        activationTokenService.resetPasswordForPlatformUser(token, newPassword);
+        activationTokenService.resetPasswordForPlatformUser(token, newPassword, request);
     }
 
     @Transactional
     public void resendActivationEmail(String email) {
         PlatformUser user = platformUserRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if (user.getStatus() == UserStatus.ACTIVE)
+        if (user.getStatus() == UserStatus.ACTIVE) {
             throw new BusinessException("User is already activated");
-        if (user.getStatus() != UserStatus.PENDING_VERIFICATION)
+        }
+        if (user.getStatus() != UserStatus.PENDING_VERIFICATION) {
             throw new BusinessException("User is not in pending verification status: " + user.getStatus());
+        }
 
         String newToken = activationTokenService.generateTokenForPlatformUser(user.getId());
         String activationLink = baseUrl + "/api/platform/auth/activate?token=" + newToken;
-        // FIX 3: async via separate bean
         notificationService.sendActivationEmail(user.getEmail(), user.getFullName(), activationLink);
         log.info("Activation email resent to: {}", email);
     }
@@ -210,8 +182,6 @@ public class PlatformUserService {
         return toResponse(user);
     }
 
-    // FIX 6: key now includes sort so different sort orders don't share a cache entry.
-    // FIX 7: returns PageResult (serializable wrapper) instead of Page<T>.
     @Cacheable(
             value = "platformUsersPage",
             key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort",
@@ -269,8 +239,6 @@ public class PlatformUserService {
                 throw new ValidationException("email", "Email address already registered");
             }
 
-            // FIX 2: evict the OLD email key from both Caffeine and Redis BEFORE
-            // overwriting the field — otherwise the old key is stale forever.
             String oldEmail = user.getEmail();
             platformUserDetailsService.invalidateCache(oldEmail);
             platformUserCacheEvictionService.evictByEmailCache(oldEmail);
@@ -282,7 +250,6 @@ public class PlatformUserService {
         if (!changed) return toResponse(user);
 
         PlatformUser updated = platformUserRepository.save(user);
-        // Evict new email key too (it may have been cached from a prior lookup)
         platformUserDetailsService.invalidateCache(updated.getEmail());
         platformUserCacheEvictionService.evictByEmailCache(updated.getEmail());
         return toResponse(updated);
@@ -305,7 +272,6 @@ public class PlatformUserService {
         }
 
         user.setStatus(status);
-        // FIX 5: keep the boolean active field in sync with the status enum
         user.setActive(status == UserStatus.ACTIVE);
         user.incrementRolesVersion();
         user.clearAuthoritiesCache();
@@ -326,9 +292,13 @@ public class PlatformUserService {
         PlatformUser user = platformUserRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (roleIds == null || roleIds.isEmpty()) throw new BusinessException("At least one valid role must be assigned");
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new BusinessException("At least one valid role must be assigned");
+        }
         Set<PlatformRole> roles = new HashSet<>(platformRoleRepository.findAllById(roleIds));
-        if (roles.isEmpty()) throw new BusinessException("At least one valid role must be assigned");
+        if (roles.isEmpty()) {
+            throw new BusinessException("At least one valid role must be assigned");
+        }
         if (roles.size() != roleIds.size()) {
             Set<Long> found = roles.stream().map(PlatformRole::getId).collect(Collectors.toSet());
             Set<Long> missing = roleIds.stream()
@@ -357,8 +327,9 @@ public class PlatformUserService {
     })
     public void activateUserByAdmin(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
-        if ("admin@sonixhr.com".equals(user.getEmail()))
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
             throw new BusinessException("Super Admin is already active");
+        }
 
         user.setStatus(UserStatus.ACTIVE);
         user.setActive(true);
@@ -367,7 +338,6 @@ public class PlatformUserService {
 
         platformUserRepository.save(user);
         platformUserDetailsService.invalidateCache(user.getEmail());
-        // FIX 3: async via separate bean
         notificationService.sendAccountActivatedNotification(user.getEmail(), user.getFullName());
         log.info("Platform user activated by admin: {}", userId);
     }
@@ -380,8 +350,9 @@ public class PlatformUserService {
     })
     public void suspendUser(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
-        if ("admin@sonixhr.com".equals(user.getEmail()))
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
             throw new BusinessException("Cannot suspend the default Super Admin");
+        }
 
         user.setStatus(UserStatus.SUSPENDED);
         user.setActive(false);
@@ -390,7 +361,6 @@ public class PlatformUserService {
 
         platformUserRepository.save(user);
         platformUserDetailsService.invalidateCache(user.getEmail());
-        // FIX 3: async via separate bean
         notificationService.sendAccountSuspendedNotification(user.getEmail(), user.getFullName());
         log.info("Platform user suspended: {}", userId);
     }
@@ -403,8 +373,9 @@ public class PlatformUserService {
     })
     public void deleteUser(@NonNull Long userId) {
         PlatformUser user = requireUser(userId);
-        if ("admin@sonixhr.com".equals(user.getEmail()))
+        if ("admin@sonixhr.com".equals(user.getEmail())) {
             throw new BusinessException("Cannot delete the default Super Admin");
+        }
 
         user.setStatus(UserStatus.DELETED);
         user.setActive(false);
@@ -432,7 +403,6 @@ public class PlatformUserService {
 
         platformUserRepository.save(user);
         platformUserDetailsService.invalidateCache(user.getEmail());
-        // FIX 3: async via separate bean
         notificationService.sendPasswordResetNotification(user.getEmail(), user.getFullName());
         log.info("Password reset by admin for user: {}", userId);
     }
@@ -441,7 +411,6 @@ public class PlatformUserService {
     // CACHE MANAGEMENT
     // =====================================================
 
-    // Cache eviction operations aren't transactional resources.
     @Caching(evict = {
             @CacheEvict(value = "platformUsers",      allEntries = true),
             @CacheEvict(value = "platformUsersPage",  allEntries = true),
@@ -462,16 +431,21 @@ public class PlatformUserService {
     }
 
     private void validatePasswordStrength(String password) {
-        if (password == null || password.length() < 8)
+        if (password == null || password.length() < 8) {
             throw new BusinessException("Password must be at least 8 characters long");
-        if (!UPPERCASE_PAT.matcher(password).find())
+        }
+        if (!UPPERCASE_PAT.matcher(password).find()) {
             throw new BusinessException("Password must contain at least one uppercase letter");
-        if (!LOWERCASE_PAT.matcher(password).find())
+        }
+        if (!LOWERCASE_PAT.matcher(password).find()) {
             throw new BusinessException("Password must contain at least one lowercase letter");
-        if (!DIGIT_PAT.matcher(password).find())
+        }
+        if (!DIGIT_PAT.matcher(password).find()) {
             throw new BusinessException("Password must contain at least one number");
-        if (!SPECIAL_PAT.matcher(password).find())
+        }
+        if (!SPECIAL_PAT.matcher(password).find()) {
             throw new BusinessException("Password must contain at least one special character (@#$%^&+=!)");
+        }
     }
 
     private PlatformUserResponse toResponse(PlatformUser user) {
@@ -509,10 +483,6 @@ public class PlatformUserService {
     // SUPPORTING TYPES
     // =====================================================
 
-    /**
-     * Serializable wrapper for paginated results.
-     * Replaces Page<T> which does not deserialize cleanly from Redis/Jackson.
-     */
     public record PageResult<T>(
             List<T> content,
             long totalElements,

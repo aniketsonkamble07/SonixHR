@@ -1,1 +1,0 @@
--- Empty migration to resolve duplicate table creation script in V2

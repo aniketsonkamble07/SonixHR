@@ -5,19 +5,20 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-@Data
 @Entity
+@Table(name = "shift_configurations",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"tenant_id", "shift_code"})
+        })
+@Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "shift_configurations")
 public class ShiftConfiguration {
 
     @Id
@@ -30,7 +31,7 @@ public class ShiftConfiguration {
     @Column(name = "shift_name", nullable = false, length = 100)
     private String shiftName;
 
-    @Column(name = "shift_code", length = 50)
+    @Column(name = "shift_code", nullable = false, length = 20)
     private String shiftCode;
 
     @Column(name = "shift_description", length = 500)
@@ -85,29 +86,27 @@ public class ShiftConfiguration {
     private Integer overtimeThresholdMinutes;
 
     @Column(name = "max_overtime_hours_per_day")
-    private Double maxOvertimeHoursPerDay;
+    private Double maxOvertimeHoursPerDay;  // Changed to Double
 
-    @Column(name = "weekly_offs", length = 100)
+    @Column(name = "weekly_offs")
     private String weeklyOffs;
 
     @Column(name = "alternate_week_off")
     private Boolean alternateWeekOff;
 
-    @Column(name = "effective_from")
+    @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
 
     @Column(name = "effective_to")
     private LocalDate effectiveTo;
 
-    @Column(name = "is_active")
-    private Boolean isActive;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
 
-    @Column(name = "is_default")
-    private Boolean isDefault;
+    @Column(name = "is_default", nullable = false)
+    private Boolean isDefault = false;
 
-    // ✅ Add this field
-    @Column(name = "is_deleted")
-    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 
     @Column(name = "created_by")
@@ -116,45 +115,29 @@ public class ShiftConfiguration {
     @Column(name = "updated_by")
     private Long updatedBy;
 
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Helper methods
-    public LocalTime getLateThreshold() {
-        if (lateGraceMinutes != null && lateGraceMinutes > 0) {
-            return startTime.plusMinutes(lateGraceMinutes);
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        if (isActive == null) {
+            isActive = true;
         }
-        return startTime;
+        if (isDefault == null) {
+            isDefault = false;
+        }
+        if (isDeleted == null) {
+            isDeleted = false;
+        }
     }
 
-    public LocalTime getEarlyExitThreshold() {
-        if (earlyExitGraceMinutes != null && earlyExitGraceMinutes > 0) {
-            return endTime.minusMinutes(earlyExitGraceMinutes);
-        }
-        return endTime;
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
-
-    public LocalTime getEarliestCheckin() {
-        if (checkinBufferBefore != null && checkinBufferBefore > 0) {
-            return startTime.minusMinutes(checkinBufferBefore);
-        }
-        return startTime;
-    }
-
-    public LocalTime getLatestCheckout() {
-        if (checkoutBufferAfter != null && checkoutBufferAfter > 0) {
-            return endTime.plusMinutes(checkoutBufferAfter);
-        }
-        return endTime;
-    }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getTenantId() { return tenantId; }
-    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 }

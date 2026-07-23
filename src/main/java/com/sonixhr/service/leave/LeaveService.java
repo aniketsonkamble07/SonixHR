@@ -613,15 +613,15 @@ public class LeaveService {
         log.info("Leave request {} approved", leaveId);
 
         try {
-            emailService.sendLeaveStatusNotification(
-                    leave.getEmployee().getEmail(),
-                    leave.getEmployee().getFullName(),
-                    leave.getLeaveType().getDisplayName(),
-                    leave.getStartDate().toString(),
-                    leave.getEndDate().toString(),
-                    "APPROVED",
-                    approverName
-            );
+        //    emailService.sendLeaveStatusNotification(
+          //          leave.getEmployee().getEmail(),
+            //        leave.getEmployee().getFullName(),
+              //      leave.getLeaveType().getDisplayName(),
+                //    leave.getStartDate().toString(),
+                  //  leave.getEndDate().toString(),
+                    //"APPROVED",
+             //       approverName
+            //);
 
             notificationService.sendNotification(
                     leave.getEmployee(),
@@ -667,15 +667,15 @@ public class LeaveService {
         log.info("Leave request {} rejected", leaveId);
 
         try {
-            emailService.sendLeaveStatusNotification(
-                    leave.getEmployee().getEmail(),
-                    leave.getEmployee().getFullName(),
-                    leave.getLeaveType().getDisplayName(),
-                    leave.getStartDate().toString(),
-                    leave.getEndDate().toString(),
-                    "REJECTED",
-                    rejectorName
-            );
+         //   emailService.sendLeaveStatusNotification(
+          //          leave.getEmployee().getEmail(),
+           //         leave.getEmployee().getFullName(),
+             //       leave.getLeaveType().getDisplayName(),
+               //     leave.getStartDate().toString(),
+                 //   leave.getEndDate().toString(),
+                 //   "REJECTED",
+                 //   rejectorName
+            //);
 
             notificationService.sendNotification(
                     leave.getEmployee(),

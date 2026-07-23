@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/employees/tasks")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class EmployeeTaskController {
 
     private final EmployeeTaskService taskService;

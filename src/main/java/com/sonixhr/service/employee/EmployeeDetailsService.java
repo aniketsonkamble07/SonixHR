@@ -10,6 +10,7 @@ import com.sonixhr.repository.tenant.TenantRoleRepository;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Slf4j
 @Service("employeeDetailsService")
 @Primary
 @Transactional(readOnly = true)
@@ -48,7 +48,7 @@ public class EmployeeDetailsService implements UserDetailsService {
     private final boolean cacheEnabled;
     private final long cacheTtlMinutes;
 
-    //  Use Caffeine cache with TTL and max size (instead of ConcurrentHashMap)
+    // Use Caffeine cache with TTL and max size
     private final Cache<String, Employee> employeeCache;
 
     // Cache for authority counts (for monitoring)
@@ -61,7 +61,7 @@ public class EmployeeDetailsService implements UserDetailsService {
             @org.springframework.beans.factory.annotation.Qualifier("caffeineCacheManager") org.springframework.cache.CacheManager cacheManager,
             @Value("${app.employee.cache.enabled:true}") boolean cacheEnabled,
             @Value("${app.employee.cache.ttl-minutes:10}") long cacheTtlMinutes) {
-        
+
         this.employeeRepository = employeeRepository;
         this.roleRepository = roleRepository;
         this.eventPublisher = eventPublisher;
@@ -85,15 +85,122 @@ public class EmployeeDetailsService implements UserDetailsService {
                 .build();
     }
 
+    // =====================================================
+    // FIND EMPLOYEE BY EMAIL - ✅ ADDED
+    // =====================================================
+
+    /**
+     * Find employee by email - returns Optional
+     */
+    public Optional<Employee> findByEmail(String email) {
+        if (email == null || email.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // Check cache first
+        if (cacheEnabled) {
+            Employee cachedEmployee = employeeCache.getIfPresent(email);
+            if (cachedEmployee != null && cachedEmployee.isActive()) {
+                log.debug("Find by email - cache hit: {}", email);
+                return Optional.of(cachedEmployee);
+            } else if (cachedEmployee != null) {
+                // Inactive employee in cache - remove it
+                employeeCache.invalidate(email);
+            }
+        }
+
+        // Fetch from database
+        return employeeRepository.findByEmail(email);
+    }
+
+    // =====================================================
+    // FIND EMPLOYEE BY EMAIL AND TENANT ID - ✅ ADDED
+    // =====================================================
+
+    /**
+     * Find employee by email and tenant ID
+     */
+    public Optional<Employee> findByEmailAndTenantId(String email, Long tenantId) {
+        if (email == null || email.isEmpty() || tenantId == null) {
+            return Optional.empty();
+        }
+
+        // Check cache first (if tenant matches)
+        if (cacheEnabled) {
+            Employee cachedEmployee = employeeCache.getIfPresent(email);
+            if (cachedEmployee != null && cachedEmployee.isActive() &&
+                    cachedEmployee.getTenantId() != null && cachedEmployee.getTenantId().equals(tenantId)) {
+                log.debug("Find by email and tenant - cache hit: {} in tenant {}", email, tenantId);
+                return Optional.of(cachedEmployee);
+            } else if (cachedEmployee != null) {
+                employeeCache.invalidate(email);
+            }
+        }
+
+        return employeeRepository.findByEmailAndTenantId(email, tenantId);
+    }
+
+    // =====================================================
+    // FIND EMPLOYEE BY ID - ✅ ADDED
+    // =====================================================
+
+    /**
+     * Find employee by ID
+     */
+    public Optional<Employee> findById(Long id) {
+        return employeeRepository.findById(id);
+    }
+
+    // =====================================================
+    // SAVE EMPLOYEE - ✅ ADDED
+    // =====================================================
+
+    /**
+     * Save employee and invalidate cache
+     */
+    @Transactional
+    public Employee save(Employee employee) {
+        Employee saved = employeeRepository.save(employee);
+        // Invalidate cache after save
+        if (cacheEnabled && saved != null && saved.getEmail() != null) {
+            invalidateEmployeeCache(saved.getEmail());
+        }
+        return saved;
+    }
+
+    // =====================================================
+    // UPDATE LAST LOGIN - ✅ ADDED
+    // =====================================================
+
+    /**
+     * Update last login timestamp and IP address
+     */
+    @Transactional
+    public void updateLastLogin(Employee employee, String ipAddress) {
+        if (employee == null) return;
+        employee.setLastLoginAt(java.time.LocalDateTime.now());
+        employee.setLastLoginIp(ipAddress);
+        employeeRepository.save(employee);
+        // Update cache if present
+        if (cacheEnabled) {
+            employeeCache.put(employee.getEmail(), employee);
+        }
+        log.debug("Updated last login for employee: {} from IP: {}", employee.getEmail(), ipAddress);
+    }
+
+    // =====================================================
+    // LOAD USER BY USERNAME (UserDetailsService)
+    // =====================================================
+
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         long startTime = System.nanoTime();
 
-        //  Check cache first with active validation
+        // Check cache first with active validation
         if (cacheEnabled) {
             Employee cachedEmployee = employeeCache.getIfPresent(email);
             if (cachedEmployee != null) {
-                //  Verify cached employee and tenant are still active
+                // Verify cached employee and tenant are still active
                 if (!cachedEmployee.isActive()) {
                     log.warn("Cached employee is inactive, removing from cache: {}", email);
                     employeeCache.invalidate(email);
@@ -121,7 +228,7 @@ public class EmployeeDetailsService implements UserDetailsService {
                     return new UsernameNotFoundException("Employee not found: " + email);
                 });
 
-        //  Check if employee is active before caching
+        // Check if employee is active before caching
         if (!employee.isActive()) {
             log.warn("Employee account is inactive for email: {}", email);
             throw new DisabledException("Employee account is inactive");
@@ -137,7 +244,7 @@ public class EmployeeDetailsService implements UserDetailsService {
             }
         }
 
-        //  Cache only if active
+        // Cache only if active
         if (cacheEnabled) {
             employeeCache.put(email, employee);
         }
@@ -270,7 +377,7 @@ public class EmployeeDetailsService implements UserDetailsService {
         Employee cachedEmployee = employeeCache.getIfPresent(email);
 
         if (cachedEmployee != null && tokenRolesVersion != null) {
-            //  Also check if cached employee and tenant are still active
+            // Also check if cached employee and tenant are still active
             if (!cachedEmployee.isActive()) {
                 log.warn("Cached employee is inactive during version check, removing: {}", email);
                 employeeCache.invalidate(email);
@@ -474,13 +581,13 @@ public class EmployeeDetailsService implements UserDetailsService {
         if (employee == null) return;
         // Trigger getAuthorities to populate cachedAuthorities if needed
         employee.getAuthorities();
-        
+
         Set<GrantedAuthority> billingOnly = employee.getAuthorities().stream()
                 .filter(a -> a != null && ("MANAGE_SUBSCRIPTION".equalsIgnoreCase(a.getAuthority())
                         || "VIEW_BILLING".equalsIgnoreCase(a.getAuthority())))
                 .map(a -> new SimpleGrantedAuthority(a.getAuthority()))
                 .collect(Collectors.toSet());
-                
+
         employee.setCachedAuthorities(billingOnly);
         employee.setCachedRolesVersion(employee.getRolesVersion());
     }

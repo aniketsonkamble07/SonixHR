@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("null")
 public class JwtService {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
     @Value("${app.jwt.secret}")
     private String secret;
@@ -33,6 +32,9 @@ public class JwtService {
 
     @Value("${app.jwt.refresh-expiration:604800000}")
     private Long refreshExpiration;
+
+    @Value("${app.jwt.password-reset-expiration:900000}") // 15 minutes default
+    private Long passwordResetExpiration;
 
     public Long getExpiration() {
         return expiration;
@@ -201,6 +203,69 @@ public class JwtService {
                 .expiresIn(expiration)
                 .refreshExpiresIn(refreshExpiration)
                 .build();
+    }
+
+    // ========================
+    // ✅ PASSWORD RESET TOKEN GENERATION - ADDED
+    // ========================
+
+    /**
+     * Generate password reset token for employee
+     * This token is short-lived (15 minutes) and used for password change flow
+     */
+    public String generatePasswordResetToken(Employee employee) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "EMPLOYEE");
+        claims.put("tenantId", employee.getTenantId() != null ? employee.getTenantId().toString() : null);
+        claims.put("employeeId", employee.getId());
+        claims.put("tokenType", "PASSWORD_RESET");
+        claims.put("purpose", "PASSWORD_CHANGE");
+
+        return createToken(claims, employee.getEmail(), passwordResetExpiration);
+    }
+
+    /**
+     * Generate password reset token for platform user
+     */
+    public String generatePasswordResetToken(PlatformUser user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "PLATFORM");
+        claims.put("userId", user.getId());
+        claims.put("tokenType", "PASSWORD_RESET");
+        claims.put("purpose", "PASSWORD_CHANGE");
+
+        return createToken(claims, user.getEmail(), passwordResetExpiration);
+    }
+
+    /**
+     * Validate password reset token
+     */
+    public boolean validatePasswordResetToken(String token) {
+        try {
+            if (token == null || token.isBlank()) {
+                return false;
+            }
+
+            Claims claims = extractAllClaims(token);
+            String tokenType = claims.get("tokenType", String.class);
+            String purpose = claims.get("purpose", String.class);
+
+            // Check token type and purpose
+            if (!"PASSWORD_RESET".equals(tokenType) || !"PASSWORD_CHANGE".equals(purpose)) {
+                return false;
+            }
+
+            // Check if token is expired
+            if (isTokenExpired(token)) {
+                return false;
+            }
+
+            return true;
+
+        } catch (Exception e) {
+            log.warn("Invalid password reset token: {}", e.getMessage());
+            return false;
+        }
     }
 
     // ========================

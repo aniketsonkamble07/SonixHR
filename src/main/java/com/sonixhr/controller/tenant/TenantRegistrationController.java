@@ -3,6 +3,8 @@ package com.sonixhr.controller.tenant;
 import com.sonixhr.dto.SetPasswordRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
+import com.sonixhr.dto.subscription.SubscriptionPlanDTO;
+import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.exceptions.BusinessException;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.service.ActivationTokenService;
@@ -16,14 +18,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
+
 import java.util.List;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -31,32 +31,12 @@ import org.slf4j.LoggerFactory;
 @RequiredArgsConstructor
 public class TenantRegistrationController {
 
-    private static final Logger log = LoggerFactory.getLogger(TenantRegistrationController.class);
-
     private final TenantRegistrationService registrationService;
     private final ActivationTokenService activationTokenService;
     private final EmployeeRepository employeeRepository;
     private final RateLimiterService rateLimiterService;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final JdbcTemplate jdbcTemplate;
-
-    @GetMapping("/plans")
-    public ResponseEntity<List<com.sonixhr.dto.platform.SubscriptionPlanDTO>> getPublicPlans() {
-        log.info("REST request to list public active subscription plans");
-        List<com.sonixhr.entity.platform.SubscriptionPlan> plans = subscriptionPlanRepository.findAllActivePlans();
-        List<com.sonixhr.dto.platform.SubscriptionPlanDTO> dtos = plans.stream()
-                .filter(p -> p.isActive())
-                .map(p -> com.sonixhr.dto.platform.SubscriptionPlanDTO.builder()
-                        .id(p.getId())
-                        .name(p.getName())
-                        .description(p.getDescription())
-                        .price(p.getPrice())
-                        .validityMonths(p.getValidityMonths())
-                        .isActive(p.isActive())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
-        return ResponseEntity.ok(dtos);
-    }
 
     @Value("${app.debug.redis-endpoint-enabled:false}")
     private boolean redisDebugEnabled;
@@ -67,6 +47,34 @@ public class TenantRegistrationController {
     @Value("${app.trust-proxy:false}")
     private boolean trustProxy;
 
+    // =====================================================
+    // PUBLIC ENDPOINTS
+    // =====================================================
+
+    @GetMapping("/plans")
+    public ResponseEntity<List<SubscriptionPlanDTO>> getPublicPlans() {
+        List<SubscriptionPlan> plans = subscriptionPlanRepository.findAllActivePlans();
+        List<SubscriptionPlanDTO> dtos = plans.stream()
+                .filter(SubscriptionPlan::isActive)
+                .map(plan -> SubscriptionPlanDTO.builder()
+                        .id(plan.getId())
+                        .code(plan.getCode())
+                        .name(plan.getName())
+                        .description(plan.getDescription())
+                        .price(plan.getPrice())
+                        .validityMonths(plan.getValidityMonths())
+                        .currency(plan.getCurrency())
+                        .maxUsers(plan.getMaxUsers())
+                        .maxEmployees(plan.getMaxEmployees())
+                        .isActive(plan.isActive())
+                        .isPublic(plan.getIsPublic())
+                        .displayOrder(plan.getDisplayOrder())
+                        .isCustom(plan.getIsCustom())
+                        .build())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
     @GetMapping("/check-email")
     public ResponseEntity<Map<String, Object>> checkEmail(
             @RequestParam String email,
@@ -74,7 +82,6 @@ public class TenantRegistrationController {
 
         String clientIp = getClientIp(request);
 
-        // Rate limit by IP
         try {
             rateLimiterService.checkOrThrow("email-check:" + clientIp, 10, 60);
         } catch (BusinessException e) {
@@ -82,28 +89,19 @@ public class TenantRegistrationController {
                     .body(Map.of("error", "Too many requests. Please try again later."));
         }
 
-        // Validate email
         if (email == null || email.trim().isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Email is required"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Email is required"));
         }
 
         String normalizedEmail = email.trim().toLowerCase();
         if (!isValidEmailFormat(normalizedEmail)) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Invalid email format"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid email format"));
         }
 
-        // Check existence
         boolean available = !employeeRepository.existsByEmail(normalizedEmail);
 
-        // ✅ Log for monitoring but don't reveal to client
-        if (log.isDebugEnabled()) {
-            log.debug("Email check - IP: {}, email: {}, available: {}",
-                    clientIp, maskEmail(normalizedEmail), available);
-        }
+        log.debug("Email check - IP: {}, available: {}", clientIp, available);
 
-        // ✅ Always return the same generic response
         return ResponseEntity.ok(Map.of(
                 "message", "If this email is available, you will receive further instructions."));
     }
@@ -114,11 +112,7 @@ public class TenantRegistrationController {
             HttpServletRequest httpRequest) {
 
         String clientIp = getClientIp(httpRequest);
-        String companyName = request.getCompanyName();
 
-        log.info("Tenant registration request from IP: {}, company: {}", clientIp, companyName);
-
-        // Rate limit registration
         try {
             rateLimiterService.checkOrThrow("register:" + clientIp, 3, 3600);
         } catch (BusinessException e) {
@@ -136,36 +130,24 @@ public class TenantRegistrationController {
 
         String clientIp = getClientIp(httpRequest);
 
-        // Rate limit by IP
         try {
             rateLimiterService.checkOrThrow("set-password:" + clientIp, 5, 60);
         } catch (BusinessException e) {
             throw new BusinessException("Too many activation attempts. Please try again later.");
         }
 
-        // Log token prefix only (NOT full token)
-        String tokenPrefix = request.getToken() != null && request.getToken().length() > 8
-                ? request.getToken().substring(0, 8) + "..."
-                : "null";
-        log.info("Set password request from IP: {}, token prefix: {}", clientIp, tokenPrefix);
-
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new BusinessException("Passwords do not match");
         }
 
-        try {
-            activationTokenService.setPassword(request.getToken(), request.getNewPassword());
-            log.info("Password set successfully for token prefix: {}", tokenPrefix);
-        } catch (BusinessException e) {
-            log.warn("Failed set password attempt from IP: {}, token prefix: {}, error: {}",
-                    clientIp, tokenPrefix, e.getMessage());
-            throw e;
-        }
-
+        activationTokenService.setPassword(request.getToken(), request.getNewPassword(), httpRequest);
         return ResponseEntity.ok().build();
     }
 
-    // ✅ Protected debug endpoint - NO STACK TRACE EXPOSURE
+    // =====================================================
+    // DEBUG ENDPOINTS (Protected)
+    // =====================================================
+
     @GetMapping("/debug-redis")
     public ResponseEntity<Map<String, Object>> debugRedis(
             @RequestHeader(value = "X-Debug-Key", required = false) String providedKey) {
@@ -186,7 +168,6 @@ public class TenantRegistrationController {
         } catch (Throwable e) {
             result.put("success", false);
             result.put("error", "Redis connection error. Check server logs for details.");
-            // ✅ Log to server logs only
             log.error("Redis debug endpoint error: {}", e.getMessage(), e);
         }
         return ResponseEntity.ok(result);
@@ -196,8 +177,8 @@ public class TenantRegistrationController {
     public ResponseEntity<Map<String, Object>> debugDb() {
         Map<String, Object> result = new java.util.HashMap<>();
         try {
-            result.put("employees", jdbcTemplate.queryForList("SELECT id, email, is_active, status, tenant_id FROM employees"));
-            result.put("tenants", jdbcTemplate.queryForList("SELECT id, company_name, tenant_code, status, is_active FROM tenants"));
+            result.put("employees", jdbcTemplate.queryForList("SELECT id, email, is_active, status, tenant_id FROM employees LIMIT 100"));
+            result.put("tenants", jdbcTemplate.queryForList("SELECT id, company_name, tenant_code, status, is_active, data_status FROM tenants LIMIT 100"));
             result.put("success", true);
         } catch (Exception e) {
             result.put("success", false);
@@ -206,9 +187,9 @@ public class TenantRegistrationController {
         return ResponseEntity.ok(result);
     }
 
-    // ==============================
+    // =====================================================
     // HELPER METHODS
-    // ==============================
+    // =====================================================
 
     private String getClientIp(HttpServletRequest request) {
         if (trustProxy) {
@@ -225,21 +206,6 @@ public class TenantRegistrationController {
     }
 
     private boolean isValidEmailFormat(String email) {
-        // ✅ Use a proper email validator
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    }
-
-    private String maskEmail(String email) {
-        if (email == null || email.length() < 5)
-            return "***";
-        String[] parts = email.split("@");
-        if (parts.length != 2)
-            return "***";
-        String local = parts[0];
-        String domain = parts[1];
-        if (local.length() <= 2) {
-            return "*@" + domain;
-        }
-        return local.charAt(0) + "***" + local.charAt(local.length() - 1) + "@" + domain;
     }
 }

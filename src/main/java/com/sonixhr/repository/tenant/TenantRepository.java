@@ -125,20 +125,11 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
                 @Param("dateTime") LocalDateTime dateTime,
                 Pageable pageable);
 
-        @Query("SELECT t FROM Tenant t WHERE t.dataStatus = :dataStatus AND t.expiredAt IS NOT NULL AND :dateTime >= t.expiredAt AND t.finalReminderSentAt IS NULL")
-        Page<Tenant> findTenantsEligibleForFinalReminder(
-                @Param("dataStatus") TenantDataStatus dataStatus,
-                @Param("dateTime") LocalDateTime dateTime,
-                Pageable pageable);
 
-        @Query("SELECT t FROM Tenant t WHERE t.dataStatus = :dataStatus AND t.expiredAt IS NOT NULL AND :dateTime >= t.expiredAt")
-        Page<Tenant> findTenantsEligibleForSoftDelete(
-                @Param("dataStatus") TenantDataStatus dataStatus,
-                @Param("dateTime") LocalDateTime dateTime,
-                Pageable pageable);
 
-        @Query("SELECT t FROM Tenant t WHERE t.dataStatus = :dataStatus AND t.legalHold = false")
+        @Query("SELECT t FROM Tenant t WHERE t.dataStatus = :dataStatus AND t.legalHold = false AND (t.deletedAt IS NULL OR t.deletedAt < :dateTime)")
         Page<Tenant> findTenantsEligibleForPurge(
                 @Param("dataStatus") TenantDataStatus dataStatus,
+                @Param("dateTime") LocalDateTime dateTime,
                 Pageable pageable);
 }

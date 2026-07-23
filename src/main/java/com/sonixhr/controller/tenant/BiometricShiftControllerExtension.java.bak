@@ -1,0 +1,123 @@
+package com.sonixhr.controller.tenant;
+
+import com.sonixhr.security.SecurityUtils;
+import com.sonixhr.service.attendance.ShiftConfigurationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+/**
+ * =========================================================================================
+ * FUTURE BIOMETRIC HARDWARE & RFID INTEGRATION CONTROLLER EXTENSION
+ * =========================================================================================
+ * Status: INACTIVE (Reserved for future Biometric Hardware / RFID Device Integration)
+ *
+ * Description:
+ * For current Manual Attendance, all calculation logic (working hours, late minutes, overtime,
+ * attendance status) is processed internally inside ShiftConfigurationService and ManualAttendanceService.
+ *
+ * When Biometric Fingerprint / Facial Recognition / RFID Hardware is integrated in the future:
+ * 1. Copy the endpoints below into ShiftConfigurationController.java (or activate this controller).
+ * 2. Biometric hardware pings can execute real-time calculation endpoints below.
+ * =========================================================================================
+ */
+/*
+@RestController
+@RequestMapping("/api/shift-configurations/biometric")
+public class BiometricShiftControllerExtension {
+
+    private final ShiftConfigurationService shiftConfigurationService;
+    private final SecurityUtils securityUtils;
+
+    public BiometricShiftControllerExtension(ShiftConfigurationService shiftConfigurationService, SecurityUtils securityUtils) {
+        this.shiftConfigurationService = shiftConfigurationService;
+        this.securityUtils = securityUtils;
+    }
+
+    @GetMapping("/working-hours")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Calculate working hours for biometric check-in/out",
+            description = "Calculates working hours based on check-in and check-out times.")
+    public ResponseEntity<Double> calculateWorkingHours(
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkIn,
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkOut,
+            @RequestParam(required = false) Integer breakMinutes) {
+        Double response = shiftConfigurationService.calculateWorkingHours(checkIn, checkOut, breakMinutes);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/overtime")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Calculate overtime for biometric check-out",
+            description = "Calculates overtime based on check-out time and shift configuration.")
+    public ResponseEntity<Double> calculateOvertime(
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkoutTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
+        if (date == null) date = LocalDate.now();
+        Double response = shiftConfigurationService.calculateOvertime(tenantId, checkoutTime, date);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/late-minutes")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Calculate late minutes for biometric check-in",
+            description = "Calculates late minutes based on check-in time and shift configuration.")
+    public ResponseEntity<Integer> calculateLateMinutes(
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkinTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
+        if (date == null) date = LocalDate.now();
+        Integer response = shiftConfigurationService.calculateLateMinutes(tenantId, checkinTime, date);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/early-exit-minutes")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Calculate early exit minutes for biometric check-out",
+            description = "Calculates early exit minutes based on check-out time and shift configuration.")
+    public ResponseEntity<Integer> calculateEarlyExitMinutes(
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkoutTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
+        if (date == null) date = LocalDate.now();
+        Integer response = shiftConfigurationService.calculateEarlyExitMinutes(tenantId, checkoutTime, date);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/validate-checkin")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Validate check-in time for biometric device",
+            description = "Validates if check-in time is valid based on shift configuration.")
+    public ResponseEntity<Boolean> isValidCheckinTime(
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime checkinTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        Long tenantId = securityUtils.getCurrentTenantId();
+        if (date == null) date = LocalDate.now();
+        Boolean response = shiftConfigurationService.isValidCheckinTime(tenantId, checkinTime, date);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/attendance-status")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get attendance status for biometric log",
+            description = "Determines attendance status based on check-in time and working hours.")
+    public ResponseEntity<String> getAttendanceStatus(
+            @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime checkinTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            @RequestParam(required = false) Double workingHours) {
+        Long tenantId = securityUtils.getCurrentTenantId();
+        if (date == null) date = LocalDate.now();
+        String response = shiftConfigurationService.determineStatus(tenantId, checkinTime, date, workingHours);
+        return ResponseEntity.ok(response);
+    }
+}
+*/

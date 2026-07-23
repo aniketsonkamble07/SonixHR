@@ -65,7 +65,8 @@ public class RedisCacheConfig implements CachingConfigurer {
             Map.entry("employeePermissions",       CacheConstants.TTL_PERMISSIONS),
             Map.entry("platform_role_permissions", CacheConstants.TTL_PERMISSIONS),
             Map.entry("tenantDetails",             CacheConstants.TTL_TENANT),
-            Map.entry("departmentsLookup",         CacheConstants.TTL_DEPARTMENTS)
+            Map.entry("departmentsLookup",         CacheConstants.TTL_DEPARTMENTS),
+            Map.entry("subscriptionPlans",         CacheConstants.TTL_TENANT)
     );
 
     @Bean
@@ -78,7 +79,13 @@ public class RedisCacheConfig implements CachingConfigurer {
 
     @Bean
     public GenericJackson2JsonRedisSerializer genericJackson2JsonRedisSerializer(ObjectMapper objectMapper) {
-        return new GenericJackson2JsonRedisSerializer(objectMapper);
+        ObjectMapper mapper = objectMapper.copy();
+        mapper.activateDefaultTyping(
+                mapper.getPolymorphicTypeValidator(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY
+        );
+        return new GenericJackson2JsonRedisSerializer(mapper);
     }
 
     @Bean
@@ -166,7 +173,7 @@ public class RedisCacheConfig implements CachingConfigurer {
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(genericJackson2JsonRedisSerializer(objectMapper()));
         template.setHashValueSerializer(genericJackson2JsonRedisSerializer(objectMapper()));
-        template.setEnableTransactionSupport(true);
+        template.setEnableTransactionSupport(false);
         template.afterPropertiesSet();
 
         log.info("RedisTemplate initialized");

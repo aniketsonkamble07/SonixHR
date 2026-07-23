@@ -2,6 +2,7 @@ package com.sonixhr.service.tenant;
 
 import com.sonixhr.dto.tenant.TenantRegistrationRequest;
 import com.sonixhr.dto.tenant.TenantRegistrationResponse;
+import com.sonixhr.service.subscription.SubscriptionEventLogService;
 import com.sonixhr.util.CountryUtils;
 import com.sonixhr.entity.employee.Employee;
 import com.sonixhr.entity.tenant.Tenant;
@@ -12,6 +13,7 @@ import com.sonixhr.entity.platform.SubscriptionPlan;
 import com.sonixhr.repository.platform.SubscriptionPlanRepository;
 import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.TenantPermissionEnum;
 import com.sonixhr.enums.employee.EmployeeStatus;
 import com.sonixhr.enums.employee.EmploymentType;
 import com.sonixhr.exceptions.BusinessException;
@@ -34,26 +36,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class TenantRegistrationService {
-
-    private static final Logger log = LoggerFactory.getLogger(TenantRegistrationService.class);
 
     private final TenantRepository tenantRepository;
     private final TenantSubscriptionRepository subscriptionRepository;
@@ -72,8 +68,38 @@ public class TenantRegistrationService {
     @Value("${app.base-url:http://localhost:8081}")
     private String baseUrl;
 
-    @Value("${app.trial-days:14}")
-    private int defaultTrialDays;
+    // =====================================================
+    // PERMISSION SETS (Permission-Based)
+    // =====================================================
+
+    private static final Set<String> EMPLOYEE_PERMISSIONS = Set.of(
+            TenantPermissionEnum.EMPLOYEE_VIEW_SELF.name(),
+            TenantPermissionEnum.LEAVE_REQUEST.name(),
+            TenantPermissionEnum.LEAVE_VIEW_OWN.name(),
+            TenantPermissionEnum.LEAVE_CANCEL_OWN.name(),
+            TenantPermissionEnum.ATTENDANCE_MARK_SELF.name(),
+            TenantPermissionEnum.ATTENDANCE_VIEW_OWN.name(),
+            TenantPermissionEnum.TASK_VIEW_OWN.name(),
+            TenantPermissionEnum.TASK_ACKNOWLEDGE.name(),
+            TenantPermissionEnum.TASK_UPDATE_STATUS.name()
+    );
+
+    private static final Set<String> MANAGER_PERMISSIONS = new HashSet<>();
+    static {
+        MANAGER_PERMISSIONS.addAll(EMPLOYEE_PERMISSIONS);
+        MANAGER_PERMISSIONS.addAll(Set.of(
+                TenantPermissionEnum.EMPLOYEE_VIEW_TEAM.name(),
+                TenantPermissionEnum.LEAVE_VIEW_TEAM.name(),
+                TenantPermissionEnum.LEAVE_APPROVE_DEPARTMENT.name(),
+                TenantPermissionEnum.ATTENDANCE_VIEW_TEAM.name(),
+                TenantPermissionEnum.DEPARTMENT_VIEW.name(),
+                TenantPermissionEnum.REPORT_VIEW_DEPARTMENT.name(),
+                TenantPermissionEnum.TASK_CREATE.name(),
+                TenantPermissionEnum.TASK_VIEW_ALL.name(),
+                TenantPermissionEnum.TASK_VIEW_TEAM.name(),
+                TenantPermissionEnum.TASK_EDIT.name()
+        ));
+    }
 
     @Transactional
     public TenantRegistrationResponse registerTenant(TenantRegistrationRequest request) {
@@ -82,19 +108,11 @@ public class TenantRegistrationService {
         // 1. Validate uniqueness
         validateUniqueness(request);
 
-        // 2. Get active plan details from DB
-        if (request.getPlanCode() == null || request.getPlanCode().trim().isEmpty()) {
-            throw new BusinessException("Subscription plan selection is required.");
-        }
-        SubscriptionPlan plan = subscriptionPlanRepository.findByNameIgnoreCase(request.getPlanCode().trim())
-                .orElseThrow(() -> new BusinessException(
-                        "Subscription plan not found: " + request.getPlanCode()));
+        // 2. Get subscription plan
+        SubscriptionPlan plan = getSubscriptionPlan(request.getPlanCode());
+        log.info("Selected plan: {} (ID: {})", plan.getName(), plan.getId());
 
-        if (!plan.isActive()) {
-            throw new BusinessException("The selected subscription plan is currently inactive.");
-        }
-
-        // 3. Generate unique identifiers
+        // 3. Generate tenant code
         String tenantCode = generateUniqueTenantCode(request.getCompanyName());
 
         // 4. Create Tenant
@@ -106,105 +124,75 @@ public class TenantRegistrationService {
             TenantContext.setCurrentTenant(tenant.getId());
             tenantRLSService.setCurrentTenantInDB(tenant.getId());
 
-            // Initialize default leave settings immediately
-            TenantLeaveSettings settings = TenantLeaveSettings.builder()
-                    .tenantId(tenant.getId())
-                    .country(tenant.getCountry())
-                    .state(tenant.getState())
-                    .stateText(tenant.getStateText())
-                    .build();
-            settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
-            tenantLeaveSettingsRepository.save(settings);
+            // 5. Initialize leave settings
+            initializeLeaveSettings(tenant);
 
-            // 5. Create default roles for this tenant (Admin, Employee, Manager)
+            // 6. Create default roles (Admin, Manager, Employee)
             TenantRole adminRole = createDefaultRolesForTenant(tenant.getId());
-            log.info("Default roles created for tenant, Admin has {} permissions",
-                    adminRole.getPermissions().size());
 
-            // 6. Create Employee (Admin)
-            Employee adminEmployee = createSuperAdminEmployee(tenant, request, adminRole);
+            // 7. Create Admin Employee (NOT Super Admin)
+            Employee adminEmployee = createAdminEmployee(tenant, request, adminRole);
             log.info("Admin employee created with ID: {}", adminEmployee.getId());
 
-            // 7. Create subscription record
+            // 8. Create subscription record
             createSubscription(tenant, plan);
-            log.info("Subscription created for tenant");
 
-            // 8. Generate activation token for employee
+            // 9. Generate activation token
             String activationToken = activationTokenService.generateTokenForEmployee(adminEmployee.getId());
             String activationLink = baseUrl + "/api/tenant/auth/activate?token=" + activationToken;
 
-            // Send activation email to the registered Admin employee (disabled for
-            // development)
-            // emailService.sendActivationEmail(adminEmployee.getEmail(),
-            // adminEmployee.getFullName(), activationLink);
+            logAdminCredentials(adminEmployee, activationLink);
 
-            // Log the credentials for manual testing
-            log.info("==========================================");
-            log.info(" TENANT & ADMIN ACTIVE IMMEDIATELY (DEV MODE)");
-            log.info(" Admin Email: {}", adminEmployee.getEmail());
-            log.info(" (Password set to a secure random value)");
-            log.info(" (Optional Activation Link: {})", activationLink);
-            log.info("==========================================");
-
-            log.info("Tenant registration completed: {}", tenant.getCompanyName());
-
-            // 9. Create default General 9-5 shift configuration
-            createDefaultShift(tenant.getId(), adminEmployee.getId());
+            // 10. Create default shift - IN SEPARATE TRANSACTION
+            createDefaultShiftSeparateTransaction(tenant.getId(), adminEmployee.getId());
 
             return buildResponse(tenant, activationToken, adminEmployee);
+
         } finally {
-            if (previousTenantId != null) {
-                TenantContext.setCurrentTenant(previousTenantId);
-                tenantRLSService.setCurrentTenantInDB(previousTenantId);
-            } else {
-                TenantContext.clear();
-                tenantRLSService.clearCurrentTenantInDB();
-            }
+            restoreTenantContext(previousTenantId);
         }
     }
 
-    private void createDefaultShift(Long tenantId, Long adminEmployeeId) {
-        log.info("Creating default shift configuration for tenant: {}", tenantId);
-
-        ShiftConfigurationRequestDTO shiftRequest = ShiftConfigurationRequestDTO.builder()
-                .shiftName("General 9-5")
-                .shiftCode("GENERAL_9-5")
-                .shiftDescription("Default general shift from 9:00 AM to 5:00 PM")
-                .startTime(LocalTime.of(9, 0))
-                .endTime(LocalTime.of(17, 0))
-                .breakDurationMinutes(60)
-                .minBreakMinutes(30)
-                .maxBreakMinutes(90)
-                .lateGraceMinutes(15)
-                .earlyExitGraceMinutes(15)
-                .checkinBufferBefore(60)
-                .checkoutBufferAfter(60)
-                .fullDayHours(8.0)
-                .halfDayHours(4.0)
-                .quarterDayHours(2.0)
-                .allowOvertime(true)
-                .overtimeMultiplier(1.5)
-                .overtimeThresholdMinutes(30)
-                .maxOvertimeHoursPerDay(4.0)
-                .weeklyOffs(List.of("SUNDAY"))
-                .alternateWeekOff(false)
-                .effectiveFrom(LocalDate.now())
-                .build();
-
-        Long previousTenantId = TenantContext.getCurrentTenant();
+    /**
+     * Create default shift in a SEPARATE transaction to avoid rollback issues
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createDefaultShiftSeparateTransaction(Long tenantId, Long adminEmployeeId) {
         try {
-            TenantContext.setCurrentTenant(tenantId);
+            log.info("Creating default shift for tenant: {} (separate transaction)", tenantId);
+
+            ShiftConfigurationRequestDTO shiftRequest = ShiftConfigurationRequestDTO.builder()
+                    .shiftName("General 9-5")
+                    .shiftCode("GENERAL_9-5")
+                    .shiftDescription("Default general shift from 9:00 AM to 5:00 PM")
+                    .startTime(LocalTime.of(9, 0))
+                    .endTime(LocalTime.of(17, 0))
+                    .breakDurationMinutes(60)
+                    .minBreakMinutes(30)
+                    .maxBreakMinutes(90)
+                    .lateGraceMinutes(15)
+                    .earlyExitGraceMinutes(15)
+                    .checkinBufferBefore(60)
+                    .checkoutBufferAfter(60)
+                    .fullDayHours(8.0)
+                    .halfDayHours(4.0)
+                    .quarterDayHours(2.0)
+                    .allowOvertime(true)
+                    .overtimeMultiplier(1.5)
+                    .overtimeThresholdMinutes(30)
+                    .maxOvertimeHoursPerDay(4.0)
+                    // ✅ Use String directly instead of List
+                    .weeklyOffs("SUNDAY")
+                    .alternateWeekOff(false)
+                    .effectiveFrom(LocalDate.now())
+                    .build();
+
             shiftConfigurationService.createShiftConfiguration(shiftRequest, tenantId, adminEmployeeId);
             log.info("Default shift 'General 9-5' created successfully for tenant: {}", tenantId);
+
         } catch (Exception e) {
-            log.error("Failed to create default shift for tenant: " + tenantId, e);
-            throw new BusinessException("Failed to initialize default shift configuration: " + e.getMessage());
-        } finally {
-            if (previousTenantId != null) {
-                TenantContext.setCurrentTenant(previousTenantId);
-            } else {
-                TenantContext.clear();
-            }
+            // Log but don't throw - shift creation failure shouldn't break tenant registration
+            log.error("Failed to create default shift for tenant {}: {}", tenantId, e.getMessage(), e);
         }
     }
 
@@ -219,6 +207,40 @@ public class TenantRegistrationService {
         if (employeeRepository.existsByEmail(request.getAdminEmail())) {
             throw new ValidationException("adminEmail", "Email address already registered");
         }
+    }
+
+    private SubscriptionPlan getSubscriptionPlan(String planCode) {
+        if (planCode == null || planCode.trim().isEmpty()) {
+            log.info("No plan code provided, using default plan");
+            return subscriptionPlanRepository.findByNameIgnoreCase("BASIC_MONTHLY")
+                    .orElseThrow(() -> new BusinessException("Default plan not found. Please contact support."));
+        }
+
+        String code = planCode.trim();
+        log.info("Looking for plan with code: {}", code);
+
+        Optional<SubscriptionPlan> planOpt = subscriptionPlanRepository.findByCodeIgnoreCase(code);
+
+        if (planOpt.isEmpty()) {
+            planOpt = subscriptionPlanRepository.findByNameIgnoreCase(code);
+        }
+
+        if (planOpt.isEmpty()) {
+            List<SubscriptionPlan> availablePlans = subscriptionPlanRepository.findAllActivePlans();
+            throw new BusinessException("Subscription plan not found: " + code +
+                    ". Available plans: " + availablePlans.stream()
+                    .map(SubscriptionPlan::getCode)
+                    .collect(Collectors.joining(", ")));
+        }
+
+        SubscriptionPlan plan = planOpt.get();
+
+        if (!plan.isActive()) {
+            throw new BusinessException("The selected subscription plan is currently inactive.");
+        }
+
+        log.info("Found plan: {} ({})", plan.getCode(), plan.getName());
+        return plan;
     }
 
     // =====================================================
@@ -240,42 +262,56 @@ public class TenantRegistrationService {
     }
 
     private Tenant createTenant(TenantRegistrationRequest request, String tenantCode,
-            SubscriptionPlan plan) {
-        UserStatus tenantStatus = UserStatus.ACTIVE;
-        boolean tenantActive = true;
-
-        PlanStatus initialPlanStatus = PlanStatus.ACTIVE;
-        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
-        LocalDateTime endsAt = LocalDateTime.now().plusMonths(validityMonths);
-
+                                SubscriptionPlan plan) {
         String validatedCountry = CountryUtils.normalizeAndValidateCountry(request.getCountry());
         boolean isIndia = "IN".equalsIgnoreCase(validatedCountry);
+
         if (isIndia && request.getState() == null) {
             throw new ValidationException("state", "State is required for tenants in India");
         }
+
+        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+        LocalDateTime endsAt = LocalDateTime.now().plusMonths(validityMonths);
 
         Tenant tenant = Tenant.builder()
                 .tenantCode(tenantCode)
                 .companyName(request.getCompanyName())
                 .subscriptionPlan(plan)
-                .adminName(request.getAdminName())
+                .adminName(request.getAdminFullName())
                 .adminEmail(request.getAdminEmail())
                 .adminPhone(request.getAdminPhone())
-                .officeAddress(request.getOfficeAddress())
+                .officeAddress(request.getAddress())
                 .city(request.getCity())
                 .state(isIndia ? request.getState() : null)
                 .stateText(!isIndia ? request.getStateText() : null)
                 .country(validatedCountry)
-                .status(tenantStatus)
-                .isActive(tenantActive)
-                .planStatus(initialPlanStatus)
+                .status(UserStatus.ACTIVE)
+                .isActive(true)
+                .planStatus(PlanStatus.ACTIVE)  // ✅ PlanStatus enum
                 .endsAt(endsAt)
+                .maxEmployees(plan.getMaxEmployees() != null ? plan.getMaxEmployees() : 100)
                 .build();
+
         return tenantRepository.save(tenant);
     }
 
     // =====================================================
-    // ROLE MANAGEMENT
+    // LEAVE SETTINGS
+    // =====================================================
+
+    private void initializeLeaveSettings(Tenant tenant) {
+        TenantLeaveSettings settings = TenantLeaveSettings.builder()
+                .tenantId(tenant.getId())
+                .country(tenant.getCountry())
+                .state(tenant.getState())
+                .stateText(tenant.getStateText())
+                .build();
+        settings.setLeavePolicies(TenantLeaveSettings.createDefaultPolicies());
+        tenantLeaveSettingsRepository.save(settings);
+    }
+
+    // =====================================================
+    // ROLE MANAGEMENT (Permission-Based)
     // =====================================================
 
     private TenantRole createDefaultRolesForTenant(Long tenantId) {
@@ -287,10 +323,24 @@ public class TenantRegistrationService {
             throw new BusinessException("No permissions found. Please ensure permissions are initialized.");
         }
 
-        log.info("Found {} global permissions to assign to default roles", allPermissions.size());
+        // 1. ADMIN ROLE - ALL PERMISSIONS
+        TenantRole adminRole = createAdminRole(tenantId, allPermissions);
+        roleRepository.save(adminRole);
 
-        // 1. Admin
-        TenantRole adminRole = TenantRole.builder()
+        // 2. MANAGER ROLE - MANAGER PERMISSIONS
+        TenantRole managerRole = createManagerRole(tenantId, allPermissions);
+        roleRepository.save(managerRole);
+
+        // 3. EMPLOYEE ROLE - BASIC PERMISSIONS
+        TenantRole employeeRole = createEmployeeRole(tenantId, allPermissions);
+        roleRepository.save(employeeRole);
+
+        log.info("Created default roles for tenant {}: Admin, Manager, Employee", tenantId);
+        return adminRole;
+    }
+
+    private TenantRole createAdminRole(Long tenantId, List<TenantPermission> allPermissions) {
+        return TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Admin")
                 .description("Administrator with full access to all tenant features")
@@ -298,37 +348,14 @@ public class TenantRegistrationService {
                 .active(true)
                 .permissions(new HashSet<>(allPermissions))
                 .build();
-        TenantRole savedAdmin = roleRepository.save(adminRole);
+    }
 
-        // 2. Employee
-        Set<String> employeePermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_CANCEL_OWN",
-                "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
-                "TASK_VIEW_OWN", "TASK_ACKNOWLEDGE", "TASK_UPDATE_STATUS");
-        Set<TenantPermission> employeePermissions = allPermissions.stream()
-                .filter(p -> employeePermissionNames.contains(p.getPermissionName()))
-                .collect(java.util.stream.Collectors.toSet());
-        TenantRole employeeRole = TenantRole.builder()
-                .tenantId(tenantId)
-                .name("Employee")
-                .description("Basic employee access - default role for new employees")
-                .isDefault(false)
-                .active(true)
-                .permissions(employeePermissions)
-                .build();
-        roleRepository.save(employeeRole);
-
-        // 3. Manager
-        Set<String> managerPermissionNames = Set.of(
-                "EMPLOYEE_VIEW_SELF", "EMPLOYEE_VIEW_TEAM", "LEAVE_REQUEST", "LEAVE_VIEW_OWN", "LEAVE_VIEW_TEAM",
-                "LEAVE_APPROVE_DEPARTMENT", "LEAVE_CANCEL_OWN", "ATTENDANCE_MARK_SELF", "ATTENDANCE_VIEW_OWN",
-                "ATTENDANCE_VIEW_TEAM", "DEPARTMENT_VIEW", "REPORT_VIEW_DEPARTMENT",
-                "TASK_CREATE", "TASK_VIEW_ALL", "TASK_VIEW_TEAM", "TASK_VIEW_OWN", "TASK_EDIT", "TASK_ACKNOWLEDGE",
-                "TASK_UPDATE_STATUS");
+    private TenantRole createManagerRole(Long tenantId, List<TenantPermission> allPermissions) {
         Set<TenantPermission> managerPermissions = allPermissions.stream()
-                .filter(p -> managerPermissionNames.contains(p.getPermissionName()))
-                .collect(java.util.stream.Collectors.toSet());
-        TenantRole managerRole = TenantRole.builder()
+                .filter(p -> MANAGER_PERMISSIONS.contains(p.getPermissionName()))
+                .collect(Collectors.toSet());
+
+        return TenantRole.builder()
                 .tenantId(tenantId)
                 .name("Manager")
                 .description("Team manager with people management access")
@@ -336,29 +363,34 @@ public class TenantRegistrationService {
                 .active(true)
                 .permissions(managerPermissions)
                 .build();
-        roleRepository.save(managerRole);
+    }
 
-        log.info("Created default roles for tenant {}: Admin, Employee, Manager", tenantId);
-        return savedAdmin;
+    private TenantRole createEmployeeRole(Long tenantId, List<TenantPermission> allPermissions) {
+        Set<TenantPermission> employeePermissions = allPermissions.stream()
+                .filter(p -> EMPLOYEE_PERMISSIONS.contains(p.getPermissionName()))
+                .collect(Collectors.toSet());
+
+        return TenantRole.builder()
+                .tenantId(tenantId)
+                .name("Employee")
+                .description("Basic employee access - default role for new employees")
+                .isDefault(false)
+                .active(true)
+                .permissions(employeePermissions)
+                .build();
     }
 
     // =====================================================
-    // EMPLOYEE CREATION (Admin)
+    // EMPLOYEE CREATION - ADMIN (NOT SUPER ADMIN)
     // =====================================================
 
-    private Employee createSuperAdminEmployee(Tenant tenant, TenantRegistrationRequest request,
-            TenantRole adminRole) {
+    private Employee createAdminEmployee(Tenant tenant, TenantRegistrationRequest request,
+                                         TenantRole adminRole) {
         String employeeCode = employeeCodeGenerator.generateEmployeeCode(tenant);
 
-        String firstName = getFirstNameFromFullName(request.getAdminName());
-        String lastName = getLastNameFromFullName(request.getAdminName());
+        String firstName = request.getAdminFirstName() != null ? request.getAdminFirstName() : "Admin";
+        String lastName = request.getAdminLastName() != null ? request.getAdminLastName() : "User";
 
-        if (adminRole.getId() == null) {
-            adminRole = roleRepository.save(adminRole);
-        }
-
-        EmployeeStatus employeeStatus = EmployeeStatus.ACTIVE;
-        boolean employeeActive = true;
         String passwordHash = passwordEncoder.encode("Admin@123");
 
         Employee adminEmployee = Employee.builder()
@@ -368,41 +400,23 @@ public class TenantRegistrationService {
                 .lastName(lastName)
                 .email(request.getAdminEmail())
                 .phone(request.getAdminPhone())
-                .position("Admin")
+                .position("Administrator")
                 .employmentType(EmploymentType.FULL_TIME)
                 .hireDate(LocalDate.now())
-                .status(employeeStatus)
-                .isActive(employeeActive)
+                .status(EmployeeStatus.ACTIVE)
+                .isActive(true)
                 .address(tenant.getOfficeAddress())
                 .city(tenant.getCity())
                 .state(tenant.getState())
                 .stateText(tenant.getStateText())
                 .country(tenant.getCountry())
-                .workLocation(
-                        tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
+                .workLocation(tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
                 .passwordHash(passwordHash)
-                .createdBy(null)
                 .roles(new HashSet<>(Set.of(adminRole)))
+                .mustChangePassword(true)
                 .build();
 
         return employeeRepository.save(adminEmployee);
-    }
-
-    private String getFirstNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty())
-            return "Admin";
-        String[] parts = fullName.trim().split(" ");
-        return parts[0];
-    }
-
-    private String getLastNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty())
-            return "User";
-        String[] parts = fullName.trim().split(" ");
-        if (parts.length > 1) {
-            return String.join(" ", java.util.Arrays.copyOfRange(parts, 1, parts.length));
-        }
-        return "";
     }
 
     // =====================================================
@@ -410,35 +424,66 @@ public class TenantRegistrationService {
     // =====================================================
 
     private void createSubscription(Tenant tenant, SubscriptionPlan plan) {
-        PlanStatus initialPlanStatus = PlanStatus.ACTIVE;
-        LocalDateTime startedAt = LocalDateTime.now();
-        int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
-        LocalDateTime endsAt = startedAt.plusMonths(validityMonths);
+        try {
+            LocalDateTime startedAt = LocalDateTime.now();
+            int validityMonths = plan.getValidityMonths() > 0 ? plan.getValidityMonths() : 1;
+            LocalDateTime endsAt = startedAt.plusMonths(validityMonths);
 
-        TenantSubscription subscription = TenantSubscription.builder()
-                .tenant(tenant)
-                .subscriptionPlan(plan)
-                .planName(plan.getName())
-                .planStatus(initialPlanStatus)
-                .startedAt(startedAt)
-                .billingPeriodStart(startedAt)
-                .billingPeriodEnd(endsAt)
-                .amount(plan.getPrice())
-                .currency("INR")
-                .isActive(true)
-                .build();
-        TenantSubscription saved = subscriptionRepository.save(subscription);
+            TenantSubscription subscription = TenantSubscription.builder()
+                    .tenant(tenant)
+                    .subscriptionPlan(plan)
+                    .planName(plan.getName())
+                    .planStatus(PlanStatus.ACTIVE)  // ✅ PlanStatus enum
+                    .startedAt(startedAt)
+                    .billingPeriodStart(startedAt)
+                    .billingPeriodEnd(endsAt)
+                    .amount(plan.getPrice())
+                    .currency(plan.getCurrency() != null ? plan.getCurrency() : "USD")
+                    .isActive(true)
+                    .isCurrent(true)
+                    .build();
 
-        // Record audit event
-        subscriptionEventLogService.recordEvent(
-                tenant,
-                saved,
-                null,
-                initialPlanStatus.name(),
-                com.sonixhr.enums.TriggerSource.SYSTEM,
-                null,
-                "Initial subscription created on onboarding"
-        );
+            TenantSubscription saved = subscriptionRepository.save(subscription);
+
+            // ✅ CORRECT: Pass PlanStatus enums, NOT Strings
+            subscriptionEventLogService.recordEvent(
+                    tenant,
+                    saved,
+                    null,                    // previousStatus (PlanStatus)
+                    PlanStatus.ACTIVE,       // newStatus (PlanStatus) - NOT .name()
+                    com.sonixhr.enums.TriggerSource.SYSTEM,
+                    null,
+                    "Initial subscription created with plan: " + plan.getName()
+            );
+
+        } catch (Exception e) {
+            log.error("Failed to create subscription for tenant {}: {}", tenant.getId(), e.getMessage());
+            throw new BusinessException("Failed to create subscription: " + e.getMessage());
+        }
+    }
+
+    // =====================================================
+    // HELPER METHODS
+    // =====================================================
+
+    private void restoreTenantContext(Long previousTenantId) {
+        if (previousTenantId != null) {
+            TenantContext.setCurrentTenant(previousTenantId);
+            tenantRLSService.setCurrentTenantInDB(previousTenantId);
+        } else {
+            TenantContext.clear();
+            tenantRLSService.clearCurrentTenantInDB();
+        }
+    }
+
+    private void logAdminCredentials(Employee adminEmployee, String activationLink) {
+        log.info("==========================================");
+        log.info(" TENANT ADMIN CREATED");
+        log.info(" Role: Admin (NOT Super Admin)");
+        log.info(" Admin Email: {}", adminEmployee.getEmail());
+        log.info(" Password: Admin@123");
+        log.info(" Activation Link: {}", activationLink);
+        log.info("==========================================");
     }
 
     // =====================================================
@@ -446,12 +491,10 @@ public class TenantRegistrationService {
     // =====================================================
 
     private TenantRegistrationResponse buildResponse(Tenant tenant, String activationToken,
-            Employee superAdminEmployee) {
-        String msg = "Registration successful! Please check your email to activate your account.";
-
+                                                     Employee adminEmployee) {
         return TenantRegistrationResponse.builder()
                 .success(true)
-                .message(msg)
+                .message("Registration successful! Please check your email to activate your account.")
                 .tenantId(tenant.getId())
                 .tenantCode(tenant.getTenantCode())
                 .companyName(tenant.getCompanyName())
@@ -459,7 +502,7 @@ public class TenantRegistrationService {
                 .planStatus(tenant.getPlanStatus() != null ? tenant.getPlanStatus().name() : null)
                 .endsAt(tenant.getEndsAt())
                 .status(tenant.getStatus() != null ? tenant.getStatus().name() : null)
-                .isActive(tenant.getIsActive())
+                .isActive(tenant.getIsActive() != null && tenant.getIsActive())
                 .adminEmail(tenant.getAdminEmail())
                 .adminName(tenant.getAdminName())
                 .adminPhone(tenant.getAdminPhone())
@@ -471,11 +514,10 @@ public class TenantRegistrationService {
                 .activationToken(activationToken)
                 .activationTokenExpiry(LocalDateTime.now().plusHours(24))
                 .createdAt(tenant.getCreatedAt())
-                .superAdminEmployeeId(superAdminEmployee.getId())
-                .superAdminEmployeeCode(superAdminEmployee.getEmployeeCode())
-                .superAdminFullName(superAdminEmployee.getFullName())
-                .superAdminEmail(superAdminEmployee.getEmail())
-                .superAdminPosition(superAdminEmployee.getPosition())
+                .adminEmployeeId(adminEmployee.getId())
+                .adminEmployeeCode(adminEmployee.getEmployeeCode())
+                .adminFullName(adminEmployee.getFullName())
+                .adminPosition(adminEmployee.getPosition())
                 .build();
     }
 }

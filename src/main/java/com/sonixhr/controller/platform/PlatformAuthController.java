@@ -1,10 +1,7 @@
 package com.sonixhr.controller.platform;
 
-import com.sonixhr.dto.ActivationRequest;
-import com.sonixhr.dto.LoginRequest;
-import com.sonixhr.dto.LoginResponse;
-import com.sonixhr.dto.RefreshTokenRequest;
-import com.sonixhr.dto.SetPasswordRequest;
+import com.sonixhr.dto.*;
+import com.sonixhr.dto.platform.PlatformUserResponse;
 import com.sonixhr.entity.platform.PlatformUser;
 import com.sonixhr.security.JwtService;
 import com.sonixhr.security.PlatformTokenBlacklistService;
@@ -22,13 +19,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 import java.security.SecureRandom;
-
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 @RestController
@@ -36,8 +31,6 @@ import org.slf4j.LoggerFactory;
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PlatformAuthController {
-
-    private static final Logger log = LoggerFactory.getLogger(PlatformAuthController.class);
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -47,9 +40,14 @@ public class PlatformAuthController {
     private final PlatformTokenBlacklistService tokenBlacklistService;
     private final RateLimiterService rateLimiterService;
     private final HashingService hashingService;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.trust-proxy:false}")
     private boolean trustProxy;
+
+    // =====================================================
+    // LOGIN
+    // =====================================================
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
@@ -61,19 +59,18 @@ public class PlatformAuthController {
         String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : "";
         String hashedEmail = hashingService.hashEmail(email);
 
-        log.info("Login attempt for platform user: {}, IP: {}, User-Agent: {}", 
-            request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
+        log.info("Login attempt for platform user: {}, IP: {}, User-Agent: {}",
+                request.getEmail(), ip, userAgent != null ? userAgent : "unknown");
 
         rateLimiterService.checkOrThrow("login:ip:" + ip, 10, 60);
         rateLimiterService.checkOrThrow("login:email:" + hashedEmail, 5, 60);
 
         try {
             LoginResponse response = platformAuthService.login(request.getEmail(), request.getPassword());
-            
-            // Reset rate limits on successful login
+
             rateLimiterService.reset("login:ip:" + ip);
             rateLimiterService.reset("login:email:" + hashedEmail);
-            
+
             log.info("Successful login for platform user: {}, IP: {}", request.getEmail(), ip);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -81,6 +78,10 @@ public class PlatformAuthController {
             throw e;
         }
     }
+
+    // =====================================================
+    // LOGOUT
+    // =====================================================
 
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
@@ -93,7 +94,7 @@ public class PlatformAuthController {
         log.info("Logout request for platform user: {}, IP: {}", user.getEmail(), ip);
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            tokenBlacklistService.blacklistToken(authHeader.substring(7));
+            platformAuthService.logout(authHeader.substring(7));
         }
 
         SecurityContextHolder.clearContext();
@@ -103,6 +104,10 @@ public class PlatformAuthController {
                 "status", "success"
         ));
     }
+
+    // =====================================================
+    // REFRESH TOKEN
+    // =====================================================
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refreshToken(
@@ -117,9 +122,13 @@ public class PlatformAuthController {
         return ResponseEntity.ok(response);
     }
 
+    // =====================================================
+    // ACTIVATE USER
+    // =====================================================
+
     @PostMapping("/activate")
-    public ResponseEntity<Map<String, Object>> activateUser(
-            @Valid @RequestBody ActivationRequest request,
+    public ResponseEntity<LoginResponse> activateUser(
+            @Valid @RequestBody SetPasswordRequest request,
             HttpServletRequest httpRequest) {
 
         String ip = resolveClientIp(httpRequest);
@@ -127,39 +136,47 @@ public class PlatformAuthController {
 
         log.info("Activating platform user from IP: {}", ip);
 
-        PlatformUser user = platformUserService.activateUser(
+        platformAuthService.setPassword(
                 request.getToken(),
-                request.getPassword(),
-                request.getConfirmPassword()
+                request.getNewPassword(),
+                request.getConfirmPassword(),
+                httpRequest
         );
 
-        var tokenPair = jwtService.generatePlatformTokenPair(user);
-        log.info("Platform user activated successfully: {}, IP: {}", user.getEmail(), ip);
+        log.info("Platform user activated successfully from IP: {}", ip);
 
-        // Return minimal response
-        Map<String, Object> response = new java.util.HashMap<>();
-        response.put("success", true);
-        response.put("message", "Account activated successfully");
-        response.put("accessToken", tokenPair.getAccessToken());
-        response.put("refreshToken", tokenPair.getRefreshToken());
-        response.put("tokenType", "Bearer");
-        response.put("expiresIn", tokenPair.getExpiresIn());
-        response.put("userType", "PLATFORM");
-        response.put("userId", user.getId());
-        response.put("email", user.getEmail());
+        // Auto-login after activation
+        String email = jwtService.extractUsername(request.getToken());
+        LoginResponse loginResponse = platformAuthService.login(email, request.getNewPassword());
 
-        return ResponseEntity.ok(response);
+        log.info("Platform user auto-logged in after activation: {}, IP: {}", email, ip);
+
+        return ResponseEntity.ok(LoginResponse.builder()
+                .success(true)
+                .message("Account activated and logged in successfully")
+                .accessToken(loginResponse.getAccessToken())
+                .refreshToken(loginResponse.getRefreshToken())
+                .tokenType("Bearer")
+                .expiresIn(loginResponse.getExpiresIn())
+                .email(loginResponse.getEmail())
+                .fullName(loginResponse.getFullName())
+                .userId(loginResponse.getUserId())
+                .build());
     }
+
+    // =====================================================
+    // FORGOT PASSWORD
+    // =====================================================
 
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(
-            @RequestParam String email,
+            @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest) {
 
+        String email = request.getEmail();
         String ip = resolveClientIp(httpRequest);
         rateLimiterService.checkOrThrow("forgot:ip:" + ip, 3, 600);
 
-        // Email-based rate limiting to prevent enumeration
         String hashedEmail = hashingService.hashEmail(email);
         rateLimiterService.checkOrThrow("forgot:email:" + hashedEmail, 2, 3600);
 
@@ -172,39 +189,68 @@ public class PlatformAuthController {
             throw new RuntimeException("Authentication delay was interrupted", e);
         }
 
-        platformUserService.forgotPassword(email);
+        platformAuthService.forgotPassword(email);
         return ResponseEntity.ok(Map.of(
                 "message", "If the email exists, a password reset link has been sent.",
                 "status", "success"
         ));
     }
 
+    // =====================================================
+    // RESET PASSWORD
+    // =====================================================
+
     @PostMapping("/reset-password")
-    public ResponseEntity<Map<String, String>> resetPassword(
-            @Valid @RequestBody SetPasswordRequest request,
+    public ResponseEntity<LoginResponse> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
             HttpServletRequest httpRequest) {
 
         String ip = resolveClientIp(httpRequest);
         rateLimiterService.checkOrThrow("reset:ip:" + ip, 5, 600);
 
-        platformUserService.resetPasswordWithToken(
-            request.getToken(), 
-            request.getNewPassword(), 
-            request.getConfirmPassword()
+        log.info("Password reset request from IP: {}", ip);
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return ResponseEntity.badRequest().body(LoginResponse.builder()
+                    .success(false)
+                    .message("Passwords do not match")
+                    .errorCode("AUTH_005")
+                    .build());
+        }
+
+        platformAuthService.resetPassword(
+                request.getToken(),
+                request.getNewPassword(),
+                request.getConfirmPassword(),
+                httpRequest
         );
-        
-        return ResponseEntity.ok(Map.of(
-                "message", "Password reset successfully",
-                "status", "success"
-        ));
+
+        // Auto-login after password reset
+        String email = jwtService.extractUsername(request.getToken());
+        LoginResponse loginResponse = platformAuthService.login(email, request.getNewPassword());
+
+        return ResponseEntity.ok(LoginResponse.builder()
+                .success(true)
+                .message("Password reset successfully. You are now logged in.")
+                .accessToken(loginResponse.getAccessToken())
+                .refreshToken(loginResponse.getRefreshToken())
+                .tokenType("Bearer")
+                .expiresIn(loginResponse.getExpiresIn())
+                .email(loginResponse.getEmail())
+                .fullName(loginResponse.getFullName())
+                .userId(loginResponse.getUserId())
+                .build());
     }
+
+    // =====================================================
+    // VERIFY TOKEN
+    // =====================================================
 
     @GetMapping("/verify-token")
     public ResponseEntity<Map<String, Object>> verifyToken(
             @RequestParam String token,
             HttpServletRequest httpRequest) {
 
-        // ✅ Add rate limiting for token verification
         rateLimiterService.checkOrThrow("verify-token:ip:" + resolveClientIp(httpRequest), 20, 60);
 
         if (tokenBlacklistService.isBlacklisted(token)) {
@@ -228,9 +274,72 @@ public class PlatformAuthController {
         }
     }
 
-    // -------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------
+    // =====================================================
+    // CHANGE PASSWORD - ✅ FIXED: Using ChangePasswordRequest
+    // =====================================================
+
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<LoginResponse> changePassword(
+            @AuthenticationPrincipal PlatformUser currentUser,
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest httpRequest) {
+
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("change-password:ip:" + ip, 5, 600);
+        rateLimiterService.checkOrThrow("change-password:user:" + currentUser.getId(), 3, 3600);
+
+        log.info("Password change request for platform user: {}, IP: {}", currentUser.getEmail(), ip);
+
+        // ✅ Use ChangePasswordRequest with currentPassword
+        LoginResponse response = platformAuthService.changePassword(
+                currentUser,
+                request.getCurrentPassword(),
+                request.getNewPassword(),
+                request.getConfirmPassword(),
+                httpRequest
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    // =====================================================
+    // GET CURRENT USER
+    // =====================================================
+
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PlatformUserResponse> getCurrentUser(
+            @AuthenticationPrincipal PlatformUser currentUser) {
+        log.debug("REST request to get current platform user");
+        return ResponseEntity.ok(platformUserService.getUserById(currentUser.getId()));
+    }
+
+    // =====================================================
+    // RESEND ACTIVATION
+    // =====================================================
+
+    @PostMapping("/resend-activation")
+    public ResponseEntity<Map<String, String>> resendActivation(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest) {
+
+        String email = request.getEmail();
+        String ip = resolveClientIp(httpRequest);
+        rateLimiterService.checkOrThrow("resend-activation:ip:" + ip, 3, 600);
+
+        log.info("REST request to resend activation email for: {}", email);
+        platformUserService.resendActivationEmail(email);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "A new activation link has been sent to your email.",
+                "status", "success"
+        ));
+    }
+
+    // =====================================================
+    // HELPER METHODS
+    // =====================================================
 
     private String resolveClientIp(HttpServletRequest request) {
         if (trustProxy) {
@@ -245,6 +354,4 @@ public class PlatformAuthController {
         }
         return request.getRemoteAddr();
     }
-
-
 }

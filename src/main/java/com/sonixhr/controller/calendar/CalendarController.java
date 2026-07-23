@@ -36,8 +36,8 @@ public class CalendarController {
             @AuthenticationPrincipal Employee currentEmployee) {
         
         LocalDate now = LocalDate.now();
-        int targetYear = year != null ? year : now.getYear();
-        int targetMonth = month != null ? month : now.getMonthValue();
+        int targetYear = (year != null && year >= 1900 && year <= 2100) ? year : now.getYear();
+        int targetMonth = (month != null && month >= 1 && month <= 12) ? month : now.getMonthValue();
 
         log.info("REST request to get consolidated calendar for logged-in employee: {} for {}-{}", 
                 currentEmployee.getId(), targetYear, targetMonth);
@@ -61,8 +61,8 @@ public class CalendarController {
             Authentication authentication) {
         
         LocalDate now = LocalDate.now();
-        int targetYear = year != null ? year : now.getYear();
-        int targetMonth = month != null ? month : now.getMonthValue();
+        int targetYear = (year != null && year >= 1900 && year <= 2100) ? year : now.getYear();
+        int targetMonth = (month != null && month >= 1 && month <= 12) ? month : now.getMonthValue();
 
         log.info("REST request to get consolidated calendar for employee: {} by user: {} for {}-{}", 
                 employeeId, currentEmployee.getId(), targetYear, targetMonth);

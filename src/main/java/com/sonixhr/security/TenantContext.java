@@ -9,13 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 public class TenantContext {
-
-    private static final Logger log = LoggerFactory.getLogger(TenantContext.class);
 
     // ThreadLocal with better debugging
     private static final ThreadLocal<Long> currentTenant = new NamedThreadLocal<>("Current Tenant ID");

@@ -5,6 +5,7 @@ import com.sonixhr.dto.platform.SystemHealthDTO;
 import com.sonixhr.entity.tenant.Tenant;
 import com.sonixhr.entity.tenant.TenantSubscription;
 import com.sonixhr.enums.UserStatus;
+import com.sonixhr.enums.PlanStatus;
 import com.sonixhr.repository.employee.EmployeeRepository;
 import com.sonixhr.repository.platform.PlatformUserRepository;
 import com.sonixhr.repository.platform.SupportTicketRepository;
@@ -22,19 +23,15 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class PlatformDashboardService {
-
-    private static final Logger log = LoggerFactory.getLogger(PlatformDashboardService.class);
 
     private final TenantRepository tenantRepository;
     private final TenantSubscriptionRepository subscriptionRepository;
@@ -67,58 +64,98 @@ public class PlatformDashboardService {
         long activeTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.ACTIVE).count();
         long suspendedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.SUSPENDED).count();
         long deletedTenants = allTenants.stream().filter(t -> t.getStatus() == UserStatus.DELETED).count();
-        long trialTenants = allTenants.stream()
-                .filter(t -> t.getStatus() != UserStatus.DELETED && t.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(t.getSubscriptionPlan().getName()))
-                .count();
-
         Map<String, Long> planDistribution = allTenants.stream()
                 .filter(t -> t.getStatus() != UserStatus.DELETED && t.getPlanType() != null)
-                .collect(Collectors.groupingBy(t -> t.getPlanType().toLowerCase(), Collectors.counting()));
+                .collect(Collectors.groupingBy(t -> getPlanCategory(t.getPlanType()), Collectors.counting()));
+
+        Map<String, Long> dataStatusDistribution = allTenants.stream()
+                .filter(t -> t.getDataStatus() != null)
+                .collect(Collectors.groupingBy(t -> t.getDataStatus().name(), Collectors.counting()));
 
         PlatformDashboardDTO.TenantSummary tenantSummary = PlatformDashboardDTO.TenantSummary.builder()
                 .totalTenants(totalTenants)
                 .activeTenants(activeTenants)
                 .suspendedTenants(suspendedTenants)
                 .deletedTenants(deletedTenants)
-                .trialTenants(trialTenants)
                 .planDistribution(planDistribution)
+                .dataStatusDistribution(dataStatusDistribution)
                 .build();
 
         // 2. Subscription Summary
-        long activeTrials = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && "trial".equalsIgnoreCase(sub.getSubscriptionPlan().getName()))
+        long totalSubscriptions = allSubscriptions.size();
+        long activeSubscriptions = allSubscriptions.stream()
+                .filter(sub -> sub.getPlanStatus() == PlanStatus.ACTIVE)
                 .count();
-        long activePaidSubscriptions = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && !sub.isExpired() && sub.getSubscriptionPlan() != null && !"trial".equalsIgnoreCase(sub.getSubscriptionPlan().getName()))
+        long expiredSubscriptions = allSubscriptions.stream()
+                .filter(sub -> sub.getPlanStatus() == PlanStatus.EXPIRED)
+                .count();
+        long cancelledSubscriptions = allSubscriptions.stream()
+                .filter(sub -> sub.getPlanStatus() == PlanStatus.CANCELLED)
                 .count();
 
-        // Expired Subscriptions
-        long expiredSubscriptions = allSubscriptions.stream()
-                .filter(TenantSubscription::isExpired)
+        long activePaidSubscriptions = allSubscriptions.stream()
+                .filter(sub -> sub.getIsActive() && !sub.isExpired())
                 .count();
 
         // Sum MRR (Monthly Recurring Revenue equivalent)
         BigDecimal totalMrr = allSubscriptions.stream()
-                .filter(sub -> sub.getIsActive() && sub.getAmount() != null)
+                .filter(sub -> sub.getPlanStatus() == PlanStatus.ACTIVE && sub.getAmount() != null)
                 .map(sub -> {
                     BigDecimal amt = sub.getAmount();
-                    int validity = sub.getSubscriptionPlan() != null ? sub.getSubscriptionPlan().getValidityMonths() : 1;
-                    if (validity >= 12) {
-                        return amt.divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
-                    }
-                    return amt;
+                    int validity = sub.getSubscriptionPlan() != null && sub.getSubscriptionPlan().getValidityMonths() != null && sub.getSubscriptionPlan().getValidityMonths() > 0
+                            ? sub.getSubscriptionPlan().getValidityMonths() : 1;
+                    return amt.divide(BigDecimal.valueOf(validity), 2, java.math.RoundingMode.HALF_UP);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Average MRR
+        BigDecimal averageMrr = activeSubscriptions > 0
+                ? totalMrr.divide(BigDecimal.valueOf(activeSubscriptions), 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        // New This Month
+        LocalDateTime startOfThisMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+        long newThisMonth = allSubscriptions.stream()
+                .filter(sub -> sub.getCreatedAt() != null && !sub.getCreatedAt().isBefore(startOfThisMonth))
+                .count();
+
+        // New Last Month & Growth Rate
+        LocalDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
+        long newLastMonth = allSubscriptions.stream()
+                .filter(sub -> sub.getCreatedAt() != null &&
+                        !sub.getCreatedAt().isBefore(startOfLastMonth) &&
+                        sub.getCreatedAt().isBefore(startOfThisMonth))
+                .count();
+
+        double growthRate = 0.0;
+        if (newLastMonth > 0) {
+            growthRate = ((double) (newThisMonth - newLastMonth) / newLastMonth) * 100.0;
+        } else if (newThisMonth > 0) {
+            growthRate = 100.0;
+        }
+
+        // Churn & Retention Rates
+        double churnRate = totalSubscriptions > 0
+                ? ((double) (expiredSubscriptions + cancelledSubscriptions) / totalSubscriptions) * 100.0
+                : 0.0;
+        double retentionRate = 100.0 - churnRate;
 
         Map<String, Long> planStatusDistribution = allSubscriptions.stream()
                 .collect(Collectors.groupingBy(sub -> sub.getPlanStatus().name(), Collectors.counting()));
 
         PlatformDashboardDTO.SubscriptionSummary subscriptionSummary = PlatformDashboardDTO.SubscriptionSummary.builder()
-                .activePaidSubscriptions(activePaidSubscriptions)
-                .activeTrials(activeTrials)
-                .totalMrr(totalMrr)
-                .planStatusDistribution(planStatusDistribution)
+                .totalSubscriptions(totalSubscriptions)
+                .activeSubscriptions(activeSubscriptions)
                 .expiredSubscriptions(expiredSubscriptions)
+                .cancelledSubscriptions(cancelledSubscriptions)
+                .totalMrr(totalMrr)
+                .averageMrr(averageMrr)
+                .newThisMonth(newThisMonth)
+                .growthRate(growthRate)
+                .churnRate(churnRate)
+                .retentionRate(retentionRate)
+                .activePaidSubscriptions(activePaidSubscriptions)
+                .planStatusDistribution(planStatusDistribution)
                 .build();
 
         // 3. System Summary
@@ -146,7 +183,7 @@ public class PlatformDashboardService {
                         .companyName(t.getCompanyName())
                         .adminName(t.getAdminName())
                         .adminEmail(t.getAdminEmail())
-                        .planType(t.getPlanType())
+                        .planType(getPlanCategory(t.getPlanType()))
                         .status(t.getStatus())
                         .createdAt(t.getCreatedAt())
                         .build())
@@ -275,5 +312,14 @@ public class PlatformDashboardService {
                 .freeDiskSpaceBytes(freeSpace)
                 .totalDiskSpaceBytes(totalSpace)
                 .build();
+    }
+
+    private String getPlanCategory(String code) {
+        if (code == null) return "STANDARD";
+        String codeUpper = code.toUpperCase();
+        if (codeUpper.contains("ENTERPRISE")) return "ENTERPRISE";
+        if (codeUpper.contains("PREMIUM") || codeUpper.contains("PRO")) return "PREMIUM";
+        if (codeUpper.contains("BASIC")) return "BASIC";
+        return "STANDARD";
     }
 }

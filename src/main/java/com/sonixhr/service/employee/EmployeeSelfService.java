@@ -16,17 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @SuppressWarnings("null")
 public class EmployeeSelfService {
-
-    private static final Logger log = LoggerFactory.getLogger(EmployeeSelfService.class);
 
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;

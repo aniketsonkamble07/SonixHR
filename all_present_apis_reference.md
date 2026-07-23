@@ -3,144 +3,1230 @@
 - **Production Base URL**: `https://sonixhr.onrender.com`
 - **Local Base URL**: `http://localhost:8081`
 
-This document lists all API endpoints across all controllers, including mapped request/response DTO structures.
-
-## EmployeeController
-
-### POST `/api/employees`
-- **Handler Method**: `createEmployee`
-- **Description**: Creates/Onboards a new employee in the tenant organization.
-- **Request Body Type**: `EmployeeCreateRequest`
-#### Request JSON Example:
-```json
-{
-  "firstName": "Rahul",
-  "lastName": "Sharma",
-  "email": "rahul.sharma@company.com",
-  "departmentId": 2,
-  "position": "Software Engineer",
-  "hireDate": "2026-01-15",
-  "phone": "+919876543210",
-  "workLocation": "Mumbai Office",
-  "workState": "MAHARASHTRA",
-  "workStateText": "Maharashtra",
-  "workCountry": "India",
-  "managerId": 1,
-  "managerCode": "EMP001",
-  "employmentType": "FULL_TIME",
-  "roleIds": [3],
-  "weekendConfig": "SATURDAY_SUNDAY",
-  "customWeekendDays": "SATURDAY,SUNDAY",
-  "salary": 75000.00,
-  "salaryType": "MONTHLY",
-  "currency": "INR",
-  "taxRegime": "NEW_REGIME",
-  "shiftId": 1,
-  "bankDetails": {
-    "accountNumber": "123456789012",
-    "ifscCode": "SBIN0001234",
-    "bankName": "State Bank of India",
-    "branchName": "Andheri East",
-    "accountHolderName": "Rahul Sharma"
-  }
-}
-```
-- **Response Type**: `EmployeeResponse`
+This document provides complete API endpoint references and JSON payload structures across all **44 Controller components**, organized sequentially starting with **Tenant Registration & Onboarding**, followed by **Tenant Operational Modules**, and concluding with **Platform (Super Admin) Management**.
 
 ---
 
-### PUT `/api/employees/{id}`
-- **Handler Method**: `updateEmployee`
-- **Description**: Updates an existing employee's organizational, shift, and compensation details.
-- **Request Body Type**: `EmployeeUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "firstName": "Rahul",
-  "lastName": "Sharma",
-  "email": "rahul.sharma@company.com",
-  "departmentId": 2,
-  "position": "Senior Software Engineer",
-  "hireDate": "2026-01-15",
-  "phone": "+919876543210",
-  "workLocation": "Mumbai Office",
-  "workState": "MAHARASHTRA",
-  "workStateText": "Maharashtra",
-  "workCountry": "India",
-  "managerId": 1,
-  "managerCode": "EMP001",
-  "employmentType": "FULL_TIME",
-  "roleIds": [3],
-  "weekendConfig": "SATURDAY_SUNDAY",
-  "customWeekendDays": "SATURDAY,SUNDAY",
-  "salary": 90000.00,
-  "salaryType": "MONTHLY",
-  "currency": "INR",
-  "taxRegime": "NEW_REGIME",
-  "shiftId": 1,
-  "bankDetails": {
-    "accountNumber": "123456789012",
-    "ifscCode": "SBIN0001234",
-    "bankName": "State Bank of India",
-    "branchName": "Andheri East",
-    "accountHolderName": "Rahul Sharma"
-  }
-}
-```
-- **Response Type**: `EmployeeResponse`
+## Table of Contents
+
+### 1. Tenant Registration & Onboarding
+- [EmployeeActivationController](#employeeactivationcontroller)
+- [EnhancedSubscriptionHistoryController](#enhancedsubscriptionhistorycontroller)
+- [PlanHistoryController](#planhistorycontroller)
+- [TenantAuthController](#tenantauthcontroller)
+- [TenantBillingController](#tenantbillingcontroller)
+- [TenantPayrollConfigurationController](#tenantpayrollconfigurationcontroller)
+- [TenantRegistrationController](#tenantregistrationcontroller)
+- [TenantSubscriptionController](#tenantsubscriptioncontroller)
+### 2. Tenant Operational Modules
+- [ApiHitLogController](#apihitlogcontroller)
+- [CalendarController](#calendarcontroller)
+- [DataExportController](#dataexportcontroller)
+- [DepartmentController](#departmentcontroller)
+- [EmployeeCompensationController](#employeecompensationcontroller)
+- [EmployeeController](#employeecontroller)
+- [EmployeeLeaveController](#employeeleavecontroller)
+- [EmployeeSelfServiceController](#employeeselfservicecontroller)
+- [EmployeeTaskController](#employeetaskcontroller)
+- [FnfController](#fnfcontroller)
+- [LeaveManagementController](#leavemanagementcontroller)
+- [ManualAttendanceController](#manualattendancecontroller)
+- [NotificationController](#notificationcontroller)
+- [PayrollConfigurationController](#payrollconfigurationcontroller)
+- [PayrollController](#payrollcontroller)
+- [PayslipController](#payslipcontroller)
+- [ReimbursementClaimController](#reimbursementclaimcontroller)
+- [ShiftConfigurationController](#shiftconfigurationcontroller)
+- [TenantPermissionController](#tenantpermissioncontroller)
+- [TenantRoleController](#tenantrolecontroller)
+- [TenantSupportTicketController](#tenantsupportticketcontroller)
+### 3. Platform Management Workflow
+- [PlatformAdminSubscriptionController](#platformadminsubscriptioncontroller)
+- [PlatformAdminTenantController](#platformadmintenantcontroller)
+- [PlatformApiHitLogController](#platformapihitlogcontroller)
+- [PlatformAuthController](#platformauthcontroller)
+- [PlatformDashboardController](#platformdashboardcontroller)
+- [PlatformDebugController](#platformdebugcontroller)
+- [PlatformNotificationController](#platformnotificationcontroller)
+- [PlatformPayrollController](#platformpayrollcontroller)
+- [PlatformPermissionController](#platformpermissioncontroller)
+- [PlatformRoleController](#platformrolecontroller)
+- [PlatformSubscriptionController](#platformsubscriptioncontroller)
+- [PlatformSubscriptionPlanController](#platformsubscriptionplancontroller)
+- [PlatformSupportTicketController](#platformsupportticketcontroller)
+- [PlatformTenantController](#platformtenantcontroller)
+- [PlatformUserController](#platformusercontroller)
 
 ---
 
-## EmployeeSelfServiceController
+## EmployeeActivationController
 
-### PUT `/api/employees/me/profile`
-- **Handler Method**: `updateMyProfile`
-- **Description**: Allows logged-in employee to update personal, address, emergency contact, and social profile details.
-- **Request Body Type**: `EmployeeProfileUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "phone": "+919876543210",
-  "personalEmail": "rahul.personal@gmail.com",
-  "dateOfBirth": "1995-05-20",
-  "gender": "MALE",
-  "maritalStatus": "SINGLE",
-  "bloodGroup": "O_POSITIVE",
-  "nationality": "Indian",
-  "address": "Flat 402, Green Heights",
-  "city": "Mumbai",
-  "state": "MAHARASHTRA",
-  "stateText": "Maharashtra",
-  "country": "India",
-  "postalCode": "400069",
-  "emergencyContactName": "Anita Sharma",
-  "emergencyContactPhone": "+919876543211",
-  "emergencyContactRelation": "Mother",
-  "emergencyContactEmail": "anita.sharma@gmail.com",
-  "secondaryEmergencyName": "Vikram Sharma",
-  "secondaryEmergencyPhone": "+919876543212",
-  "linkedinUrl": "https://linkedin.com/in/rahulsharma",
-  "githubUrl": "https://github.com/rahulsharma",
-  "twitterUrl": "https://twitter.com/rahulsharma"
-}
-```
-- **Response Type**: `EmployeeResponse`
-
----
-
-## AdminTenantController
-
-### POST `/api/admin/tenants/{id}/restore`
-- **Handler Method**: `restoreTenant`
+### POST `/api/employee/auth/activate`
+- **Handler Method**: `activateEmployee`
 - **Description**: No description provided
-- **Request Body Type**: `TenantRestoreRequest`
+- **Request Body Type**: `ActivationRequest`
 #### Request JSON Example:
 ```json
 {
-  "planId": 0,
-  "notes": ""
+  "token": "",
+  "password": "",
+  "confirmPassword": ""
 }
 ```
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+---
+
+---
+
+## EnhancedSubscriptionHistoryController
+
+### GET `/api/tenant/subscription/history`
+- **Handler Method**: `getSubscriptionHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/all`
+- **Handler Method**: `getAllSubscriptionHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/{id}`
+- **Handler Method**: `getSubscriptionHistoryById`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/search`
+- **Handler Method**: `searchSubscriptionHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/date-range`
+- **Handler Method**: `getSubscriptionHistoryByDateRange`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/events/{eventType}`
+- **Handler Method**: `getSubscriptionHistoryByEventType`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/events`
+- **Handler Method**: `getSubscriptionHistoryByEventTypes`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/plans/{planType}`
+- **Handler Method**: `getSubscriptionHistoryByPlanType`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/plan-code/{planCode}`
+- **Handler Method**: `getSubscriptionHistoryByPlanCode`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/status/{status}`
+- **Handler Method**: `getSubscriptionHistoryByStatus`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/recent`
+- **Handler Method**: `getRecentSubscriptionHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/summary`
+- **Handler Method**: `getSubscriptionHistorySummary`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/summary/year`
+- **Handler Method**: `getYearlySubscriptionHistorySummary`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/summary/monthly`
+- **Handler Method**: `getMonthlySubscriptionHistorySummary`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/export`
+- **Handler Method**: `exportSubscriptionHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/statistics/trend`
+- **Handler Method**: `getPlanOperationHistory`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/subscription/history/plan-operations`
+- **Handler Method**: `getPlanOperationHistoryForTenant`
+- **Description**: Managed endpoint in `EnhancedSubscriptionHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+
+---
+
+## PlanHistoryController
+
+### GET `/api/admin/plans/history/{planId}`
+- **Handler Method**: `getPlanHistory`
+- **Description**: Managed endpoint in `PlanHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/admin/plans/history`
+- **Handler Method**: `getAllPlanHistory`
+- **Description**: Managed endpoint in `PlanHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/admin/plans/history/search`
+- **Handler Method**: `searchPlanOperations`
+- **Description**: Managed endpoint in `PlanHistoryController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+
+---
+
+## TenantAuthController
+
+### POST `/api/tenant/auth/activate`
+- **Handler Method**: `activateUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### POST `/api/tenant/auth/forgot-password`
+- **Handler Method**: `forgotPassword`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, String>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### POST `/api/tenant/auth/login`
+- **Handler Method**: `login`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `LoginResponse`
+#### Response JSON Example:
+```json
+{
+  "accessToken": "",
+  "refreshToken": "",
+  "tokenType": "",
+  "expiresIn": 0,
+  "email": "",
+  "fullName": ""
+}
+```
+
+---
+
+### POST `/api/tenant/auth/logout`
+- **Handler Method**: `logout`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, String>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/tenant/auth/me`
+- **Handler Method**: `getCurrentUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### POST `/api/tenant/auth/refresh`
+- **Handler Method**: `refreshToken`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `LoginResponse`
+#### Response JSON Example:
+```json
+{
+  "accessToken": "",
+  "refreshToken": "",
+  "tokenType": "",
+  "expiresIn": 0,
+  "email": "",
+  "fullName": ""
+}
+```
+
+---
+
+### POST `/api/tenant/auth/reset-password`
+- **Handler Method**: `resetPassword`
+- **Description**: No description provided
+- **Request Body Type**: `SetPasswordRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "",
+  "newPassword": "",
+  "confirmPassword": ""
+}
+```
+- **Response Type**: `Map<String, String>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/tenant/auth/test-auth`
+- **Handler Method**: `testAuth`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/tenant/auth/verify-token`
+- **Handler Method**: `verifyToken`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+---
+
+---
+
+## TenantBillingController
+
+### GET `/api/tenant/billing/subscription/current`
+- **Handler Method**: `getCurrentSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/plans`
+- **Handler Method**: `getAvailablePlans`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/plans/{id}`
+- **Handler Method**: `getPlanById`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### POST `/api/tenant/billing/subscription/renew`
+- **Handler Method**: `renewSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### POST `/api/tenant/billing/subscription/renew/{subscriptionId}`
+- **Handler Method**: `renewSubscriptionById`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### POST `/api/tenant/billing/subscription/activate`
+- **Handler Method**: `activateSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### POST `/api/tenant/billing/subscription/upgrade`
+- **Handler Method**: `upgradeSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### POST `/api/tenant/billing/subscription/cancel`
+- **Handler Method**: `cancelSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/history`
+- **Handler Method**: `getSubscriptionHistory`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/subscription/status`
+- **Handler Method**: `getSubscriptionStatus`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/subscription/check-renewal`
+- **Handler Method**: `checkRenewalEligibility`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/tenant/billing/subscription/validate`
+- **Handler Method**: `validateSubscription`
+- **Description**: Managed endpoint in `TenantBillingController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+
+---
+
+## TenantPayrollConfigurationController
+
+### GET `/api/payroll/config/tenants/{tenantId}/components`
+- **Handler Method**: `getComponents`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SalaryComponentDefinitionResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "componentCode": "",
+  "componentName": "",
+  "componentType": "",
+  "calculationType": "",
+  "defaultValue": 0,
+  "formulaExpression": "",
+  "evaluationOrder": 0,
+  "isLopApplicable": false,
+  "isEmployerContribution": false,
+  "isMandatory": false,
+  "allowEmployeeOverride": false,
+  "isAllowedByTenant": false,
+  "minValue": 0,
+  "maxValue": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false
+}
+]
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/components`
+- **Handler Method**: `createComponent`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SalaryComponentDefinitionResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "componentCode": "",
+  "componentName": "",
+  "componentType": "",
+  "calculationType": "",
+  "defaultValue": 0,
+  "formulaExpression": "",
+  "evaluationOrder": 0,
+  "isLopApplicable": false,
+  "isEmployerContribution": false,
+  "isMandatory": false,
+  "allowEmployeeOverride": false,
+  "isAllowedByTenant": false,
+  "minValue": 0,
+  "maxValue": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false
+}
+```
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/components/allowed`
+- **Handler Method**: `getAllowedComponents`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SalaryComponentDefinitionResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "componentCode": "",
+  "componentName": "",
+  "componentType": "",
+  "calculationType": "",
+  "defaultValue": 0,
+  "formulaExpression": "",
+  "evaluationOrder": 0,
+  "isLopApplicable": false,
+  "isEmployerContribution": false,
+  "isMandatory": false,
+  "allowEmployeeOverride": false,
+  "isAllowedByTenant": false,
+  "minValue": 0,
+  "maxValue": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false
+}
+]
+```
+
+---
+
+### DELETE `/api/payroll/config/tenants/{tenantId}/components/{componentId}`
+- **Handler Method**: `deleteComponent`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### PATCH `/api/payroll/config/tenants/{tenantId}/components/{componentId}/allowed`
+- **Handler Method**: `toggleComponentAllowed`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/employees/profiles`
+- **Handler Method**: `getAllEmployeeProfilesForTenant`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "employeeId": 0,
+  "employeeCode": "",
+  "employeeName": "",
+  "version": 0,
+  "monthlyCtc": 0,
+  "currency": "",
+  "taxRegime": "",
+  "lopBasisOverride": "LopBasis",
+  "workingDaysOverride": 0,
+  "promotionReason": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "componentOverrides": [
+  {
+    "componentCode": "",
+    "overrideType": "",
+    "overrideValue": 0,
+    "overrideFormula": "",
+    "isEnabled": false
+  }
+  ]
+}
+]
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/employees/sync-all`
+- **Handler Method**: `syncAllEmployeeProfiles`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/history`
+- **Handler Method**: `getEmployeeSalaryHistory`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileHistory[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "profileId": "UUID",
+  "employeeId": 0,
+  "version": 0,
+  "monthlyCtc": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "changeReason": "",
+  "changedBy": 0,
+  "changedAt": "2026-06-17",
+  "componentSnapshot": ""
+}
+]
+```
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile`
+- **Handler Method**: `getEmployeeProfile`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "employeeId": 0,
+  "employeeCode": "",
+  "employeeName": "",
+  "version": 0,
+  "monthlyCtc": 0,
+  "currency": "",
+  "taxRegime": "",
+  "lopBasisOverride": "LopBasis",
+  "workingDaysOverride": 0,
+  "promotionReason": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "componentOverrides": [
+  {
+    "componentCode": "",
+    "overrideType": "",
+    "overrideValue": 0,
+    "overrideFormula": "",
+    "isEnabled": false
+  }
+  ]
+}
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile`
+- **Handler Method**: `createEmployeeProfile`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "employeeId": 0,
+  "employeeCode": "",
+  "employeeName": "",
+  "version": 0,
+  "monthlyCtc": 0,
+  "currency": "",
+  "taxRegime": "",
+  "lopBasisOverride": "LopBasis",
+  "workingDaysOverride": 0,
+  "promotionReason": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "componentOverrides": [
+  {
+    "componentCode": "",
+    "overrideType": "",
+    "overrideValue": 0,
+    "overrideFormula": "",
+    "isEnabled": false
+  }
+  ]
+}
+```
+
+---
+
+### PUT `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile/{profileId}/components`
+- **Handler Method**: `updateEmployeeComponent`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeComponentOverrideDTO`
+#### Response JSON Example:
+```json
+{
+  "componentCode": "",
+  "overrideType": "",
+  "overrideValue": 0,
+  "overrideFormula": "",
+  "isEnabled": false
+}
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile/{profileId}/sync`
+- **Handler Method**: `syncEmployeeProfileWithGlobal`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profiles/all`
+- **Handler Method**: `getAllEmployeeProfiles`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "employeeId": 0,
+  "employeeCode": "",
+  "employeeName": "",
+  "version": 0,
+  "monthlyCtc": 0,
+  "currency": "",
+  "taxRegime": "",
+  "lopBasisOverride": "LopBasis",
+  "workingDaysOverride": 0,
+  "promotionReason": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "componentOverrides": [
+  {
+    "componentCode": "",
+    "overrideType": "",
+    "overrideValue": 0,
+    "overrideFormula": "",
+    "isEnabled": false
+  }
+  ]
+}
+]
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/promote`
+- **Handler Method**: `promoteEmployee`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `EmployeeSalaryProfileResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "employeeId": 0,
+  "employeeCode": "",
+  "employeeName": "",
+  "version": 0,
+  "monthlyCtc": 0,
+  "currency": "",
+  "taxRegime": "",
+  "lopBasisOverride": "LopBasis",
+  "workingDaysOverride": 0,
+  "promotionReason": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "componentOverrides": [
+  {
+    "componentCode": "",
+    "overrideType": "",
+    "overrideValue": 0,
+    "overrideFormula": "",
+    "isEnabled": false
+  }
+  ]
+}
+```
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/global`
+- **Handler Method**: `getGlobalConfig`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `TenantPayrollConfigResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "tenantId": 0,
+  "lopBasis": "LopBasis",
+  "workingDaysPerMonth": 0,
+  "enablePfCapping": false,
+  "enableEsi": false,
+  "enablePt": false,
+  "enforceNewLabourCodes": false,
+  "defaultCurrency": "",
+  "defaultTaxRegime": "",
+  "enableOvertime": false,
+  "overtimeRatePerHour": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "salaryStructures": [ "SalaryStructureResponse" ],
+  "id": "UUID",
+  "componentCode": "",
+  "componentName": "",
+  "componentType": "",
+  "calculationType": "",
+  "value": 0,
+  "evaluationOrder": 0,
+  "isPartOfPfWages": false,
+  "isPartOfEsiWages": false,
+  "isTaxable": false,
+  "isLopApplicable": false,
+  "isEmployerContribution": false,
+  "isMandatory": false,
+  "allowEmployeeOverride": false,
+  "minValue": 0,
+  "maxValue": 0,
+  "formulaExpression": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false
+}
+```
+
+---
+
+### PUT `/api/payroll/config/tenants/{tenantId}/global`
+- **Handler Method**: `updateGlobalConfig`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `TenantPayrollConfigResponse`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "tenantId": 0,
+  "lopBasis": "LopBasis",
+  "workingDaysPerMonth": 0,
+  "enablePfCapping": false,
+  "enableEsi": false,
+  "enablePt": false,
+  "enforceNewLabourCodes": false,
+  "defaultCurrency": "",
+  "defaultTaxRegime": "",
+  "enableOvertime": false,
+  "overtimeRatePerHour": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false,
+  "salaryStructures": [ "SalaryStructureResponse" ],
+  "id": "UUID",
+  "componentCode": "",
+  "componentName": "",
+  "componentType": "",
+  "calculationType": "",
+  "value": 0,
+  "evaluationOrder": 0,
+  "isPartOfPfWages": false,
+  "isPartOfEsiWages": false,
+  "isTaxable": false,
+  "isLopApplicable": false,
+  "isEmployerContribution": false,
+  "isMandatory": false,
+  "allowEmployeeOverride": false,
+  "minValue": 0,
+  "maxValue": 0,
+  "formulaExpression": "",
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isActive": false
+}
+```
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/validate-formula`
+- **Handler Method**: `validateFormula`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `FormulaValidationResponse`
+#### Response JSON Example:
+```json
+{
+  "valid": false,
+  "formula": "",
+  "message": ""
+}
+```
+
+---
+
+---
+
+---
+
+## TenantRegistrationController
+
+### GET `/api/public/plans`
+- **Handler Method**: `getPublicPlans`
+- **Description**: List public active subscription plans
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SubscriptionPlanDTO[]`
+#### Response JSON Example:
+```json
+[
+  {
+    "id": 1,
+    "code": "trial",
+    "name": "Trial Plan",
+    "price": 0.0,
+    "validityMonths": 1,
+    "description": "Default free trial plan",
+    "isActive": true
+  }
+]
+```
+
+---
+
+### GET `/api/public/check-email`
+- **Handler Method**: `checkEmail`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/public/debug-redis`
+- **Handler Method**: `debugRedis`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### POST `/api/public/register`
+- **Handler Method**: `register`
+- **Description**: No description provided
+- **Request Body Type**: `TenantRegistrationRequest`
+#### Request JSON Example:
+```json
+{
+  "companyName": "",
+  "adminEmail": "",
+  "adminName": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planCode": ""
+}
+```
+- **Response Type**: `TenantRegistrationResponse`
+#### Response JSON Example:
+```json
+{
+  "success": false,
+  "message": "",
+  "tenantId": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "planType": "",
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "status": "",
+  "isActive": false,
+  "adminEmail": "",
+  "adminName": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "activationToken": "",
+  "activationTokenExpiry": "2026-06-17",
+  "superAdminEmployeeId": 0,
+  "superAdminEmployeeCode": "",
+  "superAdminFullName": "",
+  "superAdminEmail": "",
+  "superAdminPosition": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "deletedAt": "2026-06-17"
+}
+```
+
+---
+
+### POST `/api/public/set-password`
+- **Handler Method**: `setPassword`
+- **Description**: No description provided
+- **Request Body Type**: `SetPasswordRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "",
+  "newPassword": "",
+  "confirmPassword": ""
+}
+```
+- **Response Type**: `Void`
+
+---
+
+---
+
+---
+
+## TenantSubscriptionController
+
+### POST `/api/tenant/subscriptions/cancel`
+- **Handler Method**: `cancelSubscription`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
 - **Response Type**: `TenantSubscriptionResponseDTO`
 #### Response JSON Example:
 ```json
@@ -166,31 +1252,38 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
-### GET `/api/admin/tenants/{id}/restore-history`
-- **Handler Method**: `getRestoreHistory`
+### GET `/api/tenant/subscriptions/current`
+- **Handler Method**: `currentSubscription`
 - **Description**: No description provided
 - **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `RestoreHistoryResponseDTO[]`
+- **Response Type**: `TenantSubscriptionResponseDTO`
 #### Response JSON Example:
 ```json
-[
 {
   "id": 0,
-  "oldValue": "",
-  "newValue": "",
+  "planType": "",
+  "planName": "",
+  "planStatus": "PlanStatus",
+  "maxEmployees": 0,
+  "startedAt": "2026-06-17",
+  "endsAt": "2026-06-17",
+  "amount": 0,
+  "currency": "",
+  "isActive": false,
   "createdAt": "2026-06-17",
-  "performedByEmail": "",
-  "notes": "",
-  "planName": ""
+  "billingPeriodStart": "2026-06-17",
+  "billingPeriodEnd": "2026-06-17",
+  "gracePeriodEnd": "2026-06-17",
+  "cancellationReason": "",
+  "cancelledAtEndOfPeriod": false
 }
-]
 ```
 
 ---
 
-### GET `/api/admin/tenants/{id}/subscription-history`
+### GET `/api/tenant/subscriptions/history`
 - **Handler Method**: `getSubscriptionHistory`
-- **Description**: Get subscription history for a specific organization/tenant.
+- **Description**: No description provided
 - **Request Body**: None (Query parameters / Path variables only)
 - **Response Type**: `TenantSubscriptionResponseDTO[]`
 #### Response JSON Example:
@@ -216,6 +1309,159 @@ This document lists all API endpoints across all controllers, including mapped r
 }
 ]
 ```
+
+---
+
+### POST `/api/tenant/subscriptions/renew`
+- **Handler Method**: `renewSubscription`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `TenantSubscriptionResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "planType": "",
+  "planName": "",
+  "planStatus": "PlanStatus",
+  "maxEmployees": 0,
+  "startedAt": "2026-06-17",
+  "endsAt": "2026-06-17",
+  "amount": 0,
+  "currency": "",
+  "isActive": false,
+  "createdAt": "2026-06-17",
+  "billingPeriodStart": "2026-06-17",
+  "billingPeriodEnd": "2026-06-17",
+  "gracePeriodEnd": "2026-06-17",
+  "cancellationReason": "",
+  "cancelledAtEndOfPeriod": false
+}
+```
+
+---
+
+### POST `/api/tenant/subscriptions/upgrade`
+- **Handler Method**: `upgradeSubscription`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `TenantSubscriptionResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "planType": "",
+  "planName": "",
+  "planStatus": "PlanStatus",
+  "maxEmployees": 0,
+  "startedAt": "2026-06-17",
+  "endsAt": "2026-06-17",
+  "amount": 0,
+  "currency": "",
+  "isActive": false,
+  "createdAt": "2026-06-17",
+  "billingPeriodStart": "2026-06-17",
+  "billingPeriodEnd": "2026-06-17",
+  "gracePeriodEnd": "2026-06-17",
+  "cancellationReason": "",
+  "cancelledAtEndOfPeriod": false
+}
+```
+
+---
+
+### POST `/api/tenant/subscriptions/activate`
+- **Handler Method**: `activateSubscription`
+- **Description**: Activates a new subscription plan for the tenant.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Request Parameters**:
+  - `planId` (Long): Target subscription plan ID.
+- **Response Type**: `TenantSubscriptionResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 15,
+  "planType": "STANDARD",
+  "planName": "Standard Plan",
+  "planStatus": "ACTIVE",
+  "maxEmployees": 250,
+  "startedAt": "2026-07-23",
+  "endsAt": "2026-08-23",
+  "amount": 50000.0,
+  "currency": "INR",
+  "isActive": true,
+  "createdAt": "2026-07-23",
+  "billingPeriodStart": "2026-07-23",
+  "billingPeriodEnd": "2026-08-23"
+}
+```
+
+---
+
+### POST `/api/tenant/subscriptions/reactivate`
+- **Handler Method**: `reactivateSubscription`
+- **Description**: Reactivates an expired or cancelled subscription, optionally switching to a new plan.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Request Parameters**:
+  - `planId` (Long, Optional): Target subscription plan ID.
+- **Response Type**: `TenantSubscriptionResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 16,
+  "planType": "PREMIUM",
+  "planName": "Premium Plan",
+  "planStatus": "ACTIVE",
+  "maxEmployees": 500,
+  "startedAt": "2026-07-23",
+  "endsAt": "2026-08-23",
+  "amount": 75000.0,
+  "currency": "INR",
+  "isActive": true,
+  "createdAt": "2026-07-23",
+  "billingPeriodStart": "2026-07-23",
+  "billingPeriodEnd": "2026-08-23"
+}
+```
+
+---
+
+### GET `/api/tenant/subscriptions/check-renewal`
+- **Handler Method**: `checkRenewalEligibility`
+- **Description**: Checks whether the tenant is eligible to renew their subscription plan.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `RenewalCheckResponse`
+#### Response JSON Example:
+```json
+{
+  "canRenew": true,
+  "message": "Your subscription is active and can be renewed.",
+  "currentStatus": "ACTIVE",
+  "daysUntilExpiry": 15,
+  "hasActiveSubscription": true
+}
+```
+
+---
+
+---
+
+---
+
+## ApiHitLogController
+
+### GET `/api/api-logs`
+- **Handler Method**: `getTenantApiLogs`
+- **Description**: Managed endpoint in `ApiHitLogController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
 
 ---
 
@@ -299,6 +1545,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## DataExportController
 
 ### GET `/`
@@ -325,81 +1575,7 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
-## DebugController
-
-### GET `/api/debug/all-users`
-- **Handler Method**: `getAllPlatformUsers`
-- **Description**: Debug endpoint to check all platform users
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `ResponseEntity<?>`
-
 ---
-
-### GET `/api/debug/auth-check`
-- **Handler Method**: `checkAuth`
-- **Description**: Legacy endpoint (kept for backward compatibility)
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/debug/check-database`
-- **Handler Method**: `checkDatabase`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `ResponseEntity<?>`
-
----
-
-### GET `/api/debug/employee-auth`
-- **Handler Method**: `checkEmployeeAuth`
-- **Description**: Debug endpoint for Employee (tenant user)
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/debug/platform-auth`
-- **Handler Method**: `checkPlatformAuth`
-- **Description**: Debug endpoint for Platform User (admin)
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/debug/run-payrun`
-- **Handler Method**: `runPayrunDebug`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `ResponseEntity<?>`
-
----
-
-### GET `/api/debug/test-auth-flow`
-- **Handler Method**: `testAuthFlow`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `ResponseEntity<?>`
-
----
-
-### GET `/api/debug/test-password`
-- **Handler Method**: `testPassword`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `ResponseEntity<?>`
 
 ---
 
@@ -767,25 +1943,48 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
-## EmployeeActivationController
+---
 
-### POST `/api/employee/auth/activate`
-- **Handler Method**: `activateEmployee`
-- **Description**: No description provided
-- **Request Body Type**: `ActivationRequest`
-#### Request JSON Example:
-```json
-{
-  "token": "",
-  "password": "",
-  "confirmPassword": ""
-}
-```
-- **Response Type**: `Map<String, Object>`
+---
+
+## EmployeeCompensationController
+
+### PUT `/api/employees/{id}/compensation`
+- **Handler Method**: `updateCompensation`
+- **Description**: Managed endpoint in `EmployeeCompensationController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
+
+---
+
+### GET `/api/employees/{id}/compensation`
+- **Handler Method**: `getCompensation`
+- **Description**: Managed endpoint in `EmployeeCompensationController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+### GET `/api/employees/{id}/compensation/period`
+- **Handler Method**: `getCompensationForPeriod`
+- **Description**: Managed endpoint in `EmployeeCompensationController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
 
 ---
 
@@ -1682,6 +2881,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## EmployeeLeaveController
 
 ### GET `/api/employee/leaves`
@@ -1839,6 +3042,10 @@ This document lists all API endpoints across all controllers, including mapped r
   "isHalfDay": false
 }
 ```
+
+---
+
+---
 
 ---
 
@@ -2154,6 +3361,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## EmployeeTaskController
 
 ### POST `/api/employees/tasks`
@@ -2382,6 +3593,10 @@ This document lists all API endpoints across all controllers, including mapped r
   "updatedAt": "2026-06-17"
 }
 ```
+
+---
+
+---
 
 ---
 
@@ -2875,6 +4090,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## LeaveManagementController
 
 ### GET `/api/employees/leaves/policies`
@@ -3252,6 +4471,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## ManualAttendanceController
 
 ### GET `/api/attendance/dashboard`
@@ -3545,6 +4768,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## NotificationController
 
 ### GET `/api/notifications`
@@ -3655,6 +4882,10 @@ This document lists all API endpoints across all controllers, including mapped r
 - **Description**: Mark a specific notification as read.
 - **Request Body**: None (Query parameters / Path variables only)
 - **Response Type**: `Void`
+
+---
+
+---
 
 ---
 
@@ -3791,6 +5022,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## PayrollController
 
 ### POST `/api/payroll/calculate`
@@ -3824,6 +5059,10 @@ This document lists all API endpoints across all controllers, including mapped r
   "components": { "key": "value" }
 }
 ```
+
+---
+
+---
 
 ---
 
@@ -3941,1735 +5180,7 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
-## PlatformAuthController
-
-### POST `/api/platform/auth/activate`
-- **Handler Method**: `activateUser`
-- **Description**: No description provided
-- **Request Body Type**: `ActivationRequest`
-#### Request JSON Example:
-```json
-{
-  "token": "",
-  "password": "",
-  "confirmPassword": ""
-}
-```
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
 ---
-
-### POST `/api/platform/auth/forgot-password`
-- **Handler Method**: `forgotPassword`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### POST `/api/platform/auth/login`
-- **Handler Method**: `login`
-- **Description**: No description provided
-- **Request Body Type**: `LoginRequest`
-#### Request JSON Example:
-```json
-{
-  "email": "",
-  "password": ""
-}
-```
-- **Response Type**: `LoginResponse`
-#### Response JSON Example:
-```json
-{
-  "accessToken": "",
-  "refreshToken": "",
-  "tokenType": "",
-  "expiresIn": 0,
-  "email": "",
-  "fullName": ""
-}
-```
-
----
-
-### POST `/api/platform/auth/logout`
-- **Handler Method**: `logout`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### POST `/api/platform/auth/refresh`
-- **Handler Method**: `refreshToken`
-- **Description**: No description provided
-- **Request Body Type**: `RefreshTokenRequest`
-#### Request JSON Example:
-```json
-{
-  "refreshToken": ""
-}
-```
-- **Response Type**: `LoginResponse`
-#### Response JSON Example:
-```json
-{
-  "accessToken": "",
-  "refreshToken": "",
-  "tokenType": "",
-  "expiresIn": 0,
-  "email": "",
-  "fullName": ""
-}
-```
-
----
-
-### POST `/api/platform/auth/reset-password`
-- **Handler Method**: `resetPassword`
-- **Description**: No description provided
-- **Request Body Type**: `SetPasswordRequest`
-#### Request JSON Example:
-```json
-{
-  "token": "",
-  "newPassword": "",
-  "confirmPassword": ""
-}
-```
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/platform/auth/verify-token`
-- **Handler Method**: `verifyToken`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-## PlatformDashboardController
-
-### GET `/api/platform/dashboard`
-- **Handler Method**: `getDashboard`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformDashboardDTO`
-#### Response JSON Example:
-```json
-{
-  "tenantSummary": "TenantSummary",
-  "subscriptionSummary": "SubscriptionSummary",
-  "systemSummary": "SystemSummary",
-  "recentTenants": [ "RecentTenant" ],
-  "registrationTrend": [ "RegistrationTrendPoint" ],
-  "upsellOpportunities": [ "UpsellOpportunity" ],
-  "topResourceConsumers": [ "ResourceConsumer" ],
-  "totalTenants": 0,
-  "activeTenants": 0,
-  "suspendedTenants": 0,
-  "deletedTenants": 0,
-  "trialTenants": 0,
-  "planDistribution": { "key": "value" },
-  "activePaidSubscriptions": 0,
-  "activeTrials": 0,
-  "totalMrr": 0,
-  "planStatusDistribution": { "key": "value" },
-  "expiredSubscriptions": 0,
-  "totalEmployees": 0,
-  "totalPlatformUsers": 0,
-  "averageEmployeesPerTenant": 0,
-  "totalActiveUsers": 0,
-  "supportTicketsOpen": 0,
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "planType": "",
-  "status": "UserStatus",
-  "createdAt": "2026-06-17",
-  "period": "",
-  "count": 0,
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "currentEmployees": 0,
-  "maxEmployees": 0,
-  "utilizationPercentage": 0,
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "currentEmployees": 0,
-  "currentStorageMb": 0,
-  "apiCallsCount": 0
-}
-```
-
----
-
-### GET `/api/platform/health`
-- **Handler Method**: `getHealth`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SystemHealthDTO`
-#### Response JSON Example:
-```json
-{
-  "databaseStatus": "",
-  "redisStatus": "",
-  "mailSenderStatus": "",
-  "diskSpaceStatus": "",
-  "freeDiskSpaceBytes": 0,
-  "totalDiskSpaceBytes": 0
-}
-```
-
----
-
-## PlatformDebugController
-
-### GET `/api/platform/debug/platform-setup`
-- **Handler Method**: `checkPlatformSetup`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/platform/debug/security-context`
-- **Handler Method**: `debugSecurityContext`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/platform/debug/test-auth`
-- **Handler Method**: `testAuth`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-## PlatformNotificationController
-
-### GET `/api/platform/notifications`
-- **Handler Method**: `getMyNotifications`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformNotificationResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "title": "",
-  "message": "",
-  "type": "",
-  "isRead": false,
-  "createdAt": "2026-06-17"
-}
-]
-```
-
----
-
-### PUT `/api/platform/notifications/{id}/read`
-- **Handler Method**: `markAsRead`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-## PlatformPayrollController
-
-### GET `/api/platform/payroll/pt-configs`
-- **Handler Method**: `getAllPtConfigs`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `StateProfessionalTaxConfig[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "stateCode": "IndianState",
-  "salaryRangeMin": 0,
-  "salaryRangeMax": 0,
-  "applicableMonth": 0,
-  "amount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-]
-```
-
----
-
-### POST `/api/platform/payroll/pt-configs`
-- **Handler Method**: `createPtConfig`
-- **Description**: No description provided
-- **Request Body Type**: `StateProfessionalTaxConfig`
-#### Request JSON Example:
-```json
-{
-  "id": "UUID",
-  "stateCode": "IndianState",
-  "salaryRangeMin": 0,
-  "salaryRangeMax": 0,
-  "applicableMonth": 0,
-  "amount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-- **Response Type**: `StateProfessionalTaxConfig`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "stateCode": "IndianState",
-  "salaryRangeMin": 0,
-  "salaryRangeMax": 0,
-  "applicableMonth": 0,
-  "amount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-
----
-
-### DELETE `/api/platform/payroll/pt-configs/{id}`
-- **Handler Method**: `deletePtConfig`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### PUT `/api/platform/payroll/pt-configs/{id}`
-- **Handler Method**: `updatePtConfig`
-- **Description**: No description provided
-- **Request Body Type**: `StateProfessionalTaxConfig`
-#### Request JSON Example:
-```json
-{
-  "id": "UUID",
-  "stateCode": "IndianState",
-  "salaryRangeMin": 0,
-  "salaryRangeMax": 0,
-  "applicableMonth": 0,
-  "amount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-- **Response Type**: `StateProfessionalTaxConfig`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "stateCode": "IndianState",
-  "salaryRangeMin": 0,
-  "salaryRangeMax": 0,
-  "applicableMonth": 0,
-  "amount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-
----
-
-### GET `/api/platform/payroll/statutory-rates`
-- **Handler Method**: `getAllStatutoryRates`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `StatutoryRateConfig[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "componentCode": "",
-  "rate": 0,
-  "wageBase": "",
-  "ceilingAmount": 0,
-  "capAmount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-]
-```
-
----
-
-### POST `/api/platform/payroll/statutory-rates`
-- **Handler Method**: `createStatutoryRate`
-- **Description**: No description provided
-- **Request Body Type**: `StatutoryRateConfig`
-#### Request JSON Example:
-```json
-{
-  "id": "UUID",
-  "componentCode": "",
-  "rate": 0,
-  "wageBase": "",
-  "ceilingAmount": 0,
-  "capAmount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-- **Response Type**: `StatutoryRateConfig`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "componentCode": "",
-  "rate": 0,
-  "wageBase": "",
-  "ceilingAmount": 0,
-  "capAmount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-
----
-
-### DELETE `/api/platform/payroll/statutory-rates/{id}`
-- **Handler Method**: `deleteStatutoryRate`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### PUT `/api/platform/payroll/statutory-rates/{id}`
-- **Handler Method**: `updateStatutoryRate`
-- **Description**: No description provided
-- **Request Body Type**: `StatutoryRateConfig`
-#### Request JSON Example:
-```json
-{
-  "id": "UUID",
-  "componentCode": "",
-  "rate": 0,
-  "wageBase": "",
-  "ceilingAmount": 0,
-  "capAmount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-- **Response Type**: `StatutoryRateConfig`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "componentCode": "",
-  "rate": 0,
-  "wageBase": "",
-  "ceilingAmount": 0,
-  "capAmount": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isDeleted": false
-}
-```
-
----
-
-## PlatformPermissionController
-
-### GET `/api/platform/permissions`
-- **Handler Method**: `getAllPermissions`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PermissionDTO[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "permission": "",
-  "description": "",
-  "category": "",
-  "displayOrder": 0,
-  "selected": false,
-  "null": "return"
-}
-]
-```
-
----
-
-### GET `/api/platform/permissions/groups`
-- **Handler Method**: `getGroupedPermissions`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PermissionGroupDTO[]`
-#### Response JSON Example:
-```json
-[
-{
-  "groupName": "",
-  "permissions": [ "PermissionInfo" ],
-  "id": 0,
-  "name": "",
-  "description": "",
-  "category": "",
-  "displayOrder": 0,
-  "selected": false
-}
-]
-```
-
----
-
-## PlatformRoleController
-
-### GET `/api/platform/roles`
-- **Handler Method**: `getAllRoles`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformRoleResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "name": "",
-  "description": "",
-  "isSystemRole": false,
-  "permissions": [ "PermissionInfo" ],
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-]
-```
-
----
-
-### POST `/api/platform/roles`
-- **Handler Method**: `createRole`
-- **Description**: No description provided
-- **Request Body Type**: `PlatformRoleCreateRequest`
-#### Request JSON Example:
-```json
-{
-  "name": "",
-  "description": "",
-  "permissionIds": 0
-}
-```
-- **Response Type**: `PlatformRoleResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "name": "",
-  "description": "",
-  "isSystemRole": false,
-  "permissions": [ "PermissionInfo" ],
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/roles/lookup`
-- **Handler Method**: `getRoleLookup`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformRoleLookupResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "name": "",
-  "isSystemRole": false
-}
-]
-```
-
----
-
-### DELETE `/api/platform/roles/{roleId}`
-- **Handler Method**: `deleteRole`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/platform/roles/{roleId}`
-- **Handler Method**: `getRole`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformRoleResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "name": "",
-  "description": "",
-  "isSystemRole": false,
-  "permissions": [ "PermissionInfo" ],
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### PUT `/api/platform/roles/{roleId}`
-- **Handler Method**: `updateRole`
-- **Description**: No description provided
-- **Request Body Type**: `PlatformRoleUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "name": "",
-  "description": "",
-  "permissionIds": 0
-}
-```
-- **Response Type**: `PlatformRoleResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "name": "",
-  "description": "",
-  "isSystemRole": false,
-  "permissions": [ "PermissionInfo" ],
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/roles/{roleId}/delete-preview`
-- **Handler Method**: `getRoleDeletePreview`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformRoleDeletePreviewResponse`
-#### Response JSON Example:
-```json
-{
-  "roleId": 0,
-  "roleName": "",
-  "affectedUserCount": 0,
-  "affectedUsers": [
-  {
-    "id": 0,
-    "email": "",
-    "fullName": "",
-    "designation": "",
-    "status": "UserStatus",
-    "isActive": false,
-    "lastLoginAt": "2026-06-17",
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "invitationLink": "",
-    "invitationExpiryAt": "2026-06-17",
-    "roles": [
-    {
-      "id": 0,
-      "name": "",
-      "description": "",
-      "isSystemRole": false,
-      "permissions": [ "PermissionInfo" ],
-      "createdAt": "2026-06-17",
-      "updatedAt": "2026-06-17",
-      "id": 0,
-      "name": "",
-      "description": ""
-    }
-    ],
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "reassignmentOptions": [
-  {
-    "id": 0,
-    "name": "",
-    "isSystemRole": false
-  }
-  ],
-  "deletable": false,
-  "validationMessage": ""
-}
-```
-
----
-
-### PUT `/api/platform/roles/{roleId}/permissions`
-- **Handler Method**: `assignPermissions`
-- **Description**: No description provided
-- **Request Body Type**: `Set<Long>`
-#### Request JSON Example:
-```json
-0
-```
-- **Response Type**: `PlatformRoleResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "name": "",
-  "description": "",
-  "isSystemRole": false,
-  "permissions": [ "PermissionInfo" ],
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/roles/{roleId}/users`
-- **Handler Method**: `getUsersByRole`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformUserResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-]
-```
-
----
-
-### DELETE `/api/platform/roles/{roleId}/users/{userId}`
-- **Handler Method**: `removeRoleFromUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### POST `/api/platform/roles/{roleId}/users/{userId}`
-- **Handler Method**: `assignRoleToUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-## PlatformSubscriptionController
-
-### GET `/api/platform/subscriptions/dashboard`
-- **Handler Method**: `getDashboard`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SubscriptionDashboardDTO`
-#### Response JSON Example:
-```json
-{
-  "monthlyRevenue": [ "ChartPoint" ],
-  "subscriptionGrowth": [ "ChartPoint" ],
-  "planDistribution": [ "ChartPoint" ],
-  "label": "",
-  "value": 0
-}
-```
-
----
-
-## PlatformSubscriptionPlanController
-
-### GET `/api/platform/subscription-plans`
-- **Handler Method**: `getAllPlans`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SubscriptionPlanDTO[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-]
-```
-
----
-
-### POST `/api/platform/subscription-plans`
-- **Handler Method**: `createPlan`
-- **Description**: No description provided
-- **Request Body Type**: `SubscriptionPlanDTO`
-#### Request JSON Example:
-```json
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-```
-- **Response Type**: `SubscriptionPlanDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-```
-
----
-
-### DELETE `/api/platform/subscription-plans/{id}`
-- **Handler Method**: `deletePlan`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/platform/subscription-plans/{id}`
-- **Handler Method**: `getPlanById`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SubscriptionPlanDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-```
-
----
-
-### PUT `/api/platform/subscription-plans/{id}`
-- **Handler Method**: `updatePlan`
-- **Description**: No description provided
-- **Request Body Type**: `SubscriptionPlanDTO`
-#### Request JSON Example:
-```json
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-```
-- **Response Type**: `SubscriptionPlanDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "code": "",
-  "name": "",
-  "price": 0,
-  "validityMonths": 0,
-  "isActive": false,
-  "description": ""
-}
-```
-
----
-
-## PlatformSupportTicketController
-
-### GET `/api/platform/support-tickets`
-- **Handler Method**: `getAllTickets`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Page<SupportTicketResponse>`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "ticketNumber": "",
-  "tenantId": 0,
-  "tenantCompanyName": "",
-  "tenantCode": "",
-  "raisedByEmployeeId": 0,
-  "raisedByEmployeeName": "",
-  "raisedByEmployeeEmail": "",
-  "title": "",
-  "description": "",
-  "category": "",
-  "priority": "",
-  "status": "",
-  "resolution": "",
-  "resolvedByPlatformUserId": 0,
-  "resolvedByPlatformUserName": "",
-  "resolvedAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17"
-}
-]
-```
-
----
-
-### GET `/api/platform/support-tickets/{id}`
-- **Handler Method**: `getTicketById`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SupportTicketResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "ticketNumber": "",
-  "tenantId": 0,
-  "tenantCompanyName": "",
-  "tenantCode": "",
-  "raisedByEmployeeId": 0,
-  "raisedByEmployeeName": "",
-  "raisedByEmployeeEmail": "",
-  "title": "",
-  "description": "",
-  "category": "",
-  "priority": "",
-  "status": "",
-  "resolution": "",
-  "resolvedByPlatformUserId": 0,
-  "resolvedByPlatformUserName": "",
-  "resolvedAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17"
-}
-```
-
----
-
-### PUT `/api/platform/support-tickets/{id}/status`
-- **Handler Method**: `updateTicketStatus`
-- **Description**: No description provided
-- **Request Body Type**: `SupportTicketStatusUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "status": "",
-  "resolution": ""
-}
-```
-- **Response Type**: `SupportTicketResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "ticketNumber": "",
-  "tenantId": 0,
-  "tenantCompanyName": "",
-  "tenantCode": "",
-  "raisedByEmployeeId": 0,
-  "raisedByEmployeeName": "",
-  "raisedByEmployeeEmail": "",
-  "title": "",
-  "description": "",
-  "category": "",
-  "priority": "",
-  "status": "",
-  "resolution": "",
-  "resolvedByPlatformUserId": 0,
-  "resolvedByPlatformUserName": "",
-  "resolvedAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17"
-}
-```
-
----
-
-## PlatformTenantController
-
-### GET `/api/platform/tenants`
-- **Handler Method**: `getAllTenants`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Page<PlatformTenantResponseDTO>`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-]
-```
-
----
-
-### POST `/api/platform/tenants`
-- **Handler Method**: `createTenant`
-- **Description**: No description provided
-- **Request Body Type**: `TenantRegistrationRequest`
-#### Request JSON Example:
-```json
-{
-  "companyName": "",
-  "adminEmail": "",
-  "adminName": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planCode": ""
-}
-```
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### DELETE `/api/platform/tenants/{id}`
-- **Handler Method**: `deleteTenant`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/platform/tenants/{id}`
-- **Handler Method**: `getTenantById`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### PUT `/api/platform/tenants/{id}`
-- **Handler Method**: `updateTenant`
-- **Description**: No description provided
-- **Request Body Type**: `TenantUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "companyName": "",
-  "adminEmail": "",
-  "adminName": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": ""
-}
-```
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### PUT `/api/platform/tenants/{id}/activate`
-- **Handler Method**: `activateTenant`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### PUT `/api/platform/tenants/{id}/deactivate`
-- **Handler Method**: `deactivateTenant`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### PUT `/api/platform/tenants/{id}/plan-override`
-- **Handler Method**: `overrideTenantPlan`
-- **Description**: No description provided
-- **Request Body Type**: `TenantPlanOverrideDTO`
-#### Request JSON Example:
-```json
-{
-  "planType": "",
-  "maxEmployees": 0
-}
-```
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-### PUT `/api/platform/tenants/{id}/suspend`
-- **Handler Method**: `suspendTenant`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformTenantResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "adminName": "",
-  "adminEmail": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planType": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "maxEmployees": 0,
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "suspendedAt": "2026-06-17",
-  "suspensionReason": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "dataStatus": "",
-  "expiredAt": "2026-06-17",
-  "archivedAt": "2026-06-17",
-  "deletedAt": "2026-06-17",
-  "deletedByAdminId": 0
-}
-```
-
----
-
-## PlatformUserController
-
-### GET `/api/platform/users`
-- **Handler Method**: `getAllUsers`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PageResult<PlatformUserResponse>`
-#### Response JSON Example:
-```json
-"PageResult<PlatformUserResponse>"
-```
-
----
-
-### POST `/api/platform/users`
-- **Handler Method**: `createUser`
-- **Description**: No description provided
-- **Request Body Type**: `PlatformUserCreateRequest`
-#### Request JSON Example:
-```json
-{
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "tenantId": 0,
-  "roleIds": 0
-}
-```
-- **Response Type**: `PlatformUserResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/users/by-email/{email}`
-- **Handler Method**: `getUserByEmail`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformUserResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/users/me`
-- **Handler Method**: `getCurrentUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformUserResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### GET `/api/platform/users/statistics`
-- **Handler Method**: `getUserStatistics`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformUserStatistics`
-#### Response JSON Example:
-```json
-{
-  "totalUsers": 0,
-  "activeUsers": 0,
-  "inactiveUsers": 0,
-  "pendingVerification": 0,
-  "suspendedUsers": 0,
-  "lockedUsers": 0
-}
-```
-
----
-
-### DELETE `/api/platform/users/{id}`
-- **Handler Method**: `deleteUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/platform/users/{id}`
-- **Handler Method**: `getUserById`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `PlatformUserResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### PUT `/api/platform/users/{id}`
-- **Handler Method**: `updateUser`
-- **Description**: No description provided
-- **Request Body Type**: `PlatformUserUpdateRequest`
-#### Request JSON Example:
-```json
-{
-  "fullName": "",
-  "designation": "",
-  "email": ""
-}
-```
-- **Response Type**: `PlatformUserResponse`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "email": "",
-  "fullName": "",
-  "designation": "",
-  "status": "UserStatus",
-  "isActive": false,
-  "lastLoginAt": "2026-06-17",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "invitationLink": "",
-  "invitationExpiryAt": "2026-06-17",
-  "roles": [
-  {
-    "id": 0,
-    "name": "",
-    "description": "",
-    "isSystemRole": false,
-    "permissions": [ "PermissionInfo" ],
-    "createdAt": "2026-06-17",
-    "updatedAt": "2026-06-17",
-    "id": 0,
-    "name": "",
-    "description": ""
-  }
-  ],
-  "id": 0,
-  "name": "",
-  "description": ""
-}
-```
-
----
-
-### PATCH `/api/platform/users/{id}/activate`
-- **Handler Method**: `activateUserByAdmin`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### POST `/api/platform/users/{id}/resend-activation`
-- **Handler Method**: `resendActivationEmail`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### POST `/api/platform/users/{id}/reset-password`
-- **Handler Method**: `resetPassword`
-- **Description**: No description provided
-- **Request Body Type**: `ResetPasswordRequest`
-#### Request JSON Example:
-```json
-{
-  "newPassword": ""
-}
-```
-- **Response Type**: `Void`
-
----
-
-### PUT `/api/platform/users/{id}/roles`
-- **Handler Method**: `updateUserRoles`
-- **Description**: No description provided
-- **Request Body Type**: `Set<Long>`
-#### Request JSON Example:
-```json
-0
-```
-- **Response Type**: `Void`
-
----
-
-### PATCH `/api/platform/users/{id}/suspend`
-- **Handler Method**: `suspendUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
 
 ---
 
@@ -7124,6 +6635,10 @@ This document lists all API endpoints across all controllers, including mapped r
 
 ---
 
+---
+
+---
+
 ## ShiftConfigurationController
 
 ### POST `/api/shift-configurations`
@@ -7670,608 +7185,7 @@ false
 
 ---
 
-## TenantAuthController
-
-### POST `/api/tenant/auth/activate`
-- **Handler Method**: `activateUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
 ---
-
-### POST `/api/tenant/auth/forgot-password`
-- **Handler Method**: `forgotPassword`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### POST `/api/tenant/auth/login`
-- **Handler Method**: `login`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `LoginResponse`
-#### Response JSON Example:
-```json
-{
-  "accessToken": "",
-  "refreshToken": "",
-  "tokenType": "",
-  "expiresIn": 0,
-  "email": "",
-  "fullName": ""
-}
-```
-
----
-
-### POST `/api/tenant/auth/logout`
-- **Handler Method**: `logout`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/tenant/auth/me`
-- **Handler Method**: `getCurrentUser`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### POST `/api/tenant/auth/refresh`
-- **Handler Method**: `refreshToken`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `LoginResponse`
-#### Response JSON Example:
-```json
-{
-  "accessToken": "",
-  "refreshToken": "",
-  "tokenType": "",
-  "expiresIn": 0,
-  "email": "",
-  "fullName": ""
-}
-```
-
----
-
-### POST `/api/tenant/auth/reset-password`
-- **Handler Method**: `resetPassword`
-- **Description**: No description provided
-- **Request Body Type**: `SetPasswordRequest`
-#### Request JSON Example:
-```json
-{
-  "token": "",
-  "newPassword": "",
-  "confirmPassword": ""
-}
-```
-- **Response Type**: `Map<String, String>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/tenant/auth/test-auth`
-- **Handler Method**: `testAuth`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/tenant/auth/verify-token`
-- **Handler Method**: `verifyToken`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-## TenantPayrollConfigurationController
-
-### GET `/api/payroll/config/tenants/{tenantId}/components`
-- **Handler Method**: `getComponents`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SalaryComponentDefinitionResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "componentCode": "",
-  "componentName": "",
-  "componentType": "",
-  "calculationType": "",
-  "defaultValue": 0,
-  "formulaExpression": "",
-  "evaluationOrder": 0,
-  "isLopApplicable": false,
-  "isEmployerContribution": false,
-  "isMandatory": false,
-  "allowEmployeeOverride": false,
-  "isAllowedByTenant": false,
-  "minValue": 0,
-  "maxValue": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false
-}
-]
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/components`
-- **Handler Method**: `createComponent`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SalaryComponentDefinitionResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "componentCode": "",
-  "componentName": "",
-  "componentType": "",
-  "calculationType": "",
-  "defaultValue": 0,
-  "formulaExpression": "",
-  "evaluationOrder": 0,
-  "isLopApplicable": false,
-  "isEmployerContribution": false,
-  "isMandatory": false,
-  "allowEmployeeOverride": false,
-  "isAllowedByTenant": false,
-  "minValue": 0,
-  "maxValue": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false
-}
-```
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/components/allowed`
-- **Handler Method**: `getAllowedComponents`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SalaryComponentDefinitionResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "componentCode": "",
-  "componentName": "",
-  "componentType": "",
-  "calculationType": "",
-  "defaultValue": 0,
-  "formulaExpression": "",
-  "evaluationOrder": 0,
-  "isLopApplicable": false,
-  "isEmployerContribution": false,
-  "isMandatory": false,
-  "allowEmployeeOverride": false,
-  "isAllowedByTenant": false,
-  "minValue": 0,
-  "maxValue": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false
-}
-]
-```
-
----
-
-### DELETE `/api/payroll/config/tenants/{tenantId}/components/{componentId}`
-- **Handler Method**: `deleteComponent`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### PATCH `/api/payroll/config/tenants/{tenantId}/components/{componentId}/allowed`
-- **Handler Method**: `toggleComponentAllowed`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/employees/profiles`
-- **Handler Method**: `getAllEmployeeProfilesForTenant`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "employeeId": 0,
-  "employeeCode": "",
-  "employeeName": "",
-  "version": 0,
-  "monthlyCtc": 0,
-  "currency": "",
-  "taxRegime": "",
-  "lopBasisOverride": "LopBasis",
-  "workingDaysOverride": 0,
-  "promotionReason": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "componentOverrides": [
-  {
-    "componentCode": "",
-    "overrideType": "",
-    "overrideValue": 0,
-    "overrideFormula": "",
-    "isEnabled": false
-  }
-  ]
-}
-]
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/employees/sync-all`
-- **Handler Method**: `syncAllEmployeeProfiles`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/history`
-- **Handler Method**: `getEmployeeSalaryHistory`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileHistory[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "profileId": "UUID",
-  "employeeId": 0,
-  "version": 0,
-  "monthlyCtc": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "changeReason": "",
-  "changedBy": 0,
-  "changedAt": "2026-06-17",
-  "componentSnapshot": ""
-}
-]
-```
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile`
-- **Handler Method**: `getEmployeeProfile`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "employeeId": 0,
-  "employeeCode": "",
-  "employeeName": "",
-  "version": 0,
-  "monthlyCtc": 0,
-  "currency": "",
-  "taxRegime": "",
-  "lopBasisOverride": "LopBasis",
-  "workingDaysOverride": 0,
-  "promotionReason": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "componentOverrides": [
-  {
-    "componentCode": "",
-    "overrideType": "",
-    "overrideValue": 0,
-    "overrideFormula": "",
-    "isEnabled": false
-  }
-  ]
-}
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile`
-- **Handler Method**: `createEmployeeProfile`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "employeeId": 0,
-  "employeeCode": "",
-  "employeeName": "",
-  "version": 0,
-  "monthlyCtc": 0,
-  "currency": "",
-  "taxRegime": "",
-  "lopBasisOverride": "LopBasis",
-  "workingDaysOverride": 0,
-  "promotionReason": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "componentOverrides": [
-  {
-    "componentCode": "",
-    "overrideType": "",
-    "overrideValue": 0,
-    "overrideFormula": "",
-    "isEnabled": false
-  }
-  ]
-}
-```
-
----
-
-### PUT `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile/{profileId}/components`
-- **Handler Method**: `updateEmployeeComponent`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeComponentOverrideDTO`
-#### Response JSON Example:
-```json
-{
-  "componentCode": "",
-  "overrideType": "",
-  "overrideValue": 0,
-  "overrideFormula": "",
-  "isEnabled": false
-}
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profile/{profileId}/sync`
-- **Handler Method**: `syncEmployeeProfileWithGlobal`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Void`
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/profiles/all`
-- **Handler Method**: `getAllEmployeeProfiles`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileResponse[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": "UUID",
-  "employeeId": 0,
-  "employeeCode": "",
-  "employeeName": "",
-  "version": 0,
-  "monthlyCtc": 0,
-  "currency": "",
-  "taxRegime": "",
-  "lopBasisOverride": "LopBasis",
-  "workingDaysOverride": 0,
-  "promotionReason": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "componentOverrides": [
-  {
-    "componentCode": "",
-    "overrideType": "",
-    "overrideValue": 0,
-    "overrideFormula": "",
-    "isEnabled": false
-  }
-  ]
-}
-]
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/employees/{employeeId}/promote`
-- **Handler Method**: `promoteEmployee`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `EmployeeSalaryProfileResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "employeeId": 0,
-  "employeeCode": "",
-  "employeeName": "",
-  "version": 0,
-  "monthlyCtc": 0,
-  "currency": "",
-  "taxRegime": "",
-  "lopBasisOverride": "LopBasis",
-  "workingDaysOverride": 0,
-  "promotionReason": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "componentOverrides": [
-  {
-    "componentCode": "",
-    "overrideType": "",
-    "overrideValue": 0,
-    "overrideFormula": "",
-    "isEnabled": false
-  }
-  ]
-}
-```
-
----
-
-### GET `/api/payroll/config/tenants/{tenantId}/global`
-- **Handler Method**: `getGlobalConfig`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantPayrollConfigResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "tenantId": 0,
-  "lopBasis": "LopBasis",
-  "workingDaysPerMonth": 0,
-  "enablePfCapping": false,
-  "enableEsi": false,
-  "enablePt": false,
-  "enforceNewLabourCodes": false,
-  "defaultCurrency": "",
-  "defaultTaxRegime": "",
-  "enableOvertime": false,
-  "overtimeRatePerHour": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "salaryStructures": [ "SalaryStructureResponse" ],
-  "id": "UUID",
-  "componentCode": "",
-  "componentName": "",
-  "componentType": "",
-  "calculationType": "",
-  "value": 0,
-  "evaluationOrder": 0,
-  "isPartOfPfWages": false,
-  "isPartOfEsiWages": false,
-  "isTaxable": false,
-  "isLopApplicable": false,
-  "isEmployerContribution": false,
-  "isMandatory": false,
-  "allowEmployeeOverride": false,
-  "minValue": 0,
-  "maxValue": 0,
-  "formulaExpression": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false
-}
-```
-
----
-
-### PUT `/api/payroll/config/tenants/{tenantId}/global`
-- **Handler Method**: `updateGlobalConfig`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantPayrollConfigResponse`
-#### Response JSON Example:
-```json
-{
-  "id": "UUID",
-  "tenantId": 0,
-  "lopBasis": "LopBasis",
-  "workingDaysPerMonth": 0,
-  "enablePfCapping": false,
-  "enableEsi": false,
-  "enablePt": false,
-  "enforceNewLabourCodes": false,
-  "defaultCurrency": "",
-  "defaultTaxRegime": "",
-  "enableOvertime": false,
-  "overtimeRatePerHour": 0,
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false,
-  "salaryStructures": [ "SalaryStructureResponse" ],
-  "id": "UUID",
-  "componentCode": "",
-  "componentName": "",
-  "componentType": "",
-  "calculationType": "",
-  "value": 0,
-  "evaluationOrder": 0,
-  "isPartOfPfWages": false,
-  "isPartOfEsiWages": false,
-  "isTaxable": false,
-  "isLopApplicable": false,
-  "isEmployerContribution": false,
-  "isMandatory": false,
-  "allowEmployeeOverride": false,
-  "minValue": 0,
-  "maxValue": 0,
-  "formulaExpression": "",
-  "effectiveFrom": "2026-06-17",
-  "effectiveTo": "2026-06-17",
-  "isActive": false
-}
-```
-
----
-
-### POST `/api/payroll/config/tenants/{tenantId}/validate-formula`
-- **Handler Method**: `validateFormula`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `FormulaValidationResponse`
-#### Response JSON Example:
-```json
-{
-  "valid": false,
-  "formula": "",
-  "message": ""
-}
-```
 
 ---
 
@@ -8354,123 +7268,7 @@ false
 
 ---
 
-## TenantRegistrationController
-
-### GET `/api/public/plans`
-- **Handler Method**: `getPublicPlans`
-- **Description**: List public active subscription plans
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `SubscriptionPlanDTO[]`
-#### Response JSON Example:
-```json
-[
-  {
-    "id": 1,
-    "code": "trial",
-    "name": "Trial Plan",
-    "price": 0.0,
-    "validityMonths": 1,
-    "description": "Default free trial plan",
-    "isActive": true
-  }
-]
-```
-
 ---
-
-### GET `/api/public/check-email`
-- **Handler Method**: `checkEmail`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### GET `/api/public/debug-redis`
-- **Handler Method**: `debugRedis`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `Map<String, Object>`
-#### Response JSON Example:
-```json
-{ "key": "value" }
-```
-
----
-
-### POST `/api/public/register`
-- **Handler Method**: `register`
-- **Description**: No description provided
-- **Request Body Type**: `TenantRegistrationRequest`
-#### Request JSON Example:
-```json
-{
-  "companyName": "",
-  "adminEmail": "",
-  "adminName": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "planCode": ""
-}
-```
-- **Response Type**: `TenantRegistrationResponse`
-#### Response JSON Example:
-```json
-{
-  "success": false,
-  "message": "",
-  "tenantId": 0,
-  "tenantCode": "",
-  "companyName": "",
-  "planType": "",
-  "planStatus": "",
-  "endsAt": "2026-06-17",
-  "status": "",
-  "isActive": false,
-  "adminEmail": "",
-  "adminName": "",
-  "adminPhone": "",
-  "officeAddress": "",
-  "city": "",
-  "state": "IndianState",
-  "stateText": "",
-  "country": "",
-  "activationToken": "",
-  "activationTokenExpiry": "2026-06-17",
-  "superAdminEmployeeId": 0,
-  "superAdminEmployeeCode": "",
-  "superAdminFullName": "",
-  "superAdminEmail": "",
-  "superAdminPosition": "",
-  "createdAt": "2026-06-17",
-  "updatedAt": "2026-06-17",
-  "deletedAt": "2026-06-17"
-}
-```
-
----
-
-### POST `/api/public/set-password`
-- **Handler Method**: `setPassword`
-- **Description**: No description provided
-- **Request Body Type**: `SetPasswordRequest`
-#### Request JSON Example:
-```json
-{
-  "token": "",
-  "newPassword": "",
-  "confirmPassword": ""
-}
-```
-- **Response Type**: `Void`
 
 ---
 
@@ -8786,152 +7584,7 @@ false
 
 ---
 
-## TenantSubscriptionController
-
-### POST `/api/tenant/subscriptions/cancel`
-- **Handler Method**: `cancelSubscription`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantSubscriptionResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "planType": "",
-  "planName": "",
-  "planStatus": "PlanStatus",
-  "maxEmployees": 0,
-  "startedAt": "2026-06-17",
-  "endsAt": "2026-06-17",
-  "amount": 0,
-  "currency": "",
-  "isActive": false,
-  "createdAt": "2026-06-17",
-  "billingPeriodStart": "2026-06-17",
-  "billingPeriodEnd": "2026-06-17",
-  "gracePeriodEnd": "2026-06-17",
-  "cancellationReason": "",
-  "cancelledAtEndOfPeriod": false
-}
-```
-
 ---
-
-### GET `/api/tenant/subscriptions/current`
-- **Handler Method**: `currentSubscription`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantSubscriptionResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "planType": "",
-  "planName": "",
-  "planStatus": "PlanStatus",
-  "maxEmployees": 0,
-  "startedAt": "2026-06-17",
-  "endsAt": "2026-06-17",
-  "amount": 0,
-  "currency": "",
-  "isActive": false,
-  "createdAt": "2026-06-17",
-  "billingPeriodStart": "2026-06-17",
-  "billingPeriodEnd": "2026-06-17",
-  "gracePeriodEnd": "2026-06-17",
-  "cancellationReason": "",
-  "cancelledAtEndOfPeriod": false
-}
-```
-
----
-
-### GET `/api/tenant/subscriptions/history`
-- **Handler Method**: `getSubscriptionHistory`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantSubscriptionResponseDTO[]`
-#### Response JSON Example:
-```json
-[
-{
-  "id": 0,
-  "planType": "",
-  "planName": "",
-  "planStatus": "PlanStatus",
-  "maxEmployees": 0,
-  "startedAt": "2026-06-17",
-  "endsAt": "2026-06-17",
-  "amount": 0,
-  "currency": "",
-  "isActive": false,
-  "createdAt": "2026-06-17",
-  "billingPeriodStart": "2026-06-17",
-  "billingPeriodEnd": "2026-06-17",
-  "gracePeriodEnd": "2026-06-17",
-  "cancellationReason": "",
-  "cancelledAtEndOfPeriod": false
-}
-]
-```
-
----
-
-### POST `/api/tenant/subscriptions/renew`
-- **Handler Method**: `renewSubscription`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantSubscriptionResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "planType": "",
-  "planName": "",
-  "planStatus": "PlanStatus",
-  "maxEmployees": 0,
-  "startedAt": "2026-06-17",
-  "endsAt": "2026-06-17",
-  "amount": 0,
-  "currency": "",
-  "isActive": false,
-  "createdAt": "2026-06-17",
-  "billingPeriodStart": "2026-06-17",
-  "billingPeriodEnd": "2026-06-17",
-  "gracePeriodEnd": "2026-06-17",
-  "cancellationReason": "",
-  "cancelledAtEndOfPeriod": false
-}
-```
-
----
-
-### POST `/api/tenant/subscriptions/upgrade`
-- **Handler Method**: `upgradeSubscription`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: `TenantSubscriptionResponseDTO`
-#### Response JSON Example:
-```json
-{
-  "id": 0,
-  "planType": "",
-  "planName": "",
-  "planStatus": "PlanStatus",
-  "maxEmployees": 0,
-  "startedAt": "2026-06-17",
-  "endsAt": "2026-06-17",
-  "amount": 0,
-  "currency": "",
-  "isActive": false,
-  "createdAt": "2026-06-17",
-  "billingPeriodStart": "2026-06-17",
-  "billingPeriodEnd": "2026-06-17",
-  "gracePeriodEnd": "2026-06-17",
-  "cancellationReason": "",
-  "cancelledAtEndOfPeriod": false
-}
-```
 
 ---
 
@@ -9046,227 +7699,301 @@ false
 
 # Additional Endpoints Mapped
 
-## platform-payroll-controller
+---
 
-### PUT `/api/platform/payroll/tax-slabs/{id}`
-- **Handler Method**: `updateTaxSlab`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+---
+
+## PlatformAdminSubscriptionController
+
+### GET `/api/platform/admin/subscription-plans`
+- **Handler Method**: `getAllPlans`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### DELETE `/api/platform/payroll/tax-slabs/{id}`
-- **Handler Method**: `deleteTaxSlab`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/active`
+- **Handler Method**: `getActivePlans`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/platform/payroll/tax-slabs`
-- **Handler Method**: `getAllTaxSlabs`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/deleted`
+- **Handler Method**: `getDeletedPlans`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### POST `/api/platform/payroll/tax-slabs`
-- **Handler Method**: `createTaxSlab`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/{id}`
+- **Handler Method**: `getPlanById`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-## Employee Compensation Management
-
-### GET `/api/employees/{id}/compensation`
-- **Handler Method**: `getCompensation`
-- **Description**: Retrieves active salary profile, components overrides, bank details, and history for an employee
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### POST `/api/platform/admin/subscription-plans`
+- **Handler Method**: `createPlan`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### PUT `/api/employees/{id}/compensation`
-- **Handler Method**: `updateCompensation`
-- **Description**: Registers or updates the employee salary profile, overrides, and bank details
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### PUT `/api/platform/admin/subscription-plans/{id}`
+- **Handler Method**: `updatePlan`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/{id}/compensation/period`
-- **Handler Method**: `getCompensationForPeriod`
-- **Description**: Retrieves salary profiles and components overrides active during a given start-to-end date range
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### DELETE `/api/platform/admin/subscription-plans/{id}`
+- **Handler Method**: `deletePlan`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-## Employee Management
-
-### PUT `/api/employees/by-code/{employeeCode}/manager`
-- **Handler Method**: `assignManagerByCode`
-- **Description**: Assigns a manager to an employee using their employee codes
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### PATCH `/api/platform/admin/subscription-plans/{id}/restore`
+- **Handler Method**: `restorePlan`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### DELETE `/api/employees/by-code/{employeeCode}/manager`
-- **Handler Method**: `removeManager`
-- **Description**: Removes the manager from an employee
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### PATCH `/api/platform/admin/subscription-plans/{id}/toggle-active`
+- **Handler Method**: `togglePlanActive`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/{managerId}/team/list`
-- **Handler Method**: `getTeamMembersList`
-- **Description**: Retrieves all direct reports of a manager
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### POST `/api/platform/admin/subscription-plans/{id}/features`
+- **Handler Method**: `addFeature`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/{employeeId}/manager-chain`
-- **Handler Method**: `getManagerChain`
-- **Description**: Retrieves the complete reporting chain of an employee
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### DELETE `/api/platform/admin/subscription-plans/{id}/features/{featureCode}`
+- **Handler Method**: `removeFeature`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/{employeeId}/is-manager`
-- **Handler Method**: `isManager`
-- **Description**: Returns true if the employee has direct reports
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/{id}/history`
+- **Handler Method**: `getPlanHistory`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/search/assignment`
-- **Handler Method**: `searchEmployeesForAssignment`
-- **Description**: Searches employees by name, email, or code for assignment dropdown
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/history`
+- **Handler Method**: `getAllPlanHistory`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-### GET `/api/employees/no-manager`
-- **Handler Method**: `getEmployeesWithNoManager`
-- **Description**: Retrieves all employees who don't report to anyone
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+### GET `/api/platform/admin/subscription-plans/statistics`
+- **Handler Method**: `validatePlanCode`
+- **Description**: Managed endpoint in `PlatformAdminSubscriptionController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{ "success": true }
 ```
 
 ---
 
-## api-hit-log-controller
 
-### PUT `/api/api-logs/toggle`
-- **Handler Method**: `toggleApiLogging`
-- **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+---
+
+## PlatformAdminTenantController
+
+### POST `/api/admin/tenants/{tenantId}/restore`
+- **Handler Method**: `restoreTenant`
+- **Description**: Restores an archived or expired tenant and assigns a subscription plan.
+- **Request Body Type**: `TenantRestoreRequest` (Optional)
+#### Request JSON Example:
+```json
+{
+  "planId": 1,
+  "notes": "Restoring organizational tenant"
+}
+```
+- **Response Type**: `TenantSubscriptionResponseDTO`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+{
+  "id": 12,
+  "planType": "BASIC",
+  "planName": "Basic Plan",
+  "planStatus": "ACTIVE",
+  "maxEmployees": 50,
+  "startedAt": "2026-07-23",
+  "endsAt": "2026-08-23",
+  "amount": 25000.0,
+  "currency": "INR",
+  "isActive": true,
+  "createdAt": "2026-07-23",
+  "billingPeriodStart": "2026-07-23",
+  "billingPeriodEnd": "2026-08-23"
+}
 ```
 
 ---
 
-### GET `/api/api-logs`
-- **Handler Method**: `getTenantApiLogs`
-- **Description**: No description provided
+### GET `/api/admin/tenants/{tenantId}/subscription-history`
+- **Handler Method**: `getTenantSubscriptionHistory`
+- **Description**: Retrieves a list of all historical subscription plans for a specific tenant.
 - **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+- **Response Type**: `TenantSubscriptionResponseDTO[]`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+[
+  {
+    "id": 12,
+    "planType": "BASIC",
+    "planName": "Basic Plan",
+    "planStatus": "ACTIVE",
+    "maxEmployees": 50,
+    "startedAt": "2026-07-23",
+    "endsAt": "2026-08-23",
+    "amount": 25000.0,
+    "currency": "INR",
+    "isActive": true,
+    "createdAt": "2026-07-23",
+    "billingPeriodStart": "2026-07-23",
+    "billingPeriodEnd": "2026-08-23"
+  }
+]
 ```
 
 ---
 
-## tenant-registration-controller
-
-### GET `/api/public/debug-db`
-- **Handler Method**: `debugDb`
-- **Description**: No description provided
+### GET `/api/admin/tenants/{tenantId}/restore-history`
+- **Handler Method**: `getTenantRestoreHistory`
+- **Description**: Retrieves restoration audit event logs for a specific tenant.
 - **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+- **Response Type**: `TenantRestoreHistoryResponse[]`
 #### Response JSON Example:
 ```json
-{ "key": "value" }
+[
+  {
+    "restoredAt": "2026-07-23T09:12:53",
+    "restoredBy": "admin@sonixhr.com",
+    "planName": "Basic Plan",
+    "notes": "Restored by Platform Admin"
+  }
+]
 ```
 
 ---
 
-## platform-api-hit-log-controller
+---
+
+---
+
+## PlatformApiHitLogController
 
 ### GET `/api/platform/api-logs`
 - **Handler Method**: `getAllApiLogs`
+- **Description**: Managed endpoint in `PlatformApiHitLogController`
+- **Request Body**: None / Standard parameters
+- **Response Type**: `Object`
+#### Response JSON Example:
+```json
+{ "success": true }
+```
+
+---
+
+
+---
+
+## PlatformAuthController
+
+### POST `/api/platform/auth/activate`
+- **Handler Method**: `activateUser`
 - **Description**: No description provided
-- **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+- **Request Body Type**: `ActivationRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "",
+  "password": "",
+  "confirmPassword": ""
+}
+```
+- **Response Type**: `Map<String, Object>`
 #### Response JSON Example:
 ```json
 { "key": "value" }
@@ -9274,13 +8001,11 @@ false
 
 ---
 
-## data-export-controller
-
-### GET `/api/export/employees`
-- **Handler Method**: `exportEmployees`
+### POST `/api/platform/auth/forgot-password`
+- **Handler Method**: `forgotPassword`
 - **Description**: No description provided
 - **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+- **Response Type**: `Map<String, String>`
 #### Response JSON Example:
 ```json
 { "key": "value" }
@@ -9288,11 +8013,37 @@ false
 
 ---
 
-### GET `/api/employees/export`
-- **Handler Method**: `exportEmployees_1`
+### POST `/api/platform/auth/login`
+- **Handler Method**: `login`
+- **Description**: No description provided
+- **Request Body Type**: `LoginRequest`
+#### Request JSON Example:
+```json
+{
+  "email": "",
+  "password": ""
+}
+```
+- **Response Type**: `LoginResponse`
+#### Response JSON Example:
+```json
+{
+  "accessToken": "",
+  "refreshToken": "",
+  "tokenType": "",
+  "expiresIn": 0,
+  "email": "",
+  "fullName": ""
+}
+```
+
+---
+
+### POST `/api/platform/auth/logout`
+- **Handler Method**: `logout`
 - **Description**: No description provided
 - **Request Body**: None (Query parameters / Path variables only)
-- **Response Type**: Object
+- **Response Type**: `Map<String, String>`
 #### Response JSON Example:
 ```json
 { "key": "value" }
@@ -9300,3 +8051,1831 @@ false
 
 ---
 
+### POST `/api/platform/auth/refresh`
+- **Handler Method**: `refreshToken`
+- **Description**: No description provided
+- **Request Body Type**: `RefreshTokenRequest`
+#### Request JSON Example:
+```json
+{
+  "refreshToken": ""
+}
+```
+- **Response Type**: `LoginResponse`
+#### Response JSON Example:
+```json
+{
+  "accessToken": "",
+  "refreshToken": "",
+  "tokenType": "",
+  "expiresIn": 0,
+  "email": "",
+  "fullName": ""
+}
+```
+
+---
+
+### POST `/api/platform/auth/reset-password`
+- **Handler Method**: `resetPassword`
+- **Description**: No description provided
+- **Request Body Type**: `SetPasswordRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "",
+  "newPassword": "",
+  "confirmPassword": ""
+}
+```
+- **Response Type**: `Map<String, String>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/platform/auth/verify-token`
+- **Handler Method**: `verifyToken`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+---
+
+---
+
+## PlatformDashboardController
+
+### GET `/api/platform/dashboard`
+- **Handler Method**: `getDashboard`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformDashboardDTO`
+#### Response JSON Example:
+```json
+{
+  "tenantSummary": "TenantSummary",
+  "subscriptionSummary": "SubscriptionSummary",
+  "systemSummary": "SystemSummary",
+  "recentTenants": [ "RecentTenant" ],
+  "registrationTrend": [ "RegistrationTrendPoint" ],
+  "upsellOpportunities": [ "UpsellOpportunity" ],
+  "topResourceConsumers": [ "ResourceConsumer" ],
+  "totalTenants": 0,
+  "activeTenants": 0,
+  "suspendedTenants": 0,
+  "deletedTenants": 0,
+  "trialTenants": 0,
+  "planDistribution": { "key": "value" },
+  "activePaidSubscriptions": 0,
+  "activeTrials": 0,
+  "totalMrr": 0,
+  "planStatusDistribution": { "key": "value" },
+  "expiredSubscriptions": 0,
+  "totalEmployees": 0,
+  "totalPlatformUsers": 0,
+  "averageEmployeesPerTenant": 0,
+  "totalActiveUsers": 0,
+  "supportTicketsOpen": 0,
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "planType": "",
+  "status": "UserStatus",
+  "createdAt": "2026-06-17",
+  "period": "",
+  "count": 0,
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "currentEmployees": 0,
+  "maxEmployees": 0,
+  "utilizationPercentage": 0,
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "currentEmployees": 0,
+  "currentStorageMb": 0,
+  "apiCallsCount": 0
+}
+```
+
+---
+
+### GET `/api/platform/health`
+- **Handler Method**: `getHealth`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SystemHealthDTO`
+#### Response JSON Example:
+```json
+{
+  "databaseStatus": "",
+  "redisStatus": "",
+  "mailSenderStatus": "",
+  "diskSpaceStatus": "",
+  "freeDiskSpaceBytes": 0,
+  "totalDiskSpaceBytes": 0
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformDebugController
+
+### GET `/api/platform/debug/platform-setup`
+- **Handler Method**: `checkPlatformSetup`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/platform/debug/security-context`
+- **Handler Method**: `debugSecurityContext`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+### GET `/api/platform/debug/test-auth`
+- **Handler Method**: `testAuth`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{ "key": "value" }
+```
+
+---
+
+---
+
+---
+
+## PlatformNotificationController
+
+### GET `/api/platform/notifications`
+- **Handler Method**: `getMyNotifications`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformNotificationResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "title": "",
+  "message": "",
+  "type": "",
+  "isRead": false,
+  "createdAt": "2026-06-17"
+}
+]
+```
+
+---
+
+### PUT `/api/platform/notifications/{id}/read`
+- **Handler Method**: `markAsRead`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+---
+
+---
+
+## PlatformPayrollController
+
+### GET `/api/platform/payroll/pt-configs`
+- **Handler Method**: `getAllPtConfigs`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `StateProfessionalTaxConfig[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "stateCode": "IndianState",
+  "salaryRangeMin": 0,
+  "salaryRangeMax": 0,
+  "applicableMonth": 0,
+  "amount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+]
+```
+
+---
+
+### POST `/api/platform/payroll/pt-configs`
+- **Handler Method**: `createPtConfig`
+- **Description**: No description provided
+- **Request Body Type**: `StateProfessionalTaxConfig`
+#### Request JSON Example:
+```json
+{
+  "id": "UUID",
+  "stateCode": "IndianState",
+  "salaryRangeMin": 0,
+  "salaryRangeMax": 0,
+  "applicableMonth": 0,
+  "amount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+- **Response Type**: `StateProfessionalTaxConfig`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "stateCode": "IndianState",
+  "salaryRangeMin": 0,
+  "salaryRangeMax": 0,
+  "applicableMonth": 0,
+  "amount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+
+---
+
+### DELETE `/api/platform/payroll/pt-configs/{id}`
+- **Handler Method**: `deletePtConfig`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### PUT `/api/platform/payroll/pt-configs/{id}`
+- **Handler Method**: `updatePtConfig`
+- **Description**: No description provided
+- **Request Body Type**: `StateProfessionalTaxConfig`
+#### Request JSON Example:
+```json
+{
+  "id": "UUID",
+  "stateCode": "IndianState",
+  "salaryRangeMin": 0,
+  "salaryRangeMax": 0,
+  "applicableMonth": 0,
+  "amount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+- **Response Type**: `StateProfessionalTaxConfig`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "stateCode": "IndianState",
+  "salaryRangeMin": 0,
+  "salaryRangeMax": 0,
+  "applicableMonth": 0,
+  "amount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+
+---
+
+### GET `/api/platform/payroll/statutory-rates`
+- **Handler Method**: `getAllStatutoryRates`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `StatutoryRateConfig[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": "UUID",
+  "componentCode": "",
+  "rate": 0,
+  "wageBase": "",
+  "ceilingAmount": 0,
+  "capAmount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+]
+```
+
+---
+
+### POST `/api/platform/payroll/statutory-rates`
+- **Handler Method**: `createStatutoryRate`
+- **Description**: No description provided
+- **Request Body Type**: `StatutoryRateConfig`
+#### Request JSON Example:
+```json
+{
+  "id": "UUID",
+  "componentCode": "",
+  "rate": 0,
+  "wageBase": "",
+  "ceilingAmount": 0,
+  "capAmount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+- **Response Type**: `StatutoryRateConfig`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "componentCode": "",
+  "rate": 0,
+  "wageBase": "",
+  "ceilingAmount": 0,
+  "capAmount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+
+---
+
+### DELETE `/api/platform/payroll/statutory-rates/{id}`
+- **Handler Method**: `deleteStatutoryRate`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### PUT `/api/platform/payroll/statutory-rates/{id}`
+- **Handler Method**: `updateStatutoryRate`
+- **Description**: No description provided
+- **Request Body Type**: `StatutoryRateConfig`
+#### Request JSON Example:
+```json
+{
+  "id": "UUID",
+  "componentCode": "",
+  "rate": 0,
+  "wageBase": "",
+  "ceilingAmount": 0,
+  "capAmount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+- **Response Type**: `StatutoryRateConfig`
+#### Response JSON Example:
+```json
+{
+  "id": "UUID",
+  "componentCode": "",
+  "rate": 0,
+  "wageBase": "",
+  "ceilingAmount": 0,
+  "capAmount": 0,
+  "effectiveFrom": "2026-06-17",
+  "effectiveTo": "2026-06-17",
+  "isDeleted": false
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformPermissionController
+
+### GET `/api/platform/permissions`
+- **Handler Method**: `getAllPermissions`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PermissionDTO[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "permission": "",
+  "description": "",
+  "category": "",
+  "displayOrder": 0,
+  "selected": false,
+  "null": "return"
+}
+]
+```
+
+---
+
+### GET `/api/platform/permissions/groups`
+- **Handler Method**: `getGroupedPermissions`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PermissionGroupDTO[]`
+#### Response JSON Example:
+```json
+[
+{
+  "groupName": "",
+  "permissions": [ "PermissionInfo" ],
+  "id": 0,
+  "name": "",
+  "description": "",
+  "category": "",
+  "displayOrder": 0,
+  "selected": false
+}
+]
+```
+
+---
+
+---
+
+---
+
+## PlatformRoleController
+
+### GET `/api/platform/roles`
+- **Handler Method**: `getAllRoles`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformRoleResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "name": "",
+  "description": "",
+  "isSystemRole": false,
+  "permissions": [ "PermissionInfo" ],
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+]
+```
+
+---
+
+### POST `/api/platform/roles`
+- **Handler Method**: `createRole`
+- **Description**: No description provided
+- **Request Body Type**: `PlatformRoleCreateRequest`
+#### Request JSON Example:
+```json
+{
+  "name": "",
+  "description": "",
+  "permissionIds": 0
+}
+```
+- **Response Type**: `PlatformRoleResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "name": "",
+  "description": "",
+  "isSystemRole": false,
+  "permissions": [ "PermissionInfo" ],
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/roles/lookup`
+- **Handler Method**: `getRoleLookup`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformRoleLookupResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "name": "",
+  "isSystemRole": false
+}
+]
+```
+
+---
+
+### DELETE `/api/platform/roles/{roleId}`
+- **Handler Method**: `deleteRole`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/platform/roles/{roleId}`
+- **Handler Method**: `getRole`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformRoleResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "name": "",
+  "description": "",
+  "isSystemRole": false,
+  "permissions": [ "PermissionInfo" ],
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### PUT `/api/platform/roles/{roleId}`
+- **Handler Method**: `updateRole`
+- **Description**: No description provided
+- **Request Body Type**: `PlatformRoleUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "name": "",
+  "description": "",
+  "permissionIds": 0
+}
+```
+- **Response Type**: `PlatformRoleResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "name": "",
+  "description": "",
+  "isSystemRole": false,
+  "permissions": [ "PermissionInfo" ],
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/roles/{roleId}/delete-preview`
+- **Handler Method**: `getRoleDeletePreview`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformRoleDeletePreviewResponse`
+#### Response JSON Example:
+```json
+{
+  "roleId": 0,
+  "roleName": "",
+  "affectedUserCount": 0,
+  "affectedUsers": [
+  {
+    "id": 0,
+    "email": "",
+    "fullName": "",
+    "designation": "",
+    "status": "UserStatus",
+    "isActive": false,
+    "lastLoginAt": "2026-06-17",
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "invitationLink": "",
+    "invitationExpiryAt": "2026-06-17",
+    "roles": [
+    {
+      "id": 0,
+      "name": "",
+      "description": "",
+      "isSystemRole": false,
+      "permissions": [ "PermissionInfo" ],
+      "createdAt": "2026-06-17",
+      "updatedAt": "2026-06-17",
+      "id": 0,
+      "name": "",
+      "description": ""
+    }
+    ],
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "reassignmentOptions": [
+  {
+    "id": 0,
+    "name": "",
+    "isSystemRole": false
+  }
+  ],
+  "deletable": false,
+  "validationMessage": ""
+}
+```
+
+---
+
+### PUT `/api/platform/roles/{roleId}/permissions`
+- **Handler Method**: `assignPermissions`
+- **Description**: No description provided
+- **Request Body Type**: `Set<Long>`
+#### Request JSON Example:
+```json
+0
+```
+- **Response Type**: `PlatformRoleResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "name": "",
+  "description": "",
+  "isSystemRole": false,
+  "permissions": [ "PermissionInfo" ],
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/roles/{roleId}/users`
+- **Handler Method**: `getUsersByRole`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformUserResponse[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+]
+```
+
+---
+
+### DELETE `/api/platform/roles/{roleId}/users/{userId}`
+- **Handler Method**: `removeRoleFromUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### POST `/api/platform/roles/{roleId}/users/{userId}`
+- **Handler Method**: `assignRoleToUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+---
+
+---
+
+## PlatformSubscriptionController
+
+### GET `/api/platform/subscriptions/dashboard`
+- **Handler Method**: `getDashboard`
+- **Description**: Returns advanced SaaS metrics, charts, tables, comparisons, KPIs, and recommendations.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SubscriptionDashboardDTO`
+#### Response JSON Example:
+```json
+{
+  "monthlyRevenue": [
+    { "label": "July 2026", "value": 150000.0 }
+  ],
+  "subscriptionGrowth": [
+    { "label": "July 2026", "value": 12.0 }
+  ],
+  "planDistribution": [
+    { "label": "BASIC", "value": 23.0 }
+  ],
+  "revenueByPlanChart": [
+    { "label": "PREMIUM", "value": 45000.0 }
+  ],
+  "churnTrendChart": [
+    { "label": "July 2026", "value": 2.5 }
+  ],
+  "ltvChart": [
+    { "label": "BASIC", "value": 120000.0 }
+  ],
+  "upgradeDowngradeTrendChart": [
+    { "label": "July 2026", "value": 4.0 }
+  ],
+  "ltvStatistics": {
+    "plans": [
+      {
+        "plan": "BASIC",
+        "arpu": 12000.0,
+        "churnRate": "2.5%",
+        "avgLifespan": "40.0 months",
+        "ltv": 480000.0,
+        "cac": 15000.0,
+        "ratio": "32.0:1",
+        "status": "Excellent"
+      }
+    ]
+  },
+  "upgradeDowngradeStats": {
+    "monthlyTrend": [
+      {
+        "month": "July 2026",
+        "upgrades": 4,
+        "downgrades": 1
+      }
+    ],
+    "upgradePaths": [
+      {
+        "from": "BASIC",
+        "to": "STANDARD",
+        "count": 3,
+        "percentage": "75.0%"
+      }
+    ],
+    "downgradePaths": [
+      {
+        "from": "PREMIUM",
+        "to": "STANDARD",
+        "count": 1,
+        "percentage": "100.0%"
+      }
+    ],
+    "revenueImpact": {
+      "upgradesCount": 4,
+      "upgradesAvgChange": "₹15,000",
+      "upgradesTotalImpact": "+₹60,000",
+      "downgradesCount": 1,
+      "downgradesAvgChange": "-₹10,000",
+      "downgradesTotalImpact": "-₹10,000",
+      "netImpact": "+₹50,000"
+    }
+  },
+  "periodComparisons": {
+    "mom": [
+      {
+        "metric": "Active Subscriptions",
+        "current": "120",
+        "previous": "115",
+        "change": "+5",
+        "pctChange": "+4.3%"
+      }
+    ],
+    "qoq": [],
+    "yoy": []
+  },
+  "kpiMetrics": {
+    "healthScore": 87,
+    "kpiList": [
+      {
+        "kpi": "LTV:CAC Ratio",
+        "value": "8.5x",
+        "target": "> 3.0x",
+        "status": "Exceeded"
+      }
+    ]
+  },
+  "insightsAndHealth": {
+    "strengths": [
+      "LTV:CAC ratio is well above healthy targets"
+    ],
+    "weaknesses": [
+      "Churn rate showed a slight minor increase this month"
+    ],
+    "recommendations": [
+      "Implement upgrade campaigns for Standard plans"
+    ]
+  }
+}
+```
+
+---
+
+### GET `/api/platform/subscriptions/overview`
+- **Handler Method**: `getSubscriptionOverview`
+- **Description**: Returns quick top-level SaaS health metrics for the overview KPI cards.
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Map<String, Object>`
+#### Response JSON Example:
+```json
+{
+  "totalSubscriptions": 145,
+  "totalActive": 120,
+  "totalExpired": 15,
+  "totalCancelled": 10,
+  "totalMRR": 185000.0,
+  "growthRate": 4.5,
+  "newThisMonth": 6,
+  "retentionRate": 97.5,
+  "churnRate": 2.5
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformSubscriptionPlanController
+
+### GET `/api/platform/subscription-plans`
+- **Handler Method**: `getAllPlans`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SubscriptionPlanDTO[]`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+]
+```
+
+---
+
+### POST `/api/platform/subscription-plans`
+- **Handler Method**: `createPlan`
+- **Description**: No description provided
+- **Request Body Type**: `SubscriptionPlanDTO`
+#### Request JSON Example:
+```json
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+```
+- **Response Type**: `SubscriptionPlanDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+```
+
+---
+
+### DELETE `/api/platform/subscription-plans/{id}`
+- **Handler Method**: `deletePlan`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/platform/subscription-plans/{id}`
+- **Handler Method**: `getPlanById`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SubscriptionPlanDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+```
+
+---
+
+### PUT `/api/platform/subscription-plans/{id}`
+- **Handler Method**: `updatePlan`
+- **Description**: No description provided
+- **Request Body Type**: `SubscriptionPlanDTO`
+#### Request JSON Example:
+```json
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+```
+- **Response Type**: `SubscriptionPlanDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "code": "",
+  "name": "",
+  "price": 0,
+  "validityMonths": 0,
+  "isActive": false,
+  "description": ""
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformSupportTicketController
+
+### GET `/api/platform/support-tickets`
+- **Handler Method**: `getAllTickets`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Page<SupportTicketResponse>`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "ticketNumber": "",
+  "tenantId": 0,
+  "tenantCompanyName": "",
+  "tenantCode": "",
+  "raisedByEmployeeId": 0,
+  "raisedByEmployeeName": "",
+  "raisedByEmployeeEmail": "",
+  "title": "",
+  "description": "",
+  "category": "",
+  "priority": "",
+  "status": "",
+  "resolution": "",
+  "resolvedByPlatformUserId": 0,
+  "resolvedByPlatformUserName": "",
+  "resolvedAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17"
+}
+]
+```
+
+---
+
+### GET `/api/platform/support-tickets/{id}`
+- **Handler Method**: `getTicketById`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `SupportTicketResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "ticketNumber": "",
+  "tenantId": 0,
+  "tenantCompanyName": "",
+  "tenantCode": "",
+  "raisedByEmployeeId": 0,
+  "raisedByEmployeeName": "",
+  "raisedByEmployeeEmail": "",
+  "title": "",
+  "description": "",
+  "category": "",
+  "priority": "",
+  "status": "",
+  "resolution": "",
+  "resolvedByPlatformUserId": 0,
+  "resolvedByPlatformUserName": "",
+  "resolvedAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17"
+}
+```
+
+---
+
+### PUT `/api/platform/support-tickets/{id}/status`
+- **Handler Method**: `updateTicketStatus`
+- **Description**: No description provided
+- **Request Body Type**: `SupportTicketStatusUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "status": "",
+  "resolution": ""
+}
+```
+- **Response Type**: `SupportTicketResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "ticketNumber": "",
+  "tenantId": 0,
+  "tenantCompanyName": "",
+  "tenantCode": "",
+  "raisedByEmployeeId": 0,
+  "raisedByEmployeeName": "",
+  "raisedByEmployeeEmail": "",
+  "title": "",
+  "description": "",
+  "category": "",
+  "priority": "",
+  "status": "",
+  "resolution": "",
+  "resolvedByPlatformUserId": 0,
+  "resolvedByPlatformUserName": "",
+  "resolvedAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17"
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformTenantController
+
+### GET `/api/platform/tenants`
+- **Handler Method**: `getAllTenants`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Page<PlatformTenantResponseDTO>`
+#### Response JSON Example:
+```json
+[
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+]
+```
+
+---
+
+### POST `/api/platform/tenants`
+- **Handler Method**: `createTenant`
+- **Description**: No description provided
+- **Request Body Type**: `TenantRegistrationRequest`
+#### Request JSON Example:
+```json
+{
+  "companyName": "",
+  "adminEmail": "",
+  "adminName": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planCode": ""
+}
+```
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### DELETE `/api/platform/tenants/{id}`
+- **Handler Method**: `deleteTenant`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/platform/tenants/{id}`
+- **Handler Method**: `getTenantById`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### PUT `/api/platform/tenants/{id}`
+- **Handler Method**: `updateTenant`
+- **Description**: No description provided
+- **Request Body Type**: `TenantUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "companyName": "",
+  "adminEmail": "",
+  "adminName": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": ""
+}
+```
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### PUT `/api/platform/tenants/{id}/activate`
+- **Handler Method**: `activateTenant`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### PUT `/api/platform/tenants/{id}/deactivate`
+- **Handler Method**: `deactivateTenant`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### PUT `/api/platform/tenants/{id}/plan-override`
+- **Handler Method**: `overrideTenantPlan`
+- **Description**: No description provided
+- **Request Body Type**: `TenantPlanOverrideDTO`
+#### Request JSON Example:
+```json
+{
+  "planType": "",
+  "maxEmployees": 0
+}
+```
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+### PUT `/api/platform/tenants/{id}/suspend`
+- **Handler Method**: `suspendTenant`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformTenantResponseDTO`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "tenantCode": "",
+  "companyName": "",
+  "adminName": "",
+  "adminEmail": "",
+  "adminPhone": "",
+  "officeAddress": "",
+  "city": "",
+  "state": "IndianState",
+  "stateText": "",
+  "country": "",
+  "planType": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "maxEmployees": 0,
+  "planStatus": "",
+  "endsAt": "2026-06-17",
+  "suspendedAt": "2026-06-17",
+  "suspensionReason": "",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "dataStatus": "",
+  "expiredAt": "2026-06-17",
+  "archivedAt": "2026-06-17",
+  "deletedAt": "2026-06-17",
+  "deletedByAdminId": 0
+}
+```
+
+---
+
+---
+
+---
+
+## PlatformUserController
+
+### GET `/api/platform/users`
+- **Handler Method**: `getAllUsers`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PageResult<PlatformUserResponse>`
+#### Response JSON Example:
+```json
+"PageResult<PlatformUserResponse>"
+```
+
+---
+
+### POST `/api/platform/users`
+- **Handler Method**: `createUser`
+- **Description**: No description provided
+- **Request Body Type**: `PlatformUserCreateRequest`
+#### Request JSON Example:
+```json
+{
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "tenantId": 0,
+  "roleIds": 0
+}
+```
+- **Response Type**: `PlatformUserResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/users/by-email/{email}`
+- **Handler Method**: `getUserByEmail`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformUserResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/users/me`
+- **Handler Method**: `getCurrentUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformUserResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### GET `/api/platform/users/statistics`
+- **Handler Method**: `getUserStatistics`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformUserStatistics`
+#### Response JSON Example:
+```json
+{
+  "totalUsers": 0,
+  "activeUsers": 0,
+  "inactiveUsers": 0,
+  "pendingVerification": 0,
+  "suspendedUsers": 0,
+  "lockedUsers": 0
+}
+```
+
+---
+
+### DELETE `/api/platform/users/{id}`
+- **Handler Method**: `deleteUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/platform/users/{id}`
+- **Handler Method**: `getUserById`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `PlatformUserResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### PUT `/api/platform/users/{id}`
+- **Handler Method**: `updateUser`
+- **Description**: No description provided
+- **Request Body Type**: `PlatformUserUpdateRequest`
+#### Request JSON Example:
+```json
+{
+  "fullName": "",
+  "designation": "",
+  "email": ""
+}
+```
+- **Response Type**: `PlatformUserResponse`
+#### Response JSON Example:
+```json
+{
+  "id": 0,
+  "email": "",
+  "fullName": "",
+  "designation": "",
+  "status": "UserStatus",
+  "isActive": false,
+  "lastLoginAt": "2026-06-17",
+  "createdAt": "2026-06-17",
+  "updatedAt": "2026-06-17",
+  "invitationLink": "",
+  "invitationExpiryAt": "2026-06-17",
+  "roles": [
+  {
+    "id": 0,
+    "name": "",
+    "description": "",
+    "isSystemRole": false,
+    "permissions": [ "PermissionInfo" ],
+    "createdAt": "2026-06-17",
+    "updatedAt": "2026-06-17",
+    "id": 0,
+    "name": "",
+    "description": ""
+  }
+  ],
+  "id": 0,
+  "name": "",
+  "description": ""
+}
+```
+
+---
+
+### PATCH `/api/platform/users/{id}/activate`
+- **Handler Method**: `activateUserByAdmin`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### POST `/api/platform/users/{id}/resend-activation`
+- **Handler Method**: `resendActivationEmail`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+### POST `/api/platform/users/{id}/reset-password`
+- **Handler Method**: `resetPassword`
+- **Description**: No description provided
+- **Request Body Type**: `ResetPasswordRequest`
+#### Request JSON Example:
+```json
+{
+  "newPassword": ""
+}
+```
+- **Response Type**: `Void`
+
+---
+
+### PUT `/api/platform/users/{id}/roles`
+- **Handler Method**: `updateUserRoles`
+- **Description**: No description provided
+- **Request Body Type**: `Set<Long>`
+#### Request JSON Example:
+```json
+0
+```
+- **Response Type**: `Void`
+
+---
+
+### PATCH `/api/platform/users/{id}/suspend`
+- **Handler Method**: `suspendUser`
+- **Description**: No description provided
+- **Request Body**: None (Query parameters / Path variables only)
+- **Response Type**: `Void`
+
+---
+
+---
+
+---

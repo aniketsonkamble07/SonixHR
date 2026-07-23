@@ -44,7 +44,8 @@ import java.util.stream.Collectors;
         @Index(name = "idx_employees_manager", columnList = "manager_id"),
         @Index(name = "idx_employees_department", columnList = "department_id"),
         @Index(name = "idx_employees_status", columnList = "status"),
-        @Index(name = "idx_employees_hire_date", columnList = "hire_date")
+        @Index(name = "idx_employees_hire_date", columnList = "hire_date"),
+        @Index(name = "idx_employees_activation_token", columnList = "activation_token")
 })
 @Builder
 @NoArgsConstructor
@@ -86,6 +87,15 @@ public class Employee implements UserDetails {
     private boolean isActive = false;
 
     // =====================================================
+    // ACTIVATION TOKEN FIELDS (ADD THESE)
+    // =====================================================
+    @Column(name = "activation_token", length = 255)
+    private String activationToken;
+
+    @Column(name = "activation_token_expiry")
+    private LocalDateTime activationTokenExpiry;
+
+    // =====================================================
     // ROLES & PERMISSIONS
     // =====================================================
     @Builder.Default
@@ -121,6 +131,12 @@ public class Employee implements UserDetails {
     @Column(name = "must_change_password")
     @Builder.Default
     private boolean mustChangePassword = false;
+
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
+
+    @Column(name = "activated_at")
+    private LocalDateTime activatedAt;
 
     // =====================================================
     // PERSONAL INFORMATION
@@ -426,8 +442,14 @@ public class Employee implements UserDetails {
         return false;
     }
 
+    public boolean isActivationTokenValid() {
+        return activationToken != null &&
+                activationTokenExpiry != null &&
+                activationTokenExpiry.isAfter(LocalDateTime.now());
+    }
+
     // =====================================================
-    // PERMISSION METHODS (Single definition)
+    // PERMISSION METHODS
     // =====================================================
 
     public Set<String> getEffectivePermissions() {
@@ -452,7 +474,6 @@ public class Employee implements UserDetails {
         return getEffectivePermissions().contains(permissionName);
     }
 
-    // Convenience method for enum-based permission check
     public boolean hasPermission(TenantPermissionEnum permission) {
         if (permission == null) {
             return false;
@@ -514,6 +535,9 @@ public class Employee implements UserDetails {
         this.status = EmployeeStatus.ACTIVE;
         this.resignationDate = null;
         this.lastWorkingDate = null;
+        this.activationToken = null;
+        this.activationTokenExpiry = null;
+        this.activatedAt = LocalDateTime.now();
     }
 
     public void putOnProbation() {
@@ -524,8 +548,9 @@ public class Employee implements UserDetails {
         if (resignationDate == null || lastWorkingDate == null) {
             throw new IllegalArgumentException("Resignation date and last working date are required");
         }
-        this.isActive = !lastWorkingDate.isBefore(LocalDate.now());
-        this.status = EmployeeStatus.RESIGNED;
+        boolean isLwdPassed = lastWorkingDate.isBefore(LocalDate.now()) || lastWorkingDate.isEqual(LocalDate.now());
+        this.isActive = !isLwdPassed;
+        this.status = isLwdPassed ? EmployeeStatus.RESIGNED : EmployeeStatus.NOTICE_PERIOD;
         this.resignationDate = resignationDate;
         this.lastWorkingDate = lastWorkingDate;
     }
@@ -534,7 +559,7 @@ public class Employee implements UserDetails {
         if (this.status != EmployeeStatus.ACTIVE && this.status != EmployeeStatus.PROBATION && this.status != EmployeeStatus.ON_LEAVE) {
             throw new IllegalStateException("Employee is not in an active status to resign");
         }
-        this.status = EmployeeStatus.RESIGNED;
+        this.status = EmployeeStatus.NOTICE_PERIOD;
         this.resignationStatus = ResignationStatus.SUBMITTED;
         this.resignationReason = reason;
         this.resignationDate = LocalDate.now();
@@ -550,7 +575,9 @@ public class Employee implements UserDetails {
         this.isResignationAccepted = true;
         this.approvedLastWorkingDate = approvedLWD;
         this.lastWorkingDate = approvedLWD;
-        this.isActive = !approvedLWD.isBefore(LocalDate.now());
+        boolean isLwdPassed = approvedLWD.isBefore(LocalDate.now());
+        this.isActive = !isLwdPassed;
+        this.status = isLwdPassed ? EmployeeStatus.RESIGNED : EmployeeStatus.NOTICE_PERIOD;
     }
 
     public void rejectOrWithdrawResignation(ResignationStatus newStatus) {
@@ -578,6 +605,12 @@ public class Employee implements UserDetails {
     public void terminate() {
         this.isActive = false;
         this.status = EmployeeStatus.TERMINATED;
+        this.lastWorkingDate = LocalDate.now();
+    }
+
+    public void markAbsconded() {
+        this.isActive = false;
+        this.status = EmployeeStatus.ABSCONDED;
         this.lastWorkingDate = LocalDate.now();
     }
 
@@ -613,12 +646,11 @@ public class Employee implements UserDetails {
     }
 
     // =====================================================
-    // UserDetails Implementation (Single definition)
+    // UserDetails Implementation
     // =====================================================
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Return cached authorities if available and version matches
         if (cachedAuthorities != null && cachedRolesVersion != null &&
                 cachedRolesVersion.equals(this.rolesVersion)) {
             return cachedAuthorities;
@@ -626,7 +658,6 @@ public class Employee implements UserDetails {
 
         Set<GrantedAuthority> authorities = new HashSet<>();
 
-        // Add permissions
         Set<String> permissions = getEffectivePermissions();
         if (permissions != null) {
             for (String p : permissions) {
@@ -634,7 +665,6 @@ public class Employee implements UserDetails {
             }
         }
 
-        // Add roles with ROLE_ prefix (normalized)
         if (roles != null) {
             for (TenantRole role : roles) {
                 if (role != null && role.isActive() && role.getName() != null) {
@@ -644,7 +674,6 @@ public class Employee implements UserDetails {
             }
         }
 
-        // Cache the authorities
         this.cachedAuthorities = authorities;
         this.cachedRolesVersion = this.rolesVersion;
 
@@ -678,7 +707,9 @@ public class Employee implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive && (status == EmployeeStatus.ACTIVE || status == EmployeeStatus.PROBATION || status == EmployeeStatus.ON_LEAVE || status == EmployeeStatus.INVITED || status == EmployeeStatus.RESIGNED);
+        return isActive && (status == EmployeeStatus.ACTIVE || status == EmployeeStatus.PROBATION ||
+                status == EmployeeStatus.ON_LEAVE || status == EmployeeStatus.INVITED ||
+                status == EmployeeStatus.RESIGNED);
     }
 
     // =====================================================
@@ -790,6 +821,4 @@ public class Employee implements UserDetails {
             throw new IllegalStateException("Active employee must have at least one role");
         }
     }
-
-
 }

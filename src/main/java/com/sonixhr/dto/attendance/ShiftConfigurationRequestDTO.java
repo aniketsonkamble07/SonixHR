@@ -1,5 +1,6 @@
 package com.sonixhr.dto.attendance;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -7,9 +8,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
+import java.util.Collection;
 
 @Data
 @Builder
@@ -70,10 +72,33 @@ public class ShiftConfigurationRequestDTO {
     @Min(value = 0, message = "Max overtime hours must be positive")
     private Double maxOvertimeHoursPerDay;
 
-    private List<String> weeklyOffs;
+    /**
+     * Stored internally as a comma-separated string, e.g. "SATURDAY,SUNDAY".
+     * Accepts either a JSON array (["SATURDAY","SUNDAY"]) or a plain string
+     * ("SATURDAY,SUNDAY") from the client — see setWeeklyOffs(Object) below.
+     */
+    private String weeklyOffs;
+
     private Boolean alternateWeekOff;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
+
+    @JsonSetter("weeklyOffs")
+    public void setWeeklyOffs(Object value) {
+        if (value == null) {
+            this.weeklyOffs = null;
+        } else if (value instanceof Collection<?> collection) {
+            this.weeklyOffs = collection.isEmpty()
+                    ? null
+                    : collection.stream()
+                    .map(String::valueOf)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse(null);
+        } else {
+            String text = value.toString().trim();
+            this.weeklyOffs = text.isEmpty() ? null : text;
+        }
+    }
 
     @AssertTrue(message = "Start time cannot be equal to end time")
     private boolean isStartTimeNotEqualToEndTime() {
