@@ -1468,9 +1468,15 @@
         <form id="subscription-plan-form">
           <input type="hidden" id="plan-id">
 
-          <div class="form-group">
-            <label class="form-label" for="plan-name">Plan Name</label>
-            <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="plan-name">Plan Name</label>
+              <input type="text" id="plan-name" class="form-input" placeholder="e.g. Basic Plan" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-code">Plan Code</label>
+              <input type="text" id="plan-code" class="form-input" placeholder="e.g. BASIC_PLAN" required>
+            </div>
           </div>
 
           <div class="form-grid" style="margin-top: 15px;">
@@ -4622,6 +4628,7 @@
       document.getElementById('plan-modal-title').textContent = 'Create Subscription Plan';
       document.getElementById('plan-id').value = '';
       document.getElementById('plan-name').value = '';
+      document.getElementById('plan-code').value = '';
       document.getElementById('plan-monthly-price').value = '0.00';
       document.getElementById('plan-validity-months').value = '1';
       document.getElementById('plan-max-employees').value = '50';
@@ -4631,6 +4638,15 @@
       openModal('subscription-plan-modal');
     }
 
+    // Auto-fill plan-code when typing plan-name in create mode
+    document.getElementById('plan-name').addEventListener('input', (e) => {
+      const isCreate = document.getElementById('plan-id').value === '';
+      if (isCreate) {
+        const val = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+        document.getElementById('plan-code').value = val;
+      }
+    });
+
     function openEditPlanModal(id) {
       const plan = globalSubscriptionPlans.find(p => p.id === id);
       if (!plan) return;
@@ -4638,6 +4654,7 @@
       document.getElementById('plan-modal-title').textContent = 'Edit Subscription Plan';
       document.getElementById('plan-id').value = plan.id;
       document.getElementById('plan-name').value = plan.name;
+      document.getElementById('plan-code').value = plan.code || '';
       document.getElementById('plan-monthly-price').value = plan.price || 0;
       document.getElementById('plan-validity-months').value = plan.validityMonths || 1;
       document.getElementById('plan-max-employees').value = plan.maxEmployees || 50;
@@ -4655,8 +4672,15 @@
       const method = isEdit ? 'PUT' : 'POST';
       const url = isEdit ? `${API_BASE}/platform/subscription-plans/${id}` : `${API_BASE}/platform/subscription-plans`;
 
+      const planName = document.getElementById('plan-name').value.trim();
+      let planCode = document.getElementById('plan-code').value.trim();
+      if (!planCode) {
+        planCode = planName.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+      }
+
       const payload = {
-        name: document.getElementById('plan-name').value,
+        name: planName,
+        code: planCode,
         price: parseFloat(document.getElementById('plan-monthly-price').value),
         validityMonths: parseInt(document.getElementById('plan-validity-months').value),
         maxEmployees: parseInt(document.getElementById('plan-max-employees').value),
