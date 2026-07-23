@@ -132,6 +132,13 @@ public enum TenantPermissionEnum {
     private final int order;
     private final PermissionType type;
 
+    TenantPermissionEnum(String description, String category, int order, PermissionType type) {
+        this.description = description;
+        this.category = category;
+        this.order = order;
+        this.type = type;
+    }
+
     /**
      * Permission types for categorization
      */

@@ -98,6 +98,12 @@ public enum PlatformPermissionEnum {
     private final String category;
     private final int order;
 
+    PlatformPermissionEnum(String description, String category, int order) {
+        this.description = description;
+        this.category = category;
+        this.order = order;
+    }
+
 
 
     // =====================================================
