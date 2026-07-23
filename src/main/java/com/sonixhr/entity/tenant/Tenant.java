@@ -88,9 +88,6 @@ public class Tenant {
     // COMPANY CONTACT (Extra fields not in DTO but useful)
     // =====================================================
 
-    @Column(name = "company_email", length = 255)
-    private String companyEmail;
-
     @Column(name = "postal_code", length = 20)
     private String postalCode;
 
