@@ -49,7 +49,7 @@ public class PlatformDataInitializer implements ApplicationRunner {
     @Value("${app.platform.admin.role:Admin}")
     private String adminRoleName;
 
-    @Value("${app.platform.admin.default-password:Admin@2026}")
+    @Value("${app.platform.admin.default-password:Admin@123}")
     private String defaultAdminPassword;
 
     @jakarta.persistence.PersistenceContext

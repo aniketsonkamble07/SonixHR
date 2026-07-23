@@ -8,7 +8,7 @@ async function checkPlans() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 email: "admin@sonixhr.com",
-                password: "Admin@2026"
+                password: "Admin@123"
             })
         });
 

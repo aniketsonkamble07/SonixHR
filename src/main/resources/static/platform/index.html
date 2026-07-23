@@ -4069,10 +4069,19 @@
       e.preventDefault();
 
       const countryVal = document.getElementById('reg-country').value;
+      const adminEmailVal = document.getElementById('reg-admin-email').value.trim();
+      const fullNameVal = document.getElementById('reg-admin-name').value.trim();
+      const nameParts = fullNameVal.split(/\s+/);
+      const firstNameVal = nameParts[0] || fullNameVal || 'Admin';
+      const lastNameVal = nameParts.slice(1).join(' ') || firstNameVal;
+
       const payload = {
         companyName: document.getElementById('reg-company-name').value,
-        adminEmail: document.getElementById('reg-admin-email').value,
-        adminName: document.getElementById('reg-admin-name').value,
+        companyEmail: adminEmailVal,
+        adminEmail: adminEmailVal,
+        adminFirstName: firstNameVal,
+        adminLastName: lastNameVal,
+        adminName: fullNameVal,
         adminPhone: document.getElementById('reg-admin-phone').value,
         planType: document.getElementById('reg-plan-type').value,
         planCode: document.getElementById('reg-plan-type').value,

@@ -81,6 +81,27 @@ public class TenantRegistrationRequest {
     // UTILITY METHODS
     // =====================================================
 
+    @com.fasterxml.jackson.annotation.JsonSetter("adminName")
+    public void setAdminName(String fullName) {
+        if (fullName != null && !fullName.isBlank()) {
+            String[] parts = fullName.trim().split("\\s+", 2);
+            if (this.adminFirstName == null || this.adminFirstName.isBlank()) {
+                this.adminFirstName = parts[0];
+            }
+            if (this.adminLastName == null || this.adminLastName.isBlank()) {
+                this.adminLastName = parts.length > 1 ? parts[1] : parts[0];
+            }
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonSetter("adminEmail")
+    public void setAdminEmail(String email) {
+        this.adminEmail = email;
+        if (this.companyEmail == null || this.companyEmail.isBlank()) {
+            this.companyEmail = email;
+        }
+    }
+
     public String getAdminFullName() {
         return (adminFirstName != null ? adminFirstName : "") +
                 (adminLastName != null ? " " + adminLastName : "");
