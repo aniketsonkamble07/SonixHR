@@ -288,6 +288,11 @@
         </div>
 
         <div class="form-group">
+          <label for="companyEmail">Company Official Email</label>
+          <input type="email" id="companyEmail" name="companyEmail" required placeholder="info@company.com">
+        </div>
+
+        <div class="form-group full-width">
           <label for="planCode">Plan Option</label>
           <select id="planCode" name="planCode" required>
             <option value="">Loading active plans...</option>
@@ -438,6 +443,8 @@
 
       const fullNameVal = (document.getElementById('adminName').value || '').trim();
       const adminEmailVal = (document.getElementById('adminEmail').value || '').trim();
+      const companyEmailInput = document.getElementById('companyEmail');
+      const companyEmailVal = (companyEmailInput && companyEmailInput.value) ? companyEmailInput.value.trim() : adminEmailVal;
       const nameParts = fullNameVal.split(/\s+/);
       const firstNameVal = nameParts[0] || fullNameVal || 'Admin';
       const lastNameVal = nameParts.slice(1).join(' ') || firstNameVal;
@@ -445,7 +452,7 @@
       // Gather form inputs into DTO structure
       const payload = {
         companyName: document.getElementById('companyName').value,
-        companyEmail: adminEmailVal,
+        companyEmail: companyEmailVal || adminEmailVal,
         adminEmail: adminEmailVal,
         adminFirstName: firstNameVal,
         adminLastName: lastNameVal,

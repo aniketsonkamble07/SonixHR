@@ -44,6 +44,13 @@ public class Tenant {
     @Column(name = "company_name", nullable = false, length = 200)
     private String companyName;
 
+    @Column(name = "company_email", length = 255)
+    private String companyEmail;
+
+    public String getCompanyEmail() {
+        return (companyEmail != null && !companyEmail.isBlank()) ? companyEmail : adminEmail;
+    }
+
     // =====================================================
     // ADMIN USER DETAILS (Matches DTO)
     // =====================================================

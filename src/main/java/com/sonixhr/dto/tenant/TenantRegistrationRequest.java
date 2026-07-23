@@ -32,9 +32,11 @@ public class TenantRegistrationRequest {
     private String companyEmail;
 
     @Pattern(regexp = "^[+]?[0-9]{10,15}$", message = "Invalid phone number format")
+    @JsonAlias({"companyPhone", "phone"})
     private String phone;
 
     @Size(max = 500, message = "Address must be up to 500 characters")
+    @JsonAlias({"officeAddress", "companyAddress", "address"})
     private String address;
 
     @Size(max = 100, message = "City must be up to 100 characters")

@@ -23,6 +23,9 @@ public class TenantRegistrationResponse {
     private Long tenantId;
     private String tenantCode;
     private String companyName;
+    private String companyEmail;
+    private String companyPhone;
+    private String postalCode;
     private String planType;
     private String planStatus;
 
