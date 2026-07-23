@@ -1274,6 +1274,35 @@
               <input type="text" id="reg-company-name" class="form-input" placeholder="Acme Logistics Ltd" required>
             </div>
             <div class="form-group">
+              <label class="form-label" for="reg-company-email">Company Official Email</label>
+              <input type="email" id="reg-company-email" class="form-input" placeholder="info@acme.com" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-first-name">Admin First Name</label>
+              <input type="text" id="reg-admin-first-name" class="form-input" placeholder="John" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-last-name">Admin Last Name</label>
+              <input type="text" id="reg-admin-last-name" class="form-input" placeholder="Doe" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-email">Admin Login Email</label>
+              <input type="email" id="reg-admin-email" class="form-input" placeholder="admin@acme.com" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-admin-phone">Admin Mobile / Phone</label>
+              <input type="text" id="reg-admin-phone" class="form-input" placeholder="9876543210" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
               <label class="form-label" for="reg-plan-type">Initial Subscription Plan</label>
               <select id="reg-plan-type" class="select-input" style="width: 100%; height: 42px;">
                 <option value="Free Plan">Free Plan (14 days, 10 employees)</option>
@@ -1283,25 +1312,6 @@
                 <option value="Enterprise Plan">Enterprise ($999/mo, 10000 employees)</option>
               </select>
             </div>
-          </div>
-
-          <div class="form-grid" style="margin-top: 15px;">
-            <div class="form-group">
-              <label class="form-label" for="reg-admin-name">Super Admin Name</label>
-              <input type="text" id="reg-admin-name" class="form-input" placeholder="John Doe" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="reg-admin-email">Super Admin Email</label>
-              <input type="email" id="reg-admin-email" class="form-input" placeholder="admin@acme.com" required>
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-top: 15px;">
-            <label class="form-label" for="reg-admin-phone">Admin Mobile / Phone</label>
-            <input type="text" id="reg-admin-phone" class="form-input" placeholder="9876543210" required>
-          </div>
-
-          <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group">
               <label class="form-label" for="reg-country">Country</label>
               <select id="reg-country" class="select-input" style="width: 100%; height: 42px;"
@@ -1313,6 +1323,9 @@
                 <option value="AU">Australia</option>
               </select>
             </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
             <div class="form-group" id="reg-state-india-group">
               <label class="form-label" for="reg-state-india">State (India)</label>
               <select id="reg-state-india" class="select-input" style="width: 100%; height: 42px;">
@@ -4069,15 +4082,15 @@
       e.preventDefault();
 
       const countryVal = document.getElementById('reg-country').value;
+      const companyEmailVal = document.getElementById('reg-company-email') ? document.getElementById('reg-company-email').value.trim() : '';
       const adminEmailVal = document.getElementById('reg-admin-email').value.trim();
-      const fullNameVal = document.getElementById('reg-admin-name').value.trim();
-      const nameParts = fullNameVal.split(/\s+/);
-      const firstNameVal = nameParts[0] || fullNameVal || 'Admin';
-      const lastNameVal = nameParts.slice(1).join(' ') || firstNameVal;
+      const firstNameVal = document.getElementById('reg-admin-first-name') ? document.getElementById('reg-admin-first-name').value.trim() : 'Admin';
+      const lastNameVal = document.getElementById('reg-admin-last-name') ? document.getElementById('reg-admin-last-name').value.trim() : 'User';
+      const fullNameVal = `${firstNameVal} ${lastNameVal}`;
 
       const payload = {
         companyName: document.getElementById('reg-company-name').value,
-        companyEmail: adminEmailVal,
+        companyEmail: companyEmailVal || adminEmailVal,
         adminEmail: adminEmailVal,
         adminFirstName: firstNameVal,
         adminLastName: lastNameVal,

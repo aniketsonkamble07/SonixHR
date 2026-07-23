@@ -436,12 +436,21 @@
       const countryVal = (document.getElementById('country').value || '').trim();
       const isIndia = countryVal === '' || ['INDIA', 'IN'].includes(countryVal.toUpperCase());
 
+      const fullNameVal = (document.getElementById('adminName').value || '').trim();
+      const adminEmailVal = (document.getElementById('adminEmail').value || '').trim();
+      const nameParts = fullNameVal.split(/\s+/);
+      const firstNameVal = nameParts[0] || fullNameVal || 'Admin';
+      const lastNameVal = nameParts.slice(1).join(' ') || firstNameVal;
+
       // Gather form inputs into DTO structure
       const payload = {
         companyName: document.getElementById('companyName').value,
+        companyEmail: adminEmailVal,
+        adminEmail: adminEmailVal,
+        adminFirstName: firstNameVal,
+        adminLastName: lastNameVal,
+        adminName: fullNameVal,
         planCode: document.getElementById('planCode').value,
-        adminName: document.getElementById('adminName').value,
-        adminEmail: document.getElementById('adminEmail').value,
         adminPhone: document.getElementById('adminPhone').value || null,
         officeAddress: document.getElementById('officeAddress').value || null,
         city: document.getElementById('city').value || null,
