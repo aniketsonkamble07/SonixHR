@@ -3720,10 +3720,26 @@
 
     function getHeaders() {
       const token = localStorage.getItem('tenant_token');
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+      const headers = {
+        'Content-Type': 'application/json'
       };
+      if (token && token !== 'null' && token !== 'undefined') {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      return headers;
+    }
+
+    function checkResponseStatus(res) {
+      if (res && res.status === 401) {
+        localStorage.removeItem('tenant_token');
+        showToast('Session Expired', 'Your session has expired. Please log in again to continue.', 'warning');
+        if (document.getElementById('login-view')) {
+          document.getElementById('login-view').style.display = 'flex';
+        }
+        if (document.getElementById('app-view')) {
+          document.getElementById('app-view').style.display = 'none';
+        }
+      }
     }
 
     function showToast(title, message, type = 'info') {
@@ -4015,11 +4031,12 @@
         const res = await fetch(`${API_BASE}/tenant/auth/me`, { headers: getHeaders() });
         if (res.ok) {
           const data = await res.json();
-          if (data.authenticated && data.id) {
-            document.getElementById('header-user-name').textContent = data.fullName || 'User';
-            document.getElementById('header-user-avatar').textContent = (data.fullName || 'U').charAt(0).toUpperCase();
+          if (data && data.id) {
+            const fullName = data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'User';
+            document.getElementById('header-user-name').textContent = fullName;
+            document.getElementById('header-user-avatar').textContent = fullName.charAt(0).toUpperCase();
             document.getElementById('header-user-email').textContent = data.email || '';
-            document.getElementById('header-user-role').textContent = 'Tenant Employee';
+            document.getElementById('header-user-role').textContent = data.role ? (typeof data.role === 'object' ? data.role.name : data.role) : 'Tenant Employee';
             document.getElementById('metric-tenant-id').textContent = data.tenantId || '-';
             loggedInEmployeeId = data.id;
             currentUserAuthorities = data.authorities || '';

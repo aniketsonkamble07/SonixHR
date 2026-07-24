@@ -1209,61 +1209,77 @@
              ========================================== -->
         <section id="tab-platform-api-logs" class="view-panel">
           <div class="card" style="margin-bottom: 24px;">
-            <h3 class="card-title"><i class="fa-solid fa-terminal" style="color: var(--accent-violet);"></i> Platform
-              API Hit Logs Analysis</h3>
-            <p class="card-subtitle">Analyze API request history, traffic, client IPs, and device details across all
-              tenant organizations</p>
+            <h3 class="card-title"><i class="fa-solid fa-terminal" style="color: var(--color-primary, #6366f1);"></i> Platform API Hit Logs & Tenant Traffic Monitor</h3>
+            <p class="card-subtitle">Analyze real-time API request history, HTTP traffic, client IPs, endpoints, and device details across all tenant organizations</p>
           </div>
 
           <div class="card">
-            <div class="filter-bar">
-              <div class="filter-inputs">
-                <div class="search-input-wrapper" style="opacity: 0.7;">
-                  <i class="fa-solid fa-server"></i>
-                  <span style="margin-left: 20px; font-size: 0.85rem; color: var(--text-secondary);">Platform-wide
-                    logging aggregates across all organizations</span>
+            <div class="filter-bar" style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+              <div class="form-group" style="min-width: 220px; flex: 1;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Select Tenant Organization</label>
+                <select id="platform-api-logs-tenant-filter" class="select-input" style="width: 100%; height: 38px;" onchange="fetchPlatformApiLogs(0)">
+                  <option value="">All Organizations (Global)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="min-width: 150px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">HTTP Method</label>
+                <select id="platform-api-logs-method-filter" class="select-input" style="width: 100%; height: 38px;" onchange="fetchPlatformApiLogs(0)">
+                  <option value="ALL">All Methods</option>
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="flex: 2; min-width: 240px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Search Log URI / IP / User</label>
+                <div class="search-input-wrapper" style="position: relative;">
+                  <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                  <input type="text" id="platform-api-logs-search" class="search-input" placeholder="Search by URI, IP address, user..." style="padding-left: 36px; width: 100%; height: 38px;" oninput="filterLocalApiLogs()">
                 </div>
               </div>
 
-              <button class="btn btn-secondary" onclick="fetchPlatformApiLogs()">
-                <i class="fa-solid fa-rotate"></i>
-                <span>Refresh Global Logs</span>
-              </button>
+              <div style="display: flex; align-items: flex-end;">
+                <button class="btn btn-secondary" style="height: 38px;" onclick="fetchPlatformApiLogs(platformApiLogsPage)">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh Logs</span>
+                </button>
+              </div>
             </div>
 
             <div class="table-container">
               <table class="responsive-table">
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Tenant ID</th>
+                    <th>Hit Time</th>
+                    <th>Tenant ID / Code</th>
                     <th>Method</th>
                     <th>Request URI</th>
                     <th>IP Address</th>
-                    <th>Device Details</th>
-                    <th>User Contact</th>
+                    <th>Execution Time</th>
+                    <th>User Agent / Device</th>
                   </tr>
                 </thead>
                 <tbody id="platform-api-logs-tbody">
                   <tr>
                     <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
-                      Click Refresh to load platform-wide API hit logs.
+                      Loading API hit logs...
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <div class="pagination"
-              style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <div class="pagination" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
               <div class="pagination-info">
                 Page <span id="platform-api-logs-page-info">1 of 1</span>
               </div>
               <div class="pagination-controls">
-                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-prev"
-                  onclick="changePlatformApiLogsPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-next"
-                  onclick="changePlatformApiLogsPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-prev" onclick="changePlatformApiLogsPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-api-logs-next" onclick="changePlatformApiLogsPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
               </div>
             </div>
           </div>
@@ -4591,6 +4607,7 @@
 
               let actionsHtml = `
                 <button class="btn btn-secondary btn-icon" onclick="viewTenantDetails(${t.id})" title="Details"><i class="fa-solid fa-eye text-info"></i></button>
+                <button class="btn btn-secondary btn-icon" onclick="viewTenantApiLogs(${t.id})" title="View API Hit Logs"><i class="fa-solid fa-terminal text-violet"></i></button>
                 <button class="btn btn-secondary btn-icon" onclick="openEditTenantModal(${t.id}, '${t.companyName}', '${t.adminPhone}')" title="Edit Metadata"><i class="fa-solid fa-pen text-warning"></i></button>
                 <button class="btn btn-secondary btn-icon" onclick="openOverrideModal(${t.id}, '${t.planType}', ${t.maxEmployees})" title="Override Limits"><i class="fa-solid fa-cog text-primary"></i></button>
               `;
@@ -4610,7 +4627,7 @@
 
               const row = document.createElement('tr');
               row.innerHTML = `
-                <td><strong>${t.companyName}</strong></td>
+                <td><a style="cursor:pointer; color:var(--color-primary, #6366f1); font-weight:600; text-decoration:underline;" onclick="viewTenantApiLogs(${t.id})" title="Click to view API logs for ${escapeHtml(t.companyName)}">${escapeHtml(t.companyName)}</a></td>
                 <td><code>${t.tenantCode}</code></td>
                 <td>${t.adminName}<br><span style="font-size:0.75rem; color:var(--text-muted);">${t.adminEmail}</span></td>
                 <td><span class="badge ${(t.planType || 'free').toLowerCase()}">${t.planType || 'Free'}</span></td>
@@ -7717,6 +7734,117 @@
       }
     }
 
+    let rawGlobalApiLogs = [];
+
+    async function populatePlatformTenantOptions() {
+      const select = document.getElementById('platform-api-logs-tenant-filter');
+      if (!select) return;
+      try {
+        const res = await fetch(`${API_BASE}/platform/tenants?page=0&size=100`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.content || data.items || data;
+          if (list && list.length > 0) {
+            select.innerHTML = '<option value="">All Organizations (Global)</option>' +
+              list.map(t => `<option value="${t.id}">${escapeHtml(t.companyName)} (${t.tenantCode || 'ID:' + t.id})</option>`).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load tenants dropdown for API logs', err);
+      }
+    }
+
+    async function fetchPlatformApiLogs(page = 0) {
+      platformApiLogsPage = page;
+      const tbody = document.getElementById('platform-api-logs-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;"><span class="loading-spinner"></span> Loading API hit logs...</td></tr>';
+
+      const tenantId = document.getElementById('platform-api-logs-tenant-filter')?.value || '';
+      let url = `${API_BASE}/platform/api-logs?page=${page}&size=15&sort=hitTime,desc`;
+      if (tenantId) {
+        url += `&tenantId=${tenantId}`;
+      }
+
+      try {
+        const res = await fetch(url, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          rawGlobalApiLogs = data.content || data.items || data || [];
+          platformApiLogsTotalPages = data.totalPages || 1;
+
+          document.getElementById('platform-api-logs-page-info').textContent = `${platformApiLogsPage + 1} of ${platformApiLogsTotalPages}`;
+          document.getElementById('btn-platform-api-logs-prev').disabled = platformApiLogsPage <= 0;
+          document.getElementById('btn-platform-api-logs-next').disabled = platformApiLogsPage >= platformApiLogsTotalPages - 1;
+
+          filterLocalApiLogs();
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-rose, #ef4444);">Failed to load API hit logs.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-rose, #ef4444);">Error connecting to API hit logs service.</td></tr>';
+      }
+    }
+
+    function filterLocalApiLogs() {
+      const tbody = document.getElementById('platform-api-logs-tbody');
+      if (!tbody) return;
+
+      const methodFilter = (document.getElementById('platform-api-logs-method-filter')?.value || 'ALL').toUpperCase();
+      const searchTerm = (document.getElementById('platform-api-logs-search')?.value || '').toLowerCase().trim();
+
+      let logs = rawGlobalApiLogs || [];
+
+      if (methodFilter !== 'ALL') {
+        logs = logs.filter(l => (l.httpMethod || '').toUpperCase() === methodFilter);
+      }
+
+      if (searchTerm) {
+        logs = logs.filter(l =>
+          (l.requestUri && l.requestUri.toLowerCase().includes(searchTerm)) ||
+          (l.ipAddress && l.ipAddress.toLowerCase().includes(searchTerm)) ||
+          (l.userEmail && l.userEmail.toLowerCase().includes(searchTerm)) ||
+          (l.tenantCode && l.tenantCode.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No API hit logs found for selected filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        const timeStr = l.hitTime ? new Date(l.hitTime).toLocaleString() : '-';
+        const methodBadge = l.httpMethod === 'GET' ? 'badge info' :
+                            l.httpMethod === 'POST' ? 'badge success' :
+                            l.httpMethod === 'DELETE' ? 'badge danger' : 'badge warning';
+        const execTime = l.executionTimeMs != null ? `${l.executionTimeMs} ms` : '-';
+        const tenantDisp = l.tenantId ? `Tenant #${l.tenantId}` : 'Global';
+
+        return `
+          <tr>
+            <td style="font-size:0.8rem;">${timeStr}</td>
+            <td><code>${tenantDisp}</code></td>
+            <td><span class="${methodBadge}" style="padding:2px 6px; font-size:10px;">${escapeHtml(l.httpMethod || 'GET')}</span></td>
+            <td><code style="font-size:0.75rem; word-break:break-all;">${escapeHtml(l.requestUri || '')}</code></td>
+            <td>${escapeHtml(l.ipAddress || '-')}</td>
+            <td style="font-size:0.8rem; font-weight:600; color:var(--accent-emerald, #10b981);">${execTime}</td>
+            <td style="font-size:0.75rem; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(l.userAgent || '')}">
+              ${escapeHtml(l.userAgent || 'Unknown Device')}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function changePlatformApiLogsPage(dir) {
+      const target = platformApiLogsPage + dir;
+      if (target >= 0 && target < platformApiLogsTotalPages) {
+        fetchPlatformApiLogs(target);
+      }
+    }
+
     async function openPlatformUserRolesAssignModal(userId) {
       document.getElementById('pura-user-id').value = userId;
       const container = document.getElementById('platform-roles-checkboxes-container');
@@ -7829,6 +7957,29 @@
       }
     });
 
+    async function viewTenantApiLogs(tenantId) {
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      const targetPanel = document.getElementById('tab-platform-api-logs');
+      if (targetPanel) targetPanel.classList.add('active');
+
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-tab') === 'tab-platform-api-logs') {
+          item.classList.add('active');
+        }
+      });
+
+      const tabTitle = document.getElementById('current-tab-title');
+      if (tabTitle) tabTitle.textContent = 'Platform Global API Hit Logs';
+
+      await populatePlatformTenantOptions();
+      const select = document.getElementById('platform-api-logs-tenant-filter');
+      if (select) {
+        select.value = String(tenantId);
+      }
+      await fetchPlatformApiLogs(0);
+    }
+
     // ==========================================
     // EXPOSE GLOBALLY
     // ==========================================
@@ -7836,6 +7987,7 @@
     window.openModal = openModal;
     window.closeModal = closeModal;
     window.viewTenantDetails = viewTenantDetails;
+    window.viewTenantApiLogs = viewTenantApiLogs;
     window.executeTenantRestore = executeTenantRestore;
     window.openEditTenantModal = openEditTenantModal;
     window.openSuspendModal = openSuspendModal;
