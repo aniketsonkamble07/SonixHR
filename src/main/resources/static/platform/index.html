@@ -1595,6 +1595,90 @@
     </div>
   </div>
 
+  <!-- Modal: Create / Edit Platform Role -->
+  <div id="platform-role-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 id="platform-role-modal-title"><i class="fa-solid fa-user-shield" style="color: var(--color-primary, #6366f1);"></i> Create Platform Role</h3>
+        <button class="modal-close" onclick="closeModal('platform-role-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-role-form" onsubmit="handlePlatformRoleFormSubmit(event)">
+          <input type="hidden" id="platform-role-id">
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="platform-role-name">Role Name <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+            <input type="text" id="platform-role-name" class="form-input" placeholder="e.g. Platform Support Lead" required max="50">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="platform-role-desc">Description</label>
+            <input type="text" id="platform-role-desc" class="form-input" placeholder="Role purpose and responsibility scope" max="200">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label">Assign Permissions <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+            <div id="platform-role-modal-permissions-list" style="max-height: 220px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Loading permissions...</span>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 0; padding-top: 15px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-role-modal')">Cancel</button>
+            <button type="submit" id="platform-role-submit-btn" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Role</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create / Edit Platform Admin User -->
+  <div id="platform-user-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 id="platform-user-modal-title"><i class="fa-solid fa-user-gear" style="color: var(--color-primary, #6366f1);"></i> Create Platform Admin</h3>
+        <button class="modal-close" onclick="closeModal('platform-user-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-user-form">
+          <input type="hidden" id="puser-id">
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="puser-first-name">First Name <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+              <input type="text" id="puser-first-name" class="form-input" placeholder="e.g. Platform" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="puser-last-name">Last Name <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+              <input type="text" id="puser-last-name" class="form-input" placeholder="e.g. Admin" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="puser-email">Email Address <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+              <input type="email" id="puser-email" class="form-input" placeholder="admin@sonixhr.com" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="puser-phone">Phone / Mobile</label>
+              <input type="text" id="puser-phone" class="form-input" placeholder="9876543210">
+            </div>
+          </div>
+
+          <div class="form-group" id="puser-password-group" style="margin-top: 15px;">
+            <label class="form-label" for="puser-password">Initial Password <span style="color: var(--accent-rose, #ef4444);">*</span></label>
+            <input type="password" id="puser-password" class="form-input" placeholder="••••••••" minlength="6">
+          </div>
+
+          <div class="modal-footer" style="padding: 0; padding-top: 15px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-user-modal')">Cancel</button>
+            <button type="submit" id="puser-submit-btn" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Admin</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal 4: Edit Tenant Organization -->
   <div id="edit-tenant-modal" class="modal-overlay">
     <div class="modal" style="max-width: 500px;">
@@ -4521,7 +4605,7 @@
               }
 
               if (t.status !== 'DELETED') {
-                actionsHtml += `<button class="btn btn-secondary btn-icon" onclick="deleteTenant(${t.id})" title="Delete"><i class="fa-solid fa-trash text-danger"></i></button>`;
+                actionsHtml += `<button class="btn btn-danger" style="padding: 6px 12px; font-size:0.75rem;" onclick="deleteTenant(${t.id})" title="Permanently Delete Organization"><i class="fa-solid fa-trash"></i> Delete</button>`;
               }
 
               const row = document.createElement('tr');
@@ -7285,7 +7369,106 @@
       }
     });
 
+    async function fetchPlatformPermissionsList() {
+      const container = document.getElementById('platform-role-modal-permissions-list');
+      if (!container) return;
+      container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">Loading permissions...</span>';
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/permissions`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const permissions = await res.json();
+          container.innerHTML = '';
+          permissions.forEach(p => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.82rem; cursor:pointer; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);';
+            label.innerHTML = `
+              <input type="checkbox" class="platform-perm-cb" value="${p.id}" style="width:16px; height:16px; cursor:pointer; accent-color:var(--color-primary, #6366f1);">
+              <div>
+                <strong style="color:#fff; font-size:0.75rem; display:block;">${escapeHtml(p.permission || p.name || '')}</strong>
+                <span style="color:var(--text-muted); font-size:0.7rem;">${escapeHtml(p.description || p.category || '')}</span>
+              </div>
+            `;
+            container.appendChild(label);
+          });
+        }
+      } catch (err) {
+        container.innerHTML = '<span style="color: var(--accent-rose, #ef4444);">Failed to load permissions.</span>';
+      }
+    }
+
+    async function openCreatePlatformRoleModal() {
+      document.getElementById('platform-role-modal-title').textContent = 'Create Platform Role';
+      document.getElementById('platform-role-id').value = '';
+      document.getElementById('platform-role-name').value = '';
+      document.getElementById('platform-role-desc').value = '';
+      await fetchPlatformPermissionsList();
+      openModal('platform-role-modal');
+    }
+
+    async function handlePlatformRoleFormSubmit(e) {
+      e.preventDefault();
+      const roleId = document.getElementById('platform-role-id').value;
+      const name = document.getElementById('platform-role-name').value.trim();
+      const description = document.getElementById('platform-role-desc').value.trim();
+
+      const permissionIds = [];
+      document.querySelectorAll('#platform-role-modal-permissions-list .platform-perm-cb:checked').forEach(cb => {
+        permissionIds.push(parseInt(cb.value));
+      });
+
+      if (!name) {
+        showToast('Validation Error', 'Role name is required.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('platform-role-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner"></span> Saving...`;
+
+      try {
+        const isEdit = roleId !== '';
+        const url = isEdit ? `${API_BASE}/platform/roles/${roleId}` : `${API_BASE}/platform/roles`;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const payload = isEdit ? { name, description } : { name, description, permissionIds };
+
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-save"></i> Save Role`;
+
+        if (res.ok) {
+          const roleData = await res.json();
+          if (isEdit && permissionIds.length > 0) {
+            await fetch(`${API_BASE}/platform/roles/${roleData.id || roleId}/permissions`, {
+              method: 'PUT',
+              headers: getHeaders(),
+              body: JSON.stringify(permissionIds)
+            });
+          }
+          showToast('Success', `Platform role '${name}' saved successfully.`, 'success');
+          closeModal('platform-role-modal');
+          fetchPlatformRoles();
+        } else {
+          const err = await res.json();
+          showToast('Failed', err.message || 'Failed to save platform role.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-save"></i> Save Role`;
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
     window.openPlatformRolePermissionsModal = openPlatformRolePermissionsModal;
+    window.openCreatePlatformRoleModal = openCreatePlatformRoleModal;
+    window.handlePlatformRoleFormSubmit = handlePlatformRoleFormSubmit;
 
     // ==========================================
     // PLATFORM USERS MANAGEMENT (PlatformUserController)
@@ -7422,11 +7605,17 @@
     document.getElementById('platform-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('puser-id').value;
+      const firstName = document.getElementById('puser-first-name').value.trim();
+      const lastName = document.getElementById('puser-last-name').value.trim();
+      const fullName = (firstName + ' ' + lastName).trim() || email;
+
       const payload = {
-        firstName: document.getElementById('puser-first-name').value.trim(),
-        lastName: document.getElementById('puser-last-name').value.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        fullName: fullName,
         email: document.getElementById('puser-email').value.trim(),
-        phone: document.getElementById('puser-phone').value.trim()
+        phone: document.getElementById('puser-phone').value.trim(),
+        roleIds: [1]
       };
 
       if (!id) {

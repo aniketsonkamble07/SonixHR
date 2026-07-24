@@ -21,6 +21,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+import com.sonixhr.dto.employee.EmployeeResponse;
+import com.sonixhr.service.employee.EmployeeService;
+import io.swagger.v3.oas.annotations.Operation;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/tenant/auth")
@@ -30,6 +34,7 @@ public class TenantAuthController {
     private final TenantAuthService tenantAuthService;
     private final RateLimiterService rateLimiterService;
     private final JwtService jwtService; // ✅ Added
+    private final EmployeeService employeeService;
 
     // =====================================================
     // LOGIN
@@ -488,6 +493,19 @@ public class TenantAuthController {
                             .errorCode("AUTH_006")
                             .build());
         }
+    }
+
+    // =====================================================
+    // GET CURRENT USER PROFILE (/me)
+    // =====================================================
+
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get current authenticated tenant employee", description = "Returns currently authenticated tenant employee profile details")
+    public ResponseEntity<EmployeeResponse> getCurrentUser(@AuthenticationPrincipal Employee currentEmployee) {
+        log.info("REST request to get current tenant user profile for email: {}", currentEmployee.getEmail());
+        EmployeeResponse response = employeeService.getEmployeeById(currentEmployee.getId(), currentEmployee.getTenantId());
+        return ResponseEntity.ok(response);
     }
 
     // =====================================================

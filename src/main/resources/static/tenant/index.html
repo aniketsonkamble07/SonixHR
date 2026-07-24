@@ -7798,6 +7798,46 @@
       }
     }
 
+    async function fetchMyPayslips() {
+      try {
+        const res = await fetch(`${API_BASE}/payroll/payslips/my`, { headers: getHeaders() });
+        if (res.status === 401) {
+          showToast('Session Expired', 'Please log in again to view your payslips.', 'warning');
+          handleLogout();
+          return [];
+        }
+        if (res.ok) {
+          return await res.json();
+        } else {
+          const err = await res.json();
+          showToast('Error', err.message || 'Failed to fetch payslips.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error while loading payslips.', 'error');
+      }
+      return [];
+    }
+
+    async function fetchEmployeePayslips(employeeId) {
+      try {
+        const res = await fetch(`${API_BASE}/employees/${employeeId}/payslips`, { headers: getHeaders() });
+        if (res.status === 401) {
+          showToast('Session Expired', 'Please log in again.', 'warning');
+          handleLogout();
+          return [];
+        }
+        if (res.ok) {
+          return await res.json();
+        } else {
+          const err = await res.json();
+          showToast('Error', err.message || 'Failed to fetch employee payslips.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error while loading payslips.', 'error');
+      }
+      return [];
+    }
+
     window.fetchSupportTickets = fetchSupportTickets;
     window.openRaiseTicketModal = openRaiseTicketModal;
     window.viewTicketDetails = viewTicketDetails;
@@ -7833,6 +7873,8 @@
     window.fetchDepartmentDashboard = fetchDepartmentDashboard;
     window.fetchEmployeeCalendarData = fetchEmployeeCalendarData;
     window.handleFirstTimePasswordChangeSubmit = handleFirstTimePasswordChangeSubmit;
+    window.fetchMyPayslips = fetchMyPayslips;
+    window.fetchEmployeePayslips = fetchEmployeePayslips;
 
     // ==========================================
     // INIT
