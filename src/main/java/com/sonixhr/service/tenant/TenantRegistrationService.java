@@ -414,7 +414,7 @@ public class TenantRegistrationService {
                         tenant.getCity() != null && !tenant.getCity().isEmpty() ? tenant.getCity() : "Head Office")
                 .passwordHash(passwordHash)
                 .roles(new HashSet<>(Set.of(adminRole)))
-                .mustChangePassword(true)
+                .mustChangePassword(false)
                 .build();
 
         return employeeRepository.save(adminEmployee);

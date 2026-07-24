@@ -1226,6 +1226,46 @@
   </div>
 
   <!-- ==========================================
+     FIRST-TIME PASSWORD CHANGE MODAL
+     ========================================== -->
+  <div id="first-time-password-modal" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key" style="color: var(--accent-violet);"></i> Set Up Your Password</h3>
+        <button class="modal-close" onclick="closeModal('first-time-password-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5;">
+          First-time password setup is required for your account. Please update your password to complete your initial login.
+        </p>
+        <form id="first-time-password-form" onsubmit="handleFirstTimePasswordChangeSubmit(event)">
+          <input type="hidden" id="first-time-reset-token">
+          
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="first-time-current-password">Current / Temporary Password</label>
+            <input type="password" id="first-time-current-password" class="form-input" placeholder="••••••••" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="first-time-new-password">New Password <span style="color: var(--accent-rose);">*</span></label>
+            <input type="password" id="first-time-new-password" class="form-input" placeholder="••••••••" required minlength="6">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="first-time-confirm-password">Confirm New Password <span style="color: var(--accent-rose);">*</span></label>
+            <input type="password" id="first-time-confirm-password" class="form-input" placeholder="••••••••" required minlength="6">
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('first-time-password-modal')">Cancel</button>
+            <button type="submit" id="first-time-submit-btn" class="btn btn-primary"><i class="fa-solid fa-shield-check"></i> Save & Continue</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
      MAIN PORTAL VIEW
      ========================================== -->
   <div id="app-view" class="portal-layout" style="display: none;">
@@ -3920,18 +3960,27 @@
         btn.disabled = false;
         btn.innerHTML = `<span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>`;
 
-        if (res.ok) {
-          const data = await res.json();
+        const data = await res.json();
+
+        if (data.requiresPasswordChange || data.errorCode === 'AUTH_004') {
+          showToast('Password Setup Required', data.message || 'First-time password setup required.', 'info');
+          document.getElementById('first-time-reset-token').value = data.resetToken || '';
+          document.getElementById('first-time-current-password').value = password;
+          openModal('first-time-password-modal');
+          return;
+        }
+
+        if (res.ok && data.accessToken) {
           localStorage.setItem('tenant_token', data.accessToken);
           showToast('Welcome', `Hello ${data.fullName || 'User'}!`, 'success');
           showAppView();
           await fetchUserProfile();
           await fetchGlobalComponents();
+          initTenantNotificationStream();
           loadTab('tab-overview');
           await checkSubscriptionStatus();
         } else {
-          const err = await res.json();
-          showToast('Login Failed', err.message || 'Invalid credentials.', 'error');
+          showToast('Login Failed', data.message || 'Invalid credentials.', 'error');
         }
       } catch (err) {
         btn.disabled = false;
@@ -7694,6 +7743,61 @@
       return null;
     }
 
+    async function handleFirstTimePasswordChangeSubmit(e) {
+      e.preventDefault();
+      const resetToken = document.getElementById('first-time-reset-token').value;
+      const currentPassword = document.getElementById('first-time-current-password').value;
+      const newPassword = document.getElementById('first-time-new-password').value;
+      const confirmPassword = document.getElementById('first-time-confirm-password').value;
+
+      if (newPassword !== confirmPassword) {
+        showToast('Password Mismatch', 'New password and confirm password do not match.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('first-time-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner"></span> Updating...`;
+
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (resetToken) {
+          headers['Authorization'] = `Bearer ${resetToken}`;
+        }
+
+        const res = await fetch(`${API_BASE}/tenant/auth/change-password`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+        });
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-shield-check"></i> Save & Continue`;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.accessToken) {
+            localStorage.setItem('tenant_token', data.accessToken);
+          }
+          showToast('Password Updated', data.message || 'Password changed successfully!', 'success');
+          closeModal('first-time-password-modal');
+          showAppView();
+          await fetchUserProfile();
+          await fetchGlobalComponents();
+          initTenantNotificationStream();
+          loadTab('tab-overview');
+          await checkSubscriptionStatus();
+        } else {
+          const err = await res.json();
+          showToast('Update Failed', err.message || 'Failed to change password.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-shield-check"></i> Save & Continue`;
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    }
+
     window.fetchSupportTickets = fetchSupportTickets;
     window.openRaiseTicketModal = openRaiseTicketModal;
     window.viewTicketDetails = viewTicketDetails;
@@ -7728,6 +7832,7 @@
     window.fetchAttendanceDashboardStats = fetchAttendanceDashboardStats;
     window.fetchDepartmentDashboard = fetchDepartmentDashboard;
     window.fetchEmployeeCalendarData = fetchEmployeeCalendarData;
+    window.handleFirstTimePasswordChangeSubmit = handleFirstTimePasswordChangeSubmit;
 
     // ==========================================
     // INIT

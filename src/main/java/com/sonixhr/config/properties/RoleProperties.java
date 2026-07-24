@@ -43,10 +43,10 @@ public class RoleProperties {
 
     @PostConstruct
     public void init() {
-        // No hardcoded defaults - all from config
-        // If config is empty, log warning
+        // Fallback default roles if empty in properties
         if (definitions.isEmpty()) {
-            log.warn("No role definitions found in configuration. Please configure app.roles.definitions");
+            log.info("No app.roles.definitions provided in properties. Initializing default system role definitions.");
+            populateDefaultRoleDefinitions();
         }
 
         // Build system roles list from definitions
@@ -56,6 +56,17 @@ public class RoleProperties {
                 systemRoles.add(entry.getKey());
             }
         }
+    }
+
+    private void populateDefaultRoleDefinitions() {
+        RoleDefinition admin = new RoleDefinition();
+        admin.setName("Admin");
+        admin.setDescription("Administrator with full platform access");
+        admin.setCategory("SYSTEM");
+        admin.setPriority(1);
+        admin.setSystemRole(true);
+        admin.setIsDefault(true);
+        definitions.put("Admin", admin);
     }
 
     public RoleDefinition getRoleDefinition(String roleName) {

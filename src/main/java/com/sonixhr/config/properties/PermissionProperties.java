@@ -38,7 +38,8 @@ public class PermissionProperties {
     @PostConstruct
     public void init() {
         if (definitions.isEmpty()) {
-            log.warn("No permission definitions found in configuration. Please configure app.permissions.definitions");
+            log.info("No app.permissions.definitions provided in properties. Initializing default system permission definitions.");
+            populateDefaultPermissionDefinitions();
         }
 
         // Build modules from definitions
@@ -50,6 +51,23 @@ public class PermissionProperties {
                         .add(entry.getKey());
             }
         }
+    }
+
+    private void populateDefaultPermissionDefinitions() {
+        for (com.sonixhr.enums.PlatformPermissionEnum perm : com.sonixhr.enums.PlatformPermissionEnum.values()) {
+            addDefaultPermission(perm.name(), perm.getDescription(), perm.getCategory(), perm.getCategory(), perm.getOrder());
+        }
+    }
+
+    private void addDefaultPermission(String name, String description, String module, String category, Integer displayOrder) {
+        PermissionDefinition def = new PermissionDefinition();
+        def.setName(name);
+        def.setDescription(description);
+        def.setModule(module);
+        def.setCategory(category);
+        def.setDisplayOrder(displayOrder);
+        def.setIsActive(true);
+        definitions.put(name, def);
     }
 
     public PermissionDefinition getPermissionDefinition(String permissionName) {
