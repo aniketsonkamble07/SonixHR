@@ -9973,4 +9973,366 @@ false
 ```
 - **Response Type**: `ResponseEntity<PlatformUserResponse>`
 
+### POST `/api/tenant/register`
+- **Handler Method**: `registerTenant`
+- **Controller**: `TenantRegistrationController`
+- **Description**: Public endpoint for self-service organization registration. Automatically provisions tenant DB context, default roles (`Admin`, `Manager`, `Employee`), initial Admin Employee account, and active subscription plan.
+- **Security**: Public (No authentication required)
+- **Request Body Type**: `TenantRegistrationRequest`
+
+#### Request Parameters & Aliases:
+| Parameter | Type | Validation / Aliases | Description |
+|-----------|------|----------------------|-------------|
+| `companyName` | String | Min 2, Max 200 | Name of the registering organization |
+| `companyEmail` | String | Valid Email format | Official company contact email |
+| `phone` | String | Aliases: `companyPhone`, `phone` | Organization contact phone |
+| `address` | String | Aliases: `officeAddress`, `companyAddress`, `address` | Office address |
+| `city` | String | Max 100 | Office city |
+| `state` | Enum / String | `IndianState` (e.g. `MAHARASHTRA`, `KARNATAKA`, `DELHI`) | Indian state enum |
+| `stateText` | String | Max 100 | Custom state text fallback |
+| `country` | String | Max 50 | Country name |
+| `postalCode` | String | Max 20 | PIN / ZIP code |
+| `adminFirstName` | String | Min 2, Max 100 | Admin user first name |
+| `adminLastName` | String | Min 2, Max 100 | Admin user last name |
+| `adminName` | String | Setter helper | Full name (auto-splits into first & last name) |
+| `adminEmail` | String | Valid Email format | Admin login email credential |
+| `adminPhone` | String | Pattern `^[+]?[0-9]{10,15}$` | Admin contact phone |
+| `planCode` | String | Aliases: `planType`, `planCode` | Subscription plan code (e.g. `TEST1`, `STARTER`, `GROWTH`) |
+
+#### Complete Request JSON Example:
+```json
+{
+  "companyName": "Acme Innovations Tech",
+  "companyEmail": "contact@acmeinnovations.com",
+  "phone": "+919876543210",
+  "address": "Tech Park Tower 4, Suite 300",
+  "city": "Mumbai",
+  "state": "MAHARASHTRA",
+  "stateText": "Maharashtra",
+  "country": "India",
+  "postalCode": "400001",
+  "adminFirstName": "Aniket",
+  "adminLastName": "Sonkamble",
+  "adminEmail": "aniketsonkamble07@gmail.com",
+  "adminPhone": "+919876543210",
+  "planCode": "TEST1"
+}
+```
+
+#### Complete Response JSON Example:
+```json
+{
+  "success": true,
+  "message": "Tenant registered successfully. Admin account created with default password 'Admin@123'.",
+  "tenantId": 1,
+  "tenantCode": "ACMEINNO",
+  "companyName": "Acme Innovations Tech",
+  "companyEmail": "contact@acmeinnovations.com",
+  "companyPhone": "+919876543210",
+  "postalCode": "400001",
+  "planType": "TEST1",
+  "planStatus": "ACTIVE",
+  "endsAt": "2026-08-24T09:37:00",
+  "status": "ACTIVE",
+  "isActive": true,
+  "adminEmail": "aniketsonkamble07@gmail.com",
+  "adminName": "Aniket Sonkamble",
+  "adminPhone": "+919876543210",
+  "officeAddress": "Tech Park Tower 4, Suite 300",
+  "city": "Mumbai",
+  "state": "MAHARASHTRA",
+  "stateText": "Maharashtra",
+  "country": "India",
+  "adminEmployeeId": 1,
+  "adminEmployeeCode": "EMP001",
+  "adminPosition": "Administrator",
+  "createdAt": "2026-07-24T09:37:00"
+}
+```
+
+---
+
+### GET `/api/public/plans`
+- **Handler Method**: `getPublicPlans`
+- **Controller**: `TenantRegistrationController`
+- **Description**: Public endpoint to list all active pricing and subscription plans for tenant self-registration
+- **Security**: Public (No authentication required)
+- **Request Body**: None
+- **Response Type**: `List<SubscriptionPlanDTO>`
+
+---
+
+### GET `/api/public/check-email`
+- **Handler Method**: `checkEmail`
+- **Controller**: `TenantRegistrationController`
+- **Description**: Rate-limited public endpoint to check email availability for organization registration
+- **Security**: Public (No authentication required)
+- **Query Parameters**: `email` (String, required)
+- **Request Body**: None
+- **Response Type**: `Map<String, Object>`
+
+---
+
+### POST `/api/public/set-password`
+- **Handler Method**: `setPassword`
+- **Controller**: `TenantRegistrationController`
+- **Description**: Rate-limited public activation endpoint to set password using activation token
+- **Security**: Public (No authentication required)
+- **Request Body Type**: `SetPasswordRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "act_token_string",
+  "newPassword": "NewPassword@123",
+  "confirmPassword": "NewPassword@123"
+}
+```
+- **Response Type**: `Void`
+
+---
+
+### GET `/api/platform/tenants`
+- **Handler Method**: `getAllTenants`
+- **Controller**: `PlatformTenantController`
+- **Description**: List all registered tenant organizations with company search, status, and pagination
+- **Security**: `@PreAuthorize("hasAuthority('VIEW_TENANTS')")`
+- **Query Parameters**: `companyName` (optional), `status` (optional), `isActive` (optional), `page`, `size`
+- **Response Type**: `Page<PlatformTenantResponseDTO>`
+
+---
+
+### GET `/api/platform/tenants/{id}`
+- **Handler Method**: `getTenantById`
+- **Controller**: `PlatformTenantController`
+- **Description**: Get metadata and metrics for a specific tenant organization
+- **Security**: `@PreAuthorize("hasAuthority('VIEW_TENANT_DETAILS')")`
+- **Response Type**: `PlatformTenantResponseDTO`
+
+---
+
+### POST `/api/platform/tenants`
+- **Handler Method**: `createTenant`
+- **Controller**: `PlatformTenantController`
+- **Description**: Super Admin endpoint to manually provision a new tenant organization
+- **Security**: `@PreAuthorize("hasAuthority('CREATE_TENANT')")`
+- **Request Body Type**: `TenantRegistrationRequest`
+#### Request JSON Example:
+```json
+{
+  "companyName": "Dipak Logistics Pvt Ltd",
+  "companyEmail": "contact@dipaklogistics.com",
+  "phone": "+919822334455",
+  "address": "Logistics Park, Hub 5",
+  "city": "Pune",
+  "stateText": "MAHARASHTRA",
+  "country": "India",
+  "postalCode": "411001",
+  "adminFirstName": "Dipak",
+  "adminLastName": "Ligade",
+  "adminEmail": "ligadedipak8@gmail.com",
+  "adminPhone": "+919822334455",
+  "planCode": "TEST1"
+}
+```
+- **Response Type**: `ResponseEntity<PlatformTenantResponseDTO>`
+
+---
+
+### PUT `/api/platform/tenants/{id}`
+- **Handler Method**: `updateTenant`
+- **Controller**: `PlatformTenantController`
+- **Description**: Update organization metadata, admin contact, and office address
+- **Security**: `@PreAuthorize("hasAuthority('EDIT_TENANT')")`
+- **Request Body Type**: `TenantUpdateRequest`
+- **Response Type**: `PlatformTenantResponseDTO`
+
+---
+
+### PUT `/api/platform/tenants/{id}/suspend`
+- **Handler Method**: `suspendTenant`
+- **Controller**: `PlatformTenantController`
+- **Description**: Suspend organization access with a mandatory suspension reason
+- **Security**: `@PreAuthorize("hasAuthority('SUSPEND_TENANT')")`
+- **Query Parameters**: `reason` (String, required)
+- **Response Type**: `PlatformTenantResponseDTO`
+
+---
+
+### PUT `/api/platform/tenants/{id}/activate`
+- **Handler Method**: `activateTenant`
+- **Controller**: `PlatformTenantController`
+- **Description**: Reactivate a suspended or disabled tenant organization
+- **Security**: `@PreAuthorize("hasAuthority('ACTIVATE_TENANT')")`
+- **Response Type**: `PlatformTenantResponseDTO`
+
+---
+
+### PUT `/api/platform/tenants/{id}/plan-override`
+- **Handler Method**: `overrideTenantPlan`
+- **Controller**: `PlatformTenantController`
+- **Description**: Override plan type, seat limit, or feature entitlements for a specific tenant
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_TENANT_PLANS')")`
+- **Request Body Type**: `TenantPlanOverrideDTO`
+#### Request JSON Example:
+```json
+{
+  "planType": "ENTERPRISE",
+  "maxEmployees": 500,
+  "maxDepartments": 50,
+  "maxStorageMb": 50000
+}
+```
+- **Response Type**: `PlatformTenantResponseDTO`
+
+---
+
+### DELETE `/api/platform/tenants/{id}`
+- **Handler Method**: `deleteTenant`
+- **Controller**: `PlatformTenantController`
+- **Description**: Permanently delete tenant organization and cascade-delete all child records (employees, attendance, payroll, leaves, subscriptions) across all database tables. Generates SHA-256 GDPR compliance audit log.
+- **Security**: `@PreAuthorize("hasAuthority('DELETE_TENANT')")`
+- **Response Type**: `Void` (HTTP 204 No Content)
+
+---
+
+### GET `/api/platform/admin/tenants`
+- **Handler Method**: `getAllTenants`
+- **Controller**: `PlatformAdminTenantController`
+- **Description**: List all tenants with company name, status, and active filters for platform admins
+- **Security**: `@PreAuthorize("hasAuthority('VIEW_TENANTS')")`
+- **Response Type**: `Page<PlatformTenantResponseDTO>`
+
+---
+
+### POST `/api/platform/admin/tenants`
+- **Handler Method**: `createTenant`
+- **Controller**: `PlatformAdminTenantController`
+- **Description**: Super admin endpoint to provision a new tenant organization
+- **Security**: `@PreAuthorize("hasAuthority('CREATE_TENANT')")`
+- **Request Body Type**: `TenantRegistrationRequest`
+- **Response Type**: `ResponseEntity<PlatformTenantResponseDTO>`
+
+---
+
+### DELETE `/api/platform/admin/tenants/{id}`
+- **Handler Method**: `deleteTenant`
+- **Controller**: `PlatformAdminTenantController`
+- **Description**: Permanently delete tenant organization with GDPR compliance manifest and SHA-256 hash log
+- **Security**: `@PreAuthorize("hasAuthority('DELETE_TENANT')")`
+- **Response Type**: `Void` (HTTP 204 No Content)
+
+---
+
+### GET `/api/platform/admin/subscription-plans`
+- **Handler Method**: `getAllPlans`
+- **Controller**: `PlatformAdminSubscriptionController`
+- **Description**: Fetch all pricing plans including deleted and inactive plans
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_PRICING_PLANS')")`
+- **Response Type**: `List<SubscriptionPlanDTO>`
+
+---
+
+### POST `/api/platform/admin/subscription-plans/{id}/features`
+- **Handler Method**: `addFeature`
+- **Controller**: `PlatformAdminSubscriptionController`
+- **Description**: Add a new feature entitlement to a subscription plan
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_PRICING_PLANS')")`
+- **Query Parameters**: `featureCode` (String, required), `description` (String, optional)
+- **Response Type**: `SubscriptionPlanDTO`
+
+---
+
+### PUT `/api/payroll/config/tenants/{tenantId}/global`
+- **Handler Method**: `updateGlobalConfig`
+- **Controller**: `TenantPayrollConfigurationController`
+- **Description**: Create or update tenant global payroll configuration (PF rate, ESI rate, PT state, pay frequency)
+- **Security**: `@PreAuthorize("hasAuthority('SETTINGS_EDIT')")`
+- **Request Body Type**: `TenantPayrollConfigRequest`
+- **Response Type**: `TenantPayrollConfigResponse`
+
+---
+
+### GET `/api/payroll/config/tenants/{tenantId}/global`
+- **Handler Method**: `getGlobalConfig`
+- **Controller**: `TenantPayrollConfigurationController`
+- **Description**: Get active global payroll configuration for a tenant
+- **Security**: `@PreAuthorize("hasAuthority('SETTINGS_VIEW')")`
+- **Response Type**: `TenantPayrollConfigResponse`
+
+---
+
+### POST `/api/payroll/config/tenants/{tenantId}/components`
+- **Handler Method**: `createComponent`
+- **Controller**: `TenantPayrollConfigurationController`
+- **Description**: Create a new salary component definition (Allowances, Deductions, Reimbursements)
+- **Security**: `@PreAuthorize("hasAuthority('SETTINGS_EDIT')")`
+- **Request Body Type**: `SalaryComponentDefinitionRequest`
+- **Response Type**: `SalaryComponentDefinitionResponse`
+
+---
+
+### PUT `/api/employees/{id}/compensation`
+- **Handler Method**: `updateCompensation`
+- **Controller**: `EmployeeCompensationController`
+- **Description**: Register or update employee salary profile, component overrides, and bank account details
+- **Security**: `@PreAuthorize("hasAuthority('EMPLOYEE_EDIT')")`
+- **Request Body Type**: `EmployeeCompensationRequest`
+- **Response Type**: `EmployeeCompensationResponse`
+
+---
+
+### GET `/api/employees/{id}/compensation`
+- **Handler Method**: `getCompensation`
+- **Controller**: `EmployeeCompensationController`
+- **Description**: Get active salary profile, component overrides, bank details, and history for an employee
+- **Security**: `@PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW_ALL', 'EMPLOYEE_VIEW_TEAM') or #id == principal.id")`
+- **Response Type**: `EmployeeCompensationResponse`
+
+---
+
+### GET `/api/calendar/my`
+- **Handler Method**: `getMyCalendar`
+- **Controller**: `CalendarController`
+- **Description**: Get consolidated monthly calendar for current employee showing shifts, attendance, leaves, and holidays
+- **Security**: `@PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_OWN', 'LEAVE_VIEW_OWN')")`
+- **Query Parameters**: `year` (int), `month` (int)
+- **Response Type**: `CalendarMonthDTO`
+
+---
+
+### GET `/api/employees/tasks/my`
+- **Handler Method**: `getMyTasks`
+- **Controller**: `EmployeeTaskController`
+- **Description**: Get assigned tasks for current employee with status, priority, and due dates
+- **Security**: `@PreAuthorize("hasAuthority('TASK_VIEW_OWN')")`
+- **Response Type**: `Page<TaskResponseDTO>`
+
+---
+
+### POST `/api/employees/tasks`
+- **Handler Method**: `createTask`
+- **Controller**: `EmployeeTaskController`
+- **Description**: Create and assign a new task to one or more employees
+- **Security**: `@PreAuthorize("hasAuthority('TASK_CREATE')")`
+- **Request Body Type**: `TaskCreateRequestDTO`
+- **Response Type**: `TaskResponseDTO`
+
+---
+
+### POST `/api/payroll/reimbursements/submit`
+- **Handler Method**: `submit`
+- **Controller**: `ReimbursementClaimController`
+- **Description**: Submit a new employee reimbursement claim with category, amount, and receipt URL
+- **Security**: `@PreAuthorize("isAuthenticated()")`
+- **Response Type**: `ReimbursementClaim`
+
+---
+
+### GET `/api/tenant/shifts`
+- **Handler Method**: `getAllShifts`
+- **Controller**: `ShiftConfigurationController`
+- **Description**: Get all work shift configurations (General, Night, Rotational, Flexible) for a tenant
+- **Security**: `@PreAuthorize("hasAnyAuthority('ATTENDANCE_VIEW_ALL', 'SETTINGS_VIEW')")`
+- **Response Type**: `List<ShiftConfigurationDTO>`
+
 ---
