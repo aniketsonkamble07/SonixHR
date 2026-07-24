@@ -9874,8 +9874,23 @@ false
 - **Request Body**: None (Query parameters / Path variables only)
 - **Response Type**: `Void`
 
----
+### GET `/api/tenant/auth/me`
+- **Handler Method**: `getCurrentUser`
+- **Controller**: `TenantAuthController`
+- **Description**: Returns currently authenticated tenant employee profile details
+- **Security**: `@PreAuthorize("isAuthenticated()")`
+- **Request Body**: None
+- **Response Type**: `EmployeeResponse`
 
 ---
+
+### GET `/api/platform/api-logs`
+- **Handler Method**: `getAllApiLogs`
+- **Controller**: `PlatformApiHitLogController`
+- **Description**: Get API hit logs with optional tenantId filtering across tenant organizations
+- **Security**: `@PreAuthorize("hasAnyAuthority('API_LOG_VIEW', 'VIEW_SYSTEM_METRICS', 'VIEW_TENANTS')")`
+- **Query Parameters**: `tenantId` (Long, optional), `page` (int, default 0), `size` (int, default 15)
+- **Request Body**: None
+- **Response Type**: `Page<ApiHitLog>`
 
 ---
