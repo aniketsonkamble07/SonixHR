@@ -1191,6 +1191,41 @@
   </div>
 
   <!-- ==========================================
+     EMPLOYEE ACTIVATION MODAL / VIEW
+     ========================================== -->
+  <div id="employee-activation-modal" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-check" style="color: var(--accent-emerald);"></i> Activate Employee Account</h3>
+        <button class="modal-close" onclick="closeModal('employee-activation-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+          Welcome to SonixHR! Please set up a new password to complete account activation.
+        </p>
+        <form id="employee-activation-form" onsubmit="handleEmployeeActivationSubmit(event)">
+          <input type="hidden" id="activation-token">
+          
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="activation-new-password">New Password <span style="color: var(--accent-rose);">*</span></label>
+            <input type="password" id="activation-new-password" class="form-input" placeholder="••••••••" required minlength="6">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="activation-confirm-password">Confirm Password <span style="color: var(--accent-rose);">*</span></label>
+            <input type="password" id="activation-confirm-password" class="form-input" placeholder="••••••••" required minlength="6">
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('employee-activation-modal')">Cancel</button>
+            <button type="submit" id="activation-submit-btn" class="btn btn-primary"><i class="fa-solid fa-shield-check"></i> Activate & Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
      MAIN PORTAL VIEW
      ========================================== -->
   <div id="app-view" class="portal-layout" style="display: none;">
@@ -1291,6 +1326,18 @@
             <span>API Logs</span>
           </a>
         </li>
+        <li class="sidebar-item" data-tab="tab-support">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-headset"></i>
+            <span>Support & Tickets</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-tasks">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Tasks & Assignments</span>
+          </a>
+        </li>
       </ul>
 
       <div class="sidebar-footer">
@@ -1312,12 +1359,33 @@
           <h2 id="current-tab-title">Dashboard</h2>
         </div>
 
-        <div class="user-profile">
-          <div class="user-avatar" id="header-user-avatar">U</div>
-          <div class="user-info">
-            <span class="user-name" id="header-user-name">User</span>
-            <span class="user-role" id="header-user-role">Tenant Staff</span>
-            <span class="user-role" id="header-user-email" style="font-size:0.75rem; opacity:0.7;"></span>
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <!-- Real-Time Notifications Dropdown -->
+          <div class="notifications-dropdown-container" style="position: relative;">
+            <button id="btn-tenant-notifications" onclick="toggleTenantNotificationsDropdown()" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-main); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;" title="Notifications">
+              <i class="fa-solid fa-bell"></i>
+              <span id="tenant-unread-count-badge" style="position: absolute; top: -4px; right: -4px; background: var(--accent-rose); color: white; font-size: 0.7rem; font-weight: 700; border-radius: 10px; padding: 2px 6px; display: none;">0</span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div id="tenant-notifications-dropdown" style="display: none; position: absolute; right: 0; top: 48px; width: 340px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 1000; overflow: hidden;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary);">
+                <strong style="font-size: 0.9rem;"><i class="fa-solid fa-bell" style="color: var(--accent-violet);"></i> Notifications</strong>
+                <button onclick="markAllTenantNotificationsRead()" style="background: none; border: none; color: var(--accent-violet); font-size: 0.75rem; cursor: pointer; font-weight: 600;">Mark all read</button>
+              </div>
+              <div id="tenant-notifications-list-container" style="max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.85rem;">Loading notifications...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="user-profile">
+            <div class="user-avatar" id="header-user-avatar">U</div>
+            <div class="user-info">
+              <span class="user-name" id="header-user-name">User</span>
+              <span class="user-role" id="header-user-role">Tenant Staff</span>
+              <span class="user-role" id="header-user-email" style="font-size:0.75rem; opacity:0.7;"></span>
+            </div>
           </div>
         </div>
       </header>
@@ -1961,6 +2029,64 @@
                 1</span>
               <button class="btn btn-secondary btn-sm" id="btn-tenant-api-logs-next"
                 onclick="changeTenantApiLogsPage(1)">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+                 TAB: SUPPORT TICKETS
+                 ========================================== -->
+        <section id="tab-support" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-headset" style="color: var(--accent-violet);"></i> Support & Help Desk</h3>
+                <p class="card-subtitle" style="margin-top: 4px;">Raise and track support tickets for your organization</p>
+              </div>
+              <button class="btn btn-primary" onclick="openRaiseTicketModal()">
+                <i class="fa-solid fa-plus"></i> Raise New Ticket
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="filter-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <label class="form-label" style="margin:0;">Filter Status:</label>
+                <select id="support-ticket-status-filter" class="select-input" style="width: auto; padding: 6px 12px;" onchange="fetchSupportTickets()">
+                  <option value="">All Tickets</option>
+                  <option value="OPEN">Open</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="RESOLVED">Resolved</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="fetchSupportTickets()">
+                <i class="fa-solid fa-rotate"></i> Refresh
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Ticket Code</th>
+                    <th>Subject</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th style="text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="support-tickets-tbody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                      Click Refresh to load support tickets.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -2718,6 +2844,59 @@
           </div>
         </section>
 
+        <!-- ==========================================
+             TAB: TASKS & ASSIGNMENTS
+             ========================================== -->
+        <section id="tab-tasks" class="view-panel">
+          <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 12px;">
+              <button class="btn btn-secondary btn-sm active" id="btn-subtab-my-tasks" onclick="switchTasksSubTab('my-tasks')">
+                <i class="fa-solid fa-user-check"></i> My Tasks
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-subtab-all-tasks" onclick="switchTasksSubTab('all-tasks')">
+                <i class="fa-solid fa-list-check"></i> All Team Tasks
+              </button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openCreateTaskModal()">
+              <i class="fa-solid fa-plus"></i> Create New Task
+            </button>
+          </div>
+
+          <div class="card" style="margin: 0;">
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Task Title & Description</th>
+                    <th>Priority</th>
+                    <th>Assignee(s) / Creator</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th style="text-align: right; width: 240px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tasks-list-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+                      Loading tasks...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <div class="pagination-info" style="font-size: 0.85rem; color: var(--text-muted);">
+                Page <span id="tasks-page-info">1 of 1</span>
+              </div>
+              <div class="pagination-controls" style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-icon" id="btn-tasks-prev" onclick="changeTasksPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-tasks-next" onclick="changeTasksPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -3179,10 +3358,26 @@
             </div>
           </div>
 
-          <div class="form-group" style="margin-top: 15px; max-width: 300px;">
-            <label class="form-label" for="emp-effective-from">Effective From <span
-                style="color: var(--accent-rose);">*</span></label>
-            <input type="date" id="emp-effective-from" class="form-input" required>
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-effective-from">Effective From <span style="color: var(--accent-rose);">*</span></label>
+              <input type="date" id="emp-effective-from" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-bank-name">Bank Name</label>
+              <input type="text" id="emp-bank-name" class="form-input" placeholder="e.g. HDFC Bank">
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="emp-bank-account">Account Number</label>
+              <input type="text" id="emp-bank-account" class="form-input" placeholder="e.g. 50100234567890">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-ifsc">IFSC Code</label>
+              <input type="text" id="emp-ifsc" class="form-input" placeholder="e.g. HDFC0001234">
+            </div>
           </div>
 
           <div class="overrides-section">
@@ -3314,6 +3509,153 @@
   <div class="toast-container" id="toast-container"></div>
 
   <!-- ==========================================
+     MODAL: RAISE SUPPORT TICKET
+     ========================================== -->
+  <div id="raise-ticket-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-headset" style="color: var(--accent-violet);"></i> Raise Support Ticket</h3>
+        <button class="modal-close" onclick="closeModal('raise-ticket-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="raise-ticket-form">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="ticket-subject">Subject <span style="color: var(--accent-rose);">*</span></label>
+            <input type="text" id="ticket-subject" class="form-input" placeholder="e.g. Need help with attendance sync" required>
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="ticket-category">Category</label>
+              <select id="ticket-category" class="select-input">
+                <option value="TECHNICAL">Technical Support</option>
+                <option value="PAYROLL">Payroll Issue</option>
+                <option value="LEAVE">Leave Management</option>
+                <option value="ATTENDANCE">Attendance Issue</option>
+                <option value="BILLING">Billing & Subscription</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ticket-priority">Priority</label>
+              <select id="ticket-priority" class="select-input">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM" selected>Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="ticket-description">Detailed Description <span style="color: var(--accent-rose);">*</span></label>
+            <textarea id="ticket-description" class="form-input" style="height: 100px; resize: vertical;" placeholder="Please describe the issue or query in detail..." required></textarea>
+          </div>
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('raise-ticket-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Ticket</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+     MODAL: TICKET DETAILS
+     ========================================== -->
+  <div id="ticket-details-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="ticket-details-title">Ticket Details</h3>
+        <button class="modal-close" onclick="closeModal('ticket-details-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="ticket-details-body">
+        <span class="loading-spinner"></span> Loading ticket details...
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('ticket-details-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CREATE TASK
+       ========================================== -->
+  <div id="create-task-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-list-check" style="color: var(--accent-violet);"></i> Create Employee Task</h3>
+        <button class="modal-close" onclick="closeModal('create-task-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="create-task-form" onsubmit="handleCreateTaskSubmit(event)">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="task-title">Task Title <span style="color: var(--accent-rose);">*</span></label>
+            <input type="text" id="task-title" class="form-input" placeholder="e.g. Complete Q3 Payroll Audit" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="task-description">Task Description</label>
+            <textarea id="task-description" class="form-input" style="height: 80px; resize: vertical;" placeholder="Detailed task requirements and instructions..."></textarea>
+          </div>
+
+          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="task-priority">Priority <span style="color: var(--accent-rose);">*</span></label>
+              <select id="task-priority" class="select-input" required>
+                <option value="LOW">LOW</option>
+                <option value="MEDIUM" selected>MEDIUM</option>
+                <option value="HIGH">HIGH</option>
+                <option value="URGENT">URGENT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="task-due-date">Due Date <span style="color: var(--accent-rose);">*</span></label>
+              <input type="date" id="task-due-date" class="form-input" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label">Assign Employees <span style="color: var(--accent-rose);">*</span></label>
+            <div id="task-assignees-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <span class="loading-spinner"></span> Loading employees...
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('create-task-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Create Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: DECLINE TASK REASON
+       ========================================== -->
+  <div id="decline-task-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 style="color: var(--accent-rose);"><i class="fa-solid fa-circle-xmark"></i> Decline Task Assignment</h3>
+        <button class="modal-close" onclick="closeModal('decline-task-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="decline-task-form" onsubmit="handleDeclineTaskSubmit(event)">
+          <input type="hidden" id="decline-task-id">
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="decline-reason">Reason for Declining <span style="color: var(--accent-rose);">*</span></label>
+            <textarea id="decline-reason" class="form-input" style="height: 100px; resize: vertical;" placeholder="Please provide reason for declining this task..." required></textarea>
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('decline-task-modal')">Cancel</button>
+            <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban"></i> Confirm Decline</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
      JAVASCRIPT
      ========================================== -->
   <script>
@@ -3405,6 +3747,13 @@
     // ==========================================
 
     async function initApp() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const actToken = urlParams.get('activationToken') || urlParams.get('token');
+      if (actToken) {
+        document.getElementById('activation-token').value = actToken;
+        openModal('employee-activation-modal');
+      }
+
       const token = localStorage.getItem('tenant_token');
       if (!token) {
         showLoginView();
@@ -3419,6 +3768,7 @@
             showAppView();
             await fetchUserProfile();
             await fetchGlobalComponents();
+            initTenantNotificationStream();
             loadTab('tab-overview');
             await checkSubscriptionStatus();
             return;
@@ -3735,7 +4085,9 @@
         'tab-my-salary': 'My Salary & History',
         'tab-config': 'Payroll Config',
         'tab-billing': 'Billing & Subscriptions',
-        'tab-api-logs': 'API Hit Logs'
+        'tab-api-logs': 'API Hit Logs',
+        'tab-support': 'Support & Help Desk',
+        'tab-tasks': 'Tasks & Assignments'
       };
       document.getElementById('current-tab-title').textContent = titles[tabId] || 'Dashboard';
 
@@ -3757,6 +4109,8 @@
       else if (tabId === 'tab-config') fetchGlobalConfig();
       else if (tabId === 'tab-billing') fetchBillingData();
       else if (tabId === 'tab-api-logs') fetchTenantApiLogs(0);
+      else if (tabId === 'tab-support') fetchSupportTickets();
+      else if (tabId === 'tab-tasks') switchTasksSubTab('my-tasks');
     }
 
     // ==========================================
@@ -3982,12 +4336,19 @@
 
     async function fetchEmployeeSalary(employeeId) {
       try {
+        document.getElementById('emp-bank-name').value = '';
+        document.getElementById('emp-bank-account').value = '';
+        document.getElementById('emp-ifsc').value = '';
+
         const res = await fetch(`${API_BASE}/employees/${employeeId}/compensation`, { headers: getHeaders() });
         if (res.ok) {
           const data = await res.json();
           if (data.monthlyCtc) document.getElementById('emp-ctc').value = data.monthlyCtc;
           if (data.taxRegime) document.getElementById('emp-tax-regime').value = data.taxRegime;
           if (data.effectiveFrom) document.getElementById('emp-effective-from').value = data.effectiveFrom;
+          if (data.bankName) document.getElementById('emp-bank-name').value = data.bankName;
+          if (data.accountNumber || data.bankAccountNo) document.getElementById('emp-bank-account').value = data.accountNumber || data.bankAccountNo;
+          if (data.ifscCode) document.getElementById('emp-ifsc').value = data.ifscCode;
 
           if (data.componentOverrides && data.componentOverrides.length > 0) {
             const container = document.getElementById('employee-overrides-container');
@@ -4093,6 +4454,9 @@
         monthlyCtc: ctc,
         taxRegime: document.getElementById('emp-tax-regime').value,
         effectiveFrom: document.getElementById('emp-effective-from').value,
+        bankName: document.getElementById('emp-bank-name').value.trim() || null,
+        accountNumber: document.getElementById('emp-bank-account').value.trim() || null,
+        ifscCode: document.getElementById('emp-ifsc').value.trim() || null,
         componentOverrides: overrides
       };
 
@@ -6637,6 +7001,702 @@
       }
     }
     
+    // ==========================================
+    // SUPPORT TICKETS
+    // ==========================================
+
+    async function fetchSupportTickets() {
+      const tbody = document.getElementById('support-tickets-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><span class="loading-spinner"></span> Loading support tickets...</td></tr>';
+
+      const statusFilter = document.getElementById('support-ticket-status-filter') ? document.getElementById('support-ticket-status-filter').value : '';
+      let url = `${API_BASE}/employee/support-tickets?page=0&size=20`;
+      if (statusFilter) {
+        url += `&status=${encodeURIComponent(statusFilter)}`;
+      }
+
+      try {
+        const res = await fetch(url, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.content || data;
+          tbody.innerHTML = '';
+
+          if (!list || list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">No support tickets found.</td></tr>';
+            return;
+          }
+
+          list.forEach(ticket => {
+            const tr = document.createElement('tr');
+            const priorityBadge = (ticket.priority === 'URGENT' || ticket.priority === 'HIGH') ?
+              `<span class="badge badge-danger" style="font-size:0.75rem;">${ticket.priority}</span>` :
+              `<span class="badge badge-info" style="font-size:0.75rem;">${ticket.priority || 'MEDIUM'}</span>`;
+
+            const statusBadge = (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') ?
+              `<span class="badge badge-success">${ticket.status}</span>` :
+              ticket.status === 'IN_PROGRESS' ?
+              `<span class="badge badge-warning">${ticket.status}</span>` :
+              `<span class="badge badge-info">${ticket.status || 'OPEN'}</span>`;
+
+            const createdDate = ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+
+            tr.innerHTML = `
+              <td><code>${escapeHtml(ticket.ticketNumber || ticket.code || ('#TK-' + ticket.id))}</code></td>
+              <td><strong>${escapeHtml(ticket.subject || '')}</strong></td>
+              <td><span style="font-size:0.8rem; color:var(--text-secondary);">${escapeHtml(ticket.category || 'OTHER')}</span></td>
+              <td>${priorityBadge}</td>
+              <td>${statusBadge}</td>
+              <td>${createdDate}</td>
+              <td style="text-align: right;">
+                <button class="btn btn-secondary btn-sm" onclick="viewTicketDetails(${ticket.id})">
+                  <i class="fa-solid fa-eye"></i> View
+                </button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 20px;">Failed to load support tickets.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 20px;">Error loading support tickets.</td></tr>';
+      }
+    }
+
+    function openRaiseTicketModal() {
+      const form = document.getElementById('raise-ticket-form');
+      if (form) form.reset();
+      openModal('raise-ticket-modal');
+    }
+
+    document.getElementById('raise-ticket-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const subject = document.getElementById('ticket-subject').value.trim();
+      const category = document.getElementById('ticket-category').value;
+      const priority = document.getElementById('ticket-priority').value;
+      const description = document.getElementById('ticket-description').value.trim();
+
+      const payload = { subject, category, priority, description };
+
+      try {
+        const res = await fetch(`${API_BASE}/employee/support-tickets`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          showToast('Success', 'Support ticket raised successfully!', 'success');
+          closeModal('raise-ticket-modal');
+          fetchSupportTickets();
+        } else {
+          const err = await res.json();
+          showToast('Submission Failed', err.message || 'Failed to submit ticket.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    });
+
+    async function viewTicketDetails(id) {
+      document.getElementById('ticket-details-title').textContent = 'Ticket #' + id;
+      const body = document.getElementById('ticket-details-body');
+      body.innerHTML = '<span class="loading-spinner"></span> Loading details...';
+      openModal('ticket-details-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/employee/support-tickets/${id}`, { headers: getHeaders() });
+        if (res.ok) {
+          const t = await res.json();
+          document.getElementById('ticket-details-title').textContent = t.ticketNumber || ('Ticket #' + t.id);
+          body.innerHTML = `
+            <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+              <h4 style="font-family: var(--font-display); font-weight:700; color:#fff; margin-bottom: 8px;">${escapeHtml(t.subject || '')}</h4>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+                <span class="badge badge-info">${t.category || 'OTHER'}</span>
+                <span class="badge badge-warning">${t.priority || 'MEDIUM'}</span>
+                <span class="badge badge-success">${t.status || 'OPEN'}</span>
+              </div>
+              <p style="font-size:0.9rem; color:var(--text-secondary); line-height:1.5; white-space:pre-wrap;">${escapeHtml(t.description || 'No detailed description provided.')}</p>
+            </div>
+            ${t.resolutionNotes ? `
+              <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px; border-radius: 8px;">
+                <h5 style="color: var(--accent-emerald); font-weight:700; margin-bottom: 4px;">Resolution Notes</h5>
+                <p style="font-size:0.85rem; color:var(--text-main); margin:0;">${escapeHtml(t.resolutionNotes)}</p>
+              </div>
+            ` : ''}
+          `;
+        } else {
+          body.innerHTML = '<div style="color: var(--accent-rose);">Failed to retrieve ticket details.</div>';
+        }
+      } catch (err) {
+        body.innerHTML = '<div style="color: var(--accent-rose);">Connection error.</div>';
+      }
+    }
+
+    // ==========================================
+    // EMPLOYEES TASKS & ASSIGNMENTS (EmployeeTaskController)
+    // ==========================================
+
+    let currentTasksSubTab = 'my-tasks';
+    let tasksPage = 0;
+    let tasksTotalPages = 1;
+
+    function switchTasksSubTab(subtab) {
+      currentTasksSubTab = subtab;
+      document.getElementById('btn-subtab-my-tasks').classList.toggle('active', subtab === 'my-tasks');
+      document.getElementById('btn-subtab-all-tasks').classList.toggle('active', subtab === 'all-tasks');
+      fetchTasks(0);
+    }
+
+    async function fetchTasks(page = 0) {
+      tasksPage = page;
+      const tbody = document.getElementById('tasks-list-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;"><span class="loading-spinner"></span> Loading tasks...</td></tr>';
+
+      const endpoint = currentTasksSubTab === 'my-tasks' ? '/employees/tasks/my' : '/employees/tasks/all';
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}?page=${page}&size=15`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          const tasks = data.content || data.items || data;
+          tasksTotalPages = data.totalPages || 1;
+
+          document.getElementById('tasks-page-info').textContent = `${tasksPage + 1} of ${tasksTotalPages}`;
+          document.getElementById('btn-tasks-prev').disabled = tasksPage <= 0;
+          document.getElementById('btn-tasks-next').disabled = tasksPage >= tasksTotalPages - 1;
+
+          tbody.innerHTML = '';
+          if (!tasks || tasks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No ${currentTasksSubTab === 'my-tasks' ? 'assigned tasks' : 'team tasks'} found.</td></tr>`;
+            return;
+          }
+
+          tasks.forEach(t => {
+            const tr = document.createElement('tr');
+            
+            const priorityBadge = 
+              t.priority === 'URGENT' ? '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">URGENT</span>' :
+              t.priority === 'HIGH' ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">HIGH</span>' :
+              t.priority === 'LOW' ? '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #9ca3af;">LOW</span>' :
+              '<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">MEDIUM</span>';
+
+            const statusBadge =
+              t.status === 'COMPLETED' ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">COMPLETED</span>' :
+              t.status === 'IN_PROGRESS' ? '<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc;">IN PROGRESS</span>' :
+              t.status === 'ACKNOWLEDGED' ? '<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">ACKNOWLEDGED</span>' :
+              t.status === 'DECLINED' ? '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">DECLINED</span>' :
+              t.status === 'CANCELLED' ? '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #9ca3af;">CANCELLED</span>' :
+              '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">PENDING</span>';
+
+            const assigneesText = (t.assignees && t.assignees.length > 0) ?
+              t.assignees.map(a => escapeHtml(a.fullName || a.name || a.email || ('Emp #' + (a.id || a)))).join(', ') :
+              (t.assigneeName || 'Unassigned');
+
+            const creatorText = t.creatorName || t.createdByName || 'Manager';
+            const dueDateText = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-';
+
+            tr.innerHTML = `
+              <td>
+                <strong>${escapeHtml(t.title || '')}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted); display:block; max-width: 320px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.description || 'No description provided')}</span>
+                ${t.declineReason ? `<span style="font-size:0.75rem; color:var(--accent-rose); display:block;">Declined Reason: ${escapeHtml(t.declineReason)}</span>` : ''}
+              </td>
+              <td>${priorityBadge}</td>
+              <td>
+                <div>${assigneesText}</div>
+                <span style="font-size:0.75rem; color:var(--text-muted);">By: ${escapeHtml(creatorText)}</span>
+              </td>
+              <td><strong>${dueDateText}</strong></td>
+              <td>${statusBadge}</td>
+              <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                ${t.status === 'PENDING' ? `
+                  <button class="btn btn-secondary btn-sm" onclick="acknowledgeTask(${t.id})" title="Acknowledge Task">
+                    <i class="fa-solid fa-check"></i> Ack
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="acceptTask(${t.id})" title="Accept Task">
+                    <i class="fa-solid fa-thumbs-up text-success"></i> Accept
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="openDeclineTaskModal(${t.id})" title="Decline Task">
+                    <i class="fa-solid fa-ban text-rose"></i> Decline
+                  </button>
+                ` : ''}
+
+                ${(t.status === 'ACKNOWLEDGED' || t.status === 'PENDING') ? `
+                  <button class="btn btn-secondary btn-sm" onclick="updateTaskStatus(${t.id}, 'IN_PROGRESS')" title="Mark In Progress">
+                    <i class="fa-solid fa-play text-violet"></i> Start
+                  </button>
+                ` : ''}
+
+                ${(t.status === 'IN_PROGRESS' || t.status === 'ACKNOWLEDGED' || t.status === 'PENDING') ? `
+                  <button class="btn btn-primary btn-sm" onclick="updateTaskStatus(${t.id}, 'COMPLETED')" title="Mark Completed">
+                    <i class="fa-solid fa-check-double"></i> Complete
+                  </button>
+                ` : ''}
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-rose);">Failed to load tasks.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-rose);">Connection error.</td></tr>';
+      }
+    }
+
+    function changeTasksPage(direction) {
+      const target = tasksPage + direction;
+      if (target >= 0 && target < tasksTotalPages) {
+        fetchTasks(target);
+      }
+    }
+
+    async function openCreateTaskModal() {
+      const form = document.getElementById('create-task-form');
+      if (form) form.reset();
+      const container = document.getElementById('task-assignees-container');
+      container.innerHTML = '<span class="loading-spinner"></span> Loading assignable employees...';
+      openModal('create-task-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks/assignees?size=50`, { headers: getHeaders() });
+        if (res.ok) {
+          const assignees = await res.json();
+          container.innerHTML = '';
+          if (!assignees || assignees.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No assignable employees found.</div>';
+            return;
+          }
+
+          assignees.forEach(emp => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 0.8rem; cursor: pointer; background: rgba(255,255,255,0.03); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);';
+            label.innerHTML = `
+              <input type="checkbox" class="task-assignee-cb" value="${emp.id}" style="width:16px; height:16px; cursor:pointer;">
+              <span>${escapeHtml(emp.fullName || emp.name || (emp.firstName + ' ' + emp.lastName))}</span>
+            `;
+            container.appendChild(label);
+          });
+        } else {
+          container.innerHTML = '<div style="color: var(--accent-rose); font-size: 0.85rem;">Failed to load employees list.</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="color: var(--accent-rose); font-size: 0.85rem;">Connection error.</div>';
+      }
+    }
+
+    async function handleCreateTaskSubmit(e) {
+      e.preventDefault();
+      const selectedCb = document.querySelectorAll('.task-assignee-cb:checked');
+      const assigneeIds = Array.from(selectedCb).map(cb => parseInt(cb.value));
+
+      if (assigneeIds.length === 0) {
+        showToast('Assignee Required', 'Please select at least one employee to assign.', 'warning');
+        return;
+      }
+
+      const payload = {
+        title: document.getElementById('task-title').value.trim(),
+        description: document.getElementById('task-description').value.trim(),
+        priority: document.getElementById('task-priority').value,
+        dueDate: document.getElementById('task-due-date').value,
+        assigneeIds: assigneeIds
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          showToast('Success', 'Task created and assigned successfully.', 'success');
+          closeModal('create-task-modal');
+          fetchTasks(tasksPage);
+        } else {
+          const err = await res.json();
+          showToast('Create Failed', err.message || 'Failed to create task.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function acknowledgeTask(id) {
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks/${id}/acknowledge`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          showToast('Acknowledged', 'Task acknowledged.', 'success');
+          fetchTasks(tasksPage);
+        } else {
+          showToast('Error', 'Failed to acknowledge task.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function acceptTask(id) {
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks/${id}/accept`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          showToast('Accepted', 'Task accepted.', 'success');
+          fetchTasks(tasksPage);
+        } else {
+          showToast('Error', 'Failed to accept task.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    function openDeclineTaskModal(id) {
+      document.getElementById('decline-task-id').value = id;
+      document.getElementById('decline-reason').value = '';
+      openModal('decline-task-modal');
+    }
+
+    async function handleDeclineTaskSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('decline-task-id').value;
+      const declineReason = document.getElementById('decline-reason').value.trim();
+
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks/${id}/decline?declineReason=${encodeURIComponent(declineReason)}`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          showToast('Declined', 'Task declined.', 'info');
+          closeModal('decline-task-modal');
+          fetchTasks(tasksPage);
+        } else {
+          const err = await res.json();
+          showToast('Decline Failed', err.message || 'Failed to decline task.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function updateTaskStatus(id, status) {
+      try {
+        const res = await fetch(`${API_BASE}/employees/tasks/${id}/status?status=${status}`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          showToast('Updated', `Task status changed to ${status}.`, 'success');
+          fetchTasks(tasksPage);
+        } else {
+          showToast('Error', 'Failed to update task status.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function handleEmployeeActivationSubmit(e) {
+      e.preventDefault();
+      const token = document.getElementById('activation-token').value;
+      const newPassword = document.getElementById('activation-new-password').value;
+      const confirmPassword = document.getElementById('activation-confirm-password').value;
+
+      if (newPassword !== confirmPassword) {
+        showToast('Password Mismatch', 'New password and confirm password do not match.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('activation-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner"></span> Activating...`;
+
+      try {
+        const res = await fetch(`${API_BASE}/employee/auth/activate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client-Type': 'WEB'
+          },
+          body: JSON.stringify({ token, newPassword, confirmPassword })
+        });
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-shield-check"></i> Activate & Login`;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.accessToken) {
+            localStorage.setItem('tenant_token', data.accessToken);
+          }
+          showToast('Account Activated', data.message || 'Account activated successfully!', 'success');
+          closeModal('employee-activation-modal');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          showAppView();
+          await fetchUserProfile();
+          await fetchGlobalComponents();
+          loadTab('tab-overview');
+          await checkSubscriptionStatus();
+        } else {
+          const err = await res.json();
+          showToast('Activation Failed', err.message || 'Invalid or expired activation token.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-shield-check"></i> Activate & Login`;
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    }
+
+    async function fetchEmployeeCompensationPeriod(employeeId, startDate, endDate) {
+      try {
+        const res = await fetch(`${API_BASE}/employees/${employeeId}/compensation/period?startDate=${startDate}&endDate=${endDate}`, {
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return null;
+    }
+
+    // ==========================================
+    // NOTIFICATIONS & SSE STREAM (NotificationController)
+    // ==========================================
+
+    let tenantSseSource = null;
+
+    function initTenantNotificationStream() {
+      const token = localStorage.getItem('tenant_token');
+      if (!token || tenantSseSource) return;
+
+      try {
+        fetchUnreadTenantNotificationCount();
+        
+        if (window.EventSource) {
+          tenantSseSource = new EventSource(`${API_BASE}/notifications/stream?token=${encodeURIComponent(token)}`);
+          tenantSseSource.onmessage = (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              showToast(data.title || 'New Notification', data.message || 'You have a new update.', 'info');
+              fetchUnreadTenantNotificationCount();
+            } catch (err) { }
+          };
+          tenantSseSource.onerror = () => {
+            if (tenantSseSource) {
+              tenantSseSource.close();
+              tenantSseSource = null;
+            }
+          };
+        }
+      } catch (err) { }
+    }
+
+    async function fetchUnreadTenantNotificationCount() {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/unread-count`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          const badge = document.getElementById('tenant-unread-count-badge');
+          if (badge) {
+            const count = data.count || 0;
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = count > 0 ? 'inline-block' : 'none';
+          }
+        }
+      } catch (err) { }
+    }
+
+    async function toggleTenantNotificationsDropdown() {
+      const dropdown = document.getElementById('tenant-notifications-dropdown');
+      if (!dropdown) return;
+      const isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) {
+        fetchTenantNotifications();
+      }
+    }
+
+    async function fetchTenantNotifications() {
+      const container = document.getElementById('tenant-notifications-list-container');
+      if (!container) return;
+      container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.85rem;"><span class="loading-spinner"></span> Loading notifications...</div>';
+
+      try {
+        const res = await fetch(`${API_BASE}/notifications`, { headers: getHeaders() });
+        if (res.ok) {
+          const list = await res.json();
+          container.innerHTML = '';
+          if (!list || list.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.85rem;">No notifications found.</div>';
+            return;
+          }
+
+          list.forEach(n => {
+            const item = document.createElement('div');
+            item.style.cssText = `padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: ${n.read ? 'transparent' : 'rgba(139, 92, 246, 0.06)'}; cursor: pointer; transition: background 0.2s;`;
+            item.onclick = () => markTenantNotificationRead(n.id);
+
+            const timeStr = n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+            item.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+                <strong style="font-size:0.85rem; color:var(--text-main);">${escapeHtml(n.title || n.subject || 'Notification')}</strong>
+                <span style="font-size:0.7rem; color:var(--text-muted);">${timeStr}</span>
+              </div>
+              <p style="font-size:0.8rem; color:var(--text-secondary); margin:0; line-height:1.4;">${escapeHtml(n.message || n.content || '')}</p>
+            `;
+            container.appendChild(item);
+          });
+        } else {
+          container.innerHTML = '<div style="text-align: center; color: var(--accent-rose); padding: 20px; font-size: 0.85rem;">Failed to load notifications.</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="text-align: center; color: var(--accent-rose); padding: 20px; font-size: 0.85rem;">Error loading notifications.</div>';
+      }
+    }
+
+    async function markTenantNotificationRead(id) {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          fetchUnreadTenantNotificationCount();
+          fetchTenantNotifications();
+        }
+      } catch (err) { }
+    }
+
+    async function markAllTenantNotificationsRead() {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/read-all`, {
+          method: 'PUT',
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          showToast('Success', 'All notifications marked as read.', 'success');
+          fetchUnreadTenantNotificationCount();
+          fetchTenantNotifications();
+        }
+      } catch (err) { }
+    }
+
+    // ==========================================
+    // EMPLOYEE SELF-SERVICE ORG CHART (EmployeeSelfServiceController)
+    // ==========================================
+
+    async function fetchMyOrgChart() {
+      try {
+        const res = await fetch(`${API_BASE}/employee/organization-chart`, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return null;
+    }
+
+    // ==========================================
+    // MANUAL ATTENDANCE & CALENDAR (ManualAttendanceController & CalendarController)
+    // ==========================================
+
+    async function markAttendance(employeeId, attendanceDate, status, reason = null, overtimeHours = 0) {
+      try {
+        const res = await fetch(`${API_BASE}/attendance/mark`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ employeeId, attendanceDate, status, reason, overtimeHours })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast('Attendance Marked', `Marked ${status} for ${data.employeeName || 'employee'}.`, 'success');
+          return data;
+        } else {
+          const err = await res.json();
+          showToast('Error', err.message || 'Failed to mark attendance.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+      return null;
+    }
+
+    async function quickMarkTeamAttendance(status) {
+      try {
+        const res = await fetch(`${API_BASE}/attendance/team/quick-mark`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) {
+          const list = await res.json();
+          showToast('Quick Mark Success', `Marked ${status} for ${list.length} team members.`, 'success');
+          return list;
+        } else {
+          const err = await res.json();
+          showToast('Error', err.message || 'Failed to quick mark team.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+      return null;
+    }
+
+    async function fetchTeamAttendanceMembers(dateStr = null) {
+      try {
+        const url = dateStr ? `${API_BASE}/attendance/team/members?date=${dateStr}` : `${API_BASE}/attendance/team/members`;
+        const res = await fetch(url, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return [];
+    }
+
+    async function fetchAttendanceDashboardStats() {
+      try {
+        const res = await fetch(`${API_BASE}/attendance/dashboard`, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return null;
+    }
+
+    async function fetchDepartmentDashboard() {
+      try {
+        const res = await fetch(`${API_BASE}/tenant/departments/dashboard`, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return null;
+    }
+
+    async function fetchEmployeeCalendarData(employeeId, year, month) {
+      try {
+        const res = await fetch(`${API_BASE}/calendar/employee/${employeeId}?year=${year}&month=${month}`, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) { }
+      return null;
+    }
+
+    window.fetchSupportTickets = fetchSupportTickets;
+    window.openRaiseTicketModal = openRaiseTicketModal;
+    window.viewTicketDetails = viewTicketDetails;
     window.handleResignationSubmitForm = handleResignationSubmitForm;
     window.handleResignationWithdrawForm = handleResignationWithdrawForm;
     window.handleResignationAcceptForm = handleResignationAcceptForm;
@@ -6645,6 +7705,29 @@
     window.handleGetResignationDetailsForm = handleGetResignationDetailsForm;
     window.handleRunOffboardingProcessor = handleRunOffboardingProcessor;
     window.deleteConfigComponent = deleteConfigComponent;
+    window.switchTasksSubTab = switchTasksSubTab;
+    window.fetchTasks = fetchTasks;
+    window.changeTasksPage = changeTasksPage;
+    window.openCreateTaskModal = openCreateTaskModal;
+    window.handleCreateTaskSubmit = handleCreateTaskSubmit;
+    window.acknowledgeTask = acknowledgeTask;
+    window.acceptTask = acceptTask;
+    window.openDeclineTaskModal = openDeclineTaskModal;
+    window.handleDeclineTaskSubmit = handleDeclineTaskSubmit;
+    window.updateTaskStatus = updateTaskStatus;
+    window.handleEmployeeActivationSubmit = handleEmployeeActivationSubmit;
+    window.fetchEmployeeCompensationPeriod = fetchEmployeeCompensationPeriod;
+    window.toggleTenantNotificationsDropdown = toggleTenantNotificationsDropdown;
+    window.fetchTenantNotifications = fetchTenantNotifications;
+    window.markTenantNotificationRead = markTenantNotificationRead;
+    window.markAllTenantNotificationsRead = markAllTenantNotificationsRead;
+    window.fetchMyOrgChart = fetchMyOrgChart;
+    window.markAttendance = markAttendance;
+    window.quickMarkTeamAttendance = quickMarkTeamAttendance;
+    window.fetchTeamAttendanceMembers = fetchTeamAttendanceMembers;
+    window.fetchAttendanceDashboardStats = fetchAttendanceDashboardStats;
+    window.fetchDepartmentDashboard = fetchDepartmentDashboard;
+    window.fetchEmployeeCalendarData = fetchEmployeeCalendarData;
 
     // ==========================================
     // INIT

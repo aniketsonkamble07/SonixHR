@@ -92,6 +92,12 @@
             <span>Subscriptions</span>
           </a>
         </li>
+        <li class="sidebar-item" data-tab="tab-plans">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-tags"></i>
+            <span>Subscription Plans</span>
+          </a>
+        </li>
         <li class="sidebar-item" data-tab="tab-tickets">
           <a class="sidebar-link">
             <i class="fa-solid fa-ticket"></i>
@@ -114,6 +120,18 @@
           <a class="sidebar-link">
             <i class="fa-solid fa-terminal"></i>
             <span>Global API Logs</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-platform-roles">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>Platform Roles</span>
+          </a>
+        </li>
+        <li class="sidebar-item" data-tab="tab-platform-users">
+          <a class="sidebar-link">
+            <i class="fa-solid fa-user-gear"></i>
+            <span>Platform Admins</span>
           </a>
         </li>
       </ul>
@@ -1251,6 +1269,98 @@
           </div>
         </section>
 
+        <!-- ==========================================
+             TAB: PLATFORM ROLES & PERMISSIONS
+             ========================================== -->
+        <section id="tab-platform-roles" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-user-shield" style="color: var(--color-primary);"></i> Platform Role & Access Control</h3>
+                <p class="card-subtitle">Manage super administrator roles, system authorities, and user role assignments across the platform</p>
+              </div>
+              <button class="btn btn-primary" onclick="openCreatePlatformRoleModal()">
+                <i class="fa-solid fa-plus"></i>
+                <span>Create Role</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Role Name</th>
+                    <th>Code / Identifier</th>
+                    <th>Users Assigned</th>
+                    <th>Status</th>
+                    <th style="width: 260px; text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="platform-roles-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+                      Loading platform roles...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==========================================
+             TAB: PLATFORM ADMINISTRATORS & STAFF
+             ========================================== -->
+        <section id="tab-platform-users" class="view-panel">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <h3 class="card-title"><i class="fa-solid fa-user-gear" style="color: var(--color-primary);"></i> Platform Super Administrators & Staff</h3>
+                <p class="card-subtitle">Manage super admin accounts, assign platform roles, send activation links, and control access states</p>
+              </div>
+              <button class="btn btn-primary" onclick="openCreatePlatformUserModal()">
+                <i class="fa-solid fa-user-plus"></i>
+                <span>Add Platform Admin</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-container">
+              <table class="responsive-table">
+                <thead>
+                  <tr>
+                    <th>User ID / Name</th>
+                    <th>Email Address</th>
+                    <th>Roles Assigned</th>
+                    <th>Status</th>
+                    <th style="width: 280px; text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="platform-users-tbody">
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+                      Loading platform administrators...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+              <div class="pagination-info">
+                Page <span id="platform-users-page-info">1 of 1</span>
+              </div>
+              <div class="pagination-controls">
+                <button class="btn btn-secondary btn-icon" id="btn-platform-users-prev" onclick="changePlatformUsersPage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <button class="btn btn-secondary btn-icon" id="btn-platform-users-next" onclick="changePlatformUsersPage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -1716,6 +1826,354 @@
           <div class="modal-footer" style="padding: 0; padding-top: 15px;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('pt-config-modal')">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Slab</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <!-- ==========================================
+       MODAL: SUBSCRIPTION / PRICING PLAN
+       ========================================== -->
+  <div id="plan-modal" class="modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 id="plan-modal-title"><i class="fa-solid fa-tags text-primary"></i> Create Pricing Plan</h3>
+        <button class="close-btn" onclick="closeModal('plan-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="plan-form">
+          <input type="hidden" id="plan-id">
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="plan-code">Plan Code <span style="color: var(--color-danger);">*</span></label>
+              <input type="text" id="plan-code" class="form-input" placeholder="e.g. STARTER, PRO, ENTERPRISE" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-name">Plan Display Name <span style="color: var(--color-danger);">*</span></label>
+              <input type="text" id="plan-name" class="form-input" placeholder="e.g. Starter Tier" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="plan-price">Price (₹ INR) <span style="color: var(--color-danger);">*</span></label>
+              <input type="number" step="0.01" min="0" id="plan-price" class="form-input" placeholder="e.g. 2999.00" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-billing-cycle">Billing Cycle</label>
+              <select id="plan-billing-cycle" class="select-input">
+                <option value="MONTHLY" selected>Monthly</option>
+                <option value="YEARLY">Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="plan-validity-months">Validity (Months)</label>
+              <input type="number" min="1" max="120" id="plan-validity-months" class="form-input" value="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="plan-max-employees">Max Employee Limit (Seats)</label>
+              <input type="number" min="1" id="plan-max-employees" class="form-input" placeholder="e.g. 50" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="plan-description">Description</label>
+            <textarea id="plan-description" class="form-input" style="height: 70px; resize: vertical;" placeholder="Brief summary of plan features & target audience..."></textarea>
+          </div>
+
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+            <input type="checkbox" id="plan-is-active" style="width: 18px; height: 18px; cursor: pointer;" checked>
+            <label for="plan-is-active" class="form-label" style="margin:0; cursor: pointer;">Active (Available for tenant signups)</label>
+          </div>
+
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('plan-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Plan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLAN FEATURES MANAGEMENT
+       ========================================== -->
+  <div id="plan-feature-modal" class="modal">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="plan-feature-modal-title"><i class="fa-solid fa-list-check text-primary"></i> Plan Features</h3>
+        <button class="close-btn" onclick="closeModal('plan-feature-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pf-plan-id">
+        <div style="margin-bottom: 16px;">
+          <form id="add-feature-form" style="display: flex; gap: 10px;">
+            <input type="text" id="pf-feature-code" class="form-input" placeholder="e.g. ADVANCED_PAYROLL, BIOMETRIC" required style="flex:1;">
+            <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add Feature</button>
+          </form>
+        </div>
+        <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+          <table class="responsive-table">
+            <thead>
+              <tr>
+                <th>Feature Code</th>
+                <th style="width: 80px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="plan-features-tbody">
+              <tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Loading features...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer" style="padding: 0; padding-top: 15px; margin-top: 15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('plan-feature-modal')">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLAN AUDIT HISTORY
+       ========================================== -->
+  <div id="plan-history-modal" class="modal">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-history text-primary"></i> Plan Operation History</h3>
+        <button class="close-btn" onclick="closeModal('plan-history-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="table-container" style="max-height: 350px; overflow-y: auto;">
+          <table class="responsive-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Operation</th>
+                <th>Performed By</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="plan-history-tbody">
+              <tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Loading audit history...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer" style="padding: 0; padding-top: 15px; margin-top: 15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('plan-history-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLATFORM ROLE CREATE / EDIT
+       ========================================== -->
+  <div id="platform-role-modal" class="modal">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="platform-role-modal-title"><i class="fa-solid fa-user-shield text-primary"></i> Create Platform Role</h3>
+        <button class="close-btn" onclick="closeModal('platform-role-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-role-form">
+          <input type="hidden" id="prole-id">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="prole-name">Role Name <span style="color: var(--color-danger);">*</span></label>
+            <input type="text" id="prole-name" class="form-input" placeholder="e.g. Platform Billing Admin" required>
+          </div>
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="prole-code">Role Code / Identifier</label>
+            <input type="text" id="prole-code" class="form-input" placeholder="e.g. ROLE_PLATFORM_BILLING">
+          </div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="prole-description">Description</label>
+            <textarea id="prole-description" class="form-input" style="height: 70px; resize: vertical;" placeholder="Summary of role permissions & access scope..."></textarea>
+          </div>
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-role-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Role</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLATFORM ROLE PERMISSIONS ASSIGNMENT
+       ========================================== -->
+  <div id="platform-role-permissions-modal" class="modal">
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="platform-role-permissions-modal-title"><i class="fa-solid fa-key text-primary"></i> Assign Role Permissions</h3>
+        <button class="close-btn" onclick="closeModal('platform-role-permissions-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-role-permissions-form">
+          <input type="hidden" id="prp-role-id">
+          <div id="platform-permissions-groups-container" style="max-height: 380px; overflow-y: auto; padding-right: 5px; margin-bottom: 20px;">
+            <span class="loading-spinner"></span> Loading permissions catalog...
+          </div>
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-role-permissions-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Update Permissions</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLATFORM ROLE USERS ASSIGNMENT
+       ========================================== -->
+  <div id="platform-role-users-modal" class="modal">
+    <div class="modal-content" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 id="platform-role-users-modal-title"><i class="fa-solid fa-users text-primary"></i> Users Assigned to Role</h3>
+        <button class="close-btn" onclick="closeModal('platform-role-users-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pru-role-id">
+        <div style="margin-bottom: 16px;">
+          <form id="assign-role-user-form" style="display: flex; gap: 10px;">
+            <input type="number" id="pru-user-id" class="form-input" placeholder="Enter Platform User ID to Assign" required style="flex:1;">
+            <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Assign User</button>
+          </form>
+        </div>
+        <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+          <table class="responsive-table">
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Name / Email</th>
+                <th style="width: 80px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="platform-role-users-tbody">
+              <tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Loading assigned users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer" style="padding: 0; padding-top: 15px; margin-top: 15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('platform-role-users-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLATFORM ROLE DELETE PREVIEW
+       ========================================== -->
+  <div id="platform-role-delete-preview-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Delete Role Impact Preview</h3>
+        <button class="close-btn" onclick="closeModal('platform-role-delete-preview-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="prd-role-id">
+        <div id="platform-role-delete-preview-body" style="margin-bottom: 20px; line-height: 1.6;">
+          <span class="loading-spinner"></span> Analyzing deletion impact...
+        </div>
+        <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('platform-role-delete-preview-modal')">Cancel</button>
+          <button type="button" class="btn btn-danger" onclick="confirmDeletePlatformRole()"><i class="fa-solid fa-trash"></i> Confirm Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: PLATFORM USER CREATE / EDIT
+       ========================================== -->
+  <div id="platform-user-modal" class="modal">
+    <div class="modal-content" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 id="platform-user-modal-title"><i class="fa-solid fa-user-plus text-primary"></i> Create Platform Admin</h3>
+        <button class="close-btn" onclick="closeModal('platform-user-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-user-form">
+          <input type="hidden" id="puser-id">
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="puser-first-name">First Name <span style="color: var(--color-danger);">*</span></label>
+              <input type="text" id="puser-first-name" class="form-input" placeholder="e.g. Rahul" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="puser-last-name">Last Name <span style="color: var(--color-danger);">*</span></label>
+              <input type="text" id="puser-last-name" class="form-input" placeholder="e.g. Sharma" required>
+            </div>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group">
+              <label class="form-label" for="puser-email">Email Address <span style="color: var(--color-danger);">*</span></label>
+              <input type="email" id="puser-email" class="form-input" placeholder="rahul@sonixhr.com" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="puser-phone">Phone Number</label>
+              <input type="text" id="puser-phone" class="form-input" placeholder="+91 9876543210">
+            </div>
+          </div>
+
+          <div id="puser-password-group" class="form-group" style="margin-bottom: 15px;">
+            <label class="form-label" for="puser-password">Initial Password <span style="color: var(--color-danger);">*</span></label>
+            <input type="password" id="puser-password" class="form-input" placeholder="••••••••" required>
+          </div>
+
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-user-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Admin</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: ASSIGN ROLES TO USER
+       ========================================== -->
+  <div id="platform-user-roles-assign-modal" class="modal">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="platform-user-roles-assign-title"><i class="fa-solid fa-user-shield text-primary"></i> Assign Platform Roles</h3>
+        <button class="close-btn" onclick="closeModal('platform-user-roles-assign-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-user-roles-form">
+          <input type="hidden" id="pura-user-id">
+          <div id="platform-roles-checkboxes-container" style="max-height: 260px; overflow-y: auto; margin-bottom: 20px;">
+            <span class="loading-spinner"></span> Loading available platform roles...
+          </div>
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-user-roles-assign-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Update User Roles</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: RESET USER PASSWORD
+       ========================================== -->
+  <div id="platform-user-reset-pw-modal" class="modal">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key text-primary"></i> Reset Admin Password</h3>
+        <button class="close-btn" onclick="closeModal('platform-user-reset-pw-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="platform-user-reset-pw-form">
+          <input type="hidden" id="purp-user-id">
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" for="purp-new-password">New Password <span style="color: var(--color-danger);">*</span></label>
+            <input type="password" id="purp-new-password" class="form-input" placeholder="Enter new strong password" required minlength="8">
+          </div>
+          <div class="modal-footer" style="padding: 0; padding-top: 15px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('platform-user-reset-pw-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-lock"></i> Reset Password</button>
           </div>
         </form>
       </div>
@@ -3624,6 +4082,9 @@
         tabTitle.textContent = 'Subscription Dashboard & Billing Analytics';
         fetchSubscriptionMetrics();
         fetchSubscriptionPlans();
+      } else if (tabId === 'tab-plans') {
+        tabTitle.textContent = 'Subscription & Pricing Plan Management';
+        fetchPlans();
       } else if (tabId === 'tab-tickets') {
         tabTitle.textContent = 'Support Tickets Management';
         TICKETS_PAGE = 0;
@@ -3638,6 +4099,12 @@
       } else if (tabId === 'tab-platform-api-logs') {
         tabTitle.textContent = 'Platform Global API Hit Logs';
         fetchPlatformApiLogs(0);
+      } else if (tabId === 'tab-platform-roles') {
+        tabTitle.textContent = 'Platform Role & Access Control';
+        fetchPlatformRoles();
+      } else if (tabId === 'tab-platform-users') {
+        tabTitle.textContent = 'Platform Super Administrators & Staff';
+        fetchPlatformUsers(0);
       }
     }
 
@@ -6015,6 +6482,1105 @@
     }
 
     // ==========================================
+    // SUBSCRIPTION PLANS MANAGEMENT (PlatformAdminSubscriptionController)
+    // ==========================================
+
+    let currentPlansList = [];
+
+    async function fetchPlans() {
+      const tbody = document.getElementById('plans-list-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;"><span class="loading-spinner"></span> Loading subscription plans...</td></tr>';
+
+      try {
+        let res = await fetch(`${API_BASE}/platform/admin/subscription-plans`, { headers: getHeaders() });
+        if (!res.ok) {
+          res = await fetch(`${API_BASE}/platform/subscription-plans`, { headers: getHeaders() });
+        }
+        checkResponseStatus(res);
+        if (res.ok) {
+          currentPlansList = await res.json();
+          renderPlansList(currentPlansList);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Failed to load subscription plans.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Error connecting to subscription plan service.</td></tr>';
+      }
+    }
+
+    function renderPlansList(plans) {
+      const tbody = document.getElementById('plans-list-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!plans || plans.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No subscription plans found.</td></tr>';
+        return;
+      }
+
+      plans.forEach(plan => {
+        const row = document.createElement('tr');
+        const priceDisp = plan.price !== undefined ? `₹${parseFloat(plan.price).toFixed(2)}` : 'Free';
+        const validityDisp = `${plan.validityMonths || 1} Month(s) (${plan.billingCycle || 'MONTHLY'})`;
+        const statusBadge = plan.deleted ?
+          '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">DELETED</span>' :
+          plan.active ?
+            '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">ACTIVE</span>' :
+            '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">INACTIVE</span>';
+
+        const toggleBtnText = plan.active ? 'Disable' : 'Enable';
+
+        row.innerHTML = `
+          <td>
+            <strong>${escapeHtml(plan.name)}</strong>
+            <code style="font-size:0.75rem; color:var(--text-muted); display:block;">${escapeHtml(plan.code)}</code>
+          </td>
+          <td><strong>${priceDisp}</strong></td>
+          <td>${validityDisp}</td>
+          <td>${statusBadge}</td>
+          <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+            ${!plan.deleted ? `
+              <button class="btn btn-secondary btn-sm" onclick="openEditPlanModal(${plan.id})" title="Edit Plan">
+                <i class="fa-solid fa-pen"></i> Edit
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="togglePlanActive(${plan.id})" title="Toggle Active">
+                <i class="fa-solid fa-power-off"></i> ${toggleBtnText}
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="openPlanFeatureModal(${plan.id})" title="Manage Features">
+                <i class="fa-solid fa-list-check"></i> Features
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="viewPlanHistory(${plan.id})" title="Audit Trail">
+                <i class="fa-solid fa-history"></i> Log
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteSubscriptionPlan(${plan.id})" title="Delete Plan">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : `
+              <button class="btn btn-primary btn-sm" onclick="restoreSubscriptionPlan(${plan.id})" title="Restore Plan">
+                <i class="fa-solid fa-rotate-left"></i> Restore
+              </button>
+            `}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function filterPlans() {
+      const query = (document.getElementById('plan-search-input')?.value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('plan-status-filter')?.value || 'ALL';
+
+      let filtered = currentPlansList.filter(p => {
+        const matchesQuery = !query || p.name.toLowerCase().includes(query) || p.code.toLowerCase().includes(query);
+        let matchesStatus = true;
+        if (statusFilter === 'ACTIVE') matchesStatus = p.active && !p.deleted;
+        else if (statusFilter === 'DISABLED') matchesStatus = !p.active && !p.deleted;
+        else if (statusFilter === 'DELETED') matchesStatus = p.deleted;
+        return matchesQuery && matchesStatus;
+      });
+
+      renderPlansList(filtered);
+    }
+
+    function openCreatePlanModal() {
+      const form = document.getElementById('plan-form');
+      if (form) form.reset();
+      document.getElementById('plan-id').value = '';
+      document.getElementById('plan-modal-title').textContent = 'Create Pricing Plan';
+      openModal('plan-modal');
+    }
+
+    async function openEditPlanModal(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${id}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const plan = await res.json();
+          document.getElementById('plan-id').value = plan.id;
+          document.getElementById('plan-code').value = plan.code;
+          document.getElementById('plan-name').value = plan.name;
+          document.getElementById('plan-price').value = plan.price;
+          document.getElementById('plan-billing-cycle').value = plan.billingCycle || 'MONTHLY';
+          document.getElementById('plan-validity-months').value = plan.validityMonths || 1;
+          document.getElementById('plan-max-employees').value = plan.maxEmployees || 50;
+          document.getElementById('plan-description').value = plan.description || '';
+          document.getElementById('plan-is-active').checked = plan.active !== false;
+
+          document.getElementById('plan-modal-title').textContent = 'Edit Pricing Plan';
+          openModal('plan-modal');
+        } else {
+          showToast('Error', 'Failed to fetch plan details.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    document.getElementById('plan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('plan-id').value;
+      const payload = {
+        code: document.getElementById('plan-code').value.trim().toUpperCase(),
+        name: document.getElementById('plan-name').value.trim(),
+        price: parseFloat(document.getElementById('plan-price').value),
+        currency: 'INR',
+        billingCycle: document.getElementById('plan-billing-cycle').value,
+        validityMonths: parseInt(document.getElementById('plan-validity-months').value) || 1,
+        maxEmployees: parseInt(document.getElementById('plan-max-employees').value) || 50,
+        description: document.getElementById('plan-description').value.trim(),
+        active: document.getElementById('plan-is-active').checked
+      };
+
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_BASE}/platform/admin/subscription-plans/${id}` : `${API_BASE}/platform/admin/subscription-plans`;
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', id ? 'Subscription plan updated successfully.' : 'Subscription plan created successfully.', 'success');
+          closeModal('plan-modal');
+          fetchPlans();
+        } else {
+          const err = await res.json();
+          showToast('Save Failed', err.message || 'Failed to save subscription plan.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    });
+
+    async function togglePlanActive(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${id}/toggle-active`, {
+          method: 'PATCH',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Plan active status toggled.', 'success');
+          fetchPlans();
+        } else {
+          showToast('Error', 'Failed to toggle plan status.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function deleteSubscriptionPlan(id) {
+      if (!confirm('Are you sure you want to delete this subscription plan?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${id}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok || res.status === 204) {
+          showToast('Success', 'Plan deleted successfully.', 'success');
+          fetchPlans();
+        } else {
+          showToast('Error', 'Failed to delete plan.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function restoreSubscriptionPlan(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${id}/restore`, {
+          method: 'PATCH',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Plan restored successfully.', 'success');
+          fetchPlans();
+        } else {
+          showToast('Error', 'Failed to restore plan.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function openPlanFeatureModal(planId) {
+      document.getElementById('pf-plan-id').value = planId;
+      document.getElementById('pf-feature-code').value = '';
+      const tbody = document.getElementById('plan-features-tbody');
+      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;"><span class="loading-spinner"></span> Loading features...</td></tr>';
+      openModal('plan-feature-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${planId}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const plan = await res.json();
+          renderPlanFeatures(planId, plan.featureCodes || []);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger);">Failed to load features.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--color-danger);">Connection error.</td></tr>';
+      }
+    }
+
+    function renderPlanFeatures(planId, features) {
+      const tbody = document.getElementById('plan-features-tbody');
+      tbody.innerHTML = '';
+      if (!features || features.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">No features configured for this plan.</td></tr>';
+        return;
+      }
+
+      features.forEach(fCode => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>${escapeHtml(fCode)}</code></td>
+          <td style="text-align: right;">
+            <button class="btn btn-danger btn-sm" onclick="removePlanFeature(${planId}, '${fCode}')">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('add-feature-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const planId = document.getElementById('pf-plan-id').value;
+      const featureCode = document.getElementById('pf-feature-code').value.trim().toUpperCase();
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${planId}/features?featureCode=${encodeURIComponent(featureCode)}`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const plan = await res.json();
+          showToast('Success', 'Feature added to plan.', 'success');
+          document.getElementById('pf-feature-code').value = '';
+          renderPlanFeatures(planId, plan.featureCodes || []);
+        } else {
+          showToast('Error', 'Failed to add feature.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    });
+
+    async function removePlanFeature(planId, featureCode) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${planId}/features/${encodeURIComponent(featureCode)}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const plan = await res.json();
+          showToast('Success', 'Feature removed.', 'success');
+          renderPlanFeatures(planId, plan.featureCodes || []);
+        } else {
+          showToast('Error', 'Failed to remove feature.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function viewPlanHistory(planId) {
+      const tbody = document.getElementById('plan-history-tbody');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;"><span class="loading-spinner"></span> Loading history...</td></tr>';
+      openModal('plan-history-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/${planId}/history`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const history = await res.json();
+          tbody.innerHTML = '';
+          if (!history || history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No operation history recorded.</td></tr>';
+            return;
+          }
+
+          history.forEach(log => {
+            const tr = document.createElement('tr');
+            const dateStr = log.timestamp ? new Date(log.timestamp).toLocaleString() : '-';
+            tr.innerHTML = `
+              <td>${dateStr}</td>
+              <td><span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc;">${escapeHtml(log.operationType || '-')}</span></td>
+              <td>${escapeHtml(log.performedBy || 'System')}</td>
+              <td><span style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(log.details || '-')}</span></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--color-danger);">Failed to load history.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--color-danger);">Connection error.</td></tr>';
+      }
+    }
+
+    async function validatePlanCode(code) {
+      if (!code) return true;
+      try {
+        const res = await fetch(`${API_BASE}/platform/admin/subscription-plans/validate/${encodeURIComponent(code)}`, { headers: getHeaders() });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.error('Error validating plan code', e);
+      }
+      return true;
+    }
+
+    window.validatePlanCode = validatePlanCode;
+
+    // ==========================================
+    // PLATFORM ROLES MANAGEMENT (PlatformRoleController)
+    // ==========================================
+
+    async function fetchPlatformRoles() {
+      const tbody = document.getElementById('platform-roles-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;"><span class="loading-spinner"></span> Loading platform roles...</td></tr>';
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const roles = await res.json();
+          tbody.innerHTML = '';
+          if (!roles || roles.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No platform roles configured.</td></tr>';
+            return;
+          }
+
+          roles.forEach(role => {
+            const tr = document.createElement('tr');
+            const userCount = role.userCount !== undefined ? role.userCount : (role.users ? role.users.length : 0);
+            const statusBadge = role.isDefault ?
+              '<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc;">DEFAULT</span>' :
+              '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">CUSTOM</span>';
+
+            tr.innerHTML = `
+              <td>
+                <strong>${escapeHtml(role.name || '')}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${escapeHtml(role.description || '')}</span>
+              </td>
+              <td><code>${escapeHtml(role.code || ('ROLE_' + role.id))}</code></td>
+              <td><strong>${userCount} user(s)</strong></td>
+              <td>${statusBadge}</td>
+              <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditPlatformRoleModal(${role.id})" title="Edit Role">
+                  <i class="fa-solid fa-pen"></i> Edit
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="openPlatformRolePermissionsModal(${role.id})" title="Role Permissions">
+                  <i class="fa-solid fa-key"></i> Perms
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="openPlatformRoleUsersModal(${role.id})" title="Role Users">
+                  <i class="fa-solid fa-users"></i> Users
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="openPlatformRoleDeletePreviewModal(${role.id})" title="Delete Role">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Failed to load platform roles.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Error connecting to platform roles API.</td></tr>';
+      }
+    }
+
+    function openCreatePlatformRoleModal() {
+      const form = document.getElementById('platform-role-form');
+      if (form) form.reset();
+      document.getElementById('prole-id').value = '';
+      document.getElementById('platform-role-modal-title').textContent = 'Create Platform Role';
+      openModal('platform-role-modal');
+    }
+
+    async function openEditPlatformRoleModal(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${id}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const role = await res.json();
+          document.getElementById('prole-id').value = role.id;
+          document.getElementById('prole-name').value = role.name || '';
+          document.getElementById('prole-code').value = role.code || '';
+          document.getElementById('prole-description').value = role.description || '';
+
+          document.getElementById('platform-role-modal-title').textContent = 'Edit Platform Role';
+          openModal('platform-role-modal');
+        } else {
+          showToast('Error', 'Failed to fetch platform role details.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    document.getElementById('platform-role-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('prole-id').value;
+      const payload = {
+        name: document.getElementById('prole-name').value.trim(),
+        code: document.getElementById('prole-code').value.trim().toUpperCase() || null,
+        description: document.getElementById('prole-description').value.trim()
+      };
+
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_BASE}/platform/roles/${id}` : `${API_BASE}/platform/roles`;
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', id ? 'Platform role updated.' : 'Platform role created.', 'success');
+          closeModal('platform-role-modal');
+          fetchPlatformRoles();
+        } else {
+          const err = await res.json();
+          showToast('Save Failed', err.message || 'Failed to save role.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    });
+
+    async function openPlatformRoleUsersModal(roleId) {
+      document.getElementById('pru-role-id').value = roleId;
+      document.getElementById('pru-user-id').value = '';
+      const tbody = document.getElementById('platform-role-users-tbody');
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><span class="loading-spinner"></span> Loading assigned users...</td></tr>';
+      openModal('platform-role-users-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}/users`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const users = await res.json();
+          renderPlatformRoleUsers(roleId, users);
+        } else {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--color-danger);">Failed to fetch assigned users.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--color-danger);">Connection error.</td></tr>';
+      }
+    }
+
+    function renderPlatformRoleUsers(roleId, users) {
+      const tbody = document.getElementById('platform-role-users-tbody');
+      tbody.innerHTML = '';
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No users assigned to this platform role.</td></tr>';
+        return;
+      }
+
+      users.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code>#${u.id}</code></td>
+          <td><strong>${escapeHtml(u.fullName || u.email || 'User #' + u.id)}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">(${escapeHtml(u.email || '')})</span></td>
+          <td style="text-align: right;">
+            <button class="btn btn-danger btn-sm" onclick="removeRoleFromPlatformUser(${roleId}, ${u.id})">
+              <i class="fa-solid fa-user-minus"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('assign-role-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const roleId = document.getElementById('pru-role-id').value;
+      const userId = document.getElementById('pru-user-id').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}/users/${userId}`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Role assigned to user.', 'success');
+          document.getElementById('pru-user-id').value = '';
+          openPlatformRoleUsersModal(roleId);
+          fetchPlatformRoles();
+        } else {
+          showToast('Error', 'Failed to assign role.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    });
+
+    async function removeRoleFromPlatformUser(roleId, userId) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}/users/${userId}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok || res.status === 204) {
+          showToast('Success', 'Role removed from user.', 'success');
+          openPlatformRoleUsersModal(roleId);
+          fetchPlatformRoles();
+        } else {
+          showToast('Error', 'Failed to remove role.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function openPlatformRoleDeletePreviewModal(roleId) {
+      document.getElementById('prd-role-id').value = roleId;
+      const body = document.getElementById('platform-role-delete-preview-body');
+      body.innerHTML = '<span class="loading-spinner"></span> Analyzing deletion impact...';
+      openModal('platform-role-delete-preview-modal');
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}/delete-preview`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const preview = await res.json();
+          body.innerHTML = `
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); padding: 14px; border-radius: 8px;">
+              <p style="margin-bottom: 8px;"><strong>Role Name:</strong> ${escapeHtml(preview.roleName || ('Role #' + roleId))}</p>
+              <p style="margin-bottom: 8px;"><strong>Assigned Users Impacted:</strong> ${preview.affectedUsersCount || 0} user(s)</p>
+              <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">${escapeHtml(preview.warningMessage || 'Deleting this role will remove permissions from all assigned users.')}</p>
+            </div>
+          `;
+        } else {
+          body.innerHTML = '<p style="color: var(--color-danger);">Failed to retrieve deletion impact preview.</p>';
+        }
+      } catch (err) {
+        body.innerHTML = '<p style="color: var(--color-danger);">Connection error.</p>';
+      }
+    }
+
+    async function confirmDeletePlatformRole() {
+      const roleId = document.getElementById('prd-role-id').value;
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}?confirm=true`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Platform role deleted.', 'success');
+          closeModal('platform-role-delete-preview-modal');
+          fetchPlatformRoles();
+        } else {
+          const err = await res.json();
+          showToast('Delete Failed', err.message || 'Failed to delete platform role.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function openPlatformRolePermissionsModal(roleId) {
+      document.getElementById('prp-role-id').value = roleId;
+      const container = document.getElementById('platform-permissions-groups-container');
+      container.innerHTML = '<span class="loading-spinner"></span> Loading permissions catalog...';
+      openModal('platform-role-permissions-modal');
+
+      try {
+        // Fetch current role to get assigned permissions
+        const roleRes = await fetch(`${API_BASE}/platform/roles/${roleId}`, { headers: getHeaders() });
+        checkResponseStatus(roleRes);
+        let assignedPermIds = new Set();
+        if (roleRes.ok) {
+          const role = await roleRes.json();
+          if (role.permissions) {
+            role.permissions.forEach(p => assignedPermIds.add(p.id));
+          } else if (role.permissionIds) {
+            role.permissionIds.forEach(id => assignedPermIds.add(id));
+          }
+        }
+
+        // Fetch grouped permissions from PlatformPermissionController
+        const permRes = await fetch(`${API_BASE}/platform/permissions/groups`, { headers: getHeaders() });
+        checkResponseStatus(permRes);
+        if (permRes.ok) {
+          const groups = await permRes.json();
+          renderPlatformPermissionsGroups(groups, assignedPermIds);
+        } else {
+          // Fallback to flat list
+          const flatRes = await fetch(`${API_BASE}/platform/permissions`, { headers: getHeaders() });
+          if (flatRes.ok) {
+            const flatPerms = await flatRes.json();
+            renderFlatPlatformPermissions(flatPerms, assignedPermIds);
+          } else {
+            container.innerHTML = '<div style="color:var(--color-danger);">Failed to load platform permissions catalog.</div>';
+          }
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="color:var(--color-danger);">Connection error.</div>';
+      }
+    }
+
+    function renderPlatformPermissionsGroups(groups, assignedPermIds) {
+      const container = document.getElementById('platform-permissions-groups-container');
+      container.innerHTML = '';
+      if (!groups || groups.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">No permissions available.</div>';
+        return;
+      }
+
+      groups.forEach(g => {
+        const groupDiv = document.createElement('div');
+        groupDiv.style.cssText = 'background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 12px;';
+
+        const title = document.createElement('h4');
+        title.style.cssText = 'color: var(--color-primary); font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;';
+        title.innerHTML = `<i class="fa-solid fa-layer-group"></i> ${escapeHtml(g.moduleName || g.groupName || 'General Permissions')}`;
+        groupDiv.appendChild(title);
+
+        const permGrid = document.createElement('div');
+        permGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;';
+
+        const permsList = g.permissions || [];
+        permsList.forEach(p => {
+          const isChecked = assignedPermIds.has(p.id) ? 'checked' : '';
+          const label = document.createElement('label');
+          label.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 0.8rem; cursor: pointer; color: var(--text-main); background: rgba(0,0,0,0.15); padding: 6px 10px; border-radius: 6px;';
+          label.innerHTML = `
+            <input type="checkbox" class="platform-perm-cb" value="${p.id}" ${isChecked} style="cursor:pointer; width:16px; height:16px;">
+            <span>${escapeHtml(p.name || p.code || ('Permission #' + p.id))}</span>
+          `;
+          permGrid.appendChild(label);
+        });
+
+        groupDiv.appendChild(permGrid);
+        container.appendChild(groupDiv);
+      });
+    }
+
+    function renderFlatPlatformPermissions(perms, assignedPermIds) {
+      const container = document.getElementById('platform-permissions-groups-container');
+      container.innerHTML = '';
+      const permGrid = document.createElement('div');
+      permGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;';
+
+      perms.forEach(p => {
+        const isChecked = assignedPermIds.has(p.id) ? 'checked' : '';
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 0.8rem; cursor: pointer; color: var(--text-main); background: rgba(0,0,0,0.15); padding: 6px 10px; border-radius: 6px;';
+        label.innerHTML = `
+          <input type="checkbox" class="platform-perm-cb" value="${p.id}" ${isChecked} style="cursor:pointer; width:16px; height:16px;">
+          <span>${escapeHtml(p.name || p.code || ('Permission #' + p.id))}</span>
+        `;
+        permGrid.appendChild(label);
+      });
+
+      container.appendChild(permGrid);
+    }
+
+    document.getElementById('platform-role-permissions-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const roleId = document.getElementById('prp-role-id').value;
+      const checkboxes = document.querySelectorAll('.platform-perm-cb:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/roles/${roleId}/permissions`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(selectedIds)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Role permissions updated successfully.', 'success');
+          closeModal('platform-role-permissions-modal');
+          fetchPlatformRoles();
+        } else {
+          const err = await res.json();
+          showToast('Update Failed', err.message || 'Failed to update permissions.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    });
+
+    window.openPlatformRolePermissionsModal = openPlatformRolePermissionsModal;
+
+    // ==========================================
+    // PLATFORM USERS MANAGEMENT (PlatformUserController)
+    // ==========================================
+
+    let platformUsersPage = 0;
+    let platformUsersTotalPages = 1;
+
+    async function fetchPlatformUsers(page = 0) {
+      platformUsersPage = page;
+      const tbody = document.getElementById('platform-users-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;"><span class="loading-spinner"></span> Loading platform administrators...</td></tr>';
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/users?page=${page}&size=15&sort=createdAt,desc`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const data = await res.json();
+          tbody.innerHTML = '';
+          const users = data.content || data.items || data;
+          platformUsersTotalPages = data.totalPages || 1;
+
+          document.getElementById('platform-users-page-info').textContent = `${platformUsersPage + 1} of ${platformUsersTotalPages}`;
+          document.getElementById('btn-platform-users-prev').disabled = platformUsersPage <= 0;
+          document.getElementById('btn-platform-users-next').disabled = platformUsersPage >= platformUsersTotalPages - 1;
+
+          if (!users || users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px 0;">No platform users found.</td></tr>';
+            return;
+          }
+
+          users.forEach(u => {
+            const tr = document.createElement('tr');
+            const rolesDisp = (u.roles && u.roles.length > 0) ?
+              u.roles.map(r => `<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; font-size:0.75rem;">${escapeHtml(r.name || r.code || r)}</span>`).join(' ') :
+              '<span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #9ca3af; font-size:0.75rem;">NO ROLE</span>';
+
+            const statusBadge = (u.status === 'ACTIVE' || u.active) ?
+              '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">ACTIVE</span>' :
+              (u.status === 'SUSPENDED') ?
+              '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">SUSPENDED</span>' :
+              '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">PENDING</span>';
+
+            tr.innerHTML = `
+              <td>
+                <strong>${escapeHtml(u.fullName || ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || 'Admin #' + u.id)}</strong>
+                <code style="font-size:0.75rem; color:var(--text-muted); display:block;">ID: #${u.id}</code>
+              </td>
+              <td>
+                <div>${escapeHtml(u.email || '')}</div>
+                <span style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.phone || u.phoneNumber || '-')}</span>
+              </td>
+              <td>${rolesDisp}</td>
+              <td>${statusBadge}</td>
+              <td style="text-align: right; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditPlatformUserModal(${u.id})" title="Edit Admin">
+                  <i class="fa-solid fa-pen"></i> Edit
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="openPlatformUserRolesAssignModal(${u.id})" title="Assign Roles">
+                  <i class="fa-solid fa-user-shield"></i> Roles
+                </button>
+                ${(u.status === 'ACTIVE' || u.active) ? `
+                  <button class="btn btn-secondary btn-sm" onclick="suspendPlatformUser(${u.id})" title="Suspend User">
+                    <i class="fa-solid fa-user-slash text-warning"></i> Suspend
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary btn-sm" onclick="activatePlatformUser(${u.id})" title="Activate User">
+                    <i class="fa-solid fa-user-check text-success"></i> Activate
+                  </button>
+                `}
+                <button class="btn btn-secondary btn-sm" onclick="resendPlatformUserActivation(${u.id})" title="Resend Activation Email">
+                  <i class="fa-solid fa-envelope"></i> Link
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="openPlatformUserResetPwModal(${u.id})" title="Reset Password">
+                  <i class="fa-solid fa-key"></i> Pass
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deletePlatformUser(${u.id})" title="Delete Admin">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Failed to load platform users.</td></tr>';
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--color-danger);">Error connecting to platform users service.</td></tr>';
+      }
+    }
+
+    function changePlatformUsersPage(direction) {
+      const target = platformUsersPage + direction;
+      if (target >= 0 && target < platformUsersTotalPages) {
+        fetchPlatformUsers(target);
+      }
+    }
+
+    function openCreatePlatformUserModal() {
+      const form = document.getElementById('platform-user-form');
+      if (form) form.reset();
+      document.getElementById('puser-id').value = '';
+      document.getElementById('puser-password-group').style.display = 'block';
+      document.getElementById('puser-password').required = true;
+      document.getElementById('platform-user-modal-title').textContent = 'Create Platform Admin';
+      openModal('platform-user-modal');
+    }
+
+    async function openEditPlatformUserModal(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${id}`, { headers: getHeaders() });
+        checkResponseStatus(res);
+        if (res.ok) {
+          const u = await res.json();
+          document.getElementById('puser-id').value = u.id;
+          document.getElementById('puser-first-name').value = u.firstName || '';
+          document.getElementById('puser-last-name').value = u.lastName || '';
+          document.getElementById('puser-email').value = u.email || '';
+          document.getElementById('puser-phone').value = u.phone || u.phoneNumber || '';
+          document.getElementById('puser-password-group').style.display = 'none';
+          document.getElementById('puser-password').required = false;
+
+          document.getElementById('platform-user-modal-title').textContent = 'Edit Platform Admin';
+          openModal('platform-user-modal');
+        } else {
+          showToast('Error', 'Failed to fetch platform user details.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    document.getElementById('platform-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('puser-id').value;
+      const payload = {
+        firstName: document.getElementById('puser-first-name').value.trim(),
+        lastName: document.getElementById('puser-last-name').value.trim(),
+        email: document.getElementById('puser-email').value.trim(),
+        phone: document.getElementById('puser-phone').value.trim()
+      };
+
+      if (!id) {
+        payload.password = document.getElementById('puser-password').value;
+      }
+
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_BASE}/platform/users/${id}` : `${API_BASE}/platform/users`;
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', id ? 'Platform user updated.' : 'Platform user created.', 'success');
+          closeModal('platform-user-modal');
+          fetchPlatformUsers(platformUsersPage);
+        } else {
+          const err = await res.json();
+          showToast('Save Failed', err.message || 'Failed to save platform user.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Failed to connect to server.', 'error');
+      }
+    });
+
+    async function activatePlatformUser(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${id}/activate`, {
+          method: 'PATCH',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Platform user activated.', 'success');
+          fetchPlatformUsers(platformUsersPage);
+        } else {
+          showToast('Error', 'Failed to activate platform user.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function suspendPlatformUser(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${id}/suspend`, {
+          method: 'PATCH',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Platform user suspended.', 'success');
+          fetchPlatformUsers(platformUsersPage);
+        } else {
+          showToast('Error', 'Failed to suspend platform user.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function resendPlatformUserActivation(id) {
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${id}/resend-activation`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Activation email sent.', 'success');
+        } else {
+          showToast('Error', 'Failed to send activation email.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function deletePlatformUser(id) {
+      if (!confirm('Are you sure you want to delete this platform user account?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${id}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        checkResponseStatus(res);
+        if (res.ok || res.status === 204) {
+          showToast('Success', 'Platform user deleted.', 'success');
+          fetchPlatformUsers(platformUsersPage);
+        } else {
+          showToast('Error', 'Failed to delete platform user.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    }
+
+    async function openPlatformUserRolesAssignModal(userId) {
+      document.getElementById('pura-user-id').value = userId;
+      const container = document.getElementById('platform-roles-checkboxes-container');
+      container.innerHTML = '<span class="loading-spinner"></span> Loading available platform roles...';
+      openModal('platform-user-roles-assign-modal');
+
+      try {
+        const userRes = await fetch(`${API_BASE}/platform/users/${userId}`, { headers: getHeaders() });
+        checkResponseStatus(userRes);
+        let assignedRoleIds = new Set();
+        if (userRes.ok) {
+          const u = await userRes.json();
+          if (u.roles) {
+            u.roles.forEach(r => assignedRoleIds.add(typeof r === 'object' ? r.id : r));
+          }
+        }
+
+        const rolesRes = await fetch(`${API_BASE}/platform/roles`, { headers: getHeaders() });
+        checkResponseStatus(rolesRes);
+        if (rolesRes.ok) {
+          const roles = await rolesRes.json();
+          container.innerHTML = '';
+          if (!roles || roles.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted);">No roles configured. Create roles first.</div>';
+            return;
+          }
+
+          const grid = document.createElement('div');
+          grid.style.cssText = 'display: grid; grid-template-columns: 1fr; gap: 10px;';
+          roles.forEach(r => {
+            const isChecked = assignedRoleIds.has(r.id) ? 'checked' : '';
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 10px; font-size: 0.85rem; cursor: pointer; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);';
+            label.innerHTML = `
+              <input type="checkbox" class="puser-role-cb" value="${r.id}" ${isChecked} style="width:18px; height:18px; cursor:pointer;">
+              <div>
+                <strong>${escapeHtml(r.name || '')}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">${escapeHtml(r.description || '')}</span>
+              </div>
+            `;
+            grid.appendChild(label);
+          });
+          container.appendChild(grid);
+        } else {
+          container.innerHTML = '<div style="color:var(--color-danger);">Failed to fetch roles.</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="color:var(--color-danger);">Connection error.</div>';
+      }
+    }
+
+    document.getElementById('platform-user-roles-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userId = document.getElementById('pura-user-id').value;
+      const checkboxes = document.querySelectorAll('.puser-role-cb:checked');
+      const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+      if (selectedIds.length === 0) {
+        showToast('Selection Required', 'At least one role must be selected.', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${userId}/roles`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(selectedIds)
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'User roles updated.', 'success');
+          closeModal('platform-user-roles-assign-modal');
+          fetchPlatformUsers(platformUsersPage);
+        } else {
+          const err = await res.json();
+          showToast('Update Failed', err.message || 'Failed to update roles.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    });
+
+    function openPlatformUserResetPwModal(userId) {
+      document.getElementById('purp-user-id').value = userId;
+      document.getElementById('purp-new-password').value = '';
+      openModal('platform-user-reset-pw-modal');
+    }
+
+    document.getElementById('platform-user-reset-pw-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userId = document.getElementById('purp-user-id').value;
+      const newPassword = document.getElementById('purp-new-password').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/platform/users/${userId}/reset-password`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ newPassword })
+        });
+        checkResponseStatus(res);
+        if (res.ok) {
+          showToast('Success', 'Admin password reset successfully.', 'success');
+          closeModal('platform-user-reset-pw-modal');
+        } else {
+          const err = await res.json();
+          showToast('Reset Failed', err.message || 'Failed to reset password.', 'error');
+        }
+      } catch (err) {
+        showToast('Error', 'Connection error.', 'error');
+      }
+    });
+
+    // ==========================================
     // EXPOSE GLOBALLY
     // ==========================================
 
@@ -6028,9 +7594,16 @@
     window.deactivateTenant = deactivateTenant;
     window.openOverrideModal = openOverrideModal;
     window.deleteTenant = deleteTenant;
+    window.fetchPlans = fetchPlans;
+    window.filterPlans = filterPlans;
     window.openCreatePlanModal = openCreatePlanModal;
     window.openEditPlanModal = openEditPlanModal;
+    window.togglePlanActive = togglePlanActive;
     window.deleteSubscriptionPlan = deleteSubscriptionPlan;
+    window.restoreSubscriptionPlan = restoreSubscriptionPlan;
+    window.openPlanFeatureModal = openPlanFeatureModal;
+    window.removePlanFeature = removePlanFeature;
+    window.viewPlanHistory = viewPlanHistory;
     window.viewTicketDetails = viewTicketDetails;
     window.handleNotificationClick = handleNotificationClick;
     window.markNotificationRead = markNotificationRead;
@@ -6042,6 +7615,23 @@
     window.deletePtConfig = deletePtConfig;
     window.fetchPlatformApiLogs = fetchPlatformApiLogs;
     window.changePlatformApiLogsPage = changePlatformApiLogsPage;
+    window.fetchPlatformRoles = fetchPlatformRoles;
+    window.openCreatePlatformRoleModal = openCreatePlatformRoleModal;
+    window.openEditPlatformRoleModal = openEditPlatformRoleModal;
+    window.openPlatformRoleUsersModal = openPlatformRoleUsersModal;
+    window.removeRoleFromPlatformUser = removeRoleFromPlatformUser;
+    window.openPlatformRoleDeletePreviewModal = openPlatformRoleDeletePreviewModal;
+    window.confirmDeletePlatformRole = confirmDeletePlatformRole;
+    window.fetchPlatformUsers = fetchPlatformUsers;
+    window.changePlatformUsersPage = changePlatformUsersPage;
+    window.openCreatePlatformUserModal = openCreatePlatformUserModal;
+    window.openEditPlatformUserModal = openEditPlatformUserModal;
+    window.activatePlatformUser = activatePlatformUser;
+    window.suspendPlatformUser = suspendPlatformUser;
+    window.resendPlatformUserActivation = resendPlatformUserActivation;
+    window.deletePlatformUser = deletePlatformUser;
+    window.openPlatformUserRolesAssignModal = openPlatformUserRolesAssignModal;
+    window.openPlatformUserResetPwModal = openPlatformUserResetPwModal;
     window.updateTrendPeriod = updateTrendPeriod;
     window.simulateFlushCache = simulateFlushCache;
     window.simulateTestEmail = simulateTestEmail;
