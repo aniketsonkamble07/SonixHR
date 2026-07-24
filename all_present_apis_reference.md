@@ -9893,4 +9893,84 @@ false
 - **Request Body**: None
 - **Response Type**: `Page<ApiHitLog>`
 
+### POST `/api/tenant/auth/change-password`
+- **Handler Method**: `changePassword`
+- **Controller**: `TenantAuthController`
+- **Description**: Update user password during first-time login setup or password change workflow
+- **Security**: Bearer token / `isAuthenticated()`
+- **Request Body Type**: `PasswordChangeRequest`
+#### Request JSON Example:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "oldPassword": "CurrentPassword@123",
+  "newPassword": "NewPassword@123",
+  "confirmPassword": "NewPassword@123"
+}
+```
+- **Response Type**: `ResponseEntity<LoginResponse>`
+
+---
+
+### POST `/api/platform/subscription-plans`
+- **Handler Method**: `createSubscriptionPlan`
+- **Controller**: `PlatformAdminSubscriptionController`
+- **Description**: Create a new platform subscription plan
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_PRICING_PLANS')")`
+- **Request Body Type**: `SubscriptionPlanDTO`
+#### Request JSON Example:
+```json
+{
+  "name": "Growth Plan",
+  "code": "GROWTH",
+  "description": "Comprehensive HR plan for medium teams",
+  "price": 149.00,
+  "currency": "USD",
+  "billingCycle": "MONTHLY",
+  "maxEmployees": 100,
+  "maxDepartments": 20,
+  "maxStorageMb": 10000,
+  "features": ["ATTENDANCE", "LEAVE", "PAYROLL", "REPORTS"],
+  "active": true
+}
+```
+- **Response Type**: `ResponseEntity<SubscriptionPlanDTO>`
+
+---
+
+### POST `/api/platform/roles`
+- **Handler Method**: `createPlatformRole`
+- **Controller**: `PlatformRoleController`
+- **Description**: Create a new platform admin role with permissions
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_PLATFORM_ROLES')")`
+- **Request Body Type**: `PlatformRoleCreateRequest`
+#### Request JSON Example:
+```json
+{
+  "name": "ROLE_SUPPORT_ADMIN",
+  "description": "Platform support administrator",
+  "permissionIds": [1, 2, 5, 8]
+}
+```
+- **Response Type**: `ResponseEntity<PlatformRoleResponse>`
+
+---
+
+### POST `/api/platform/users`
+- **Handler Method**: `createPlatformUser`
+- **Controller**: `PlatformUserController`
+- **Description**: Create a new platform administrator user account
+- **Security**: `@PreAuthorize("hasAuthority('MANAGE_PLATFORM_USERS')")`
+- **Request Body Type**: `PlatformUserCreateRequest`
+#### Request JSON Example:
+```json
+{
+  "fullName": "Support Admin",
+  "email": "support@sonixhr.com",
+  "password": "SecurePassword@123",
+  "roleIds": [1, 2]
+}
+```
+- **Response Type**: `ResponseEntity<PlatformUserResponse>`
+
 ---
